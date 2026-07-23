@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle } from "../components/ui";
+import { PatternLock } from "../components/PatternLock";
 import { uid, nowISO, brl, whatsappLink, formatDateTime, codigoOS } from "../lib/format";
 import { totalOS, totalPecas, custoPecas, lucroOS } from "../lib/calc";
 import {
@@ -426,16 +427,17 @@ const OSForm: React.FC<{
           <legend className="flex items-center gap-1 px-2 text-sm font-bold text-amber-700">
             <KeyRound size={15} /> Acesso / Senhas (confidencial)
           </legend>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Senha / PIN">
               <input className="input" value={os.senhaAparelho} onChange={(e) => setOs({ ...os, senhaAparelho: e.target.value })} />
-            </Field>
-            <Field label="Padrão de desbloqueio">
-              <input className="input" placeholder="ex: 1-2-3-6-9" value={os.padraoDesbloqueio} onChange={(e) => setOs({ ...os, padraoDesbloqueio: e.target.value })} />
             </Field>
             <Field label="Conta vinculada (Google/Apple)">
               <input className="input" value={os.contaVinculada} onChange={(e) => setOs({ ...os, contaVinculada: e.target.value })} />
             </Field>
+          </div>
+          <div className="mt-4">
+            <label className="label">Padrão de desbloqueio (desenhe tocando nos pontos)</label>
+            <PatternLock value={os.padraoDesbloqueio} onChange={(v) => setOs({ ...os, padraoDesbloqueio: v })} />
           </div>
         </fieldset>
 
@@ -646,6 +648,11 @@ const OSDetalhe: React.FC<{
             <span>Padrão: <b>{os.padraoDesbloqueio || "—"}</b></span>
             <span>Conta: <b>{os.contaVinculada || "—"}</b></span>
           </div>
+          {os.padraoDesbloqueio && os.padraoDesbloqueio.includes("-") && (
+            <div className="mt-3">
+              <PatternLock value={os.padraoDesbloqueio} readOnly size={120} />
+            </div>
+          )}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
