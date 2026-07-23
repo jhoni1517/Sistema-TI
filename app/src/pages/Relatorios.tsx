@@ -14,19 +14,42 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { TrendingUp, DollarSign, Percent, Wrench } from "lucide-react";
+import { TrendingUp, DollarSign, Percent, Wrench, Users } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { SectionTitle } from "../components/ui";
 import { brl, monthKey } from "../lib/format";
-import { receitaBruta, totalDespesas, custoProdutos, lucroLiquido } from "../lib/calc";
+import { receitaBruta, totalDespesas, custoProdutos, lucroLiquido, totalOS } from "../lib/calc";
+import { accentHex, isDark } from "../lib/themes";
 import { OS_STATUS_META, type OSStatus } from "../lib/types";
 
-const CORES = ["#2563eb", "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4", "#ec4899", "#64748b"];
 const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
 export const Relatorios: React.FC = () => {
-  const { movimentos, ordens } = useApp();
+  const { movimentos, ordens, config } = useApp();
   const [meses, setMeses] = useState(6);
+
+  const acc = accentHex(config.corDestaque);
+  const dark = isDark(config.tema || "claro");
+  const gridColor = dark ? "#26314a" : "#e2e8f0";
+  const tickColor = dark ? "#94a3b8" : "#475569";
+  const CORES = [acc, "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4", "#ec4899", "#64748b"];
+
+  // Comissão por técnico (baseada nas OS entregues)
+  const porTecnico = useMemo(() => {
+    const pct = (config.comissaoPadrao || 0) / 100;
+    const map: Record<string, { qtd: number; total: number }> = {};
+    ordens
+      .filter((o) => o.status === "entregue")
+      .forEach((o) => {
+        const nome = (o.tecnico || "").trim() || "Sem técnico";
+        if (!map[nome]) map[nome] = { qtd: 0, total: 0 };
+        map[nome].qtd += 1;
+        map[nome].total += totalOS(o);
+      });
+    return Object.entries(map)
+      .map(([nome, v]) => ({ nome, qtd: v.qtd, total: v.total, comissao: v.total * pct }))
+      .sort((a, b) => b.total - a.total);
+  }, [ordens, config.comissaoPadrao]);
 
   // Série mensal
   const serie = useMemo(() => {
@@ -106,12 +129,12 @@ export const Relatorios: React.FC = () => {
         <h3 className="mb-4 font-bold text-slate-700">Evolução do faturamento e lucro</h3>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={serie}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-            <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-            <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `R$${v}`} width={70} />
+            <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+            <XAxis dataKey="mes" tick={{ fontSize: 12, fill: tickColor }} />
+            <YAxis tick={{ fontSize: 12, fill: tickColor }} tickFormatter={(v) => `R$${v}`} width={70} />
             <Tooltip formatter={(v) => brl(Number(v))} />
             <Legend />
-            <Line type="monotone" dataKey="receita" name="Receita" stroke="#2563eb" strokeWidth={2.5} dot={{ r: 3 }} />
+            <Line type="monotone" dataKey="receita" name="Receita" stroke={acc} strokeWidth={2.5} dot={{ r: 3 }} />
             <Line type="monotone" dataKey="lucroBruto" name="Lucro bruto" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} />
             <Line type="monotone" dataKey="lucroLiquido" name="Lucro líquido" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} />
           </LineChart>
@@ -124,12 +147,12 @@ export const Relatorios: React.FC = () => {
           <h3 className="mb-4 font-bold text-slate-700">Receita x Despesas por mês</h3>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={serie}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-              <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} width={60} />
+              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+              <XAxis dataKey="mes" tick={{ fontSize: 12, fill: tickColor }} />
+              <YAxis tick={{ fontSize: 12, fill: tickColor }} width={60} />
               <Tooltip formatter={(v) => brl(Number(v))} />
               <Legend />
-              <Bar dataKey="receita" name="Receita" fill="#2563eb" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="receita" name="Receita" fill={acc} radius={[4, 4, 0, 0]} />
               <Bar dataKey="despesa" name="Despesas" fill="#ef4444" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -162,13 +185,45 @@ export const Relatorios: React.FC = () => {
           ) : (
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={porForma} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis type="number" tick={{ fontSize: 12 }} tickFormatter={(v) => `R$${v}`} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} width={90} className="capitalize" />
+                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
+                <XAxis type="number" tick={{ fontSize: 12, fill: tickColor }} tickFormatter={(v) => `R$${v}`} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: tickColor }} width={90} className="capitalize" />
                 <Tooltip formatter={(v) => brl(Number(v))} />
                 <Bar dataKey="value" name="Total" fill="#10b981" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* Comissão por técnico */}
+        <div className="card lg:col-span-2">
+          <h3 className="mb-1 flex items-center gap-2 font-bold text-slate-700"><Users size={16} /> Comissão por técnico</h3>
+          <p className="mb-4 text-xs text-slate-400">Baseado nas OS entregues · comissão de {config.comissaoPadrao || 0}% (ajuste em Configurações)</p>
+          {porTecnico.length === 0 ? (
+            <p className="py-8 text-center text-sm text-slate-400">Nenhuma OS entregue ainda.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
+                  <tr>
+                    <th className="px-3 py-2">Técnico</th>
+                    <th className="px-3 py-2 text-center">OS entregues</th>
+                    <th className="px-3 py-2 text-right">Total produzido</th>
+                    <th className="px-3 py-2 text-right">Comissão</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {porTecnico.map((t) => (
+                    <tr key={t.nome} className="border-b border-slate-100">
+                      <td className="px-3 py-2 font-semibold text-slate-800">{t.nome}</td>
+                      <td className="px-3 py-2 text-center text-slate-600">{t.qtd}</td>
+                      <td className="px-3 py-2 text-right text-slate-700">{brl(t.total)}</td>
+                      <td className="px-3 py-2 text-right font-bold text-emerald-600">{brl(t.comissao)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </div>

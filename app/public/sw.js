@@ -1,5 +1,5 @@
 // Service worker simples: cache em tempo de execução (offline após o 1º acesso)
-const CACHE = "sistema-ti-v1";
+const CACHE = "sistema-ti-v2";
 
 self.addEventListener("install", (e) => {
   self.skipWaiting();

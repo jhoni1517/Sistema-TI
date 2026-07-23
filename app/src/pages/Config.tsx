@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { Store, KeyRound, Cloud, Download, Upload, Save, Database } from "lucide-react";
+import { Store, KeyRound, Cloud, Download, Upload, Save, Database, Palette, Sun, Moon, Monitor, Percent } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Field, SectionTitle } from "../components/ui";
+import { ACCENTS, ACCENT_KEYS } from "../lib/themes";
 import type { Config as ConfigType } from "../lib/types";
 
 export const Config: React.FC = () => {
@@ -13,6 +14,13 @@ export const Config: React.FC = () => {
     saveConfig(form);
     setSalvo(true);
     setTimeout(() => setSalvo(false), 2500);
+  };
+
+  // Aparência aplica na hora (pré-visualização ao vivo)
+  const setAparencia = (patch: Partial<ConfigType>) => {
+    const novo = { ...config, ...form, ...patch };
+    setForm(novo);
+    saveConfig(novo);
   };
 
   const exportar = () => {
@@ -83,9 +91,62 @@ export const Config: React.FC = () => {
       {/* Segurança */}
       <div className="card mb-5">
         <h3 className="mb-4 flex items-center gap-2 font-bold text-slate-700"><KeyRound size={18} /> Senha de acesso</h3>
-        <Field label="Senha do sistema" className="max-w-xs">
-          <input className="input" value={form.senhaAcesso} onChange={(e) => setForm({ ...form, senhaAcesso: e.target.value })} />
-        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Senha do sistema">
+            <input className="input" value={form.senhaAcesso} onChange={(e) => setForm({ ...form, senhaAcesso: e.target.value })} />
+          </Field>
+          <Field label="Comissão padrão do técnico (%)">
+            <input type="number" className="input" value={form.comissaoPadrao ?? 0} onChange={(e) => setForm({ ...form, comissaoPadrao: +e.target.value })} />
+          </Field>
+        </div>
+      </div>
+
+      {/* Aparência */}
+      <div className="card mb-5">
+        <h3 className="mb-4 flex items-center gap-2 font-bold text-slate-700"><Palette size={18} /> Aparência</h3>
+
+        <label className="label">Tema</label>
+        <div className="mb-5 grid max-w-md grid-cols-3 gap-2">
+          {([
+            { k: "claro", nome: "Claro", icon: <Sun size={16} /> },
+            { k: "escuro", nome: "Escuro", icon: <Moon size={16} /> },
+            { k: "auto", nome: "Automático", icon: <Monitor size={16} /> },
+          ] as const).map((t) => (
+            <button
+              key={t.k}
+              onClick={() => setAparencia({ tema: t.k })}
+              className={`flex items-center justify-center gap-2 rounded-lg border px-3 py-2.5 text-sm font-semibold transition ${
+                (config.tema || "claro") === t.k
+                  ? "border-brand-500 bg-brand-50 text-brand-700"
+                  : "border-slate-200 text-slate-600 hover:bg-slate-50"
+              }`}
+            >
+              {t.icon} {t.nome}
+            </button>
+          ))}
+        </div>
+
+        <label className="label">Cor de destaque</label>
+        <div className="flex flex-wrap gap-3">
+          {ACCENT_KEYS.map((key) => {
+            const a = ACCENTS[key];
+            const ativo = (config.corDestaque || "azul") === key;
+            return (
+              <button
+                key={key}
+                onClick={() => setAparencia({ corDestaque: key })}
+                title={a.nome}
+                className={`flex h-11 w-11 items-center justify-center rounded-full ring-2 ring-offset-2 transition ${
+                  ativo ? "ring-slate-400 scale-110" : "ring-transparent hover:scale-105"
+                }`}
+                style={{ backgroundColor: a.hex }}
+              >
+                {ativo && <span className="font-bold text-white">✓</span>}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-3 flex items-center gap-1 text-xs text-slate-400"><Percent size={12} /> As mudanças de tema aparecem na hora e valem para este dispositivo.</p>
       </div>
 
       {/* Nuvem */}
