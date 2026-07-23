@@ -79,6 +79,18 @@ create table if not exists sessoes (
   observacoes text
 );
 
+create table if not exists fiados (
+  id text primary key,
+  "clienteId" text,
+  descricao text,
+  "osId" text,
+  valor numeric default 0,
+  pagamentos jsonb default '[]'::jsonb,
+  quitado boolean default false,
+  vencimento text,
+  "criadoEm" text
+);
+
 -- ------------------------------------------------------------
 -- Segurança (RLS)
 -- Como o app usa um login único próprio (não o Auth do Supabase),
@@ -90,11 +102,12 @@ alter table produtos  enable row level security;
 alter table ordens    enable row level security;
 alter table movimentos enable row level security;
 alter table sessoes   enable row level security;
+alter table fiados    enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['clientes','produtos','ordens','movimentos','sessoes']
+  foreach t in array array['clientes','produtos','ordens','movimentos','sessoes','fiados']
   loop
     execute format('drop policy if exists "acesso_total" on %I;', t);
     execute format('create policy "acesso_total" on %I for all using (true) with check (true);', t);

@@ -12,6 +12,8 @@ import {
   KeyRound,
   Trash,
   DollarSign,
+  HandCoins,
+  Link as LinkIcon,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle } from "../components/ui";
@@ -67,7 +69,7 @@ const novaOS = (numero: number): OrdemServico => ({
 });
 
 export const OrdensServico: React.FC = () => {
-  const { ordens, clientes, produtos, config, saveOrdem, removeOrdem, saveMovimento, saveProduto } = useApp();
+  const { ordens, clientes, produtos, config, saveOrdem, removeOrdem, saveMovimento, saveProduto, saveFiado } = useApp();
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<OSStatus | "todas" | "abertas">("abertas");
   const [editando, setEditando] = useState<OrdemServico | null>(null);
@@ -119,6 +121,27 @@ export const OrdensServico: React.FC = () => {
     };
     await saveOrdem(atualizado);
     setDetalhe(atualizado);
+  };
+
+  const baixarEstoqueEEntregar = async (o: OrdemServico) => {
+    for (const p of o.pecas) {
+      if (p.produtoId) {
+        const prod = produtos.find((x) => x.id === p.produtoId);
+        if (prod) {
+          await saveProduto({
+            ...prod,
+            quantidade: Math.max(0, prod.quantidade - p.quantidade),
+          });
+        }
+      }
+    }
+    await saveOrdem({
+      ...o,
+      status: "entregue",
+      entregueEm: nowISO(),
+      atualizadoEm: nowISO(),
+      historico: [...o.historico, { data: nowISO(), status: "entregue" }],
+    });
   };
 
   const avisarCliente = (o: OrdemServico) => {
@@ -263,23 +286,24 @@ export const OrdensServico: React.FC = () => {
               data: nowISO(),
             };
             await saveMovimento(mov);
-            // baixa de estoque das peças vinculadas
-            for (const p of detalhe.pecas) {
-              if (p.produtoId) {
-                const prod = produtos.find((x) => x.id === p.produtoId);
-                if (prod) {
-                  await saveProduto({
-                    ...prod,
-                    quantidade: Math.max(0, prod.quantidade - p.quantidade),
-                  });
-                }
-              }
-            }
-            await mudarStatus(detalhe, "entregue");
-            const done = { ...detalhe, status: "entregue" as const, entregueEm: nowISO() };
-            await saveOrdem(done);
+            await baixarEstoqueEEntregar(detalhe);
             setDetalhe(null);
             alert("Pagamento registrado no caixa e OS marcada como entregue!");
+          }}
+          onFiado={async () => {
+            await saveFiado({
+              id: uid(),
+              clienteId: detalhe.clienteId,
+              descricao: `${codigoOS(detalhe.numero)} · ${detalhe.marca} ${detalhe.modelo}`,
+              osId: detalhe.id,
+              valor: totalOS(detalhe),
+              pagamentos: [],
+              quitado: false,
+              criadoEm: nowISO(),
+            });
+            await baixarEstoqueEEntregar(detalhe);
+            setDetalhe(null);
+            alert("OS entregue e lançada em 'A Receber' (fiado)!");
           }}
         />
       )}
@@ -528,8 +552,20 @@ const OSDetalhe: React.FC<{
   onEditar: () => void;
   onExcluir: () => void;
   onReceber: (forma: FormaPagamento) => void;
-}> = ({ os, clienteNome, cliente, config, onClose, onStatus, onAvisar, onEditar, onExcluir, onReceber }) => {
+  onFiado: () => void;
+}> = ({ os, clienteNome, cliente, config, onClose, onStatus, onAvisar, onEditar, onExcluir, onReceber, onFiado }) => {
   const [forma, setForma] = useState<FormaPagamento>("dinheiro");
+
+  const linkRastreio = () => {
+    const url = `${window.location.origin}${window.location.pathname}#/rastreio/${codigoOS(os.numero)}`;
+    if (cliente?.telefone) {
+      const msg = `Acompanhe o status do seu aparelho na ${config.nomeLoja}:\n${url}`;
+      window.open(whatsappLink(cliente.telefone, msg), "_blank");
+    } else {
+      navigator.clipboard?.writeText(url);
+      alert("Link de acompanhamento copiado:\n" + url);
+    }
+  };
   return (
     <Modal
       open
@@ -543,7 +579,8 @@ const OSDetalhe: React.FC<{
             <button className="btn-secondary" onClick={() => window.print()}><Printer size={16} /> Imprimir</button>
           </div>
           <div className="flex gap-2">
-            <button className="btn-success" onClick={onAvisar}><MessageCircle size={16} /> Avisar cliente</button>
+            <button className="btn-secondary" onClick={linkRastreio}><LinkIcon size={16} /> Link p/ cliente</button>
+            <button className="btn-success" onClick={onAvisar}><MessageCircle size={16} /> Avisar</button>
             <button className="btn-primary" onClick={onEditar}><Pencil size={16} /> Editar</button>
           </div>
         </div>
@@ -657,7 +694,10 @@ const OSDetalhe: React.FC<{
               <option value="transferencia">Transferência</option>
             </select>
             <button className="btn-success !py-1.5 text-sm" onClick={() => onReceber(forma)}>
-              Registrar {brl(totalOS(os))}
+              Receber {brl(totalOS(os))}
+            </button>
+            <button className="btn-secondary !py-1.5 text-sm" onClick={onFiado} title="Entregar e deixar para pagar depois">
+              <HandCoins size={15} /> Fiado
             </button>
           </div>
         )}

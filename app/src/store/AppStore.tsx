@@ -12,6 +12,7 @@ import type {
   Produto,
   MovimentoCaixa,
   SessaoCaixa,
+  Fiado,
   Config,
 } from "../lib/types";
 
@@ -31,6 +32,7 @@ interface AppState {
   produtos: Produto[];
   movimentos: MovimentoCaixa[];
   sessoes: SessaoCaixa[];
+  fiados: Fiado[];
   config: Config;
   // ações
   reload: () => Promise<void>;
@@ -43,6 +45,8 @@ interface AppState {
   saveMovimento: (m: MovimentoCaixa) => Promise<void>;
   removeMovimento: (id: string) => Promise<void>;
   saveSessao: (s: SessaoCaixa) => Promise<void>;
+  saveFiado: (f: Fiado) => Promise<void>;
+  removeFiado: (id: string) => Promise<void>;
   saveConfig: (c: Config) => void;
 }
 
@@ -73,23 +77,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [produtos, setProdutos] = useState<Produto[]>([]);
   const [movimentos, setMovimentos] = useState<MovimentoCaixa[]>([]);
   const [sessoes, setSessoes] = useState<SessaoCaixa[]>([]);
+  const [fiados, setFiados] = useState<Fiado[]>([]);
   const [config, setConfig] = useState<Config>(loadConfig());
 
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [c, o, p, m, s] = await Promise.all([
+      const [c, o, p, m, s, f] = await Promise.all([
         db.clientes.all(),
         db.ordens.all(),
         db.produtos.all(),
         db.movimentos.all(),
         db.sessoes.all(),
+        db.fiados.all(),
       ]);
       setClientes(c);
       setOrdens(o);
       setProdutos(p);
       setMovimentos(m);
       setSessoes(s);
+      setFiados(f);
     } catch (e) {
       console.error("Erro ao carregar dados:", e);
     } finally {
@@ -182,6 +189,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     });
   };
 
+  const saveFiado = async (f: Fiado) => {
+    await db.fiados.save(f);
+    setFiados((prev) => {
+      const i = prev.findIndex((x) => x.id === f.id);
+      if (i >= 0) {
+        const n = [...prev];
+        n[i] = f;
+        return n;
+      }
+      return [...prev, f];
+    });
+  };
+  const removeFiado = async (id: string) => {
+    await db.fiados.remove(id);
+    setFiados((prev) => prev.filter((x) => x.id !== id));
+  };
+
   const saveConfig = (c: Config) => {
     localStorage.setItem("sistema-ti:config", JSON.stringify(c));
     setConfig(c);
@@ -195,6 +219,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     produtos,
     movimentos,
     sessoes,
+    fiados,
     config,
     reload,
     saveCliente,
@@ -206,6 +231,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     saveMovimento,
     removeMovimento,
     saveSessao,
+    saveFiado,
+    removeFiado,
     saveConfig,
   };
 

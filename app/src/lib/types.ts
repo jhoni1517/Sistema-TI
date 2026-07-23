@@ -125,6 +125,24 @@ export interface SessaoCaixa {
   observacoes?: string;
 }
 
+export interface PagamentoFiado {
+  data: string;
+  valor: number;
+  formaPagamento: FormaPagamento;
+}
+
+export interface Fiado {
+  id: ID;
+  clienteId: ID;
+  descricao: string;
+  osId?: ID;
+  valor: number; // valor total devido
+  pagamentos: PagamentoFiado[];
+  quitado: boolean;
+  vencimento?: string;
+  criadoEm: string;
+}
+
 export interface Config {
   nomeLoja: string;
   telefoneLoja: string;

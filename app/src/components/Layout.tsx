@@ -6,6 +6,7 @@ import {
   Users,
   Package,
   Wallet,
+  HandCoins,
   BarChart3,
   Settings,
   Menu,
@@ -21,6 +22,7 @@ const nav = [
   { to: "/clientes", label: "Clientes", icon: Users },
   { to: "/estoque", label: "Estoque", icon: Package },
   { to: "/caixa", label: "Caixa", icon: Wallet },
+  { to: "/a-receber", label: "A Receber (Fiado)", icon: HandCoins },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
   { to: "/config", label: "Configurações", icon: Settings },
 ];

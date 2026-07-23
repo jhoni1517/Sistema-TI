@@ -1,4 +1,4 @@
-import type { OrdemServico, MovimentoCaixa } from "./types";
+import type { OrdemServico, MovimentoCaixa, Fiado } from "./types";
 
 export const totalPecas = (o: OrdemServico): number =>
   o.pecas.reduce((s, p) => s + p.precoUnit * p.quantidade, 0);
@@ -30,6 +30,14 @@ export const custoProdutos = (movs: MovimentoCaixa[]): number =>
 /** Lucro líquido = receita - custo dos produtos - despesas */
 export const lucroLiquido = (movs: MovimentoCaixa[]): number =>
   receitaBruta(movs) - custoProdutos(movs) - totalDespesas(movs);
+
+/** Total já pago de um fiado */
+export const pagoFiado = (f: Fiado): number =>
+  f.pagamentos.reduce((s, p) => s + p.valor, 0);
+
+/** Saldo devedor de um fiado */
+export const saldoFiado = (f: Fiado): number =>
+  Math.max(0, f.valor - pagoFiado(f));
 
 /** Saldo em caixa considerando abertura */
 export const saldoCaixa = (

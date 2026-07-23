@@ -8,10 +8,12 @@ import { OrdensServico } from "./pages/OrdensServico";
 import { Clientes } from "./pages/Clientes";
 import { Estoque } from "./pages/Estoque";
 import { Caixa } from "./pages/Caixa";
+import { AReceber } from "./pages/AReceber";
 import { Relatorios } from "./pages/Relatorios";
 import { Config } from "./pages/Config";
+import { Rastreio } from "./pages/Rastreio";
 
-const Shell: React.FC = () => {
+const AreaProtegida: React.FC = () => {
   const { loading } = useApp();
   const [logado, setLogado] = useState(
     () => sessionStorage.getItem("sistema-ti:auth") === "1"
@@ -37,25 +39,32 @@ const Shell: React.FC = () => {
   if (!logado) return <Login onLogin={login} />;
 
   return (
-    <HashRouter>
-      <Routes>
-        <Route element={<Layout onLogout={logout} />}>
-          <Route index element={<Dashboard />} />
-          <Route path="ordens" element={<OrdensServico />} />
-          <Route path="clientes" element={<Clientes />} />
-          <Route path="estoque" element={<Estoque />} />
-          <Route path="caixa" element={<Caixa />} />
-          <Route path="relatorios" element={<Relatorios />} />
-          <Route path="config" element={<Config />} />
-        </Route>
-      </Routes>
-    </HashRouter>
+    <Routes>
+      <Route element={<Layout onLogout={logout} />}>
+        <Route index element={<Dashboard />} />
+        <Route path="ordens" element={<OrdensServico />} />
+        <Route path="clientes" element={<Clientes />} />
+        <Route path="estoque" element={<Estoque />} />
+        <Route path="caixa" element={<Caixa />} />
+        <Route path="a-receber" element={<AReceber />} />
+        <Route path="relatorios" element={<Relatorios />} />
+        <Route path="config" element={<Config />} />
+      </Route>
+    </Routes>
   );
 };
 
 const App: React.FC = () => (
   <AppProvider>
-    <Shell />
+    <HashRouter>
+      <Routes>
+        {/* Página pública de acompanhamento (sem login) */}
+        <Route path="/rastreio" element={<Rastreio />} />
+        <Route path="/rastreio/:codigo" element={<Rastreio />} />
+        {/* Todo o restante é área protegida */}
+        <Route path="/*" element={<AreaProtegida />} />
+      </Routes>
+    </HashRouter>
   </AppProvider>
 );
 
