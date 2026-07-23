@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import QRCode from "qrcode";
 import {
   Plus,
   Search,
@@ -556,8 +557,9 @@ const OSDetalhe: React.FC<{
 }> = ({ os, clienteNome, cliente, config, onClose, onStatus, onAvisar, onEditar, onExcluir, onReceber, onFiado }) => {
   const [forma, setForma] = useState<FormaPagamento>("dinheiro");
 
+  const trackingUrl = `${window.location.origin}${window.location.pathname}#/rastreio/${codigoOS(os.numero)}`;
   const linkRastreio = () => {
-    const url = `${window.location.origin}${window.location.pathname}#/rastreio/${codigoOS(os.numero)}`;
+    const url = trackingUrl;
     if (cliente?.telefone) {
       const msg = `Acompanhe o status do seu aparelho na ${config.nomeLoja}:\n${url}`;
       window.open(whatsappLink(cliente.telefone, msg), "_blank");
@@ -596,6 +598,18 @@ const OSDetalhe: React.FC<{
         <div className="flex items-center justify-between">
           <span className={`badge ${OS_STATUS_META[os.status].color}`}>{OS_STATUS_META[os.status].label}</span>
           <span className="text-sm text-slate-400">Aberta em {formatDateTime(os.criadoEm)}</span>
+        </div>
+
+        {/* Etiqueta com QR Code de acompanhamento */}
+        <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
+          <div className="shrink-0 rounded bg-white p-1.5 ring-1 ring-slate-200">
+            <QRCodeImg text={trackingUrl} size={84} />
+          </div>
+          <div className="text-xs text-slate-500">
+            <p className="text-sm font-bold text-slate-700">Etiqueta de acompanhamento</p>
+            <p>Cole no aparelho — o cliente escaneia e vê o status da OS.</p>
+            <p className="mt-1 font-mono font-bold text-slate-600">{codigoOS(os.numero)}</p>
+          </div>
         </div>
 
         {/* Alterar status */}
@@ -704,6 +718,14 @@ const OSDetalhe: React.FC<{
       </div>
     </Modal>
   );
+};
+
+const QRCodeImg: React.FC<{ text: string; size?: number }> = ({ text, size = 84 }) => {
+  const [src, setSrc] = useState("");
+  useEffect(() => {
+    QRCode.toDataURL(text, { width: size, margin: 1 }).then(setSrc).catch(() => setSrc(""));
+  }, [text, size]);
+  return src ? <img src={src} width={size} height={size} alt="QR de acompanhamento" className="rounded" /> : null;
 };
 
 const Info: React.FC<{ label: string; value: string }> = ({ label, value }) => (

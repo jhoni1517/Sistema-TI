@@ -151,4 +151,8 @@ export interface Config {
   senhaAcesso: string; // login único
   supabaseUrl?: string;
   supabaseKey?: string;
+  // Aparência
+  tema?: "auto" | "claro" | "escuro";
+  corDestaque?: string; // chave em ACCENTS (azul, esmeralda, ...)
+  comissaoPadrao?: number; // % de comissão padrão por técnico
 }

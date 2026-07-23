@@ -4,6 +4,21 @@
 
 :root {
   color-scheme: light;
+  /* Cor de destaque padrão (Azul) — sobrescrita em tempo real pelo tema */
+  --brand-50: 239 246 255;
+  --brand-100: 219 234 254;
+  --brand-200: 191 219 254;
+  --brand-300: 147 197 253;
+  --brand-400: 96 165 250;
+  --brand-500: 59 130 246;
+  --brand-600: 37 99 235;
+  --brand-700: 29 78 216;
+  --brand-800: 30 64 175;
+  --brand-900: 30 58 138;
+}
+
+:root.dark {
+  color-scheme: dark;
 }
 
 html,
@@ -18,6 +33,12 @@ body {
   -webkit-font-smoothing: antialiased;
   background-color: #f1f5f9;
   color: #0f172a;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.dark body {
+  background-color: #0b1220;
+  color: #e2e8f0;
 }
 
 @layer components {
@@ -53,6 +74,42 @@ body {
   }
 }
 
+/* ====== MODO ESCURO (sobrescreve utilitários fixos com segurança) ====== */
+/* Superfícies */
+.dark .bg-white { background-color: #131c2e; }
+.dark .bg-white\/80 { background-color: rgba(19, 28, 46, 0.8); }
+.dark .bg-slate-50 { background-color: #0f1728; }
+.dark .bg-slate-100 { background-color: #26314a; }
+.dark .card { background-color: #131c2e; }
+.dark .input {
+  background-color: #0f1728;
+  border-color: #334155;
+  color: #e2e8f0;
+}
+.dark .btn-secondary {
+  background-color: #131c2e;
+  color: #cbd5e1;
+  --tw-ring-color: #334155;
+}
+/* Textos neutros */
+.dark .text-slate-900 { color: #f1f5f9; }
+.dark .text-slate-800 { color: #e2e8f0; }
+.dark .text-slate-700 { color: #cbd5e1; }
+.dark .text-slate-600 { color: #cbd5e1; }
+.dark .text-slate-500 { color: #94a3b8; }
+/* Bordas / divisórias / rings */
+.dark .border-slate-200 { border-color: #26314a; }
+.dark .border-slate-100 { border-color: #26314a; }
+.dark .border-b { border-color: #26314a; }
+.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #26314a; }
+.dark .ring-slate-200 { --tw-ring-color: #26314a; }
+.dark .ring-slate-300 { --tw-ring-color: #334155; }
+/* Hovers */
+.dark .hover\:bg-slate-50:hover { background-color: rgba(38, 49, 74, 0.5); }
+.dark .hover\:bg-slate-100:hover { background-color: #26314a; }
+.dark .hover\:bg-slate-200:hover { background-color: #334155; }
+/* Caixas de busca/filtro com fundo branco viram escuras via .bg-white acima */
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -60,6 +117,9 @@ body {
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
   border-radius: 8px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;

@@ -6,6 +6,7 @@ import React, {
   useCallback,
 } from "react";
 import { db } from "../lib/db";
+import { aplicarTema } from "../lib/themes";
 import type {
   Cliente,
   OrdemServico,
@@ -22,6 +23,9 @@ const DEFAULT_CONFIG: Config = {
   enderecoLoja: "",
   cnpj: "",
   senhaAcesso: "1234",
+  tema: "claro",
+  corDestaque: "azul",
+  comissaoPadrao: 0,
 };
 
 interface AppState {
@@ -79,6 +83,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [sessoes, setSessoes] = useState<SessaoCaixa[]>([]);
   const [fiados, setFiados] = useState<Fiado[]>([]);
   const [config, setConfig] = useState<Config>(loadConfig());
+
+  // Aplica o tema (cor + claro/escuro) e reage à mudança do sistema no modo "auto"
+  useEffect(() => {
+    const modo = config.tema || "claro";
+    aplicarTema(config.corDestaque || "azul", modo);
+    if (modo !== "auto") return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = () => aplicarTema(config.corDestaque || "azul", "auto");
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, [config.tema, config.corDestaque]);
 
   const reload = useCallback(async () => {
     setLoading(true);
