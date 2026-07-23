@@ -1,0 +1,19 @@
+{
+  "name": "Sistema TI · Caixa e Ordens de Serviço",
+  "short_name": "Sistema TI",
+  "description": "Gestão de ordens de serviço, caixa, estoque e clientes para assistência técnica.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f172a",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
