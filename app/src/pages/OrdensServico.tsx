@@ -19,6 +19,8 @@ import {
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle } from "../components/ui";
 import { PatternLock } from "../components/PatternLock";
+import { printHTML } from "../lib/print";
+import { reciboOS } from "../lib/recibo";
 import { uid, nowISO, brl, whatsappLink, formatDateTime, codigoOS } from "../lib/format";
 import { totalOS, totalPecas, custoPecas, lucroOS } from "../lib/calc";
 import {
@@ -27,6 +29,7 @@ import {
   type OSStatus,
   type PecaOS,
   type FormaPagamento,
+  type Config,
 } from "../lib/types";
 
 const CHECKLIST_ITENS = [
@@ -151,14 +154,14 @@ export const OrdensServico: React.FC = () => {
     if (!c?.telefone) return alert("Cliente sem telefone cadastrado.");
     const msg =
       `*${config.nomeLoja}*\n\n` +
-      `Olá ${c.nome}! Atualização da sua ordem de serviço ${codigoOS(o.numero)}:\n\n` +
-      `📱 ${o.marca} ${o.modelo}\n` +
-      `🔧 Status: *${OS_STATUS_META[o.status].label}*\n\n` +
+      `Olá ${c.nome}! Segue a atualização da sua ordem de serviço ${codigoOS(o.numero)}.\n\n` +
+      `Aparelho: ${o.marca} ${o.modelo}\n` +
+      `Situação: *${OS_STATUS_META[o.status].label}*\n\n` +
       `${OS_STATUS_META[o.status].cliente}\n\n` +
       (o.status === "pronta" || o.status === "aguardando_aprovacao"
-        ? `💰 Valor: ${brl(totalOS(o))}\n\n`
+        ? `Valor do serviço: ${brl(totalOS(o))}\n\n`
         : "") +
-      `Qualquer dúvida, estamos à disposição!`;
+      `Qualquer dúvida, estamos à disposição. Obrigado pela preferência!`;
     window.open(whatsappLink(c.telefone, msg), "_blank");
   };
 
@@ -539,7 +542,7 @@ const OSDetalhe: React.FC<{
   os: OrdemServico;
   clienteNome: string;
   cliente?: { nome: string; telefone: string; cpf?: string };
-  config: { nomeLoja: string; telefoneLoja: string; enderecoLoja: string };
+  config: Config;
   onClose: () => void;
   onStatus: (s: OSStatus) => void;
   onAvisar: () => void;
@@ -552,9 +555,7 @@ const OSDetalhe: React.FC<{
 
   const trackingUrl = `${window.location.origin}${window.location.pathname}#/rastreio/${codigoOS(os.numero)}`;
   const imprimir = () => {
-    document.body.classList.add("imprimindo-os");
-    window.print();
-    setTimeout(() => document.body.classList.remove("imprimindo-os"), 500);
+    printHTML(reciboOS(os, cliente, config), codigoOS(os.numero));
   };
   const linkRastreio = () => {
     const url = trackingUrl;
