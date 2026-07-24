@@ -13,8 +13,18 @@ const cab = (config: Config) => `
 export function reciboOS(
   os: OrdemServico,
   cliente: { nome?: string; telefone?: string; cpf?: string } | undefined,
-  config: Config
+  config: Config,
+  opts?: { incluirCliente?: boolean }
 ): string {
+  const incluirCliente = opts?.incluirCliente !== false && !!cliente?.nome;
+  const dias = config.diasAbandono || 90;
+  const taxa = config.taxaArmazenamentoDia || 0;
+  const termoGuarda =
+    `Prazo de retirada: o equipamento deve ser retirado em até ${dias} dias após a comunicação de conclusão do serviço.` +
+    (taxa > 0
+      ? ` Após esse prazo, será cobrada taxa de armazenamento/guarda de ${brl(taxa)} por dia.`
+      : "") +
+    ` Decorrido o prazo legal sem retirada, o aparelho poderá ser vendido para custear o serviço/armazenamento ou descartado, nos termos da legislação vigente. O cliente declara ciência destas condições.`;
   const itens = os.pecas
     .map(
       (p) => `<tr>
@@ -34,12 +44,16 @@ export function reciboOS(
   </div>
 
   <div class="row">
-    <div class="box" style="flex:1">
+    ${
+      incluirCliente
+        ? `<div class="box" style="flex:1">
       <div class="label">Cliente</div>
       <div class="val"><b>${cliente?.nome || "-"}</b></div>
       <div class="label">Contato</div>
       <div class="val">${[cliente?.telefone, cliente?.cpf].filter(Boolean).join(" · ") || "-"}</div>
-    </div>
+    </div>`
+        : ""
+    }
     <div class="box" style="flex:1">
       <div class="label">Aparelho</div>
       <div class="val"><b>${[os.tipoAparelho, os.marca, os.modelo].filter(Boolean).join(" ")}</b></div>
@@ -71,9 +85,11 @@ export function reciboOS(
     <div class="line grand"><span>Total</span><span>${brl(totalOS(os))}</span></div>
   </div>
 
-  <div class="foot">
-    Garantia de ${os.garantiaDias} dias sobre o serviço realizado.<br/>
-    ${os.tecnico ? `Técnico responsável: ${os.tecnico}` : ""}
+  ${os.tecnico ? `<div class="muted" style="margin-top:10px">Técnico responsável: ${os.tecnico}</div>` : ""}
+
+  <div class="box" style="margin-top:14px">
+    <div class="label">Termo de guarda e retirada</div>
+    <div style="font-size:11px;color:#333">${termoGuarda}</div>
   </div>
 
   <div class="sign">

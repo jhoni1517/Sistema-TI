@@ -28,6 +28,8 @@ const DEFAULT_CONFIG: Config = {
   tema: "claro",
   corDestaque: "azul",
   comissaoPadrao: 0,
+  taxaArmazenamentoDia: 0,
+  diasAbandono: 90,
 };
 
 interface AppState {
@@ -287,6 +289,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         cnpj: c.cnpj,
         senhaAcesso: c.senhaAcesso,
         comissaoPadrao: c.comissaoPadrao,
+        taxaArmazenamentoDia: c.taxaArmazenamentoDia,
+        diasAbandono: c.diasAbandono,
       })
       .catch(() => {});
   };
