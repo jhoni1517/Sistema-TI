@@ -87,10 +87,19 @@ export interface OrdemServico {
   entregueEm?: string;
 }
 
+export interface Categoria {
+  id: ID;
+  nome: string;
+  paiId?: ID | null; // null/undefined = classe (nível 1); preenchido = subclasse
+  criadoEm: string;
+}
+
 export interface Produto {
   id: ID;
   nome: string;
-  categoria?: string;
+  categoria?: string; // texto livre (compatibilidade / exibição)
+  categoriaId?: ID; // classe cadastrada
+  subcategoriaId?: ID; // subclasse cadastrada
   sku?: string;
   quantidade: number;
   estoqueMinimo: number;

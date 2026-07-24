@@ -6,7 +6,7 @@ import { ACCENTS, ACCENT_KEYS } from "../lib/themes";
 import type { Config as ConfigType } from "../lib/types";
 
 export const Config: React.FC = () => {
-  const { config, saveConfig, reload, clientes, ordens, produtos, movimentos, sessoes, fiados } = useApp();
+  const { config, saveConfig, reload, clientes, ordens, produtos, movimentos, sessoes, fiados, categorias } = useApp();
   const [form, setForm] = useState<ConfigType>(config);
   const [salvo, setSalvo] = useState(false);
 
@@ -32,6 +32,7 @@ export const Config: React.FC = () => {
       movimentos,
       sessoes,
       fiados,
+      categorias,
     };
     const blob = new Blob([JSON.stringify(dump, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -56,6 +57,7 @@ export const Config: React.FC = () => {
         localStorage.setItem("sistema-ti:movimentos", JSON.stringify(d.movimentos || []));
         localStorage.setItem("sistema-ti:sessoes", JSON.stringify(d.sessoes || []));
         localStorage.setItem("sistema-ti:fiados", JSON.stringify(d.fiados || []));
+        localStorage.setItem("sistema-ti:categorias", JSON.stringify(d.categorias || []));
         reload();
         alert("Backup importado com sucesso!");
       } catch {

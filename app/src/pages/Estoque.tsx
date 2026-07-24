@@ -1,14 +1,16 @@
 import React, { useMemo, useState } from "react";
-import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp } from "lucide-react";
+import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle } from "../components/ui";
 import { uid, nowISO, brl } from "../lib/format";
-import type { Produto } from "../lib/types";
+import type { Produto, Categoria } from "../lib/types";
 
 const vazio = (): Produto => ({
   id: uid(),
   nome: "",
   categoria: "",
+  categoriaId: "",
+  subcategoriaId: "",
   sku: "",
   quantidade: 0,
   estoqueMinimo: 2,
@@ -19,18 +21,34 @@ const vazio = (): Produto => ({
 });
 
 export const Estoque: React.FC = () => {
-  const { produtos, saveProduto, removeProduto } = useApp();
+  const { produtos, categorias, saveProduto, removeProduto, saveCategoria, removeCategoria } = useApp();
   const [busca, setBusca] = useState("");
   const [editando, setEditando] = useState<Produto | null>(null);
   const [soBaixo, setSoBaixo] = useState(false);
+  const [gerCategorias, setGerCategorias] = useState(false);
+
+  const classes = useMemo(
+    () => categorias.filter((c) => !c.paiId).sort((a, b) => a.nome.localeCompare(b.nome)),
+    [categorias]
+  );
+  const subde = (paiId?: string) =>
+    categorias.filter((c) => c.paiId === paiId).sort((a, b) => a.nome.localeCompare(b.nome));
+
+  const nomeCat = (p: Produto): string => {
+    const cls = categorias.find((c) => c.id === p.categoriaId);
+    const sub = categorias.find((c) => c.id === p.subcategoriaId);
+    if (cls) return sub ? `${cls.nome} · ${sub.nome}` : cls.nome;
+    return p.categoria || "sem categoria";
+  };
 
   const lista = useMemo(() => {
     const b = busca.toLowerCase();
     return [...produtos]
-      .filter((p) => p.nome.toLowerCase().includes(b) || (p.sku || "").toLowerCase().includes(b))
+      .filter((p) => p.nome.toLowerCase().includes(b) || (p.sku || "").toLowerCase().includes(b) || nomeCat(p).toLowerCase().includes(b))
       .filter((p) => (soBaixo ? p.quantidade <= p.estoqueMinimo : true))
       .sort((a, b) => a.nome.localeCompare(b.nome));
-  }, [produtos, busca, soBaixo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [produtos, busca, soBaixo, categorias]);
 
   const resumo = useMemo(() => {
     const valorCusto = produtos.reduce((s, p) => s + p.custo * p.quantidade, 0);
@@ -42,7 +60,9 @@ export const Estoque: React.FC = () => {
   const salvar = async () => {
     if (!editando) return;
     if (!editando.nome.trim()) return alert("Informe o nome do produto.");
-    await saveProduto(editando);
+    // grava o texto da categoria para exibição/compatibilidade
+    const p = { ...editando, categoria: editando.categoriaId ? nomeCat(editando) : editando.categoria };
+    await saveProduto(p);
     setEditando(null);
   };
 
@@ -52,9 +72,14 @@ export const Estoque: React.FC = () => {
         title="Estoque"
         subtitle="Peças e produtos"
         action={
-          <button className="btn-primary" onClick={() => setEditando(vazio())}>
-            <Plus size={18} /> Novo item
-          </button>
+          <div className="flex gap-2">
+            <button className="btn-secondary" onClick={() => setGerCategorias(true)}>
+              <FolderTree size={18} /> Categorias
+            </button>
+            <button className="btn-primary" onClick={() => setEditando(vazio())}>
+              <Plus size={18} /> Novo item
+            </button>
+          </div>
         }
       />
 
@@ -79,7 +104,7 @@ export const Estoque: React.FC = () => {
 
       <div className="relative mb-4 max-w-md">
         <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input className="input pl-10" placeholder="Buscar produto ou código..." value={busca} onChange={(e) => setBusca(e.target.value)} />
+        <input className="input pl-10" placeholder="Buscar produto, código ou categoria..." value={busca} onChange={(e) => setBusca(e.target.value)} />
       </div>
 
       {lista.length === 0 ? (
@@ -105,7 +130,7 @@ export const Estoque: React.FC = () => {
                   <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="px-4 py-3">
                       <p className="font-semibold text-slate-800">{p.nome}</p>
-                      <p className="text-xs text-slate-400">{p.categoria || "sem categoria"}{p.sku ? ` · ${p.sku}` : ""}</p>
+                      <p className="text-xs text-slate-400">{nomeCat(p)}{p.sku ? ` · ${p.sku}` : ""}</p>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className={`badge ${baixo ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"}`}>
@@ -130,6 +155,7 @@ export const Estoque: React.FC = () => {
         </div>
       )}
 
+      {/* Modal produto */}
       <Modal
         open={!!editando}
         onClose={() => setEditando(null)}
@@ -146,9 +172,36 @@ export const Estoque: React.FC = () => {
             <Field label="Nome do produto *" className="sm:col-span-2">
               <input className="input" value={editando.nome} onChange={(e) => setEditando({ ...editando, nome: e.target.value })} />
             </Field>
-            <Field label="Categoria">
-              <input className="input" placeholder="Tela, Bateria, Cabo..." value={editando.categoria} onChange={(e) => setEditando({ ...editando, categoria: e.target.value })} />
+            <Field label="Categoria (classe)">
+              <select
+                className="input"
+                value={editando.categoriaId || ""}
+                onChange={(e) => setEditando({ ...editando, categoriaId: e.target.value, subcategoriaId: "" })}
+              >
+                <option value="">— selecione —</option>
+                {classes.map((c) => (
+                  <option key={c.id} value={c.id}>{c.nome}</option>
+                ))}
+              </select>
             </Field>
+            <Field label="Subcategoria">
+              <select
+                className="input"
+                value={editando.subcategoriaId || ""}
+                onChange={(e) => setEditando({ ...editando, subcategoriaId: e.target.value })}
+                disabled={!editando.categoriaId}
+              >
+                <option value="">{editando.categoriaId ? "— nenhuma —" : "escolha a classe primeiro"}</option>
+                {subde(editando.categoriaId).map((c) => (
+                  <option key={c.id} value={c.id}>{c.nome}</option>
+                ))}
+              </select>
+            </Field>
+            {classes.length === 0 && (
+              <p className="sm:col-span-2 -mt-2 text-xs text-amber-600">
+                Nenhuma categoria cadastrada. Clique em <b>“Categorias”</b> (no topo) para criar classes e subclasses.
+              </p>
+            )}
             <Field label="Código / SKU">
               <input className="input" value={editando.sku} onChange={(e) => setEditando({ ...editando, sku: e.target.value })} />
             </Field>
@@ -170,6 +223,17 @@ export const Estoque: React.FC = () => {
           </div>
         )}
       </Modal>
+
+      {/* Modal categorias */}
+      {gerCategorias && (
+        <CategoriasManager
+          classes={classes}
+          subde={subde}
+          onClose={() => setGerCategorias(false)}
+          onAdd={saveCategoria}
+          onRemove={removeCategoria}
+        />
+      )}
     </div>
   );
 };
@@ -183,3 +247,90 @@ const ResumoCard: React.FC<{ label: string; value: string; icon: React.ReactNode
     </div>
   </div>
 );
+
+// ====== Gerenciador de categorias (classes e subclasses) ======
+const CategoriasManager: React.FC<{
+  classes: Categoria[];
+  subde: (paiId?: string) => Categoria[];
+  onClose: () => void;
+  onAdd: (c: Categoria) => Promise<void>;
+  onRemove: (id: string) => Promise<void>;
+}> = ({ classes, subde, onClose, onAdd, onRemove }) => {
+  const [novaClasse, setNovaClasse] = useState("");
+  const [novaSub, setNovaSub] = useState<Record<string, string>>({});
+
+  const addClasse = async () => {
+    const nome = novaClasse.trim();
+    if (!nome) return;
+    await onAdd({ id: uid(), nome, paiId: null, criadoEm: nowISO() });
+    setNovaClasse("");
+  };
+  const addSub = async (paiId: string) => {
+    const nome = (novaSub[paiId] || "").trim();
+    if (!nome) return;
+    await onAdd({ id: uid(), nome, paiId, criadoEm: nowISO() });
+    setNovaSub((s) => ({ ...s, [paiId]: "" }));
+  };
+
+  return (
+    <Modal open onClose={onClose} title="Categorias do estoque" maxWidth="max-w-2xl"
+      footer={<button className="btn-primary" onClick={onClose}>Concluir</button>}
+    >
+      <div className="space-y-5">
+        {/* Nova classe */}
+        <div>
+          <label className="label">Nova categoria (classe)</label>
+          <div className="flex gap-2">
+            <input
+              className="input"
+              placeholder="Ex: Informática, Celular, Acessórios..."
+              value={novaClasse}
+              onChange={(e) => setNovaClasse(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addClasse()}
+            />
+            <button className="btn-primary shrink-0" onClick={addClasse}><FolderPlus size={16} /> Criar</button>
+          </div>
+        </div>
+
+        {classes.length === 0 ? (
+          <EmptyState icon={<FolderTree size={40} />} title="Nenhuma categoria ainda" hint="Crie uma classe acima (ex: Informática) e depois adicione subclasses (ex: Mouses)." />
+        ) : (
+          <div className="space-y-4">
+            {classes.map((cls) => (
+              <div key={cls.id} className="rounded-xl border border-slate-200 p-3">
+                <div className="flex items-center justify-between">
+                  <p className="flex items-center gap-2 font-bold text-slate-800">
+                    <FolderTree size={16} className="text-brand-600" /> {cls.nome}
+                  </p>
+                  <button className="btn-ghost !p-1.5 text-red-500" title="Excluir classe e subclasses" onClick={() => { if (confirm(`Excluir a classe "${cls.nome}" e suas subclasses?`)) onRemove(cls.id); }}>
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+
+                {/* subclasses */}
+                <div className="mt-2 space-y-1 pl-5">
+                  {subde(cls.id).map((sub) => (
+                    <div key={sub.id} className="flex items-center justify-between text-sm text-slate-600">
+                      <span className="flex items-center gap-1"><CornerDownRight size={13} className="text-slate-400" /> {sub.nome}</span>
+                      <button className="btn-ghost !p-1 text-red-400" onClick={() => onRemove(sub.id)}><Trash2 size={13} /></button>
+                    </div>
+                  ))}
+                  <div className="flex gap-2 pt-1">
+                    <input
+                      className="input !py-1.5 text-sm"
+                      placeholder="Nova subclasse (ex: Mouses, Cabos de carregador...)"
+                      value={novaSub[cls.id] || ""}
+                      onChange={(e) => setNovaSub((s) => ({ ...s, [cls.id]: e.target.value }))}
+                      onKeyDown={(e) => e.key === "Enter" && addSub(cls.id)}
+                    />
+                    <button className="btn-secondary shrink-0 !py-1.5 text-sm" onClick={() => addSub(cls.id)}><Plus size={14} /> Add</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+};
