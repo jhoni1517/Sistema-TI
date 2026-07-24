@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Store, KeyRound, Cloud, Download, Upload, Save, Database, Palette, Sun, Moon, Monitor, Percent } from "lucide-react";
+import { Store, KeyRound, Cloud, Download, Upload, Save, Database, Palette, Sun, Moon, Monitor, Percent, FileText } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Field, SectionTitle } from "../components/ui";
 import { ACCENTS, ACCENT_KEYS } from "../lib/themes";
@@ -88,6 +88,20 @@ export const Config: React.FC = () => {
           </Field>
           <Field label="Endereço" className="sm:col-span-2">
             <input className="input" value={form.enderecoLoja} onChange={(e) => setForm({ ...form, enderecoLoja: e.target.value })} />
+          </Field>
+        </div>
+      </div>
+
+      {/* Termos do recibo */}
+      <div className="card mb-5">
+        <h3 className="mb-1 flex items-center gap-2 font-bold text-slate-700"><FileText size={18} /> Termos do recibo (guarda / abandono)</h3>
+        <p className="mb-4 text-sm text-slate-500">Aparece no rodapé do recibo da OS. Após o prazo, o aparelho pode ser vendido para custear o serviço ou descartado, conforme a lei.</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Prazo para retirada (dias)">
+            <input type="number" className="input" value={form.diasAbandono ?? 90} onChange={(e) => setForm({ ...form, diasAbandono: +e.target.value })} />
+          </Field>
+          <Field label="Taxa de armazenamento por dia (R$)">
+            <input type="number" className="input" value={form.taxaArmazenamentoDia ?? 0} onChange={(e) => setForm({ ...form, taxaArmazenamentoDia: +e.target.value })} />
           </Field>
         </div>
       </div>

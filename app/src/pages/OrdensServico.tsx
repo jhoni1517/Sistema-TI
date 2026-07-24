@@ -507,15 +507,12 @@ const OSForm: React.FC<{
         </fieldset>
 
         {/* Financeiro */}
-        <div className="grid gap-4 sm:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Mão de obra (R$)">
             <input type="number" className="input" value={os.maoDeObra} onChange={(e) => setOs({ ...os, maoDeObra: +e.target.value })} />
           </Field>
           <Field label="Desconto (R$)">
             <input type="number" className="input" value={os.desconto} onChange={(e) => setOs({ ...os, desconto: +e.target.value })} />
-          </Field>
-          <Field label="Garantia (dias)">
-            <input type="number" className="input" value={os.garantiaDias} onChange={(e) => setOs({ ...os, garantiaDias: +e.target.value })} />
           </Field>
           <Field label="Técnico responsável">
             <input className="input" value={os.tecnico} onChange={(e) => setOs({ ...os, tecnico: e.target.value })} />
@@ -552,10 +549,11 @@ const OSDetalhe: React.FC<{
   onFiado: () => void;
 }> = ({ os, clienteNome, cliente, config, onClose, onStatus, onAvisar, onEditar, onExcluir, onReceber, onFiado }) => {
   const [forma, setForma] = useState<FormaPagamento>("dinheiro");
+  const [incluirCliente, setIncluirCliente] = useState(true);
 
   const trackingUrl = `${window.location.origin}${window.location.pathname}#/rastreio/${codigoOS(os.numero)}`;
   const imprimir = () => {
-    printHTML(reciboOS(os, cliente, config), codigoOS(os.numero));
+    printHTML(reciboOS(os, cliente, config, { incluirCliente }), codigoOS(os.numero));
   };
   const linkRastreio = () => {
     const url = trackingUrl;
@@ -575,9 +573,13 @@ const OSDetalhe: React.FC<{
       maxWidth="max-w-3xl"
       footer={
         <div className="flex w-full flex-wrap items-center justify-between gap-2 no-print">
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button className="btn-secondary text-red-600" onClick={onExcluir}><Trash2 size={16} /></button>
             <button className="btn-secondary" onClick={imprimir}><Printer size={16} /> Imprimir</button>
+            <label className="flex items-center gap-1.5 text-xs text-slate-600">
+              <input type="checkbox" className="h-4 w-4" checked={incluirCliente} onChange={(e) => setIncluirCliente(e.target.checked)} />
+              Incluir cliente no recibo
+            </label>
           </div>
           <div className="flex gap-2">
             <button className="btn-secondary" onClick={linkRastreio}><LinkIcon size={16} /> Link p/ cliente</button>
@@ -695,9 +697,7 @@ const OSDetalhe: React.FC<{
           </div>
         </div>
 
-        <p className="text-center text-xs text-slate-400">
-          Garantia de {os.garantiaDias} dias · {config.nomeLoja}
-        </p>
+        <p className="text-center text-xs text-slate-400">{config.nomeLoja}</p>
 
         {/* Receber pagamento */}
         {os.status !== "entregue" && os.status !== "cancelada" && (

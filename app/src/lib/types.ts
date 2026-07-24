@@ -175,4 +175,7 @@ export interface Config {
   tema?: "auto" | "claro" | "escuro";
   corDestaque?: string; // chave em ACCENTS (azul, esmeralda, ...)
   comissaoPadrao?: number; // % de comissão padrão por técnico
+  // Termos do recibo (guarda/abandono)
+  taxaArmazenamentoDia?: number; // R$/dia após a conclusão
+  diasAbandono?: number; // prazo legal para retirada antes de venda/descarte
 }
