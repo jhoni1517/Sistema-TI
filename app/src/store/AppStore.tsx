@@ -14,6 +14,7 @@ import type {
   MovimentoCaixa,
   SessaoCaixa,
   Fiado,
+  Categoria,
   Config,
 } from "../lib/types";
 
@@ -37,6 +38,7 @@ interface AppState {
   movimentos: MovimentoCaixa[];
   sessoes: SessaoCaixa[];
   fiados: Fiado[];
+  categorias: Categoria[];
   config: Config;
   // ações
   reload: () => Promise<void>;
@@ -51,6 +53,8 @@ interface AppState {
   saveSessao: (s: SessaoCaixa) => Promise<void>;
   saveFiado: (f: Fiado) => Promise<void>;
   removeFiado: (id: string) => Promise<void>;
+  saveCategoria: (c: Categoria) => Promise<void>;
+  removeCategoria: (id: string) => Promise<void>;
   saveConfig: (c: Config) => void;
 }
 
@@ -82,6 +86,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [movimentos, setMovimentos] = useState<MovimentoCaixa[]>([]);
   const [sessoes, setSessoes] = useState<SessaoCaixa[]>([]);
   const [fiados, setFiados] = useState<Fiado[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [config, setConfig] = useState<Config>(loadConfig());
 
   // Aplica o tema (cor + claro/escuro) e reage à mudança do sistema no modo "auto"
@@ -98,13 +103,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [c, o, p, m, s, f] = await Promise.all([
+      const [c, o, p, m, s, f, cat] = await Promise.all([
         db.clientes.all(),
         db.ordens.all(),
         db.produtos.all(),
         db.movimentos.all(),
         db.sessoes.all(),
         db.fiados.all(),
+        db.categorias.all(),
       ]);
       setClientes(c);
       setOrdens(o);
@@ -112,6 +118,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       setMovimentos(m);
       setSessoes(s);
       setFiados(f);
+      setCategorias(cat);
     } catch (e) {
       console.error("Erro ao carregar dados:", e);
     } finally {
@@ -221,6 +228,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     setFiados((prev) => prev.filter((x) => x.id !== id));
   };
 
+  const saveCategoria = async (c: Categoria) => {
+    await db.categorias.save(c);
+    setCategorias((prev) => {
+      const i = prev.findIndex((x) => x.id === c.id);
+      if (i >= 0) {
+        const n = [...prev];
+        n[i] = c;
+        return n;
+      }
+      return [...prev, c];
+    });
+  };
+  const removeCategoria = async (id: string) => {
+    await db.categorias.remove(id);
+    // remove também as subclasses da classe apagada
+    const filhos = categorias.filter((c) => c.paiId === id).map((c) => c.id);
+    for (const fid of filhos) await db.categorias.remove(fid);
+    setCategorias((prev) => prev.filter((x) => x.id !== id && x.paiId !== id));
+  };
+
   const saveConfig = (c: Config) => {
     localStorage.setItem("sistema-ti:config", JSON.stringify(c));
     setConfig(c);
@@ -235,6 +262,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     movimentos,
     sessoes,
     fiados,
+    categorias,
     config,
     reload,
     saveCliente,
@@ -248,6 +276,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     saveSessao,
     saveFiado,
     removeFiado,
+    saveCategoria,
+    removeCategoria,
     saveConfig,
   };
 

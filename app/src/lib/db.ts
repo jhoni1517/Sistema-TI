@@ -6,6 +6,7 @@ import type {
   MovimentoCaixa,
   SessaoCaixa,
   Fiado,
+  Categoria,
 } from "./types";
 
 /**
@@ -25,7 +26,8 @@ type TableName =
   | "produtos"
   | "movimentos"
   | "sessoes"
-  | "fiados";
+  | "fiados"
+  | "categorias";
 
 interface WithId {
   id: string;
@@ -119,5 +121,10 @@ export const db = {
     all: () => getAll<Fiado>("fiados"),
     save: (f: Fiado) => upsert("fiados", f),
     remove: (id: string) => remove("fiados", id),
+  },
+  categorias: {
+    all: () => getAll<Categoria>("categorias"),
+    save: (c: Categoria) => upsert("categorias", c),
+    remove: (id: string) => remove("categorias", id),
   },
 };
