@@ -94,6 +94,16 @@ export interface Categoria {
   criadoEm: string;
 }
 
+export interface Fornecedor {
+  id: ID;
+  nome: string;
+  telefone?: string;
+  contato?: string;
+  cnpj?: string;
+  observacoes?: string;
+  criadoEm: string;
+}
+
 export interface Produto {
   id: ID;
   nome: string;
@@ -105,7 +115,8 @@ export interface Produto {
   estoqueMinimo: number;
   custo: number; // custo unitário
   preco: number; // preço de venda
-  fornecedor?: string;
+  fornecedor?: string; // texto livre (compatibilidade)
+  fornecedorId?: ID; // fornecedor cadastrado
   criadoEm: string;
 }
 

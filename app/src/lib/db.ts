@@ -7,6 +7,7 @@ import type {
   SessaoCaixa,
   Fiado,
   Categoria,
+  Fornecedor,
 } from "./types";
 
 /**
@@ -27,7 +28,8 @@ type TableName =
   | "movimentos"
   | "sessoes"
   | "fiados"
-  | "categorias";
+  | "categorias"
+  | "fornecedores";
 
 interface WithId {
   id: string;
@@ -126,5 +128,27 @@ export const db = {
     all: () => getAll<Categoria>("categorias"),
     save: (c: Categoria) => upsert("categorias", c),
     remove: (id: string) => remove("categorias", id),
+  },
+  fornecedores: {
+    all: () => getAll<Fornecedor>("fornecedores"),
+    save: (f: Fornecedor) => upsert("fornecedores", f),
+    remove: (id: string) => remove("fornecedores", id),
+  },
+  // Configurações da loja compartilhadas na nuvem (linha única id='app')
+  config: {
+    async get(): Promise<Record<string, unknown> | null> {
+      if (!supabaseEnabled || !supabase) return null;
+      const { data, error } = await supabase
+        .from("configuracoes")
+        .select("dados")
+        .eq("id", "app")
+        .maybeSingle();
+      if (error) return null;
+      return (data?.dados as Record<string, unknown>) || null;
+    },
+    async save(dados: Record<string, unknown>): Promise<void> {
+      if (!supabaseEnabled || !supabase) return;
+      await supabase.from("configuracoes").upsert({ id: "app", dados });
+    },
   },
 };

@@ -15,6 +15,7 @@ import type {
   SessaoCaixa,
   Fiado,
   Categoria,
+  Fornecedor,
   Config,
 } from "../lib/types";
 
@@ -39,6 +40,7 @@ interface AppState {
   sessoes: SessaoCaixa[];
   fiados: Fiado[];
   categorias: Categoria[];
+  fornecedores: Fornecedor[];
   config: Config;
   // ações
   reload: () => Promise<void>;
@@ -55,6 +57,8 @@ interface AppState {
   removeFiado: (id: string) => Promise<void>;
   saveCategoria: (c: Categoria) => Promise<void>;
   removeCategoria: (id: string) => Promise<void>;
+  saveFornecedor: (f: Fornecedor) => Promise<void>;
+  removeFornecedor: (id: string) => Promise<void>;
   saveConfig: (c: Config) => void;
 }
 
@@ -87,6 +91,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [sessoes, setSessoes] = useState<SessaoCaixa[]>([]);
   const [fiados, setFiados] = useState<Fiado[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
   const [config, setConfig] = useState<Config>(loadConfig());
 
   // Aplica o tema (cor + claro/escuro) e reage à mudança do sistema no modo "auto"
@@ -103,7 +108,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [c, o, p, m, s, f, cat] = await Promise.all([
+      const [c, o, p, m, s, f, cat, forn] = await Promise.all([
         db.clientes.all(),
         db.ordens.all(),
         db.produtos.all(),
@@ -111,6 +116,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         db.sessoes.all(),
         db.fiados.all(),
         db.categorias.all(),
+        db.fornecedores.all(),
       ]);
       setClientes(c);
       setOrdens(o);
@@ -119,6 +125,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       setSessoes(s);
       setFiados(f);
       setCategorias(cat);
+      setFornecedores(forn);
+      // Configurações da loja vindas da nuvem (nome, senha, etc.) — mantém aparência local
+      const cloudCfg = await db.config.get();
+      if (cloudCfg) setConfig((prev) => ({ ...prev, ...cloudCfg }));
     } catch (e) {
       console.error("Erro ao carregar dados:", e);
     } finally {
@@ -248,9 +258,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     setCategorias((prev) => prev.filter((x) => x.id !== id && x.paiId !== id));
   };
 
+  const saveFornecedor = async (f: Fornecedor) => {
+    await db.fornecedores.save(f);
+    setFornecedores((prev) => {
+      const i = prev.findIndex((x) => x.id === f.id);
+      if (i >= 0) {
+        const n = [...prev];
+        n[i] = f;
+        return n;
+      }
+      return [...prev, f];
+    });
+  };
+  const removeFornecedor = async (id: string) => {
+    await db.fornecedores.remove(id);
+    setFornecedores((prev) => prev.filter((x) => x.id !== id));
+  };
+
   const saveConfig = (c: Config) => {
     localStorage.setItem("sistema-ti:config", JSON.stringify(c));
     setConfig(c);
+    // sincroniza os dados da loja na nuvem (nome, senha, comissão) — aparência fica local
+    db.config
+      .save({
+        nomeLoja: c.nomeLoja,
+        telefoneLoja: c.telefoneLoja,
+        enderecoLoja: c.enderecoLoja,
+        cnpj: c.cnpj,
+        senhaAcesso: c.senhaAcesso,
+        comissaoPadrao: c.comissaoPadrao,
+      })
+      .catch(() => {});
   };
 
   const value: AppState = {
@@ -263,6 +301,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     sessoes,
     fiados,
     categorias,
+    fornecedores,
     config,
     reload,
     saveCliente,
@@ -278,6 +317,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     removeFiado,
     saveCategoria,
     removeCategoria,
+    saveFornecedor,
+    removeFornecedor,
     saveConfig,
   };
 
