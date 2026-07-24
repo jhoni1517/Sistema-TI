@@ -131,5 +131,28 @@ body {
   }
   body {
     background: white;
+    color: #000;
+  }
+  /* Imprime apenas o conteúdo da OS, não a tela toda */
+  body.imprimindo-os * {
+    visibility: hidden;
+  }
+  body.imprimindo-os #os-print,
+  body.imprimindo-os #os-print * {
+    visibility: visible;
+  }
+  body.imprimindo-os #os-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 12px;
+  }
+  /* garante fundo branco/texto preto no recibo, mesmo no tema escuro */
+  #os-print,
+  #os-print * {
+    background: #fff !important;
+    color: #000 !important;
+    box-shadow: none !important;
   }
 }

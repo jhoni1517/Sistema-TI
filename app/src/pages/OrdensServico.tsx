@@ -363,16 +363,7 @@ const OSForm: React.FC<{
         {/* Cliente & Status */}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Cliente *">
-            <select
-              className="input"
-              value={os.clienteId}
-              onChange={(e) => setOs({ ...os, clienteId: e.target.value })}
-            >
-              <option value="">Selecione...</option>
-              {clientes.map((c) => (
-                <option key={c.id} value={c.id}>{c.nome}</option>
-              ))}
-            </select>
+            <ClienteSelect clientes={clientes} value={os.clienteId} onChange={(id) => setOs({ ...os, clienteId: id })} />
           </Field>
           <Field label="Status">
             <select
@@ -560,6 +551,11 @@ const OSDetalhe: React.FC<{
   const [forma, setForma] = useState<FormaPagamento>("dinheiro");
 
   const trackingUrl = `${window.location.origin}${window.location.pathname}#/rastreio/${codigoOS(os.numero)}`;
+  const imprimir = () => {
+    document.body.classList.add("imprimindo-os");
+    window.print();
+    setTimeout(() => document.body.classList.remove("imprimindo-os"), 500);
+  };
   const linkRastreio = () => {
     const url = trackingUrl;
     if (cliente?.telefone) {
@@ -580,7 +576,7 @@ const OSDetalhe: React.FC<{
         <div className="flex w-full flex-wrap items-center justify-between gap-2 no-print">
           <div className="flex gap-2">
             <button className="btn-secondary text-red-600" onClick={onExcluir}><Trash2 size={16} /></button>
-            <button className="btn-secondary" onClick={() => window.print()}><Printer size={16} /> Imprimir</button>
+            <button className="btn-secondary" onClick={imprimir}><Printer size={16} /> Imprimir</button>
           </div>
           <div className="flex gap-2">
             <button className="btn-secondary" onClick={linkRastreio}><LinkIcon size={16} /> Link p/ cliente</button>
@@ -724,6 +720,57 @@ const OSDetalhe: React.FC<{
         )}
       </div>
     </Modal>
+  );
+};
+
+// Seletor de cliente com busca
+const ClienteSelect: React.FC<{
+  clientes: { id: string; nome: string }[];
+  value?: string;
+  onChange: (id: string) => void;
+}> = ({ clientes, value, onChange }) => {
+  const sel = clientes.find((c) => c.id === value);
+  const [q, setQ] = useState(sel?.nome || "");
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    setQ(clientes.find((c) => c.id === value)?.nome || "");
+  }, [value, clientes]);
+  const filtro = clientes
+    .filter((c) => c.nome.toLowerCase().includes(q.toLowerCase()))
+    .slice(0, 8);
+  return (
+    <div className="relative">
+      <input
+        className="input"
+        placeholder="Digite o nome do cliente..."
+        value={q}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setOpen(true);
+          if (!e.target.value) onChange("");
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+      />
+      {open && filtro.length > 0 && (
+        <div className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg bg-white shadow-lg ring-1 ring-slate-200">
+          {filtro.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+              onMouseDown={() => {
+                onChange(c.id);
+                setQ(c.nome);
+                setOpen(false);
+              }}
+            >
+              {c.nome}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 };
 

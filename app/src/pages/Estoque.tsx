@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from "react";
-import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight } from "lucide-react";
+import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle } from "../components/ui";
 import { uid, nowISO, brl } from "../lib/format";
-import type { Produto, Categoria } from "../lib/types";
+import type { Produto, Categoria, Fornecedor } from "../lib/types";
 
 const vazio = (): Produto => ({
   id: uid(),
@@ -17,15 +17,17 @@ const vazio = (): Produto => ({
   custo: 0,
   preco: 0,
   fornecedor: "",
+  fornecedorId: "",
   criadoEm: nowISO(),
 });
 
 export const Estoque: React.FC = () => {
-  const { produtos, categorias, saveProduto, removeProduto, saveCategoria, removeCategoria } = useApp();
+  const { produtos, categorias, fornecedores, saveProduto, removeProduto, saveCategoria, removeCategoria, saveFornecedor, removeFornecedor } = useApp();
   const [busca, setBusca] = useState("");
   const [editando, setEditando] = useState<Produto | null>(null);
   const [soBaixo, setSoBaixo] = useState(false);
   const [gerCategorias, setGerCategorias] = useState(false);
+  const [gerFornecedores, setGerFornecedores] = useState(false);
 
   const classes = useMemo(
     () => categorias.filter((c) => !c.paiId).sort((a, b) => a.nome.localeCompare(b.nome)),
@@ -40,6 +42,8 @@ export const Estoque: React.FC = () => {
     if (cls) return sub ? `${cls.nome} · ${sub.nome}` : cls.nome;
     return p.categoria || "sem categoria";
   };
+  const nomeForn = (p: Produto): string =>
+    fornecedores.find((f) => f.id === p.fornecedorId)?.nome || p.fornecedor || "";
 
   const lista = useMemo(() => {
     const b = busca.toLowerCase();
@@ -60,10 +64,18 @@ export const Estoque: React.FC = () => {
   const salvar = async () => {
     if (!editando) return;
     if (!editando.nome.trim()) return alert("Informe o nome do produto.");
-    // grava o texto da categoria para exibição/compatibilidade
-    const p = { ...editando, categoria: editando.categoriaId ? nomeCat(editando) : editando.categoria };
-    await saveProduto(p);
-    setEditando(null);
+    // grava os textos de categoria/fornecedor para exibição/compatibilidade
+    const p = {
+      ...editando,
+      categoria: editando.categoriaId ? nomeCat(editando) : editando.categoria,
+      fornecedor: editando.fornecedorId ? nomeForn(editando) : editando.fornecedor,
+    };
+    try {
+      await saveProduto(p);
+      setEditando(null);
+    } catch (e) {
+      alert("Não foi possível salvar o produto.\n\n" + (e instanceof Error ? e.message : String(e)) + "\n\nSe você usa a nuvem, confira se rodou o comando SQL de atualização das tabelas.");
+    }
   };
 
   return (
@@ -72,7 +84,10 @@ export const Estoque: React.FC = () => {
         title="Estoque"
         subtitle="Peças e produtos"
         action={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <button className="btn-secondary" onClick={() => setGerFornecedores(true)}>
+              <Truck size={18} /> Fornecedores
+            </button>
             <button className="btn-secondary" onClick={() => setGerCategorias(true)}>
               <FolderTree size={18} /> Categorias
             </button>
@@ -218,7 +233,19 @@ export const Estoque: React.FC = () => {
               <input type="number" className="input" value={editando.preco} onChange={(e) => setEditando({ ...editando, preco: +e.target.value })} />
             </Field>
             <Field label="Fornecedor" className="sm:col-span-2">
-              <input className="input" value={editando.fornecedor} onChange={(e) => setEditando({ ...editando, fornecedor: e.target.value })} />
+              <select
+                className="input"
+                value={editando.fornecedorId || ""}
+                onChange={(e) => setEditando({ ...editando, fornecedorId: e.target.value })}
+              >
+                <option value="">— nenhum —</option>
+                {fornecedores.map((f) => (
+                  <option key={f.id} value={f.id}>{f.nome}</option>
+                ))}
+              </select>
+              {fornecedores.length === 0 && (
+                <p className="mt-1 text-xs text-amber-600">Cadastre em <b>“Fornecedores”</b> (no topo) para poder selecionar.</p>
+              )}
             </Field>
           </div>
         )}
@@ -234,7 +261,92 @@ export const Estoque: React.FC = () => {
           onRemove={removeCategoria}
         />
       )}
+
+      {/* Modal fornecedores */}
+      {gerFornecedores && (
+        <FornecedoresManager
+          fornecedores={fornecedores}
+          onClose={() => setGerFornecedores(false)}
+          onSave={saveFornecedor}
+          onRemove={removeFornecedor}
+        />
+      )}
     </div>
+  );
+};
+
+// ====== Gerenciador de fornecedores ======
+const FornecedoresManager: React.FC<{
+  fornecedores: Fornecedor[];
+  onClose: () => void;
+  onSave: (f: Fornecedor) => Promise<void>;
+  onRemove: (id: string) => Promise<void>;
+}> = ({ fornecedores, onClose, onSave, onRemove }) => {
+  const vazioF = (): Fornecedor => ({ id: uid(), nome: "", telefone: "", contato: "", cnpj: "", observacoes: "", criadoEm: nowISO() });
+  const [edit, setEdit] = useState<Fornecedor | null>(null);
+
+  const salvar = async () => {
+    if (!edit) return;
+    if (!edit.nome.trim()) return alert("Informe o nome do fornecedor.");
+    try {
+      await onSave(edit);
+      setEdit(null);
+    } catch (e) {
+      alert("Erro ao salvar: " + (e instanceof Error ? e.message : String(e)));
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title="Fornecedores" maxWidth="max-w-2xl"
+      footer={<button className="btn-primary" onClick={onClose}>Concluir</button>}
+    >
+      {edit ? (
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Nome / Empresa *" className="sm:col-span-2">
+              <input className="input" value={edit.nome} onChange={(e) => setEdit({ ...edit, nome: e.target.value })} />
+            </Field>
+            <Field label="Telefone / WhatsApp">
+              <input className="input" value={edit.telefone} onChange={(e) => setEdit({ ...edit, telefone: e.target.value })} />
+            </Field>
+            <Field label="Pessoa de contato">
+              <input className="input" value={edit.contato} onChange={(e) => setEdit({ ...edit, contato: e.target.value })} />
+            </Field>
+            <Field label="CNPJ">
+              <input className="input" value={edit.cnpj} onChange={(e) => setEdit({ ...edit, cnpj: e.target.value })} />
+            </Field>
+            <Field label="Observações" className="sm:col-span-2">
+              <textarea className="input" rows={2} value={edit.observacoes} onChange={(e) => setEdit({ ...edit, observacoes: e.target.value })} />
+            </Field>
+          </div>
+          <div className="flex justify-end gap-2">
+            <button className="btn-secondary" onClick={() => setEdit(null)}>Voltar</button>
+            <button className="btn-primary" onClick={salvar}>Salvar</button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <button className="btn-primary" onClick={() => setEdit(vazioF())}><Plus size={16} /> Novo fornecedor</button>
+          {fornecedores.length === 0 ? (
+            <EmptyState icon={<Truck size={40} />} title="Nenhum fornecedor" hint="Cadastre seus fornecedores para vincular aos produtos." />
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {[...fornecedores].sort((a, b) => a.nome.localeCompare(b.nome)).map((f) => (
+                <div key={f.id} className="flex items-center gap-3 py-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600"><Truck size={16} /></div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold text-slate-800">{f.nome}</p>
+                    <p className="truncate text-xs text-slate-400">{[f.telefone, f.contato, f.cnpj].filter(Boolean).join(" · ") || "—"}</p>
+                  </div>
+                  <button className="btn-ghost !p-2" onClick={() => setEdit(f)}><Pencil size={15} /></button>
+                  <button className="btn-ghost !p-2 text-red-500" onClick={() => { if (confirm(`Excluir ${f.nome}?`)) onRemove(f.id); }}><Trash2 size={15} /></button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </Modal>
   );
 };
 

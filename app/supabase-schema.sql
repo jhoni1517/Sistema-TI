@@ -98,6 +98,27 @@ create table if not exists categorias (
   "criadoEm" text
 );
 
+create table if not exists fornecedores (
+  id text primary key,
+  nome text not null,
+  telefone text,
+  contato text,
+  cnpj text,
+  observacoes text,
+  "criadoEm" text
+);
+
+-- Configurações da loja compartilhadas (linha única id='app')
+create table if not exists configuracoes (
+  id text primary key,
+  dados jsonb default '{}'::jsonb
+);
+
+-- Colunas de vínculo no produto
+alter table produtos add column if not exists "categoriaId" text;
+alter table produtos add column if not exists "subcategoriaId" text;
+alter table produtos add column if not exists "fornecedorId" text;
+
 -- ------------------------------------------------------------
 -- Segurança (RLS)
 -- Como o app usa um login único próprio (não o Auth do Supabase),
@@ -111,11 +132,13 @@ alter table movimentos enable row level security;
 alter table sessoes   enable row level security;
 alter table fiados    enable row level security;
 alter table categorias enable row level security;
+alter table fornecedores enable row level security;
+alter table configuracoes enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['clientes','produtos','ordens','movimentos','sessoes','fiados','categorias']
+  foreach t in array array['clientes','produtos','ordens','movimentos','sessoes','fiados','categorias','fornecedores','configuracoes']
   loop
     execute format('drop policy if exists "acesso_total" on %I;', t);
     execute format('create policy "acesso_total" on %I for all using (true) with check (true);', t);
