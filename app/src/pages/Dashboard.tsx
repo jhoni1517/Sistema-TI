@@ -11,7 +11,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
-import { brl, isToday, codigoOS, formatDate } from "../lib/format";
+import { brl, isToday, codigoOS, formatDate, txt } from "../lib/format";
 import { receitaBruta, totalOS, lucroLiquido } from "../lib/calc";
 import { OS_STATUS_META, type OSStatus } from "../lib/types";
 
@@ -29,7 +29,7 @@ export const Dashboard: React.FC = () => {
       .reduce((s, o) => s + totalOS(o), 0);
     const estoqueBaixo = produtos.filter((p) => p.quantidade <= p.estoqueMinimo);
     const lucroMes = lucroLiquido(
-      movimentos.filter((m) => m.data.slice(0, 7) === new Date().toISOString().slice(0, 7))
+      movimentos.filter((m) => txt(m.data).slice(0, 7) === new Date().toISOString().slice(0, 7))
     );
     return { abertas, prontas, caixaHoje, aReceber, estoqueBaixo, lucroMes, movHoje };
   }, [ordens, produtos, movimentos]);

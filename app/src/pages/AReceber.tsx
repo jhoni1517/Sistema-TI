@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle } from "../components/ui";
-import { uid, nowISO, brl, formatDate, whatsappLink } from "../lib/format";
+import { uid, nowISO, brl, formatDate, whatsappLink, txt } from "../lib/format";
 import { saldoFiado, pagoFiado } from "../lib/calc";
 import type { Fiado, FormaPagamento } from "../lib/types";
 
@@ -34,7 +34,7 @@ export const AReceber: React.FC = () => {
     () =>
       [...fiados]
         .filter((f) => (mostrarQuitados ? true : !f.quitado))
-        .sort((a, b) => (a.quitado === b.quitado ? b.criadoEm.localeCompare(a.criadoEm) : a.quitado ? 1 : -1)),
+        .sort((a, b) => (a.quitado === b.quitado ? txt(b.criadoEm).localeCompare(txt(a.criadoEm)) : a.quitado ? 1 : -1)),
     [fiados, mostrarQuitados]
   );
 

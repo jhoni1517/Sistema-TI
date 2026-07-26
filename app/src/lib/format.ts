@@ -1,6 +1,19 @@
 export const uid = (): string =>
   Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 
+/**
+ * Texto seguro para buscas e ordenações.
+ * As colunas da nuvem aceitam nulo; sem isso, um registro incompleto
+ * quebra a tela inteira ao chamar .toLowerCase()/.includes().
+ */
+export const txt = (v?: string | null): string => (v ?? "").toString();
+
+/** Número seguro (a nuvem pode devolver nulo ou texto) */
+export const num = (v?: number | string | null): number => {
+  const n = typeof v === "string" ? parseFloat(v) : v;
+  return Number.isFinite(n as number) ? (n as number) : 0;
+};
+
 export const brl = (v: number): string =>
   (v || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
