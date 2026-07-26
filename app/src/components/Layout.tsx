@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { BuscaGlobal } from "./BuscaGlobal";
 import {
   LayoutDashboard,
   Wrench,
@@ -13,6 +14,7 @@ import {
   LogOut,
   Cloud,
   HardDrive,
+  Search,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 
@@ -30,7 +32,20 @@ const nav = [
 export const Layout: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
   const { config, online } = useApp();
   const [open, setOpen] = useState(false);
+  const [busca, setBusca] = useState(false);
   const navigate = useNavigate();
+
+  // Atalho Ctrl+K / Cmd+K abre a busca global
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setBusca(true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   return (
     <div className="flex min-h-screen bg-slate-100">
@@ -68,6 +83,19 @@ export const Layout: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
               )}
             </p>
           </div>
+        </div>
+
+        <div className="px-3 pt-3">
+          <button
+            onClick={() => setBusca(true)}
+            className="flex w-full items-center gap-2 rounded-lg bg-slate-800 px-3 py-2 text-sm text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+          >
+            <Search size={16} />
+            <span className="flex-1 text-left">Buscar...</span>
+            <span className="hidden rounded border border-slate-600 px-1.5 py-0.5 text-[10px] lg:inline">
+              Ctrl K
+            </span>
+          </button>
         </div>
 
         <nav className="space-y-1 p-3">
@@ -114,13 +142,22 @@ export const Layout: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
           >
             <Menu size={22} />
           </button>
-          <span className="font-bold text-slate-800">{config.nomeLoja}</span>
+          <span className="flex-1 truncate font-bold text-slate-800">{config.nomeLoja}</span>
+          <button
+            onClick={() => setBusca(true)}
+            className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"
+            title="Buscar"
+          >
+            <Search size={20} />
+          </button>
         </header>
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
           <Outlet />
         </main>
       </div>
+
+      <BuscaGlobal aberto={busca} onClose={() => setBusca(false)} />
     </div>
   );
 };

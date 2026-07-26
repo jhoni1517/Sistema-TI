@@ -15,6 +15,9 @@ import {
   DollarSign,
   HandCoins,
   Link as LinkIcon,
+  AlertTriangle,
+  Clock,
+  History,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle } from "../components/ui";
@@ -22,7 +25,7 @@ import { PatternLock } from "../components/PatternLock";
 import { printHTML } from "../lib/print";
 import { reciboOS } from "../lib/recibo";
 import { uid, nowISO, brl, whatsappLink, formatDateTime, codigoOS } from "../lib/format";
-import { totalOS, totalPecas, custoPecas, lucroOS } from "../lib/calc";
+import { totalOS, totalPecas, custoPecas, lucroOS, diasEmPosse, taxaArmazenamento } from "../lib/calc";
 import {
   OS_STATUS_META,
   type OrdemServico,
@@ -121,6 +124,8 @@ export const OrdensServico: React.FC = () => {
     const atualizado: OrdemServico = {
       ...o,
       status,
+      // marca quando ficou pronta — base para a taxa de armazenamento
+      prontaEm: status === "pronta" ? o.prontaEm || nowISO() : o.prontaEm,
       atualizadoEm: nowISO(),
       historico: [...o.historico, { data: nowISO(), status }],
     };
@@ -220,6 +225,23 @@ export const OrdensServico: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-xs font-bold text-slate-400">{codigoOS(o.numero)}</span>
                   <span className={`badge ${OS_STATUS_META[o.status].color}`}>{OS_STATUS_META[o.status].label}</span>
+                  {(() => {
+                    const dias = diasEmPosse(o);
+                    const t = taxaArmazenamento(o, config.taxaArmazenamentoDia || 0, config.diasAbandono || 90);
+                    if (t.valor > 0)
+                      return (
+                        <span className="badge bg-red-100 text-red-700" title={`${t.diasExcedidos} dia(s) além do prazo`}>
+                          <AlertTriangle size={11} /> Guarda {brl(t.valor)}
+                        </span>
+                      );
+                    if (dias >= 15)
+                      return (
+                        <span className="badge bg-amber-100 text-amber-700" title="Aparelho parado há muito tempo">
+                          <Clock size={11} /> {dias} dias
+                        </span>
+                      );
+                    return null;
+                  })()}
                 </div>
                 <p className="truncate font-bold text-slate-800">{nomeCliente(o.clienteId)}</p>
                 <p className="truncate text-sm text-slate-500">
@@ -265,6 +287,15 @@ export const OrdensServico: React.FC = () => {
           clienteNome={nomeCliente(detalhe.clienteId)}
           cliente={cliente(detalhe.clienteId)}
           config={config}
+          historicoAparelho={
+            detalhe.imeiSerial?.trim()
+              ? ordens.filter(
+                  (x) =>
+                    x.id !== detalhe.id &&
+                    x.imeiSerial?.trim().toLowerCase() === detalhe.imeiSerial?.trim().toLowerCase()
+                )
+              : []
+          }
           onClose={() => setDetalhe(null)}
           onStatus={(s) => mudarStatus(detalhe, s)}
           onAvisar={() => avisarCliente(detalhe)}
@@ -547,7 +578,8 @@ const OSDetalhe: React.FC<{
   onExcluir: () => void;
   onReceber: (forma: FormaPagamento) => void;
   onFiado: () => void;
-}> = ({ os, clienteNome, cliente, config, onClose, onStatus, onAvisar, onEditar, onExcluir, onReceber, onFiado }) => {
+  historicoAparelho: OrdemServico[];
+}> = ({ os, clienteNome, cliente, config, onClose, onStatus, onAvisar, onEditar, onExcluir, onReceber, onFiado, historicoAparelho }) => {
   const [forma, setForma] = useState<FormaPagamento>("dinheiro");
   const [incluirCliente, setIncluirCliente] = useState(true);
 
@@ -658,6 +690,51 @@ const OSDetalhe: React.FC<{
           <Info label="Defeito relatado" value={os.defeitoRelatado} />
           <Info label="Laudo técnico" value={os.defeitoConstatado || "—"} />
         </div>
+
+        {/* Alerta de permanência / taxa de guarda */}
+        {(() => {
+          const t = taxaArmazenamento(os, config.taxaArmazenamentoDia || 0, config.diasAbandono || 90);
+          const dias = diasEmPosse(os);
+          if (t.valor > 0)
+            return (
+              <div className="rounded-xl bg-red-50 p-3 text-sm no-print">
+                <p className="flex items-center gap-1 font-bold text-red-700">
+                  <AlertTriangle size={14} /> Taxa de guarda acumulada: {brl(t.valor)}
+                </p>
+                <p className="text-xs text-red-600">
+                  Pronta há {t.diasParado} dias · {t.diasExcedidos} dia(s) além do prazo de {config.diasAbandono || 90} dias
+                </p>
+              </div>
+            );
+          if (dias >= 15)
+            return (
+              <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-700 no-print">
+                <p className="flex items-center gap-1 font-semibold">
+                  <Clock size={14} /> Aparelho na loja há {dias} dias
+                </p>
+              </div>
+            );
+          return null;
+        })()}
+
+        {/* Histórico deste aparelho (mesmo IMEI/série) */}
+        {historicoAparelho.length > 0 && (
+          <div className="rounded-xl bg-slate-50 p-3 no-print">
+            <p className="mb-2 flex items-center gap-1 text-xs font-bold text-slate-600">
+              <History size={13} /> Este aparelho já passou aqui {historicoAparelho.length}x
+            </p>
+            <div className="space-y-1">
+              {historicoAparelho.slice(0, 5).map((h) => (
+                <div key={h.id} className="flex items-center justify-between text-xs text-slate-600">
+                  <span className="truncate">
+                    <b className="font-mono">{codigoOS(h.numero)}</b> · {h.defeitoRelatado || "—"}
+                  </span>
+                  <span className="ml-2 shrink-0 text-slate-400">{formatDateTime(h.criadoEm).slice(0, 10)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Peças */}
         {os.pecas.length > 0 && (

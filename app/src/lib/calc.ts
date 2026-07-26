@@ -39,6 +39,37 @@ export const pagoFiado = (f: Fiado): number =>
 export const saldoFiado = (f: Fiado): number =>
   Math.max(0, f.valor - pagoFiado(f));
 
+/** Dias corridos entre uma data e hoje */
+export const diasDesde = (iso?: string): number => {
+  if (!iso) return 0;
+  const ms = Date.now() - new Date(iso).getTime();
+  return Math.max(0, Math.floor(ms / 86400000));
+};
+
+/** Há quantos dias o aparelho está na loja (aberta -> entregue) */
+export const diasEmPosse = (o: OrdemServico): number =>
+  o.status === "entregue" || o.status === "cancelada"
+    ? 0
+    : diasDesde(o.criadoEm);
+
+/**
+ * Taxa de armazenamento acumulada: começa a contar depois que a OS ficou
+ * pronta e o prazo de retirada expirou.
+ */
+export const taxaArmazenamento = (
+  o: OrdemServico,
+  taxaDia: number,
+  prazoDias: number
+): { diasParado: number; diasExcedidos: number; valor: number } => {
+  const base = o.prontaEm;
+  if (!base || o.status !== "pronta" || !taxaDia) {
+    return { diasParado: base ? diasDesde(base) : 0, diasExcedidos: 0, valor: 0 };
+  }
+  const diasParado = diasDesde(base);
+  const diasExcedidos = Math.max(0, diasParado - (prazoDias || 0));
+  return { diasParado, diasExcedidos, valor: diasExcedidos * taxaDia };
+};
+
 /** Saldo em caixa considerando abertura */
 export const saldoCaixa = (
   movs: MovimentoCaixa[],
