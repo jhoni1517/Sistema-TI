@@ -24,7 +24,7 @@ import { Modal, Field, EmptyState, SectionTitle } from "../components/ui";
 import { PatternLock } from "../components/PatternLock";
 import { printHTML } from "../lib/print";
 import { reciboOS } from "../lib/recibo";
-import { uid, nowISO, brl, whatsappLink, formatDateTime, codigoOS } from "../lib/format";
+import { uid, nowISO, brl, whatsappLink, formatDateTime, codigoOS, txt } from "../lib/format";
 import { totalOS, totalPecas, custoPecas, lucroOS, diasEmPosse, taxaArmazenamento } from "../lib/calc";
 import {
   OS_STATUS_META,
@@ -100,15 +100,14 @@ export const OrdensServico: React.FC = () => {
         return true;
       })
       .filter((o) => {
-        const nome = nomeCliente(o.clienteId).toLowerCase();
-        return (
-          nome.includes(b) ||
-          codigoOS(o.numero).toLowerCase().includes(b) ||
-          o.modelo.toLowerCase().includes(b) ||
-          o.marca.toLowerCase().includes(b)
-        );
+        // busca em cliente, código, aparelho e IMEI (tolerante a campos vazios)
+        const alvo = [nomeCliente(o.clienteId), codigoOS(o.numero), o.marca, o.modelo, o.imeiSerial]
+          .map(txt)
+          .join(" ")
+          .toLowerCase();
+        return alvo.includes(b);
       })
-      .sort((a, b) => b.numero - a.numero);
+      .sort((a, b) => (b.numero || 0) - (a.numero || 0));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ordens, busca, filtro, clientes]);
 

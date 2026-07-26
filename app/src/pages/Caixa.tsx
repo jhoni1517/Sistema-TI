@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, SectionTitle, EmptyState } from "../components/ui";
-import { uid, nowISO, brl, formatDateTime, isToday } from "../lib/format";
+import { uid, nowISO, brl, formatDateTime, isToday, txt } from "../lib/format";
 import { receitaBruta, totalDespesas, totalSangrias } from "../lib/calc";
 import { printHTML } from "../lib/print";
 import { reciboFechamento } from "../lib/recibo";
@@ -49,7 +49,7 @@ export const Caixa: React.FC = () => {
   const saldo = abertura + entradas - saidas - sangrias;
 
   const listaMovs = useMemo(
-    () => [...movimentos].sort((a, b) => b.data.localeCompare(a.data)).slice(0, 100),
+    () => [...movimentos].sort((a, b) => txt(b.data).localeCompare(txt(a.data))).slice(0, 100),
     [movimentos]
   );
 

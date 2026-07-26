@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Plus, Search, Pencil, Trash2, Users, Phone, MessageCircle, Wrench } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle } from "../components/ui";
-import { uid, nowISO, whatsappLink, formatDate } from "../lib/format";
+import { uid, nowISO, whatsappLink, formatDate, txt } from "../lib/format";
 import type { Cliente } from "../lib/types";
 
 const vazio = (): Cliente => ({
@@ -26,11 +26,11 @@ export const Clientes: React.FC = () => {
     return [...clientes]
       .filter(
         (c) =>
-          c.nome.toLowerCase().includes(b) ||
-          c.telefone.includes(b) ||
-          (c.cpf || "").includes(b)
+          txt(c.nome).toLowerCase().includes(b) ||
+          txt(c.telefone).includes(b) ||
+          txt(c.cpf).includes(b)
       )
-      .sort((a, b) => a.nome.localeCompare(b.nome));
+      .sort((a, b) => txt(a.nome).localeCompare(txt(b.nome)));
   }, [clientes, busca]);
 
   const osCount = (id: string) => ordens.filter((o) => o.clienteId === id).length;

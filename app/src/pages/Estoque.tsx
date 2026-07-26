@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle } from "../components/ui";
-import { uid, nowISO, brl } from "../lib/format";
+import { uid, nowISO, brl, txt } from "../lib/format";
 import type { Produto, Categoria, Fornecedor } from "../lib/types";
 
 const vazio = (): Produto => ({
@@ -30,11 +30,11 @@ export const Estoque: React.FC = () => {
   const [gerFornecedores, setGerFornecedores] = useState(false);
 
   const classes = useMemo(
-    () => categorias.filter((c) => !c.paiId).sort((a, b) => a.nome.localeCompare(b.nome)),
+    () => categorias.filter((c) => !c.paiId).sort((a, b) => txt(a.nome).localeCompare(txt(b.nome))),
     [categorias]
   );
   const subde = (paiId?: string) =>
-    categorias.filter((c) => c.paiId === paiId).sort((a, b) => a.nome.localeCompare(b.nome));
+    categorias.filter((c) => c.paiId === paiId).sort((a, b) => txt(a.nome).localeCompare(txt(b.nome)));
 
   const nomeCat = (p: Produto): string => {
     const cls = categorias.find((c) => c.id === p.categoriaId);
@@ -48,9 +48,9 @@ export const Estoque: React.FC = () => {
   const lista = useMemo(() => {
     const b = busca.toLowerCase();
     return [...produtos]
-      .filter((p) => p.nome.toLowerCase().includes(b) || (p.sku || "").toLowerCase().includes(b) || nomeCat(p).toLowerCase().includes(b))
+      .filter((p) => [p.nome, p.sku, nomeCat(p), nomeForn(p)].map(txt).join(" ").toLowerCase().includes(b))
       .filter((p) => (soBaixo ? p.quantidade <= p.estoqueMinimo : true))
-      .sort((a, b) => a.nome.localeCompare(b.nome));
+      .sort((a, b) => txt(a.nome).localeCompare(txt(b.nome)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [produtos, busca, soBaixo, categorias]);
 
@@ -331,7 +331,7 @@ const FornecedoresManager: React.FC<{
             <EmptyState icon={<Truck size={40} />} title="Nenhum fornecedor" hint="Cadastre seus fornecedores para vincular aos produtos." />
           ) : (
             <div className="divide-y divide-slate-100">
-              {[...fornecedores].sort((a, b) => a.nome.localeCompare(b.nome)).map((f) => (
+              {[...fornecedores].sort((a, b) => txt(a.nome).localeCompare(txt(b.nome))).map((f) => (
                 <div key={f.id} className="flex items-center gap-3 py-2.5">
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600"><Truck size={16} /></div>
                   <div className="min-w-0 flex-1">
