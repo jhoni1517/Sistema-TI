@@ -17,19 +17,23 @@ import {
   Search,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
+import { pode, NOME_PAPEL, type Sessao } from "../lib/auth";
 
 const nav = [
-  { to: "/", label: "Painel", icon: LayoutDashboard, end: true },
-  { to: "/ordens", label: "Ordens de Serviço", icon: Wrench },
-  { to: "/clientes", label: "Clientes", icon: Users },
-  { to: "/estoque", label: "Estoque", icon: Package },
-  { to: "/caixa", label: "Caixa", icon: Wallet },
-  { to: "/a-receber", label: "A Receber (Fiado)", icon: HandCoins },
-  { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
-  { to: "/config", label: "Configurações", icon: Settings },
+  { to: "/", label: "Painel", icon: LayoutDashboard, end: true, recurso: "*" },
+  { to: "/ordens", label: "Ordens de Serviço", icon: Wrench, recurso: "os" },
+  { to: "/clientes", label: "Clientes", icon: Users, recurso: "clientes" },
+  { to: "/estoque", label: "Estoque", icon: Package, recurso: "estoque" },
+  { to: "/caixa", label: "Caixa", icon: Wallet, recurso: "caixa" },
+  { to: "/a-receber", label: "A Receber (Fiado)", icon: HandCoins, recurso: "fiado" },
+  { to: "/relatorios", label: "Relatórios", icon: BarChart3, recurso: "relatorios" },
+  { to: "/config", label: "Configurações", icon: Settings, recurso: "config" },
 ];
 
-export const Layout: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
+export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
+  onLogout,
+  sessao,
+}) => {
   const { config, online } = useApp();
   const [open, setOpen] = useState(false);
   const [busca, setBusca] = useState(false);
@@ -99,7 +103,9 @@ export const Layout: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         </div>
 
         <nav className="space-y-1 p-3">
-          {nav.map((item) => (
+          {nav
+            .filter((item) => item.recurso === "*" || pode(sessao?.perfil?.papel, item.recurso))
+            .map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -120,6 +126,16 @@ export const Layout: React.FC<{ onLogout: () => void }> = ({ onLogout }) => {
         </nav>
 
         <div className="absolute bottom-0 w-full border-t border-slate-800 p-3">
+          {sessao && (
+            <div className="mb-2 px-3">
+              <p className="truncate text-xs font-semibold text-slate-300">
+                {sessao.perfil?.nome || sessao.email}
+              </p>
+              <p className="text-[11px] text-slate-500">
+                {sessao.perfil ? NOME_PAPEL[sessao.perfil.papel] : "sem perfil"}
+              </p>
+            </div>
+          )}
           <button
             onClick={() => {
               onLogout();

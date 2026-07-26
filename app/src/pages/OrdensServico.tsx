@@ -23,6 +23,7 @@ import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle } from "../components/ui";
 import { PatternLock } from "../components/PatternLock";
 import { printHTML } from "../lib/print";
+import { obterLoja } from "../lib/db";
 import { reciboOS } from "../lib/recibo";
 import { uid, nowISO, brl, whatsappLink, formatDateTime, codigoOS, txt } from "../lib/format";
 import { totalOS, totalPecas, custoPecas, lucroOS, diasEmPosse, taxaArmazenamento } from "../lib/calc";
@@ -582,7 +583,8 @@ const OSDetalhe: React.FC<{
   const [forma, setForma] = useState<FormaPagamento>("dinheiro");
   const [incluirCliente, setIncluirCliente] = useState(true);
 
-  const trackingUrl = `${window.location.origin}${window.location.pathname}#/rastreio/${codigoOS(os.numero)}`;
+  // o link leva a loja: a consulta pública só devolve dados desta loja
+  const trackingUrl = `${window.location.origin}${window.location.pathname}#/rastreio/${codigoOS(os.numero)}?loja=${obterLoja() || ""}`;
   const imprimir = () => {
     printHTML(reciboOS(os, cliente, config, { incluirCliente }), codigoOS(os.numero));
   };
