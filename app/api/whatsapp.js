@@ -51,7 +51,23 @@ function parseMensagem(textoOriginal) {
   return { tipo, valor, descricao, categoria };
 }
 
+/** Descobre a sessão de caixa aberta, para o lançamento entrar no fechamento do dia */
+async function sessaoAbertaId() {
+  try {
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/sessoes?select=id&fechadoEm=is.null&order=abertoEm.desc&limit=1`,
+      { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } }
+    );
+    if (!r.ok) return undefined;
+    const linhas = await r.json();
+    return linhas?.[0]?.id;
+  } catch {
+    return undefined;
+  }
+}
+
 async function registrarMovimento(mov) {
+  const sessaoId = await sessaoAbertaId();
   const res = await fetch(`${SUPABASE_URL}/rest/v1/movimentos`, {
     method: "POST",
     headers: {
@@ -69,6 +85,7 @@ async function registrarMovimento(mov) {
         valor: mov.valor,
         formaPagamento: "dinheiro",
         data: new Date().toISOString(),
+        sessaoId: sessaoId || null,
       },
     ]),
   });
@@ -134,13 +151,18 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
-    await registrarMovimento(parsed);
+    try {
+      await registrarMovimento(parsed);
+    } catch (e) {
+      console.error("Falha ao gravar no banco:", e);
+      await responder(from, "Não consegui registrar agora. Verifique /api/status no site.");
+      return res.status(200).json({ ok: false, erro: String(e) });
+    }
 
-    const emoji = parsed.tipo === "entrada" ? "🟢" : "🔴";
     const rotulo = parsed.tipo === "entrada" ? "Entrada" : parsed.tipo === "sangria" ? "Sangria" : "Despesa";
     await responder(
       from,
-      `${emoji} ${rotulo} registrada!\n${parsed.descricao} — ${brl(parsed.valor)}`
+      `${rotulo} registrada!\n${parsed.descricao} - ${brl(parsed.valor)}`
     );
 
     return res.status(200).json({ ok: true });
