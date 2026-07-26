@@ -14,14 +14,17 @@ export default async function handler(req, res) {
     configuracao: {
       supabaseUrl: !!SUPABASE_URL,
       supabaseKey: !!SUPABASE_KEY,
+      telegramToken: !!process.env.TELEGRAM_TOKEN,
+      telegramChatId: process.env.TELEGRAM_CHAT_ID || "(sem restrição)",
       whatsappToken: !!process.env.WHATSAPP_TOKEN,
       whatsappPhoneId: process.env.WHATSAPP_PHONE_ID || null,
       whatsappVerifyToken: !!process.env.WHATSAPP_VERIFY_TOKEN,
       tokenTerminaEm: fim(process.env.WHATSAPP_TOKEN),
     },
     banco: "não testado",
+    telegram: "não testado",
     whatsapp: "não testado",
-    ultimosLancamentosWhatsApp: [],
+    ultimosLancamentos: [],
   };
 
   // 1) Testa leitura/gravação no Supabase
@@ -34,7 +37,7 @@ export default async function handler(req, res) {
       if (r.ok) {
         const linhas = await r.json();
         out.banco = "ok — consegui ler a tabela de movimentos";
-        out.ultimosLancamentosWhatsApp = linhas;
+        out.ultimosLancamentos = linhas;
       } else {
         out.banco = `ERRO ao ler (${r.status}): ${await r.text()}`;
       }
@@ -45,7 +48,31 @@ export default async function handler(req, res) {
     out.banco = "ERRO — faltam VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY no Vercel";
   }
 
-  // 2) Testa se o token do WhatsApp ainda é válido
+  // 2) Testa o robô do Telegram
+  const tg = process.env.TELEGRAM_TOKEN;
+  if (tg) {
+    try {
+      const r = await fetch(`https://api.telegram.org/bot${tg}/getWebhookInfo`);
+      const body = await r.json();
+      if (body?.ok) {
+        const url = body.result?.url;
+        out.telegram = url
+          ? `ok — bot ligado e recebendo em ${url}`
+          : "token válido, mas o webhook AINDA NÃO foi ligado (falta abrir o link setWebhook)";
+        if (body.result?.last_error_message) {
+          out.telegram += ` | último erro: ${body.result.last_error_message}`;
+        }
+      } else {
+        out.telegram = "ERRO — token do Telegram inválido";
+      }
+    } catch (e) {
+      out.telegram = "ERRO de conexão com o Telegram: " + (e?.message || String(e));
+    }
+  } else {
+    out.telegram = "falta TELEGRAM_TOKEN no Vercel";
+  }
+
+  // 3) Testa se o token do WhatsApp ainda é válido
   const token = process.env.WHATSAPP_TOKEN;
   const phoneId = process.env.WHATSAPP_PHONE_ID;
   if (token && phoneId) {
