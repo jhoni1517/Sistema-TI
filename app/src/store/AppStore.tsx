@@ -142,6 +142,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     reload();
   }, [reload]);
 
+  // Recarrega ao voltar para a aba/app (mostra lançamentos feitos pelo WhatsApp ou por outro aparelho)
+  useEffect(() => {
+    if (!db.online) return;
+    const aoVoltar = () => {
+      if (document.visibilityState === "visible") reload();
+    };
+    document.addEventListener("visibilitychange", aoVoltar);
+    window.addEventListener("focus", aoVoltar);
+    return () => {
+      document.removeEventListener("visibilitychange", aoVoltar);
+      window.removeEventListener("focus", aoVoltar);
+    };
+  }, [reload]);
+
   const saveCliente = async (c: Cliente) => {
     await db.clientes.save(c);
     setClientes((prev) => {
