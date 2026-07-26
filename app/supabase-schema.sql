@@ -119,6 +119,12 @@ alter table produtos add column if not exists "categoriaId" text;
 alter table produtos add column if not exists "subcategoriaId" text;
 alter table produtos add column if not exists "fornecedorId" text;
 
+-- Aprovação online do orçamento, assinatura e controle de guarda
+alter table ordens add column if not exists "aprovadoEm" text;
+alter table ordens add column if not exists "recusadoEm" text;
+alter table ordens add column if not exists "assinaturaCliente" text;
+alter table ordens add column if not exists "prontaEm" text;
+
 -- ------------------------------------------------------------
 -- Segurança (RLS)
 -- Como o app usa um login único próprio (não o Auth do Supabase),

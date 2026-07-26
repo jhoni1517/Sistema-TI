@@ -85,6 +85,13 @@ export interface OrdemServico {
   criadoEm: string;
   atualizadoEm: string;
   entregueEm?: string;
+  // Aprovação do orçamento pelo cliente (link público)
+  aprovadoEm?: string;
+  recusadoEm?: string;
+  // Assinatura do cliente (imagem em data URL)
+  assinaturaCliente?: string;
+  // Quando ficou pronta (base para taxa de armazenamento)
+  prontaEm?: string;
 }
 
 export interface Categoria {

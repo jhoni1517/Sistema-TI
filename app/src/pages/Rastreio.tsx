@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Search, Wrench, CheckCircle2, Clock, Smartphone } from "lucide-react";
+import { Search, Wrench, CheckCircle2, Clock, Smartphone, ThumbsUp, ThumbsDown } from "lucide-react";
 import { useApp } from "../store/AppStore";
-import { brl, formatDateTime, codigoOS } from "../lib/format";
+import { brl, formatDateTime, codigoOS, nowISO } from "../lib/format";
 import { totalOS } from "../lib/calc";
 import { OS_STATUS_META, type OSStatus } from "../lib/types";
 
@@ -19,8 +19,9 @@ const FLUXO: OSStatus[] = [
 export const Rastreio: React.FC = () => {
   const { codigo } = useParams();
   const navigate = useNavigate();
-  const { ordens, clientes, config, loading } = useApp();
+  const { ordens, clientes, config, loading, saveOrdem } = useApp();
   const [busca, setBusca] = useState(codigo || "");
+  const [enviando, setEnviando] = useState(false);
 
   const os = useMemo(() => {
     if (!codigo) return null;
@@ -35,6 +36,37 @@ export const Rastreio: React.FC = () => {
     e.preventDefault();
     const num = parseInt(busca.replace(/\D/g, ""), 10);
     if (num) navigate(`/rastreio/${codigoOS(num)}`);
+  };
+
+  /** Cliente aprova ou recusa o orçamento pelo próprio link */
+  const decidir = async (aprovar: boolean) => {
+    if (!os || enviando) return;
+    const texto = aprovar
+      ? "Confirma a APROVAÇÃO do orçamento e a execução do serviço?"
+      : "Confirma que NÃO deseja realizar o serviço?";
+    if (!confirm(texto)) return;
+    setEnviando(true);
+    try {
+      await saveOrdem({
+        ...os,
+        status: aprovar ? "aprovada" : "cancelada",
+        aprovadoEm: aprovar ? nowISO() : os.aprovadoEm,
+        recusadoEm: aprovar ? os.recusadoEm : nowISO(),
+        atualizadoEm: nowISO(),
+        historico: [
+          ...os.historico,
+          {
+            data: nowISO(),
+            status: aprovar ? "aprovada" : "cancelada",
+            nota: aprovar ? "Aprovado pelo cliente" : "Recusado pelo cliente",
+          },
+        ],
+      });
+    } catch {
+      alert("Não foi possível registrar sua resposta. Tente novamente.");
+    } finally {
+      setEnviando(false);
+    }
   };
 
   return (
@@ -99,6 +131,32 @@ export const Rastreio: React.FC = () => {
                   <p className="text-sm text-emerald-700">Valor do serviço</p>
                   <p className="text-2xl font-bold text-emerald-700">{brl(totalOS(os))}</p>
                 </div>
+              )}
+
+              {/* Aprovação do orçamento pelo próprio cliente */}
+              {os.status === "aguardando_aprovacao" && (
+                <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
+                  <p className="mb-3 text-center text-sm font-semibold text-amber-800">
+                    Podemos executar o serviço?
+                  </p>
+                  <div className="flex gap-2">
+                    <button className="btn-success flex-1" disabled={enviando} onClick={() => decidir(true)}>
+                      <ThumbsUp size={16} /> Aprovar
+                    </button>
+                    <button className="btn-secondary flex-1" disabled={enviando} onClick={() => decidir(false)}>
+                      <ThumbsDown size={16} /> Não quero
+                    </button>
+                  </div>
+                  <p className="mt-2 text-center text-xs text-amber-700">
+                    Sua resposta chega na hora para a assistência.
+                  </p>
+                </div>
+              )}
+
+              {os.aprovadoEm && os.status !== "aguardando_aprovacao" && (
+                <p className="mb-4 rounded-lg bg-emerald-50 p-2 text-center text-xs text-emerald-700">
+                  Orçamento aprovado por você em {formatDateTime(os.aprovadoEm)}
+                </p>
               )}
 
               {/* Linha do tempo */}
