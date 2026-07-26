@@ -3,12 +3,19 @@ import { Store, KeyRound, Cloud, Download, Upload, Save, Database, Palette, Sun,
 import { useApp } from "../store/AppStore";
 import { Field, SectionTitle } from "../components/ui";
 import { ACCENTS, ACCENT_KEYS } from "../lib/themes";
+import { Equipe } from "../components/Equipe";
+import { carregarSessao, type Sessao } from "../lib/auth";
 import type { Config as ConfigType } from "../lib/types";
 
 export const Config: React.FC = () => {
   const { config, saveConfig, reload, clientes, ordens, produtos, movimentos, sessoes, fiados, categorias, fornecedores } = useApp();
   const [form, setForm] = useState<ConfigType>(config);
   const [salvo, setSalvo] = useState(false);
+  const [sessao, setSessao] = useState<Sessao | null>(null);
+
+  React.useEffect(() => {
+    carregarSessao().then(setSessao);
+  }, []);
 
   const salvar = () => {
     saveConfig(form);
@@ -106,17 +113,23 @@ export const Config: React.FC = () => {
         </div>
       </div>
 
-      {/* Segurança */}
+      {/* Equipe e permissões */}
+      {sessao?.perfil && (
+        <Equipe meuId={sessao.perfil.id} meuPapel={sessao.perfil.papel} />
+      )}
+
+      {/* Operação */}
       <div className="card mb-5">
-        <h3 className="mb-4 flex items-center gap-2 font-bold text-slate-700"><KeyRound size={18} /> Senha de acesso</h3>
+        <h3 className="mb-4 flex items-center gap-2 font-bold text-slate-700"><KeyRound size={18} /> Operação</h3>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Senha do sistema">
-            <input className="input" value={form.senhaAcesso} onChange={(e) => setForm({ ...form, senhaAcesso: e.target.value })} />
-          </Field>
           <Field label="Comissão padrão do técnico (%)">
             <input type="number" className="input" value={form.comissaoPadrao ?? 0} onChange={(e) => setForm({ ...form, comissaoPadrao: +e.target.value })} />
           </Field>
         </div>
+        <p className="mt-3 text-xs text-slate-500">
+          A senha de acesso agora é individual: cada pessoa entra com o próprio
+          e-mail e pode trocar a senha pela opção "Esqueci minha senha".
+        </p>
       </div>
 
       {/* Aparência */}

@@ -35,6 +35,17 @@ interface WithId {
   id: string;
 }
 
+/**
+ * Loja do usuário logado. Todo registro gravado leva este carimbo, e as
+ * políticas do banco (RLS) só permitem ler/gravar linhas da própria loja —
+ * mesmo que alguém tente burlar pelo navegador.
+ */
+let lojaAtual: string | null = null;
+export const definirLoja = (id: string | null) => {
+  lojaAtual = id;
+};
+export const obterLoja = (): string | null => lojaAtual;
+
 // ---------- Backend local ----------
 const localBackend = {
   list<T>(table: TableName): T[] {
@@ -62,9 +73,11 @@ async function getAll<T extends WithId>(table: TableName): Promise<T[]> {
 
 async function upsert<T extends WithId>(table: TableName, row: T): Promise<T> {
   if (supabaseEnabled && supabase) {
+    // carimba a loja do usuário — sem isso o banco rejeita a gravação
+    const payload = lojaAtual ? { ...row, lojaId: lojaAtual } : row;
     const { data, error } = await supabase
       .from(table)
-      .upsert(row)
+      .upsert(payload)
       .select()
       .single();
     if (error) throw error;
@@ -134,21 +147,23 @@ export const db = {
     save: (f: Fornecedor) => upsert("fornecedores", f),
     remove: (id: string) => remove("fornecedores", id),
   },
-  // Configurações da loja compartilhadas na nuvem (linha única id='app')
+  // Configurações da loja compartilhadas na nuvem (uma linha por loja)
   config: {
     async get(): Promise<Record<string, unknown> | null> {
-      if (!supabaseEnabled || !supabase) return null;
+      if (!supabaseEnabled || !supabase || !lojaAtual) return null;
       const { data, error } = await supabase
         .from("configuracoes")
         .select("dados")
-        .eq("id", "app")
+        .eq("id", lojaAtual)
         .maybeSingle();
       if (error) return null;
       return (data?.dados as Record<string, unknown>) || null;
     },
     async save(dados: Record<string, unknown>): Promise<void> {
-      if (!supabaseEnabled || !supabase) return;
-      await supabase.from("configuracoes").upsert({ id: "app", dados });
+      if (!supabaseEnabled || !supabase || !lojaAtual) return;
+      await supabase
+        .from("configuracoes")
+        .upsert({ id: lojaAtual, lojaId: lojaAtual, dados });
     },
   },
 };
