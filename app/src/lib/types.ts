@@ -185,4 +185,10 @@ export interface Config {
   // Termos do recibo (guarda/abandono)
   taxaArmazenamentoDia?: number; // R$/dia após a conclusão
   diasAbandono?: number; // prazo legal para retirada antes de venda/descarte
+  /**
+   * Apaga senha, padrão e conta do aparelho quando a OS é entregue.
+   * Guardar senha de cliente depois que o aparelho saiu da loja é risco puro,
+   * sem nenhuma utilidade. Ligado por padrão.
+   */
+  limparSenhaNaEntrega?: boolean;
 }

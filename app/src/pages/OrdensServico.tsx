@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { aviso } from "../components/Aviso";
 import QRCode from "qrcode";
 import {
   Plus,
@@ -18,14 +19,17 @@ import {
   AlertTriangle,
   Clock,
   History,
+  EyeOff,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle } from "../components/ui";
 import { PatternLock } from "../components/PatternLock";
 import { printHTML } from "../lib/print";
 import { obterLoja } from "../lib/db";
+import { registrarAcessoSigilo } from "../lib/auth";
 import { reciboOS } from "../lib/recibo";
-import { uid, nowISO, brl, whatsappLink, formatDateTime, codigoOS, txt } from "../lib/format";
+import { mensagemCliente } from "../lib/mensagens";
+import { uid, nowISO, brl, abrirWhatsapp, formatDateTime, codigoOS, txt } from "../lib/format";
 import { totalOS, totalPecas, custoPecas, lucroOS, diasEmPosse, taxaArmazenamento } from "../lib/calc";
 import {
   OS_STATUS_META,
@@ -114,15 +118,25 @@ export const OrdensServico: React.FC = () => {
 
   const salvar = async () => {
     if (!editando) return;
-    if (!editando.clienteId) return alert("Selecione o cliente.");
-    if (!editando.defeitoRelatado.trim()) return alert("Descreva o defeito relatado.");
+    if (!editando.clienteId) return aviso.alerta("Selecione o cliente.");
+    if (!editando.defeitoRelatado.trim()) return aviso.alerta("Descreva o defeito relatado.");
     await saveOrdem({ ...editando, atualizadoEm: nowISO() });
     setEditando(null);
   };
 
+  /**
+   * Depois que o aparelho sai da loja, guardar a senha dele só gera risco.
+   * O melhor dado é o que não existe mais.
+   */
+  const semSigilo = (): Partial<OrdemServico> =>
+    config.limparSenhaNaEntrega === false
+      ? {}
+      : { senhaAparelho: "", padraoDesbloqueio: "", contaVinculada: "" };
+
   const mudarStatus = async (o: OrdemServico, status: OSStatus) => {
     const atualizado: OrdemServico = {
       ...o,
+      ...(status === "entregue" ? semSigilo() : {}),
       status,
       // marca quando ficou pronta — base para a taxa de armazenamento
       prontaEm: status === "pronta" ? o.prontaEm || nowISO() : o.prontaEm,
@@ -147,6 +161,7 @@ export const OrdensServico: React.FC = () => {
     }
     await saveOrdem({
       ...o,
+      ...semSigilo(),
       status: "entregue",
       entregueEm: nowISO(),
       atualizadoEm: nowISO(),
@@ -156,18 +171,12 @@ export const OrdensServico: React.FC = () => {
 
   const avisarCliente = (o: OrdemServico) => {
     const c = cliente(o.clienteId);
-    if (!c?.telefone) return alert("Cliente sem telefone cadastrado.");
-    const msg =
-      `*${config.nomeLoja}*\n\n` +
-      `Olá ${c.nome}! Segue a atualização da sua ordem de serviço ${codigoOS(o.numero)}.\n\n` +
-      `Aparelho: ${o.marca} ${o.modelo}\n` +
-      `Situação: *${OS_STATUS_META[o.status].label}*\n\n` +
-      `${OS_STATUS_META[o.status].cliente}\n\n` +
-      (o.status === "pronta" || o.status === "aguardando_aprovacao"
-        ? `Valor do serviço: ${brl(totalOS(o))}\n\n`
-        : "") +
-      `Qualquer dúvida, estamos à disposição. Obrigado pela preferência!`;
-    window.open(whatsappLink(c.telefone, msg), "_blank");
+    if (!txt(c?.telefone)) return aviso.alerta("Cliente sem telefone cadastrado.");
+    const loja = obterLoja();
+    const link = loja
+      ? `${window.location.origin}${window.location.pathname}#/rastreio/${codigoOS(o.numero)}?loja=${loja}`
+      : undefined;
+    abrirWhatsapp(txt(c?.telefone), mensagemCliente(o, c, config, link));
   };
 
   return (
@@ -324,7 +333,7 @@ export const OrdensServico: React.FC = () => {
             await saveMovimento(mov);
             await baixarEstoqueEEntregar(detalhe);
             setDetalhe(null);
-            alert("Pagamento registrado no caixa e OS marcada como entregue!");
+            aviso.sucesso("Pagamento registrado no caixa e OS marcada como entregue!");
           }}
           onFiado={async () => {
             await saveFiado({
@@ -339,7 +348,7 @@ export const OrdensServico: React.FC = () => {
             });
             await baixarEstoqueEEntregar(detalhe);
             setDetalhe(null);
-            alert("OS entregue e lançada em 'A Receber' (fiado)!");
+            aviso.sucesso("OS entregue e lançada em 'A Receber' (fiado)!");
           }}
         />
       )}
@@ -592,10 +601,10 @@ const OSDetalhe: React.FC<{
     const url = trackingUrl;
     if (cliente?.telefone) {
       const msg = `Acompanhe o status do seu aparelho na ${config.nomeLoja}:\n${url}`;
-      window.open(whatsappLink(cliente.telefone, msg), "_blank");
+      abrirWhatsapp(txt(cliente.telefone), msg);
     } else {
       navigator.clipboard?.writeText(url);
-      alert("Link de acompanhamento copiado:\n" + url);
+      aviso.sucesso("Link de acompanhamento copiado.");
     }
   };
   return (
@@ -673,19 +682,7 @@ const OSDetalhe: React.FC<{
           <Info label="Técnico" value={os.tecnico || "—"} />
         </div>
 
-        <div className="rounded-xl bg-amber-50 p-3 print:hidden">
-          <p className="mb-1 flex items-center gap-1 text-xs font-bold text-amber-700"><KeyRound size={13} /> Acesso (confidencial)</p>
-          <div className="grid gap-1 text-sm sm:grid-cols-3">
-            <span>Senha: <b>{os.senhaAparelho || "—"}</b></span>
-            <span>Padrão: <b>{os.padraoDesbloqueio || "—"}</b></span>
-            <span>Conta: <b>{os.contaVinculada || "—"}</b></span>
-          </div>
-          {os.padraoDesbloqueio && os.padraoDesbloqueio.includes("-") && (
-            <div className="mt-3">
-              <PatternLock value={os.padraoDesbloqueio} readOnly size={120} />
-            </div>
-          )}
-        </div>
+        <BlocoSigilo os={os} />
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Info label="Defeito relatado" value={os.defeitoRelatado} />
@@ -799,6 +796,64 @@ const OSDetalhe: React.FC<{
         )}
       </div>
     </Modal>
+  );
+};
+
+/**
+ * Dados de acesso do aparelho.
+ * Ficam escondidos por padrão: a tela da OS é aberta na frente do cliente,
+ * na frente do próximo da fila e em cima do balcão. Revelar é um ato
+ * deliberado, e fica registrado quem revelou.
+ */
+const BlocoSigilo: React.FC<{ os: OrdemServico }> = ({ os }) => {
+  const [aberto, setAberto] = useState(false);
+  const temAlgo = !!(os.senhaAparelho || os.padraoDesbloqueio || os.contaVinculada);
+
+  const revelarDados = () => {
+    setAberto(true);
+    const loja = obterLoja();
+    // Registro discreto: não trava a tela se falhar
+    if (loja) registrarAcessoSigilo(loja, os.numero).catch(() => {});
+  };
+
+  return (
+    <div className="rounded-xl bg-amber-50 p-3 print:hidden">
+      <div className="flex items-center justify-between gap-2">
+        <p className="flex items-center gap-1 text-xs font-bold text-amber-700">
+          <KeyRound size={13} /> Acesso (confidencial)
+        </p>
+        {temAlgo && (
+          <button
+            className="btn-ghost !px-2 !py-1 text-xs text-amber-700"
+            onClick={() => (aberto ? setAberto(false) : revelarDados())}
+          >
+            {aberto ? <EyeOff size={13} /> : <Eye size={13} />}
+            {aberto ? "Ocultar" : "Revelar"}
+          </button>
+        )}
+      </div>
+
+      {!temAlgo ? (
+        <p className="mt-1 text-sm text-amber-700/70">Nenhum dado de acesso registrado.</p>
+      ) : !aberto ? (
+        <p className="mt-1 text-sm text-amber-700/70">
+          Protegido. Clique em "Revelar" para exibir — fica registrado quem viu.
+        </p>
+      ) : (
+        <>
+          <div className="mt-1 grid gap-1 text-sm sm:grid-cols-3">
+            <span>Senha: <b>{os.senhaAparelho || "—"}</b></span>
+            <span>Padrão: <b>{os.padraoDesbloqueio || "—"}</b></span>
+            <span>Conta: <b>{os.contaVinculada || "—"}</b></span>
+          </div>
+          {os.padraoDesbloqueio && os.padraoDesbloqueio.includes("-") && (
+            <div className="mt-3">
+              <PatternLock value={os.padraoDesbloqueio} readOnly size={120} />
+            </div>
+          )}
+        </>
+      )}
+    </div>
   );
 };
 

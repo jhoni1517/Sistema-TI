@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { Store, KeyRound, Cloud, Download, Upload, Save, Database, Palette, Sun, Moon, Monitor, Percent, FileText } from "lucide-react";
+import { aviso } from "../components/Aviso";
+import { Store, KeyRound, Cloud, Download, Upload, Save, Database, Palette, Sun, Moon, Monitor, Percent, FileText, ShieldCheck } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Field, SectionTitle } from "../components/ui";
 import { ACCENTS, ACCENT_KEYS } from "../lib/themes";
@@ -68,9 +69,9 @@ export const Config: React.FC = () => {
         localStorage.setItem("sistema-ti:categorias", JSON.stringify(d.categorias || []));
         localStorage.setItem("sistema-ti:fornecedores", JSON.stringify(d.fornecedores || []));
         reload();
-        alert("Backup importado com sucesso!");
+        aviso.sucesso("Backup importado com sucesso!");
       } catch {
-        alert("Arquivo inválido.");
+        aviso.erro("Arquivo inválido.");
       }
     };
     reader.readAsText(file);
@@ -133,6 +134,39 @@ export const Config: React.FC = () => {
         <p className="mt-3 text-xs text-slate-500">
           A senha de acesso agora é individual: cada pessoa entra com o próprio
           e-mail e pode trocar a senha pela opção "Esqueci minha senha".
+        </p>
+      </div>
+
+      {/* Proteção dos dados do cliente */}
+      <div className="card mb-5">
+        <h3 className="mb-1 flex items-center gap-2 font-bold text-slate-700">
+          <ShieldCheck size={18} /> Proteção dos dados do cliente
+        </h3>
+        <p className="mb-4 text-sm text-slate-500">
+          A senha e o padrão de desbloqueio do aparelho são guardados
+          criptografados. Nem num backup do banco eles aparecem em texto legível.
+        </p>
+
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-slate-50 p-3">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4"
+            checked={form.limparSenhaNaEntrega !== false}
+            onChange={(e) => setForm({ ...form, limparSenhaNaEntrega: e.target.checked })}
+          />
+          <span className="text-sm">
+            <b className="text-slate-700">Apagar a senha do aparelho na entrega</b>
+            <span className="mt-0.5 block text-xs text-slate-500">
+              Recomendado. Depois que o aparelho volta para o dono, guardar a
+              senha dele não serve para nada e só aumenta o estrago em caso de
+              vazamento.
+            </span>
+          </span>
+        </label>
+
+        <p className="mt-3 flex items-start gap-1.5 text-xs text-slate-400">
+          <ShieldCheck size={13} className="mt-0.5 shrink-0" />
+          Quem abre a senha de um aparelho fica registrado com data e hora.
         </p>
       </div>
 

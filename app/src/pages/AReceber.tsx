@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { aviso } from "../components/Aviso";
 import {
   Plus,
   HandCoins,
@@ -10,7 +11,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle } from "../components/ui";
-import { uid, nowISO, brl, formatDate, whatsappLink, txt } from "../lib/format";
+import { uid, nowISO, brl, formatDate, abrirWhatsapp, txt } from "../lib/format";
 import { saldoFiado, pagoFiado } from "../lib/calc";
 import type { Fiado, FormaPagamento } from "../lib/types";
 
@@ -63,8 +64,8 @@ export const AReceber: React.FC = () => {
 
   const salvarNovo = async () => {
     if (!novo) return;
-    if (!novo.clienteId) return alert("Selecione o cliente.");
-    if (novo.valor <= 0) return alert("Informe o valor.");
+    if (!novo.clienteId) return aviso.alerta("Selecione o cliente.");
+    if (novo.valor <= 0) return aviso.alerta("Informe o valor.");
     await saveFiado(novo);
     setNovo(null);
   };
@@ -93,7 +94,7 @@ export const AReceber: React.FC = () => {
 
   const cobrar = (f: Fiado) => {
     const tel = telCliente(f.clienteId);
-    if (!tel) return alert("Cliente sem telefone cadastrado.");
+    if (!tel) return aviso.alerta("Cliente sem telefone cadastrado.");
     const msg =
       `*${config.nomeLoja}*\n\n` +
       `Olá ${nomeCliente(f.clienteId)}! Passando para lembrar do seu débito:\n\n` +
@@ -101,7 +102,7 @@ export const AReceber: React.FC = () => {
       `💰 Saldo devedor: *${brl(saldoFiado(f))}*\n` +
       (f.vencimento ? `📅 Vencimento: ${formatDate(f.vencimento)}\n` : "") +
       `\nQualquer coisa é só chamar. Obrigado!`;
-    window.open(whatsappLink(tel, msg), "_blank");
+    abrirWhatsapp(tel, msg);
   };
 
   return (
