@@ -11,6 +11,8 @@ import type {
   Fornecedor,
   Cotacao,
   PrecoFornecedor,
+  ContaPagar,
+  Meta,
 } from "./types";
 
 /**
@@ -34,7 +36,9 @@ type TableName =
   | "categorias"
   | "fornecedores"
   | "cotacoes"
-  | "precos_fornecedor";
+  | "precos_fornecedor"
+  | "contas_pagar"
+  | "metas";
 
 interface WithId {
   id: string;
@@ -219,6 +223,8 @@ export interface DumpLoja {
   fornecedores?: Fornecedor[];
   cotacoes?: Cotacao[];
   precos?: PrecoFornecedor[];
+  contas?: ContaPagar[];
+  metas?: Meta[];
 }
 
 const TABELA_DO_CAMPO: Record<keyof DumpLoja, TableName> = {
@@ -232,6 +238,8 @@ const TABELA_DO_CAMPO: Record<keyof DumpLoja, TableName> = {
   fornecedores: "fornecedores",
   cotacoes: "cotacoes",
   precos: "precos_fornecedor",
+  contas: "contas_pagar",
+  metas: "metas",
 };
 
 /**
@@ -326,6 +334,16 @@ export const db = {
     all: () => getAll<PrecoFornecedor>("precos_fornecedor"),
     save: (p: PrecoFornecedor) => upsert("precos_fornecedor", p),
     remove: (id: string) => remove("precos_fornecedor", id),
+  },
+  contas: {
+    all: () => getAll<ContaPagar>("contas_pagar"),
+    save: (c: ContaPagar) => upsert("contas_pagar", c),
+    remove: (id: string) => remove("contas_pagar", id),
+  },
+  metas: {
+    all: () => getAll<Meta>("metas"),
+    save: (m: Meta) => upsert("metas", m),
+    remove: (id: string) => remove("metas", id),
   },
   // Configurações da loja compartilhadas na nuvem (uma linha por loja)
   config: {

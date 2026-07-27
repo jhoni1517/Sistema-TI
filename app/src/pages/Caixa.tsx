@@ -164,12 +164,30 @@ export const Caixa: React.FC = () => {
         produtos={produtos}
         onClose={() => setModal(null)}
         onSave={async (m, extra) => {
-          await saveMovimento({ ...m, sessaoId: sessaoAberta?.id, custoRelacionado: extra?.custo });
-          if (extra?.baixa && extra.produtoId) {
-            const prod = produtos.find((p) => p.id === extra.produtoId);
-            if (prod) await saveProduto({ ...prod, quantidade: Math.max(0, prod.quantidade - (extra.quantidade || 1)) });
+          try {
+            // Lança o dinheiro primeiro e só então mexe no estoque. Se algo
+            // falhar, o erro APARECE — antes a falha era engolida e sobrava
+            // baixa de estoque sem lançamento correspondente no caixa.
+            await saveMovimento({ ...m, sessaoId: sessaoAberta?.id, custoRelacionado: extra?.custo });
+            if (extra?.baixa && extra.produtoId) {
+              const prod = produtos.find((p) => p.id === extra.produtoId);
+              if (prod) {
+                await saveProduto({
+                  ...prod,
+                  quantidade: Math.max(0, prod.quantidade - (extra.quantidade || 1)),
+                });
+              }
+            }
+            setModal(null);
+            aviso.sucesso(
+              `${m.tipo === "entrada" ? "Entrada" : m.tipo === "sangria" ? "Sangria" : "Saída"} de ${brl(m.valor)} registrada.`
+            );
+          } catch (e) {
+            aviso.erro(
+              "Não foi possível registrar no caixa:\n\n" +
+                (e instanceof Error ? e.message : String(e))
+            );
           }
-          setModal(null);
         }}
       />
 

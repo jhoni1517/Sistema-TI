@@ -82,7 +82,7 @@ const novaOS = (numero: number): OrdemServico => ({
 });
 
 export const OrdensServico: React.FC = () => {
-  const { ordens, clientes, produtos, config, saveOrdem, removeOrdem, saveMovimento, saveProduto, saveFiado } = useApp();
+  const { ordens, clientes, produtos, sessoes, config, saveOrdem, removeOrdem, saveMovimento, saveProduto, saveFiado } = useApp();
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<OSStatus | "todas" | "abertas">("abertas");
   const [editando, setEditando] = useState<OrdemServico | null>(null);
@@ -319,36 +319,68 @@ export const OrdensServico: React.FC = () => {
             }
           }}
           onReceber={async (forma) => {
-            const mov = {
-              id: uid(),
-              tipo: "entrada" as const,
-              categoria: "OS",
-              descricao: `${codigoOS(detalhe.numero)} - ${nomeCliente(detalhe.clienteId)}`,
-              valor: totalOS(detalhe),
-              formaPagamento: forma,
-              osId: detalhe.id,
-              custoRelacionado: custoPecas(detalhe),
-              data: nowISO(),
-            };
-            await saveMovimento(mov);
-            await baixarEstoqueEEntregar(detalhe);
-            setDetalhe(null);
-            aviso.sucesso("Pagamento registrado no caixa e OS marcada como entregue!");
+            const valor = totalOS(detalhe);
+            if (!(valor > 0)) {
+              return aviso.alerta(
+                "Esta OS está com valor zero. Informe a mão de obra ou as peças antes de receber."
+              );
+            }
+            try {
+              // O dinheiro ENTRA primeiro. Se a gravação falhar, o estoque não
+              // é baixado — antes o erro sumia e sobrava aparelho entregue sem
+              // lançamento nenhum no caixa.
+              const sessaoAberta = sessoes.find((s) => !s.fechadoEm);
+              await saveMovimento({
+                id: uid(),
+                tipo: "entrada" as const,
+                categoria: "OS",
+                descricao: `${codigoOS(detalhe.numero)} - ${nomeCliente(detalhe.clienteId)}`,
+                valor,
+                formaPagamento: forma,
+                osId: detalhe.id,
+                custoRelacionado: custoPecas(detalhe),
+                // Sem isto, uma OS paga com o caixa aberto não entrava no
+                // fechamento daquela sessão e a conta do dia não batia.
+                sessaoId: sessaoAberta?.id,
+                data: nowISO(),
+              });
+              await baixarEstoqueEEntregar(detalhe);
+              setDetalhe(null);
+              aviso.sucesso(`${brl(valor)} lançado no caixa e OS entregue.`);
+            } catch (e) {
+              aviso.erro(
+                "Não foi possível registrar o pagamento:\n\n" +
+                  (e instanceof Error ? e.message : String(e)) +
+                  "\n\nNada foi alterado. Tente de novo."
+              );
+            }
           }}
           onFiado={async () => {
-            await saveFiado({
-              id: uid(),
-              clienteId: detalhe.clienteId,
-              descricao: `${codigoOS(detalhe.numero)} · ${detalhe.marca} ${detalhe.modelo}`,
-              osId: detalhe.id,
-              valor: totalOS(detalhe),
-              pagamentos: [],
-              quitado: false,
-              criadoEm: nowISO(),
-            });
-            await baixarEstoqueEEntregar(detalhe);
-            setDetalhe(null);
-            aviso.sucesso("OS entregue e lançada em 'A Receber' (fiado)!");
+            try {
+              await saveFiado({
+                id: uid(),
+                clienteId: detalhe.clienteId,
+                descricao: `${codigoOS(detalhe.numero)} · ${detalhe.marca} ${detalhe.modelo}`,
+                osId: detalhe.id,
+                valor: totalOS(detalhe),
+                pagamentos: [],
+                quitado: false,
+                criadoEm: nowISO(),
+              });
+              await baixarEstoqueEEntregar(detalhe);
+              setDetalhe(null);
+              // Deixa explícito que NÃO entrou dinheiro: quem clica em fiado
+              // sem querer estranha o caixa parado e acha que é defeito.
+              aviso.sucesso(
+                "OS entregue e lançada em 'A Receber'. O caixa NÃO foi movimentado — " +
+                  "o valor entra quando o cliente pagar."
+              );
+            } catch (e) {
+              aviso.erro(
+                "Não foi possível lançar o fiado:\n\n" +
+                  (e instanceof Error ? e.message : String(e))
+              );
+            }
           }}
         />
       )}

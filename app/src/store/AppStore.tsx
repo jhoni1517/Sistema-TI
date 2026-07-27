@@ -18,6 +18,8 @@ import type {
   Fornecedor,
   Cotacao,
   PrecoFornecedor,
+  ContaPagar,
+  Meta,
   Config,
 } from "../lib/types";
 
@@ -48,6 +50,8 @@ interface AppState {
   fornecedores: Fornecedor[];
   cotacoes: Cotacao[];
   precos: PrecoFornecedor[];
+  contas: ContaPagar[];
+  metas: Meta[];
   config: Config;
   // ações
   reload: () => Promise<void>;
@@ -65,6 +69,10 @@ interface AppState {
   saveCategoria: (c: Categoria) => Promise<void>;
   removeCategoria: (id: string) => Promise<void>;
   saveFornecedor: (f: Fornecedor) => Promise<void>;
+  saveConta: (c: ContaPagar) => Promise<void>;
+  removeConta: (id: string) => Promise<void>;
+  saveMeta: (m: Meta) => Promise<void>;
+  removeMeta: (id: string) => Promise<void>;
   saveCotacao: (c: Cotacao) => Promise<void>;
   removeCotacao: (id: string) => Promise<void>;
   savePreco: (p: PrecoFornecedor) => Promise<void>;
@@ -104,6 +112,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
   const [cotacoes, setCotacoes] = useState<Cotacao[]>([]);
   const [precos, setPrecos] = useState<PrecoFornecedor[]>([]);
+  const [contas, setContas] = useState<ContaPagar[]>([]);
+  const [metas, setMetas] = useState<Meta[]>([]);
   const [config, setConfig] = useState<Config>(loadConfig());
 
   // Aplica o tema (cor + claro/escuro) e reage à mudança do sistema no modo "auto"
@@ -120,7 +130,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [c, o, p, m, s, f, cat, forn, cot, prc] = await Promise.all([
+      const [c, o, p, m, s, f, cat, forn, cot, prc, cts, mts] = await Promise.all([
         db.clientes.all(),
         db.ordens.all(),
         db.produtos.all(),
@@ -131,6 +141,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         db.fornecedores.all(),
         db.cotacoes.all(),
         db.precos.all(),
+        db.contas.all(),
+        db.metas.all(),
       ]);
       setClientes(c);
       setOrdens(o);
@@ -142,6 +154,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       setFornecedores(forn);
       setCotacoes(cot);
       setPrecos(prc);
+      setContas(cts);
+      setMetas(mts);
       // Configurações da loja vindas da nuvem (nome, senha, etc.) — mantém aparência local
       const cloudCfg = await db.config.get();
       if (cloudCfg) setConfig((prev) => ({ ...prev, ...cloudCfg }));
@@ -326,6 +340,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     setPrecos((prev) => [...prev.filter((x) => x.id !== p.id), p]);
   };
 
+  const saveConta = async (c: ContaPagar) => {
+    await db.contas.save(c);
+    setContas((prev) => {
+      const i = prev.findIndex((x) => x.id === c.id);
+      if (i >= 0) {
+        const n = [...prev];
+        n[i] = c;
+        return n;
+      }
+      return [...prev, c];
+    });
+  };
+  const removeConta = async (id: string) => {
+    await db.contas.remove(id);
+    setContas((prev) => prev.filter((x) => x.id !== id));
+  };
+  const saveMeta = async (m: Meta) => {
+    await db.metas.save(m);
+    setMetas((prev) => {
+      const i = prev.findIndex((x) => x.id === m.id);
+      if (i >= 0) {
+        const n = [...prev];
+        n[i] = m;
+        return n;
+      }
+      return [...prev, m];
+    });
+  };
+  const removeMeta = async (id: string) => {
+    await db.metas.remove(id);
+    setMetas((prev) => prev.filter((x) => x.id !== id));
+  };
+
   const saveConfig = (c: Config) => {
     localStorage.setItem("sistema-ti:config", JSON.stringify(c));
     setConfig(c);
@@ -357,6 +404,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     fornecedores,
     cotacoes,
     precos,
+    contas,
+    metas,
     config,
     reload,
     saveCliente,
@@ -374,6 +423,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     removeCategoria,
     saveFornecedor,
     removeFornecedor,
+    saveConta,
+    removeConta,
+    saveMeta,
+    removeMeta,
     saveCotacao,
     removeCotacao,
     savePreco,

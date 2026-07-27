@@ -11,6 +11,7 @@ import { Clientes } from "./pages/Clientes";
 import { Estoque } from "./pages/Estoque";
 import { Caixa } from "./pages/Caixa";
 import { AReceber } from "./pages/AReceber";
+import { Contas } from "./pages/Contas";
 import { Relatorios } from "./pages/Relatorios";
 import { Config } from "./pages/Config";
 import { Rastreio } from "./pages/Rastreio";
@@ -106,6 +107,7 @@ const AreaProtegida: React.FC = () => {
           <Route path="estoque" element={<Protegida recurso="estoque" papel={papel}><Estoque /></Protegida>} />
           <Route path="caixa" element={<Protegida recurso="caixa" papel={papel}><Caixa /></Protegida>} />
           <Route path="a-receber" element={<Protegida recurso="fiado" papel={papel}><AReceber /></Protegida>} />
+          <Route path="contas" element={<Protegida recurso="caixa" papel={papel}><Contas /></Protegida>} />
           <Route path="relatorios" element={<Protegida recurso="relatorios" papel={papel}><Relatorios /></Protegida>} />
           <Route path="config" element={<Protegida recurso="config" papel={papel}><Config /></Protegida>} />
           <Route path="assinatura" element={<Protegida recurso="config" papel={papel}><Assinatura /></Protegida>} />

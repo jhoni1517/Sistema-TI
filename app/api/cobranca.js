@@ -161,12 +161,88 @@ export default async function handler(req, res) {
       });
     }
 
+    const contas = await avisarContas();
+
     return res.status(200).json({
       ok: true,
       enviados: enviou ? novos.length : 0,
+      contas,
       telegram: enviou ? "enviado" : "não configurado ou falhou",
     });
   } catch (e) {
     return res.status(500).json({ erro: String(e?.message || e) });
   }
+}
+
+/**
+ * Lembrete das contas a pagar de cada loja.
+ *
+ * A notificação do navegador só alcança quem está com o sistema aberto.
+ * Este aqui chega no celular mesmo com tudo fechado — é o que evita
+ * esquecer o aluguel por não ter entrado no sistema naquele dia.
+ */
+async function avisarContas() {
+  // A tabela pode não existir ainda (migração não rodada): falhar aqui não
+  // pode derrubar o aviso de mensalidade, que é independente.
+  let contas;
+  try {
+    contas = await sb(
+      'contas_pagar?select=id,descricao,valor,vencimento,"lembreteDias",ativo,recorrencia,pagamentos,"lojaId"&ativo=is.true'
+    );
+  } catch {
+    return "tabela de contas ainda não existe";
+  }
+
+  let jaAvisados;
+  try {
+    jaAvisados = await sb("avisos_contas?select=conta_id,referencia,tipo");
+  } catch {
+    return "tabela de avisos ainda não existe";
+  }
+
+  const enviados = new Set(
+    (jaAvisados || []).map((a) => `${a.conta_id}|${a.referencia}|${a.tipo}`)
+  );
+
+  const atrasadas = [];
+  const hoje = [];
+  const proximas = [];
+  const novos = [];
+
+  for (const c of contas || []) {
+    // Conta avulsa já quitada não volta a cobrar
+    if (c.recorrencia === "unica" && (c.pagamentos || []).length > 0) continue;
+
+    const dias = diasAte(c.vencimento);
+    const limite = Number(c.lembreteDias ?? 3);
+    if (dias > limite) continue;
+
+    const tipo = dias < 0 ? "atrasada" : dias === 0 ? "hoje" : "proxima";
+    const referencia = String(c.vencimento).slice(0, 10);
+    if (enviados.has(`${c.id}|${referencia}|${tipo}`)) continue;
+
+    const linha = `• ${c.descricao} — ${dinheiro(c.valor)}` +
+      (dias < 0 ? ` (${Math.abs(dias)}d em atraso)` : dias > 0 ? ` (em ${dias}d)` : "");
+    (dias < 0 ? atrasadas : dias === 0 ? hoje : proximas).push(linha);
+
+    novos.push({ lojaId: c.lojaId, conta_id: c.id, referencia, tipo });
+  }
+
+  if (novos.length === 0) return "nada novo";
+
+  const partes = ["*Contas a pagar*"];
+  if (atrasadas.length) partes.push(`EM ATRASO\n${atrasadas.join("\n")}`);
+  if (hoje.length) partes.push(`VENCEM HOJE\n${hoje.join("\n")}`);
+  if (proximas.length) partes.push(`CHEGANDO\n${proximas.join("\n")}`);
+
+  const ok = await enviarTelegram(partes.join("\n\n"));
+  if (!ok) return "telegram não configurado";
+
+  await sb("avisos_contas", {
+    method: "POST",
+    headers: { Prefer: "resolution=ignore-duplicates" },
+    body: JSON.stringify(novos),
+  });
+
+  return `${novos.length} lembrete(s) enviado(s)`;
 }

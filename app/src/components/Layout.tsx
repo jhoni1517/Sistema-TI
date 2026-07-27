@@ -18,6 +18,7 @@ import {
   Search,
   CreditCard,
   Building2,
+  Receipt,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { pode, NOME_PAPEL, type Sessao } from "../lib/auth";
@@ -29,6 +30,7 @@ const nav = [
   { to: "/estoque", label: "Estoque", icon: Package, recurso: "estoque" },
   { to: "/caixa", label: "Caixa", icon: Wallet, recurso: "caixa" },
   { to: "/a-receber", label: "A Receber (Fiado)", icon: HandCoins, recurso: "fiado" },
+  { to: "/contas", label: "Contas a Pagar", icon: Receipt, recurso: "caixa" },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3, recurso: "relatorios" },
   { to: "/assinatura", label: "Assinatura", icon: CreditCard, recurso: "config" },
   { to: "/config", label: "Configurações", icon: Settings, recurso: "config" },
