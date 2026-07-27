@@ -192,6 +192,109 @@ export const COTACAO_STATUS_META: Record<StatusCotacao, { label: string; color: 
   recusada: { label: "Recusada", color: "bg-slate-100 text-slate-600" },
 };
 
+/* ------------------------------------------------------------------ */
+/* Contas a pagar e contas fixas                                       */
+/* ------------------------------------------------------------------ */
+
+export type Recorrencia = "unica" | "semanal" | "mensal" | "bimestral" | "trimestral" | "anual";
+
+export const RECORRENCIA_META: Record<Recorrencia, { label: string; meses: number; dias: number }> = {
+  unica: { label: "Uma vez só", meses: 0, dias: 0 },
+  semanal: { label: "Toda semana", meses: 0, dias: 7 },
+  mensal: { label: "Todo mês", meses: 1, dias: 0 },
+  bimestral: { label: "A cada 2 meses", meses: 2, dias: 0 },
+  trimestral: { label: "A cada 3 meses", meses: 3, dias: 0 },
+  anual: { label: "Todo ano", meses: 12, dias: 0 },
+};
+
+export interface PagamentoConta {
+  data: string;
+  valor: number;
+  formaPagamento: FormaPagamento;
+  /** Vencimento a que este pagamento se refere (a conta pode ser paga adiantada ou atrasada) */
+  referencia: string;
+}
+
+export interface ContaPagar {
+  id: ID;
+  descricao: string;
+  categoria: string;
+  valor: number;
+  /** Data do próximo vencimento (ISO). Nas recorrentes, avança a cada baixa. */
+  vencimento: string;
+  recorrencia: Recorrencia;
+  fornecedorId?: ID;
+  /** Quantos dias antes começa a avisar */
+  lembreteDias: number;
+  /** Conta desligada continua no histórico, mas para de cobrar */
+  ativo: boolean;
+  /** Reposição de estoque não é despesa do resultado (mesma regra do caixa) */
+  compraEstoque?: boolean;
+  pagamentos: PagamentoConta[];
+  observacoes?: string;
+  criadoEm: string;
+}
+
+export const CATEGORIAS_CONTA = [
+  "Aluguel",
+  "Energia",
+  "Água",
+  "Internet",
+  "Telefone",
+  "Salário",
+  "Contador",
+  "Impostos",
+  "Fornecedor",
+  "Software / Assinaturas",
+  "Marketing",
+  "Manutenção",
+  "Transporte",
+  "Outro",
+];
+
+/* ------------------------------------------------------------------ */
+/* Objetivos (metas)                                                   */
+/* ------------------------------------------------------------------ */
+
+export type TipoMeta = "faturamento" | "lucro" | "os" | "teto_gasto";
+
+export const META_META: Record<TipoMeta, { label: string; descricao: string; dinheiro: boolean; menorEMelhor: boolean }> = {
+  faturamento: {
+    label: "Faturamento",
+    descricao: "Quanto quero receber no período",
+    dinheiro: true,
+    menorEMelhor: false,
+  },
+  lucro: {
+    label: "Lucro líquido",
+    descricao: "Quanto quero que sobre depois de tudo",
+    dinheiro: true,
+    menorEMelhor: false,
+  },
+  os: {
+    label: "Ordens entregues",
+    descricao: "Quantos serviços quero concluir",
+    dinheiro: false,
+    menorEMelhor: false,
+  },
+  teto_gasto: {
+    label: "Teto de gastos",
+    descricao: "Quanto NÃO quero passar de despesas",
+    dinheiro: true,
+    menorEMelhor: true,
+  },
+};
+
+export interface Meta {
+  id: ID;
+  titulo: string;
+  tipo: TipoMeta;
+  alvo: number;
+  periodo: "mensal" | "anual";
+  ativo: boolean;
+  criadoEm: string;
+}
+
 export type TipoMovimento = "entrada" | "saida" | "sangria";
 export type FormaPagamento = "dinheiro" | "pix" | "debito" | "credito" | "transferencia" | "outro";
 
