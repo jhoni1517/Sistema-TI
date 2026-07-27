@@ -134,6 +134,15 @@ export const OrdensServico: React.FC = () => {
       : { senhaAparelho: "", padraoDesbloqueio: "", contaVinculada: "" };
 
   const mudarStatus = async (o: OrdemServico, status: OSStatus) => {
+    // Marcar "Entregue" no seletor pulava o caixa E o estoque: o aparelho
+    // saía da loja e nada era registrado. A entrega tem que passar por
+    // Receber ou Fiado, que é onde o dinheiro e a baixa acontecem.
+    if (status === "entregue" && o.status !== "entregue") {
+      return aviso.alerta(
+        "Para entregar, use o botão Receber (dinheiro entra no caixa) ou Fiado " +
+          "(fica em A Receber). Assim o estoque baixa e o valor é registrado."
+      );
+    }
     const atualizado: OrdemServico = {
       ...o,
       ...(status === "entregue" ? semSigilo() : {}),
@@ -147,17 +156,38 @@ export const OrdensServico: React.FC = () => {
     setDetalhe(atualizado);
   };
 
+  /**
+   * Baixa o estoque das peças da OS e marca como entregue.
+   *
+   * A peça só baixava quando tinha sido escolhida na lista de produtos. Quem
+   * digitava o nome à mão via a OS fechar com o estoque intacto, sem aviso
+   * nenhum. Agora casamos também pelo nome, e o que não der para casar é
+   * informado em vez de sumir em silêncio.
+   */
   const baixarEstoqueEEntregar = async (o: OrdemServico) => {
-    for (const p of o.pecas) {
-      if (p.produtoId) {
-        const prod = produtos.find((x) => x.id === p.produtoId);
-        if (prod) {
-          await saveProduto({
-            ...prod,
-            quantidade: Math.max(0, prod.quantidade - p.quantidade),
-          });
-        }
+    const semVinculo: string[] = [];
+
+    for (const p of o.pecas || []) {
+      const nome = txt(p.descricao).trim().toLowerCase();
+      const prod =
+        (p.produtoId && produtos.find((x) => x.id === p.produtoId)) ||
+        (nome ? produtos.find((x) => txt(x.nome).trim().toLowerCase() === nome) : undefined);
+
+      if (!prod) {
+        if (nome) semVinculo.push(txt(p.descricao));
+        continue;
       }
+      await saveProduto({
+        ...prod,
+        quantidade: Math.max(0, (Number(prod.quantidade) || 0) - (Number(p.quantidade) || 0)),
+      });
+    }
+
+    if (semVinculo.length > 0) {
+      aviso.alerta(
+        `Estas peças não existem no estoque e não foram baixadas: ${semVinculo.join(", ")}. ` +
+          "Cadastre-as no estoque para o controle ficar certo."
+      );
     }
     await saveOrdem({
       ...o,
