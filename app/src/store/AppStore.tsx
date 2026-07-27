@@ -16,6 +16,8 @@ import type {
   Fiado,
   Categoria,
   Fornecedor,
+  Cotacao,
+  PrecoFornecedor,
   Config,
 } from "../lib/types";
 
@@ -44,6 +46,8 @@ interface AppState {
   fiados: Fiado[];
   categorias: Categoria[];
   fornecedores: Fornecedor[];
+  cotacoes: Cotacao[];
+  precos: PrecoFornecedor[];
   config: Config;
   // ações
   reload: () => Promise<void>;
@@ -61,6 +65,9 @@ interface AppState {
   saveCategoria: (c: Categoria) => Promise<void>;
   removeCategoria: (id: string) => Promise<void>;
   saveFornecedor: (f: Fornecedor) => Promise<void>;
+  saveCotacao: (c: Cotacao) => Promise<void>;
+  removeCotacao: (id: string) => Promise<void>;
+  savePreco: (p: PrecoFornecedor) => Promise<void>;
   removeFornecedor: (id: string) => Promise<void>;
   saveConfig: (c: Config) => void;
 }
@@ -95,6 +102,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [fiados, setFiados] = useState<Fiado[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [fornecedores, setFornecedores] = useState<Fornecedor[]>([]);
+  const [cotacoes, setCotacoes] = useState<Cotacao[]>([]);
+  const [precos, setPrecos] = useState<PrecoFornecedor[]>([]);
   const [config, setConfig] = useState<Config>(loadConfig());
 
   // Aplica o tema (cor + claro/escuro) e reage à mudança do sistema no modo "auto"
@@ -111,7 +120,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [c, o, p, m, s, f, cat, forn] = await Promise.all([
+      const [c, o, p, m, s, f, cat, forn, cot, prc] = await Promise.all([
         db.clientes.all(),
         db.ordens.all(),
         db.produtos.all(),
@@ -120,6 +129,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         db.fiados.all(),
         db.categorias.all(),
         db.fornecedores.all(),
+        db.cotacoes.all(),
+        db.precos.all(),
       ]);
       setClientes(c);
       setOrdens(o);
@@ -129,6 +140,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       setFiados(f);
       setCategorias(cat);
       setFornecedores(forn);
+      setCotacoes(cot);
+      setPrecos(prc);
       // Configurações da loja vindas da nuvem (nome, senha, etc.) — mantém aparência local
       const cloudCfg = await db.config.get();
       if (cloudCfg) setConfig((prev) => ({ ...prev, ...cloudCfg }));
@@ -292,6 +305,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     setFornecedores((prev) => prev.filter((x) => x.id !== id));
   };
 
+  const saveCotacao = async (c: Cotacao) => {
+    await db.cotacoes.save(c);
+    setCotacoes((prev) => {
+      const i = prev.findIndex((x) => x.id === c.id);
+      if (i >= 0) {
+        const n = [...prev];
+        n[i] = c;
+        return n;
+      }
+      return [...prev, c];
+    });
+  };
+  const removeCotacao = async (id: string) => {
+    await db.cotacoes.remove(id);
+    setCotacoes((prev) => prev.filter((x) => x.id !== id));
+  };
+  const savePreco = async (p: PrecoFornecedor) => {
+    await db.precos.save(p);
+    setPrecos((prev) => [...prev.filter((x) => x.id !== p.id), p]);
+  };
+
   const saveConfig = (c: Config) => {
     localStorage.setItem("sistema-ti:config", JSON.stringify(c));
     setConfig(c);
@@ -321,6 +355,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     fiados,
     categorias,
     fornecedores,
+    cotacoes,
+    precos,
     config,
     reload,
     saveCliente,
@@ -338,6 +374,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     removeCategoria,
     saveFornecedor,
     removeFornecedor,
+    saveCotacao,
+    removeCotacao,
+    savePreco,
     saveConfig,
   };
 
