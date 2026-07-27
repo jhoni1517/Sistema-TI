@@ -804,7 +804,7 @@ const OSDetalhe: React.FC<{
 
 // Seletor de cliente com busca
 const ClienteSelect: React.FC<{
-  clientes: { id: string; nome: string }[];
+  clientes: { id: string; nome: string; telefone?: string; documento?: string }[];
   value?: string;
   onChange: (id: string) => void;
 }> = ({ clientes, value, onChange }) => {
@@ -815,7 +815,18 @@ const ClienteSelect: React.FC<{
     setQ(clientes.find((c) => c.id === value)?.nome || "");
   }, [value, clientes]);
   const filtro = clientes
-    .filter((c) => c.nome.toLowerCase().includes(q.toLowerCase()))
+    .filter((c) => {
+      const alvo = q.toLowerCase();
+      // Só compara número quando o usuário digitou número — senão o
+      // "contém string vazia" daria positivo para a lista inteira.
+      const digitos = q.replace(/\D/g, "");
+      return (
+        txt(c.nome).toLowerCase().includes(alvo) ||
+        (digitos.length > 0 &&
+          (txt(c.telefone).replace(/\D/g, "").includes(digitos) ||
+            txt(c.documento).replace(/\D/g, "").includes(digitos)))
+      );
+    })
     .slice(0, 8);
   return (
     <div className="relative">
@@ -844,7 +855,10 @@ const ClienteSelect: React.FC<{
                 setOpen(false);
               }}
             >
-              {c.nome}
+              <span className="block truncate font-medium">{txt(c.nome) || "(sem nome)"}</span>
+              {txt(c.telefone) && (
+                <span className="block text-xs text-slate-400">{txt(c.telefone)}</span>
+              )}
             </button>
           ))}
         </div>

@@ -8,6 +8,18 @@ export interface Perfil {
   nome?: string | null;
   papel: Papel;
   ativo: boolean;
+  /** Administra o sistema inteiro (pode liberar lojas novas), não só uma loja */
+  super_admin?: boolean;
+}
+
+export interface Convite {
+  codigo: string;
+  papel: Papel;
+  nome?: string | null;
+  nova_loja: boolean;
+  expira_em: string;
+  usado_por?: string | null;
+  usado_em?: string | null;
 }
 
 export interface Sessao {
@@ -52,7 +64,7 @@ export async function carregarSessao(): Promise<Sessao | null> {
 
   const { data: perfil } = await supabase
     .from("perfis")
-    .select("id, loja_id, nome, papel, ativo")
+    .select("id, loja_id, nome, papel, ativo, super_admin")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -84,6 +96,87 @@ export async function criarConta(
   if (error) throw new Error(traduzErro(error.message));
   return { precisaConfirmar: !data.session };
 }
+
+/* ------------------------------------------------------------------ */
+/* Convites — criar conta só é possível com um código válido           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Onde guardamos o convite entre "criar conta" e o primeiro login.
+ * Quando o Supabase exige confirmação de e-mail, a conta só existe de
+ * verdade depois que a pessoa volta pelo link — o código precisa esperar.
+ */
+export const CONVITE_PENDENTE = "sistema-ti:convite-pendente";
+
+/** Confere o código antes de criar a conta, para não deixar conta órfã */
+export async function conferirConvite(codigo: string): Promise<boolean> {
+  if (!supabase) return false;
+  const { data, error } = await supabase.rpc("convite_valido", {
+    p_codigo: codigo.trim().toUpperCase(),
+  });
+  if (error) {
+    // A função não existe: falta rodar supabase-migracao-convites.sql.
+    // Sem esta distinção, o dono passaria horas achando que digitou errado.
+    if (/function|does not exist|PGRST202|schema cache/i.test(error.message)) {
+      throw new Error(
+        "O sistema de convites ainda não foi instalado no banco. Rode o arquivo supabase-migracao-convites.sql no Supabase."
+      );
+    }
+    return false;
+  }
+  return data === true;
+}
+
+/** Vincula a conta logada à loja do convite. Devolve o id da loja. */
+export async function aceitarConvite(
+  codigo: string,
+  nome?: string,
+  nomeLoja?: string
+): Promise<string> {
+  if (!supabase) throw new Error("Nuvem não configurada.");
+  const { data, error } = await supabase.rpc("aceitar_convite", {
+    p_codigo: codigo.trim().toUpperCase(),
+    p_nome: nome || null,
+    p_nome_loja: nomeLoja || null,
+  });
+  if (error) throw new Error(traduzErro(error.message));
+  return String(data);
+}
+
+/** Gera um convite. novaLoja libera uma assistência nova (só super admin). */
+export async function criarConvite(
+  papel: Papel = "atendente",
+  nome?: string,
+  novaLoja = false,
+  dias = 7
+): Promise<string> {
+  if (!supabase) throw new Error("Nuvem não configurada.");
+  const { data, error } = await supabase.rpc("criar_convite", {
+    p_papel: papel,
+    p_nome: nome || null,
+    p_nova_loja: novaLoja,
+    p_dias: dias,
+  });
+  if (error) throw new Error(traduzErro(error.message));
+  return String(data);
+}
+
+export async function listarConvites(): Promise<Convite[]> {
+  if (!supabase) return [];
+  const { data } = await supabase
+    .from("convites")
+    .select("codigo, papel, nome, nova_loja, expira_em, usado_por, usado_em")
+    .order("criadoEm", { ascending: false });
+  return (data as Convite[]) || [];
+}
+
+export async function apagarConvite(codigo: string): Promise<void> {
+  await supabase?.from("convites").delete().eq("codigo", codigo);
+}
+
+/** Link pronto para mandar no WhatsApp, já com o código preenchido */
+export const linkConvite = (codigo: string): string =>
+  `${window.location.origin}${window.location.pathname}#/entrar?convite=${codigo}`;
 
 export async function sair(): Promise<void> {
   await supabase?.auth.signOut();

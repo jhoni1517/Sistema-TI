@@ -115,7 +115,11 @@ export const Config: React.FC = () => {
 
       {/* Equipe e permissões */}
       {sessao?.perfil && (
-        <Equipe meuId={sessao.perfil.id} meuPapel={sessao.perfil.papel} />
+        <Equipe
+          meuId={sessao.perfil.id}
+          meuPapel={sessao.perfil.papel}
+          souSuperAdmin={sessao.perfil.super_admin}
+        />
       )}
 
       {/* Operação */}

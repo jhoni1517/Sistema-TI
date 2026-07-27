@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import { ShieldOff } from "lucide-react";
 import { AppProvider } from "./store/AppStore";
 import { Layout } from "./components/Layout";
 import { Login } from "./pages/Login";
@@ -14,12 +15,29 @@ import { Config } from "./pages/Config";
 import { Rastreio } from "./pages/Rastreio";
 import { SemPerfil } from "./pages/SemPerfil";
 import { carregarSessao, sair, pode, type Sessao } from "./lib/auth";
-import { definirLoja } from "./lib/db";
+import { definirLoja, limparCacheLocal } from "./lib/db";
 import { supabase, supabaseEnabled } from "./lib/supabase";
 
 const Carregando: React.FC = () => (
   <div className="flex min-h-screen items-center justify-center bg-slate-100">
     <div className="h-10 w-10 animate-spin rounded-full border-4 border-brand-200 border-t-brand-600" />
+  </div>
+);
+
+/** Perfil existe, mas o responsável desativou o acesso */
+const Suspenso: React.FC<{ onSair: () => void }> = ({ onSair }) => (
+  <div className="flex min-h-screen items-center justify-center bg-slate-900 p-4">
+    <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl">
+      <ShieldOff className="mx-auto mb-3 text-amber-500" size={40} />
+      <h1 className="text-lg font-bold text-slate-800">Acesso suspenso</h1>
+      <p className="mt-2 text-sm text-slate-600">
+        O responsável pela loja desativou o seu acesso. Fale com ele para
+        reativar em Configurações → Equipe.
+      </p>
+      <button className="btn-secondary mt-5" onClick={onSair}>
+        Sair
+      </button>
+    </div>
   </div>
 );
 
@@ -55,13 +73,20 @@ const AreaProtegida: React.FC = () => {
   const logout = async () => {
     await sair();
     definirLoja(null);
+    // Não deixa dados da loja anterior no aparelho (balcão compartilhado)
+    limparCacheLocal();
     setSessao(null);
   };
 
   if (verificando) return <Carregando />;
   if (!sessao) return <Login onEntrou={revalidar} />;
   // Conta criada, mas ainda sem vínculo com uma loja
-  if (!sessao.perfil) return <SemPerfil email={sessao.email} onSair={logout} />;
+  if (!sessao.perfil) {
+    return <SemPerfil email={sessao.email} onSair={logout} onVinculado={revalidar} />;
+  }
+  // Acesso suspenso pelo responsável: antes a pessoa entrava e via tudo
+  // vazio, sem entender o motivo. Agora o sistema fala com clareza.
+  if (!sessao.perfil.ativo) return <Suspenso onSair={logout} />;
 
   const papel = sessao.perfil.papel;
 
