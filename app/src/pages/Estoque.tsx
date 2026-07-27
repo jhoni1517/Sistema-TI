@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { aviso } from "../components/Aviso";
-import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck } from "lucide-react";
+import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck, FileQuestion } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle } from "../components/ui";
+import { Cotacoes } from "../components/Cotacoes";
 import { uid, nowISO, brl, txt } from "../lib/format";
 import type { Produto, Categoria, Fornecedor } from "../lib/types";
 
@@ -23,12 +24,13 @@ const vazio = (): Produto => ({
 });
 
 export const Estoque: React.FC = () => {
-  const { produtos, categorias, fornecedores, saveProduto, removeProduto, saveCategoria, removeCategoria, saveFornecedor, removeFornecedor } = useApp();
+  const { produtos, categorias, fornecedores, cotacoes, saveProduto, removeProduto, saveCategoria, removeCategoria, saveFornecedor, removeFornecedor } = useApp();
   const [busca, setBusca] = useState("");
   const [editando, setEditando] = useState<Produto | null>(null);
   const [soBaixo, setSoBaixo] = useState(false);
   const [gerCategorias, setGerCategorias] = useState(false);
   const [gerFornecedores, setGerFornecedores] = useState(false);
+  const [verCotacoes, setVerCotacoes] = useState(false);
 
   const classes = useMemo(
     () => categorias.filter((c) => !c.paiId).sort((a, b) => txt(a.nome).localeCompare(txt(b.nome))),
@@ -54,6 +56,25 @@ export const Estoque: React.FC = () => {
       .sort((a, b) => txt(a.nome).localeCompare(txt(b.nome)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [produtos, busca, soBaixo, categorias]);
+
+  const cotacoesAbertas = useMemo(
+    () => cotacoes.filter((c) => c.status === "aberta" || c.status === "respondida").length,
+    [cotacoes]
+  );
+
+  /** Itens já em falta viram sugestão de cotação, sem redigitar nada */
+  const emFalta = useMemo(
+    () =>
+      produtos
+        .filter((p) => p.quantidade <= p.estoqueMinimo)
+        .slice(0, 10)
+        .map((p) => ({
+          produtoId: p.id,
+          descricao: p.nome,
+          quantidade: Math.max(1, (p.estoqueMinimo || 1) - p.quantidade + 1),
+        })),
+    [produtos]
+  );
 
   const resumo = useMemo(() => {
     const valorCusto = produtos.reduce((s, p) => s + p.custo * p.quantidade, 0);
@@ -86,6 +107,14 @@ export const Estoque: React.FC = () => {
         subtitle="Peças e produtos"
         action={
           <div className="flex flex-wrap gap-2">
+            <button className="btn-secondary" onClick={() => setVerCotacoes(true)}>
+              <FileQuestion size={18} /> Cotações
+              {cotacoesAbertas > 0 && (
+                <span className="ml-1 rounded-full bg-amber-500 px-1.5 text-[11px] font-bold text-white">
+                  {cotacoesAbertas}
+                </span>
+              )}
+            </button>
             <button className="btn-secondary" onClick={() => setGerFornecedores(true)}>
               <Truck size={18} /> Fornecedores
             </button>
@@ -272,6 +301,13 @@ export const Estoque: React.FC = () => {
           onRemove={removeFornecedor}
         />
       )}
+
+      {/* Cotações com fornecedores */}
+      <Cotacoes
+        aberto={verCotacoes}
+        onClose={() => setVerCotacoes(false)}
+        sugestao={soBaixo ? emFalta : undefined}
+      />
     </div>
   );
 };

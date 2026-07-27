@@ -127,6 +127,58 @@ export interface Produto {
   criadoEm: string;
 }
 
+/**
+ * Cotação com fornecedor.
+ *
+ * Fluxo real do balcão: chega uma OS, a peça não está no estoque. Em vez de
+ * cadastrar produto fantasma, o técnico abre uma cotação, o sistema monta a
+ * mensagem para o fornecedor já com o último valor pago como referência, e
+ * quando a resposta chega ela vira estoque + saída de caixa em um clique.
+ */
+export type StatusCotacao = "aberta" | "respondida" | "comprada" | "recusada";
+
+export interface ItemCotacao {
+  produtoId?: ID; // quando já existe no cadastro
+  descricao: string;
+  quantidade: number;
+  /** Resposta do fornecedor */
+  temEstoque?: boolean;
+  precoUnit?: number;
+  prazoDias?: number;
+}
+
+export interface Cotacao {
+  id: ID;
+  numero: number;
+  fornecedorId?: ID;
+  osId?: ID; // cotação nascida de uma ordem de serviço
+  itens: ItemCotacao[];
+  status: StatusCotacao;
+  observacoes?: string;
+  enviadoEm?: string;
+  respondidoEm?: string;
+  compradoEm?: string;
+  criadoEm: string;
+}
+
+/** Histórico de preços: é daqui que sai o "último valor pago" */
+export interface PrecoFornecedor {
+  id: ID;
+  produtoId?: ID;
+  descricao: string;
+  fornecedorId?: ID;
+  preco: number;
+  quantidade: number;
+  data: string;
+}
+
+export const COTACAO_STATUS_META: Record<StatusCotacao, { label: string; color: string }> = {
+  aberta: { label: "Aguardando resposta", color: "bg-amber-100 text-amber-700" },
+  respondida: { label: "Respondida", color: "bg-blue-100 text-blue-700" },
+  comprada: { label: "Comprada", color: "bg-emerald-100 text-emerald-700" },
+  recusada: { label: "Recusada", color: "bg-slate-100 text-slate-600" },
+};
+
 export type TipoMovimento = "entrada" | "saida" | "sangria";
 export type FormaPagamento = "dinheiro" | "pix" | "debito" | "credito" | "transferencia" | "outro";
 

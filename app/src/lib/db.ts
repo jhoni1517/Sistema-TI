@@ -9,6 +9,8 @@ import type {
   Fiado,
   Categoria,
   Fornecedor,
+  Cotacao,
+  PrecoFornecedor,
 } from "./types";
 
 /**
@@ -30,7 +32,9 @@ type TableName =
   | "sessoes"
   | "fiados"
   | "categorias"
-  | "fornecedores";
+  | "fornecedores"
+  | "cotacoes"
+  | "precos_fornecedor";
 
 interface WithId {
   id: string;
@@ -202,6 +206,16 @@ export const db = {
     all: () => getAll<Fornecedor>("fornecedores"),
     save: (f: Fornecedor) => upsert("fornecedores", f),
     remove: (id: string) => remove("fornecedores", id),
+  },
+  cotacoes: {
+    all: () => getAll<Cotacao>("cotacoes"),
+    save: (c: Cotacao) => upsert("cotacoes", c),
+    remove: (id: string) => remove("cotacoes", id),
+  },
+  precos: {
+    all: () => getAll<PrecoFornecedor>("precos_fornecedor"),
+    save: (p: PrecoFornecedor) => upsert("precos_fornecedor", p),
+    remove: (id: string) => remove("precos_fornecedor", id),
   },
   // Configurações da loja compartilhadas na nuvem (uma linha por loja)
   config: {
