@@ -39,6 +39,10 @@ alter table produtos add column if not exists servico boolean default false;
 alter table clientes add column if not exists "tipoPessoa" text default 'fisica';
 alter table clientes add column if not exists "nomeFantasia" text;
 alter table clientes add column if not exists "inscricaoEstadual" text;
+-- Classificação de risco: normal / atencao / bloqueado (ausente = normal).
+alter table clientes add column if not exists classificacao text;
+alter table clientes add column if not exists "motivoClassificacao" text;
+alter table clientes add column if not exists "classificadoEm" text;
 
 -- ---------- Fiado ----------
 alter table fiados add column if not exists vencimento text;

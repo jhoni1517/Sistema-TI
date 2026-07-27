@@ -20,6 +20,7 @@ import {
   Clock,
   History,
   EyeOff,
+  ShieldAlert,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle } from "../components/ui";
@@ -33,12 +34,15 @@ import { uid, nowISO, brl, abrirWhatsapp, formatDateTime, codigoOS, txt } from "
 import { totalOS, totalPecas, custoPecas, lucroOS, diasEmPosse, taxaArmazenamento } from "../lib/calc";
 import {
   OS_STATUS_META,
+  CLASSIFICACAO_META,
+  type Cliente,
   type OrdemServico,
   type OSStatus,
   type PecaOS,
   type FormaPagamento,
   type Config,
 } from "../lib/types";
+import { travaAtendimento, classificacaoDe } from "../lib/clientes";
 
 const CHECKLIST_ITENS = [
   "Liga normalmente",
@@ -120,7 +124,23 @@ export const OrdensServico: React.FC = () => {
     if (!editando) return;
     if (!editando.clienteId) return aviso.alerta("Selecione o cliente.");
     if (!editando.defeitoRelatado.trim()) return aviso.alerta("Descreva o defeito relatado.");
+
+    // Cliente bloqueado só passa com autorização explícita, e só na abertura:
+    // OS que já está na bancada precisa continuar editável, senão o aparelho
+    // do cara fica preso num sistema que não deixa mexer.
+    const nova = !ordens.some((o) => o.id === editando.id);
+    const trava = travaAtendimento(cliente(editando.clienteId));
+    if (nova && trava.bloqueia) {
+      const ok = confirm(
+        `${trava.titulo}\n\nMotivo: ${trava.motivo}\n\nAbrir a OS mesmo assim?`
+      );
+      if (!ok) return;
+    }
+
     await saveOrdem({ ...editando, atualizadoEm: nowISO() });
+    if (nova && trava.avisa) {
+      aviso.alerta(`${trava.titulo}. Motivo: ${trava.motivo}`);
+    }
     setEditando(null);
   };
 
@@ -305,7 +325,20 @@ export const OrdensServico: React.FC = () => {
                     return null;
                   })()}
                 </div>
-                <p className="truncate font-bold text-slate-800">{nomeCliente(o.clienteId)}</p>
+                <p className="flex items-center gap-1.5 truncate font-bold text-slate-800">
+                  {nomeCliente(o.clienteId)}
+                  {classificacaoDe(cliente(o.clienteId)) !== "normal" && (
+                    <span
+                      className={`badge shrink-0 ${
+                        CLASSIFICACAO_META[classificacaoDe(cliente(o.clienteId))].cor
+                      }`}
+                      title={txt(cliente(o.clienteId)?.motivoClassificacao)}
+                    >
+                      <ShieldAlert size={11} />
+                      {CLASSIFICACAO_META[classificacaoDe(cliente(o.clienteId))].label}
+                    </span>
+                  )}
+                </p>
                 <p className="truncate text-sm text-slate-500">
                   {o.marca} {o.modelo} · {o.defeitoRelatado}
                 </p>
@@ -461,11 +494,12 @@ export const OrdensServico: React.FC = () => {
 const OSForm: React.FC<{
   os: OrdemServico;
   setOs: (o: OrdemServico) => void;
-  clientes: { id: string; nome: string }[];
+  clientes: Cliente[];
   produtos: { id: string; nome: string; preco: number; custo: number }[];
   onSave: () => void;
   onClose: () => void;
 }> = ({ os, setOs, clientes, produtos, onSave, onClose }) => {
+  const trava = travaAtendimento(clientes.find((c) => c.id === os.clienteId));
   const addPeca = () =>
     setOs({
       ...os,
@@ -508,6 +542,26 @@ const OSForm: React.FC<{
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Cliente *">
             <ClienteSelect clientes={clientes} value={os.clienteId} onChange={(id) => setOs({ ...os, clienteId: id })} />
+            {/* Avisa na hora de escolher, não depois de digitar a OS inteira */}
+            {trava.avisa && (
+              <div
+                className={`mt-2 rounded-lg border p-2.5 text-sm ${
+                  trava.bloqueia
+                    ? "border-red-200 bg-red-50 text-red-800"
+                    : "border-amber-200 bg-amber-50 text-amber-800"
+                }`}
+              >
+                <p className="flex items-center gap-1.5 font-semibold">
+                  <ShieldAlert size={15} /> {trava.titulo}
+                </p>
+                <p className="mt-0.5">{trava.motivo}</p>
+                {trava.bloqueia && (
+                  <p className="mt-1 text-xs opacity-80">
+                    Dá para abrir mesmo assim, mas o sistema vai pedir confirmação ao salvar.
+                  </p>
+                )}
+              </div>
+            )}
           </Field>
           <Field label="Status">
             <select
