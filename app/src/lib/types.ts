@@ -161,7 +161,13 @@ export interface Cotacao {
   criadoEm: string;
 }
 
-/** Histórico de preços: é daqui que sai o "último valor pago" */
+/**
+ * Histórico de preços.
+ * Guarda tanto o que foi COMPRADO quanto o que foi apenas COTADO: um preço
+ * que você não aceitou hoje continua sendo referência na próxima negociação.
+ * O campo "comprado" separa os dois — sem ele, uma cotação recusada viraria
+ * "última compra" e bagunçaria a conta.
+ */
 export interface PrecoFornecedor {
   id: ID;
   produtoId?: ID;
@@ -170,6 +176,7 @@ export interface PrecoFornecedor {
   preco: number;
   quantidade: number;
   data: string;
+  comprado?: boolean;
 }
 
 export const COTACAO_STATUS_META: Record<StatusCotacao, { label: string; color: string }> = {
