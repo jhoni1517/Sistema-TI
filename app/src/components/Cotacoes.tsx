@@ -88,6 +88,7 @@ export const Cotacoes: React.FC<{
   const [respondendo, setRespondendo] = useState<Cotacao | null>(null);
   const [comprando, setComprando] = useState<Cotacao | null>(null);
   const [escolhidos, setEscolhidos] = useState<Set<number>>(new Set());
+  const [processando, setProcessando] = useState(false);
 
   const proximoNumero = useMemo(
     () => (cotacoes.reduce((m, c) => Math.max(m, c.numero || 0), 0) || 0) + 1,
@@ -195,6 +196,15 @@ export const Cotacoes: React.FC<{
   const comprar = async () => {
     const c = comprando;
     if (!c) return;
+    // Trava contra duplo clique e contra comprar a mesma cotação duas vezes.
+    // Sem isto, cada disparo criava um produto novo em vez de somar ao que
+    // já existia — foi assim que a mesma fonte virou duas linhas de 1 un.
+    if (processando) return;
+    if (c.status === "comprada") {
+      setComprando(null);
+      return aviso.alerta("Esta cotação já foi comprada e entrou no estoque.");
+    }
+
     const itens = c.itens.filter((i, idx) => escolhidos.has(idx) && (Number(i.precoUnit) || 0) > 0);
     if (itens.length === 0) return aviso.alerta("Escolha pelo menos um item.");
 
@@ -203,20 +213,34 @@ export const Cotacoes: React.FC<{
       0
     );
 
+    setProcessando(true);
     try {
+      const chave = (nome: string) => txt(nome).trim().toLowerCase();
+
+      /**
+       * O estado de produtos só é atualizado depois que a função termina, então
+       * dentro do laço "produtos" continua com a foto antiga. Este mapa guarda
+       * o que já foi gravado nesta execução para que o item seguinte com o
+       * mesmo nome some quantidade em vez de criar outra linha.
+       */
+      const gravadosAgora = new Map<string, Produto>();
+      for (const p of produtos) gravadosAgora.set(chave(p.nome), p);
+
       for (const item of itens) {
-        const existente = produtos.find(
-          (p) =>
-            (item.produtoId && p.id === item.produtoId) ||
-            txt(p.nome).trim().toLowerCase() === txt(item.descricao).trim().toLowerCase()
-        );
-        const produto = aplicarCompra(item, existente);
+        const k = chave(item.descricao);
+        const existente =
+          (item.produtoId && produtos.find((p) => p.id === item.produtoId)) ||
+          gravadosAgora.get(k);
+
+        const produto = aplicarCompra(item, existente || undefined);
         if (produto) {
-          await saveProduto({
+          const salvo = {
             ...produto,
             id: produto.id || uid(),
             fornecedorId: c.fornecedorId,
-          } as Produto);
+          } as Produto;
+          await saveProduto(salvo);
+          gravadosAgora.set(k, salvo);
         }
         // agora sim como COMPRA: é este valor que vira "última compra"
         await savePreco({
@@ -261,6 +285,8 @@ export const Cotacoes: React.FC<{
         "Não foi possível concluir a compra.\n\n" +
           (e instanceof Error ? e.message : String(e))
       );
+    } finally {
+      setProcessando(false);
     }
   };
 
@@ -359,7 +385,7 @@ export const Cotacoes: React.FC<{
                       </>
                     )}
                     {c.status === "respondida" && (
-                      <button className="btn-success !py-1.5 text-xs" onClick={() => abrirCompra(c)}>
+                      <button className="btn-success !py-1.5 text-xs" disabled={processando} onClick={() => abrirCompra(c)}>
                         <ShoppingCart size={14} /> Comprei
                       </button>
                     )}
@@ -519,8 +545,8 @@ export const Cotacoes: React.FC<{
             <button className="btn-secondary" onClick={() => setComprando(null)}>
               Cancelar
             </button>
-            <button className="btn-success" onClick={comprar}>
-              <ShoppingCart size={16} /> Confirmar compra
+            <button className="btn-success" onClick={comprar} disabled={processando}>
+              <ShoppingCart size={16} /> {processando ? "Gravando..." : "Confirmar compra"}
             </button>
           </>
         }
