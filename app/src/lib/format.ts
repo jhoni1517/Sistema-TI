@@ -74,3 +74,70 @@ export const abrirWhatsapp = (telefone: string, mensagem: string): void => {
 /** Código público de acompanhamento a partir do número da OS */
 export const codigoOS = (numero: number): string =>
   `OS${numero.toString().padStart(5, "0")}`;
+
+
+/* ------------------------------------------------------------------ */
+/* CPF / CNPJ                                                          */
+/* ------------------------------------------------------------------ */
+
+/** Só os dígitos — é assim que o documento é guardado no banco */
+export const soDigitos = (v?: string | null): string => txt(v).replace(/\D/g, "");
+
+/** Aplica a máscara conforme o tamanho: 000.000.000-00 ou 00.000.000/0000-00 */
+export const mascaraDocumento = (v?: string | null): string => {
+  const d = soDigitos(v).slice(0, 14);
+  if (d.length <= 11) {
+    return d
+      .replace(/^(\d{3})(\d)/, "$1.$2")
+      .replace(/^(\d{3})\.(\d{3})(\d)/, "$1.$2.$3")
+      .replace(/^(\d{3})\.(\d{3})\.(\d{3})(\d)/, "$1.$2.$3-$4");
+  }
+  return d
+    .replace(/^(\d{2})(\d)/, "$1.$2")
+    .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
+    .replace(/^(\d{2})\.(\d{3})\.(\d{3})(\d)/, "$1.$2.$3/$4")
+    .replace(/^(\d{2})\.(\d{3})\.(\d{3})\/(\d{4})(\d)/, "$1.$2.$3/$4-$5");
+};
+
+/** Dígitos verificadores do CPF */
+export const cpfValido = (v?: string | null): boolean => {
+  const d = soDigitos(v);
+  if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
+  const dv = (base: string, pesoInicial: number): number => {
+    let soma = 0;
+    for (let i = 0; i < base.length; i++) soma += +base[i] * (pesoInicial - i);
+    const r = (soma * 10) % 11;
+    return r === 10 ? 0 : r;
+  };
+  return dv(d.slice(0, 9), 10) === +d[9] && dv(d.slice(0, 10), 11) === +d[10];
+};
+
+/** Dígitos verificadores do CNPJ */
+export const cnpjValido = (v?: string | null): boolean => {
+  const d = soDigitos(v);
+  if (d.length !== 14 || /^(\d)\1{13}$/.test(d)) return false;
+  const dv = (base: string): number => {
+    let peso = base.length - 7;
+    let soma = 0;
+    for (let i = 0; i < base.length; i++) {
+      soma += +base[i] * peso--;
+      if (peso < 2) peso = 9;
+    }
+    const r = soma % 11;
+    return r < 2 ? 0 : 11 - r;
+  };
+  return dv(d.slice(0, 12)) === +d[12] && dv(d.slice(0, 13)) === +d[13];
+};
+
+/**
+ * Documento válido para o tipo informado.
+ * Campo vazio passa: nem todo cliente de balcão deixa o documento, e travar
+ * o cadastro por isso só faz o atendente inventar número.
+ */
+export const documentoValido = (v?: string | null): boolean => {
+  const d = soDigitos(v);
+  if (!d) return true;
+  if (d.length === 11) return cpfValido(d);
+  if (d.length === 14) return cnpjValido(d);
+  return false;
+};

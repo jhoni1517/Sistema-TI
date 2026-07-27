@@ -55,10 +55,35 @@ export const obterLoja = (): string | null => lojaAtual;
  * Apaga o rastro da loja anterior neste aparelho.
  * Num computador de balcão compartilhado, sem isto o próximo usuário veria
  * o nome, o endereço e os dados em cache da loja de quem saiu.
+ *
+ * A chave "config" NÃO é apagada por inteiro: quando a nuvem foi ligada
+ * pela tela de Configurações (e não por variável de ambiente), é ali que
+ * moram a URL e a chave do Supabase. Apagar tudo desconectava o aparelho
+ * da nuvem ao sair, e o próximo login falhava como se a conta não
+ * existisse.
  */
 export const limparCacheLocal = () => {
   for (const chave of Object.keys(localStorage)) {
-    if (chave.startsWith(PREFIX)) localStorage.removeItem(chave);
+    if (chave.startsWith(PREFIX) && chave !== PREFIX + "config") {
+      localStorage.removeItem(chave);
+    }
+  }
+  // Da configuração, guarda só o que é do APARELHO (conexão e aparência)
+  try {
+    const raw = localStorage.getItem(PREFIX + "config");
+    if (!raw) return;
+    const cfg = JSON.parse(raw);
+    localStorage.setItem(
+      PREFIX + "config",
+      JSON.stringify({
+        supabaseUrl: cfg.supabaseUrl,
+        supabaseKey: cfg.supabaseKey,
+        tema: cfg.tema,
+        corDestaque: cfg.corDestaque,
+      })
+    );
+  } catch {
+    /* configuração ilegível: melhor deixar como está do que perder a conexão */
   }
 };
 

@@ -69,7 +69,14 @@ begin
   end loop;
 end $$;
 
+-- ---------- Cliente pessoa jurídica ----------
+-- O mesmo campo "cpf" guarda CPF ou CNPJ (só dígitos); o tipo diz qual é.
+alter table clientes add column if not exists "tipoPessoa" text default 'fisica';
+alter table clientes add column if not exists "nomeFantasia" text;
+alter table clientes add column if not exists "inscricaoEstadual" text;
+
 -- =====================================================================
 -- DEPOIS DE RODAR:
---   Nada. A aba "Cotações" aparece dentro de Estoque.
+--   Nada. A aba "Cotações" aparece dentro de Estoque, e o cadastro de
+--   cliente passa a aceitar empresa com CNPJ.
 -- =====================================================================

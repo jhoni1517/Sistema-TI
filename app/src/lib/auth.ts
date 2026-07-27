@@ -221,18 +221,78 @@ export async function recuperarSenha(email: string): Promise<void> {
   if (error) throw new Error(traduzErro(error.message));
 }
 
-/** Mensagens do Supabase em português claro */
+/**
+ * Mensagens do Supabase em português claro.
+ *
+ * Cuidado com o excesso de tradução: "E-mail ou senha incorretos" para
+ * QUALQUER falha esconde os casos que a pessoa não tem como adivinhar —
+ * chave da nuvem trocada, e-mail sem confirmar, projeto pausado. Cada um
+ * desses tem uma saída diferente, e o texto precisa dizer qual é.
+ */
 function traduzErro(msg: string): string {
-  const m = msg.toLowerCase();
-  if (m.includes("invalid login")) return "E-mail ou senha incorretos.";
-  if (m.includes("email not confirmed"))
-    return "Confirme seu e-mail antes de entrar (veja a caixa de entrada).";
+  const m = (msg || "").toLowerCase();
+
+  // Chave anon inválida/rotacionada: nada a ver com a senha do usuário
+  if (m.includes("invalid api key") || m.includes("no api key") || m.includes("jwt")) {
+    return (
+      "A chave de acesso à nuvem não é mais válida. Se você rotacionou as " +
+      "chaves no Supabase, atualize VITE_SUPABASE_ANON_KEY no Vercel e " +
+      "publique de novo."
+    );
+  }
+  if (m.includes("email not confirmed") || m.includes("not confirmed")) {
+    return "CONFIRMAR_EMAIL";
+  }
+  if (m.includes("invalid login") || m.includes("invalid credentials")) {
+    return (
+      "E-mail ou senha incorretos. Se a conta é nova, confirme antes o " +
+      "e-mail que enviamos — sem isso o login é recusado."
+    );
+  }
   if (m.includes("already registered") || m.includes("already been registered"))
     return "Este e-mail já tem conta. Faça login.";
   if (m.includes("password") && m.includes("6"))
     return "A senha precisa ter pelo menos 6 caracteres.";
-  if (m.includes("rate limit")) return "Muitas tentativas. Aguarde um minuto.";
+  if (m.includes("rate limit") || m.includes("too many"))
+    return "Muitas tentativas. Aguarde um minuto e tente de novo.";
+  if (m.includes("failed to fetch") || m.includes("networkerror"))
+    return "Sem conexão com a nuvem. Verifique a internet e tente de novo.";
   return msg;
+}
+
+/** Reenvia o e-mail de confirmação de cadastro */
+export async function reenviarConfirmacao(email: string): Promise<void> {
+  if (!supabase) throw new Error("Nuvem não configurada.");
+  const { error } = await supabase.auth.resend({
+    type: "signup",
+    email: email.trim(),
+  });
+  if (error) throw new Error(traduzErro(error.message));
+}
+
+/**
+ * Diagnóstico da conexão, para a tela de login poder dizer o que está
+ * errado em vez de deixar a pessoa adivinhando de outro computador.
+ */
+export async function diagnosticar(): Promise<{
+  ok: boolean;
+  detalhe: string;
+}> {
+  if (!supabaseEnabled || !supabase) {
+    return {
+      ok: false,
+      detalhe:
+        "Este aparelho não está conectado à nuvem. Faltam as variáveis " +
+        "VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY na publicação.",
+    };
+  }
+  try {
+    const { error } = await supabase.auth.getSession();
+    if (error) return { ok: false, detalhe: traduzErro(error.message) };
+    return { ok: true, detalhe: "Conectado à nuvem." };
+  } catch (e) {
+    return { ok: false, detalhe: traduzErro(e instanceof Error ? e.message : String(e)) };
+  }
 }
 
 /** Força mínima da senha, para orientar o usuário na criação da conta */

@@ -6,6 +6,8 @@ import {
   recuperarSenha,
   forcaSenha,
   conferirConvite,
+  reenviarConfirmacao,
+  diagnosticar,
   CONVITE_PENDENTE,
 } from "../lib/auth";
 import { supabaseEnabled } from "../lib/supabase";
@@ -28,13 +30,32 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
   const [erro, setErro] = useState("");
   const [aviso, setAviso] = useState("");
   const [carregando, setCarregando] = useState(false);
+  const [precisaConfirmar, setPrecisaConfirmar] = useState(false);
+  const [diag, setDiag] = useState("");
 
   const forca = forcaSenha(senha);
 
   // Limpa mensagens ao trocar de modo, para não confundir quem está lendo
   useEffect(() => {
     setErro("");
+    setPrecisaConfirmar(false);
   }, [modo]);
+
+  const verDiagnostico = async () => {
+    setDiag("Verificando...");
+    const r = await diagnosticar();
+    setDiag(r.detalhe);
+  };
+
+  const reenviar = async () => {
+    try {
+      await reenviarConfirmacao(email);
+      setErro("");
+      setAviso("Reenviamos o e-mail de confirmação. Verifique também o lixo eletrônico.");
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : String(e));
+    }
+  };
 
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,7 +97,19 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
         setModo("entrar");
       }
     } catch (e) {
-      setErro(e instanceof Error ? e.message : String(e));
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg === "CONFIRMAR_EMAIL") {
+        setPrecisaConfirmar(true);
+        setErro(
+          "Este e-mail ainda não foi confirmado. Abra o link que enviamos para " +
+            email.trim() + " e depois entre."
+        );
+      } else {
+        setErro(msg);
+        // Senha errada é o caso comum, mas não o único: se a conta é nova,
+        // o Supabase também recusa quem não confirmou o e-mail.
+        setPrecisaConfirmar(modo === "entrar" && /incorretos/.test(msg));
+      }
     } finally {
       setCarregando(false);
     }
@@ -194,7 +227,18 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
           )}
 
           {erro && (
-            <p className="mt-3 rounded-lg bg-red-50 p-2 text-sm font-medium text-red-700">{erro}</p>
+            <div className="mt-3 rounded-lg bg-red-50 p-2 text-sm font-medium text-red-700">
+              <p>{erro}</p>
+              {precisaConfirmar && email.trim() && (
+                <button
+                  type="button"
+                  className="mt-1.5 underline"
+                  onClick={reenviar}
+                >
+                  Reenviar e-mail de confirmação
+                </button>
+              )}
+            </div>
           )}
           {aviso && (
             <p className="mt-3 rounded-lg bg-emerald-50 p-2 text-sm font-medium text-emerald-700">
@@ -241,6 +285,22 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
         <p className="mt-4 flex items-center justify-center gap-1 text-center text-xs text-slate-400">
           <ShieldCheck size={13} /> Conexão criptografada · dados isolados por loja
         </p>
+
+        {/* Diagnóstico: dá o motivo real quando o login falha em outro aparelho */}
+        <div className="mt-2 text-center">
+          <button
+            type="button"
+            onClick={verDiagnostico}
+            className="text-xs text-slate-500 underline hover:text-slate-300"
+          >
+            Problemas para entrar? Testar conexão
+          </button>
+          {diag && (
+            <p className="mx-auto mt-2 max-w-sm rounded-lg bg-slate-800/70 p-2 text-xs text-slate-300">
+              {diag}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
