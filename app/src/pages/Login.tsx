@@ -1,19 +1,40 @@
-import React, { useState } from "react";
-import { Lock, Wrench, Mail, AlertTriangle, ShieldCheck } from "lucide-react";
-import { entrar, criarConta, recuperarSenha, forcaSenha } from "../lib/auth";
+import React, { useEffect, useState } from "react";
+import { Lock, Wrench, Mail, AlertTriangle, ShieldCheck, Ticket, User } from "lucide-react";
+import {
+  entrar,
+  criarConta,
+  recuperarSenha,
+  forcaSenha,
+  conferirConvite,
+  CONVITE_PENDENTE,
+} from "../lib/auth";
 import { supabaseEnabled } from "../lib/supabase";
 
 type Modo = "entrar" | "criar" | "recuperar";
 
+/** Código de convite que pode vir no link: #/entrar?convite=ABC123 */
+const conviteDoLink = (): string =>
+  new URLSearchParams(window.location.hash.split("?")[1] || "")
+    .get("convite")
+    ?.toUpperCase() || "";
+
 export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
-  const [modo, setModo] = useState<Modo>("entrar");
+  const convidado = conviteDoLink();
+  const [modo, setModo] = useState<Modo>(convidado ? "criar" : "entrar");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
+  const [nome, setNome] = useState("");
+  const [convite, setConvite] = useState(convidado);
   const [erro, setErro] = useState("");
   const [aviso, setAviso] = useState("");
   const [carregando, setCarregando] = useState(false);
 
   const forca = forcaSenha(senha);
+
+  // Limpa mensagens ao trocar de modo, para não confundir quem está lendo
+  useEffect(() => {
+    setErro("");
+  }, [modo]);
 
   const enviar = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,10 +46,26 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
         await entrar(email, senha);
         onEntrou();
       } else if (modo === "criar") {
-        if (forca.nivel === 0) throw new Error("A senha precisa ter pelo menos 6 caracteres.");
+        if (forca.nivel === 0) {
+          throw new Error("A senha precisa ter pelo menos 6 caracteres.");
+        }
+        // Confere o convite ANTES de criar a conta: sem isso o sistema
+        // acumularia contas soltas que nunca vão acessar nada.
+        const ok = await conferirConvite(convite);
+        if (!ok) {
+          throw new Error(
+            "Código de convite inválido, já usado ou vencido. Peça um novo para o responsável pela loja."
+          );
+        }
+        // Guardado para ser aplicado assim que a conta entrar de fato
+        localStorage.setItem(CONVITE_PENDENTE, convite.trim().toUpperCase());
+        if (nome.trim()) localStorage.setItem("sistema-ti:nome-convite", nome.trim());
+
         const { precisaConfirmar } = await criarConta(email, senha);
         if (precisaConfirmar) {
-          setAviso("Conta criada! Confirme o e-mail que enviamos e depois faça login.");
+          setAviso(
+            "Conta criada! Confirme o e-mail que enviamos e depois faça login — seu acesso já estará liberado."
+          );
           setModo("entrar");
         } else {
           onEntrou();
@@ -71,11 +108,42 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
             <Wrench className="text-white" size={30} />
           </div>
           <h1 className="text-2xl font-bold text-white">Sistema TI</h1>
-          <p className="text-sm text-slate-400">Caixa & Ordens de Serviço</p>
+          <p className="text-sm text-slate-400">Caixa &amp; Ordens de Serviço</p>
         </div>
 
         <form onSubmit={enviar} className="rounded-2xl bg-white p-6 shadow-2xl">
           <h2 className="mb-4 text-lg font-bold text-slate-800">{titulo}</h2>
+
+          {modo === "criar" && (
+            <>
+              <label className="label">Código de convite</label>
+              <div className="relative mb-1">
+                <Ticket size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  required
+                  className="input pl-10 font-mono uppercase tracking-widest"
+                  placeholder="XXXXXXXXXX"
+                  maxLength={10}
+                  value={convite}
+                  onChange={(e) => setConvite(e.target.value.toUpperCase())}
+                />
+              </div>
+              <p className="mb-4 text-xs text-slate-400">
+                Peça ao responsável pela loja. Sem convite não é possível criar conta.
+              </p>
+
+              <label className="label">Seu nome</label>
+              <div className="relative mb-4">
+                <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  className="input pl-10"
+                  placeholder="Como aparece para a equipe"
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                />
+              </div>
+            </>
+          )}
 
           <label className="label">E-mail</label>
           <div className="relative mb-4">
@@ -141,17 +209,29 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
           <div className="mt-4 space-y-1 text-center text-xs">
             {modo === "entrar" && (
               <>
-                <button type="button" className="text-brand-600 hover:underline" onClick={() => { setModo("criar"); setErro(""); }}>
-                  Não tem conta? Criar agora
+                <button
+                  type="button"
+                  className="text-brand-600 hover:underline"
+                  onClick={() => setModo("criar")}
+                >
+                  Tenho um convite — criar conta
                 </button>
                 <br />
-                <button type="button" className="text-slate-400 hover:underline" onClick={() => { setModo("recuperar"); setErro(""); }}>
+                <button
+                  type="button"
+                  className="text-slate-400 hover:underline"
+                  onClick={() => setModo("recuperar")}
+                >
                   Esqueci minha senha
                 </button>
               </>
             )}
             {modo !== "entrar" && (
-              <button type="button" className="text-brand-600 hover:underline" onClick={() => { setModo("entrar"); setErro(""); }}>
+              <button
+                type="button"
+                className="text-brand-600 hover:underline"
+                onClick={() => setModo("entrar")}
+              >
                 Voltar para o login
               </button>
             )}

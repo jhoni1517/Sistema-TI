@@ -267,7 +267,11 @@ const MovimentoModal: React.FC<{
   };
 
   const filtroProd = produtos
-    .filter((p) => p.nome.toLowerCase().includes(buscaProd.toLowerCase()) || (p.sku || "").toLowerCase().includes(buscaProd.toLowerCase()))
+    .filter(
+      (p) =>
+        txt(p.nome).toLowerCase().includes(buscaProd.toLowerCase()) ||
+        txt(p.sku).toLowerCase().includes(buscaProd.toLowerCase())
+    )
     .slice(0, 8);
 
   const salvar = () => {

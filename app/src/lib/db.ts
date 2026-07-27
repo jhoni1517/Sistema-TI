@@ -46,6 +46,17 @@ export const definirLoja = (id: string | null) => {
 };
 export const obterLoja = (): string | null => lojaAtual;
 
+/**
+ * Apaga o rastro da loja anterior neste aparelho.
+ * Num computador de balcão compartilhado, sem isto o próximo usuário veria
+ * o nome, o endereço e os dados em cache da loja de quem saiu.
+ */
+export const limparCacheLocal = () => {
+  for (const chave of Object.keys(localStorage)) {
+    if (chave.startsWith(PREFIX)) localStorage.removeItem(chave);
+  }
+};
+
 // ---------- Backend local ----------
 const localBackend = {
   list<T>(table: TableName): T[] {
@@ -73,8 +84,15 @@ async function getAll<T extends WithId>(table: TableName): Promise<T[]> {
 
 async function upsert<T extends WithId>(table: TableName, row: T): Promise<T> {
   if (supabaseEnabled && supabase) {
+    // Sem loja definida a gravação seria recusada pelo banco com uma mensagem
+    // técnica incompreensível. Melhor falhar aqui, dizendo o que fazer.
+    if (!lojaAtual) {
+      throw new Error(
+        "Sua sessão expirou e o registro não foi salvo. Entre novamente e repita a operação."
+      );
+    }
     // carimba a loja do usuário — sem isso o banco rejeita a gravação
-    const payload = lojaAtual ? { ...row, lojaId: lojaAtual } : row;
+    const payload = { ...row, lojaId: lojaAtual };
     const { data, error } = await supabase
       .from(table)
       .upsert(payload)
