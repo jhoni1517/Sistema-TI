@@ -28,14 +28,20 @@ export const OS_STATUS_META: Record<
   cancelada: { label: "Cancelada", color: "bg-red-100 text-red-700", cliente: "Ordem de serviço cancelada." },
 };
 
+export type TipoPessoa = "fisica" | "juridica";
+
 export interface Cliente {
   id: ID;
-  nome: string;
+  nome: string; // pessoa física: nome; jurídica: razão social
   telefone: string;
+  /** CPF ou CNPJ, guardado só com dígitos */
   cpf?: string;
   email?: string;
   endereco?: string;
   observacoes?: string;
+  tipoPessoa?: TipoPessoa; // ausente = física (cadastros antigos)
+  nomeFantasia?: string; // só jurídica
+  inscricaoEstadual?: string; // só jurídica
   criadoEm: string;
 }
 
