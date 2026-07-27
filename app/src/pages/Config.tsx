@@ -5,13 +5,16 @@ import { useApp } from "../store/AppStore";
 import { Field, SectionTitle } from "../components/ui";
 import { ACCENTS, ACCENT_KEYS } from "../lib/themes";
 import { Equipe } from "../components/Equipe";
+import { MinhaConta } from "../components/MinhaConta";
 import { carregarSessao, type Sessao } from "../lib/auth";
+import { importarTudo, type DumpLoja } from "../lib/db";
 import type { Config as ConfigType } from "../lib/types";
 
 export const Config: React.FC = () => {
-  const { config, saveConfig, reload, clientes, ordens, produtos, movimentos, sessoes, fiados, categorias, fornecedores } = useApp();
+  const { config, saveConfig, reload, clientes, ordens, produtos, movimentos, sessoes, fiados, categorias, fornecedores, cotacoes, precos } = useApp();
   const [form, setForm] = useState<ConfigType>(config);
   const [salvo, setSalvo] = useState(false);
+  const [importando, setImportando] = useState(false);
   const [sessao, setSessao] = useState<Sessao | null>(null);
 
   React.useEffect(() => {
@@ -32,8 +35,15 @@ export const Config: React.FC = () => {
   };
 
   const exportar = () => {
+    // A configuração vai junto, MENOS as credenciais da nuvem: um backup
+    // costuma ser mandado por e-mail ou WhatsApp, e a chave não pode ir a
+    // reboque. Cotações e histórico de preços entram porque são dados que
+    // levam meses para acumular e não têm como ser recriados.
+    const { supabaseUrl: _u, supabaseKey: _k, senhaAcesso: _s, ...configSegura } = config;
     const dump = {
       exportadoEm: new Date().toISOString(),
+      versao: 2,
+      config: configSegura,
       clientes,
       ordens,
       produtos,
@@ -42,6 +52,8 @@ export const Config: React.FC = () => {
       fiados,
       categorias,
       fornecedores,
+      cotacoes,
+      precos,
     };
     const blob = new Blob([JSON.stringify(dump, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -55,23 +67,50 @@ export const Config: React.FC = () => {
   const importar = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    // Permite escolher o mesmo arquivo de novo depois de um erro
+    e.target.value = "";
+
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
+      let d: Record<string, unknown>;
       try {
-        const d = JSON.parse(reader.result as string);
-        if (!confirm("Isso substituirá os dados locais atuais. Continuar?")) return;
-        localStorage.setItem("sistema-ti:clientes", JSON.stringify(d.clientes || []));
-        localStorage.setItem("sistema-ti:ordens", JSON.stringify(d.ordens || []));
-        localStorage.setItem("sistema-ti:produtos", JSON.stringify(d.produtos || []));
-        localStorage.setItem("sistema-ti:movimentos", JSON.stringify(d.movimentos || []));
-        localStorage.setItem("sistema-ti:sessoes", JSON.stringify(d.sessoes || []));
-        localStorage.setItem("sistema-ti:fiados", JSON.stringify(d.fiados || []));
-        localStorage.setItem("sistema-ti:categorias", JSON.stringify(d.categorias || []));
-        localStorage.setItem("sistema-ti:fornecedores", JSON.stringify(d.fornecedores || []));
-        reload();
-        aviso.sucesso("Backup importado com sucesso!");
+        d = JSON.parse(reader.result as string);
       } catch {
-        aviso.erro("Arquivo inválido.");
+        return aviso.erro("Arquivo inválido: não é um backup do sistema.");
+      }
+      if (!d || typeof d !== "object" || !Array.isArray(d.clientes)) {
+        return aviso.erro("Arquivo inválido: não parece um backup deste sistema.");
+      }
+
+      const total = ["clientes", "ordens", "produtos", "movimentos", "sessoes", "fiados", "categorias", "fornecedores", "cotacoes", "precos"]
+        .reduce((s2, k) => s2 + (Array.isArray(d[k]) ? (d[k] as unknown[]).length : 0), 0);
+
+      if (
+        !confirm(
+          `Importar ${total} registro(s)? Registros com o mesmo código serão sobrescritos pelos do arquivo.`
+        )
+      ) {
+        return;
+      }
+
+      setImportando(true);
+      try {
+        const r = await importarTudo(d as DumpLoja);
+        await reload();
+        if (r.falhas > 0) {
+          aviso.alerta(
+            `${r.gravados} registro(s) importado(s), ${r.falhas} recusado(s). ` +
+              "Se a assinatura estiver vencida, a gravação fica bloqueada."
+          );
+        } else {
+          aviso.sucesso(`${r.gravados} registro(s) importado(s).`);
+        }
+      } catch (err) {
+        aviso.erro(
+          "Falha ao importar: " + (err instanceof Error ? err.message : String(err))
+        );
+      } finally {
+        setImportando(false);
       }
     };
     reader.readAsText(file);
@@ -114,6 +153,9 @@ export const Config: React.FC = () => {
         </div>
       </div>
 
+      {/* Minha conta */}
+      {sessao && <MinhaConta sessao={sessao} />}
+
       {/* Equipe e permissões */}
       {sessao?.perfil && (
         <Equipe
@@ -132,8 +174,8 @@ export const Config: React.FC = () => {
           </Field>
         </div>
         <p className="mt-3 text-xs text-slate-500">
-          A senha de acesso agora é individual: cada pessoa entra com o próprio
-          e-mail e pode trocar a senha pela opção "Esqueci minha senha".
+          A senha de acesso é individual: cada pessoa entra com o próprio e-mail
+          e troca a senha aqui mesmo, em "Minha conta".
         </p>
       </div>
 
@@ -241,8 +283,8 @@ export const Config: React.FC = () => {
         <h3 className="mb-4 flex items-center gap-2 font-bold text-slate-700"><Database size={18} /> Backup dos dados</h3>
         <div className="flex flex-wrap gap-3">
           <button className="btn-secondary" onClick={exportar}><Download size={16} /> Exportar backup</button>
-          <label className="btn-secondary cursor-pointer">
-            <Upload size={16} /> Importar backup
+          <label className={`btn-secondary cursor-pointer ${importando ? "pointer-events-none opacity-60" : ""}`}>
+            <Upload size={16} /> {importando ? "Importando..." : "Importar backup"}
             <input type="file" accept="application/json" className="hidden" onChange={importar} />
           </label>
         </div>

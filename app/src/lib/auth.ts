@@ -213,6 +213,48 @@ export async function sair(): Promise<void> {
   await supabase?.auth.signOut();
 }
 
+/**
+ * Troca a senha e derruba as sessões dos outros aparelhos.
+ *
+ * Quem troca a senha quase sempre tem um motivo: desconfiou de alguém,
+ * perdeu o celular, demitiu um funcionário. Se as outras sessões
+ * continuassem abertas, a troca não protegeria de nada — quem já estava
+ * dentro continuaria dentro.
+ *
+ * A senha atual é conferida antes: sem isso, um aparelho esquecido logado
+ * no balcão viraria porta para trocar a senha do dono.
+ */
+export async function trocarSenha(
+  senhaAtual: string,
+  novaSenha: string
+): Promise<void> {
+  if (!supabase) throw new Error("Nuvem não configurada.");
+
+  const { data: atual } = await supabase.auth.getUser();
+  const email = atual?.user?.email;
+  if (!email) throw new Error("Sessão expirada. Entre novamente.");
+
+  // Confere a senha atual reautenticando
+  const { error: erroLogin } = await supabase.auth.signInWithPassword({
+    email,
+    password: senhaAtual,
+  });
+  if (erroLogin) throw new Error("A senha atual está incorreta.");
+
+  const { error } = await supabase.auth.updateUser({ password: novaSenha });
+  if (error) throw new Error(traduzErro(error.message));
+
+  // Derruba os outros aparelhos, mantendo este conectado
+  await supabase.auth.signOut({ scope: "others" });
+}
+
+/** Encerra a sessão em TODOS os aparelhos, inclusive este */
+export async function sairDeTodosOsAparelhos(): Promise<void> {
+  if (!supabase) throw new Error("Nuvem não configurada.");
+  const { error } = await supabase.auth.signOut({ scope: "global" });
+  if (error) throw new Error(traduzErro(error.message));
+}
+
 export async function recuperarSenha(email: string): Promise<void> {
   if (!supabase) throw new Error("Nuvem não configurada.");
   const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {

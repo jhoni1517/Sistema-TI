@@ -207,6 +207,71 @@ async function remove(table: TableName, id: string): Promise<void> {
   );
 }
 
+/** Conjunto completo de dados da loja, usado no backup */
+export interface DumpLoja {
+  clientes?: Cliente[];
+  ordens?: OrdemServico[];
+  produtos?: Produto[];
+  movimentos?: MovimentoCaixa[];
+  sessoes?: SessaoCaixa[];
+  fiados?: Fiado[];
+  categorias?: Categoria[];
+  fornecedores?: Fornecedor[];
+  cotacoes?: Cotacao[];
+  precos?: PrecoFornecedor[];
+}
+
+const TABELA_DO_CAMPO: Record<keyof DumpLoja, TableName> = {
+  clientes: "clientes",
+  ordens: "ordens",
+  produtos: "produtos",
+  movimentos: "movimentos",
+  sessoes: "sessoes",
+  fiados: "fiados",
+  categorias: "categorias",
+  fornecedores: "fornecedores",
+  cotacoes: "cotacoes",
+  precos: "precos_fornecedor",
+};
+
+/**
+ * Restaura um backup.
+ *
+ * Antes isto só gravava no localStorage e avisava "importado com sucesso".
+ * Com a nuvem ligada — que é o caso normal — a tela recarregava do servidor
+ * e nada mudava: a pessoa achava que tinha restaurado e não tinha. Numa
+ * restauração pós-desastre, essa mentira é o pior defeito possível.
+ */
+export async function importarTudo(
+  dump: DumpLoja
+): Promise<{ gravados: number; falhas: number }> {
+  let gravados = 0;
+  let falhas = 0;
+
+  for (const campo of Object.keys(TABELA_DO_CAMPO) as (keyof DumpLoja)[]) {
+    const linhas = dump[campo];
+    if (!Array.isArray(linhas) || linhas.length === 0) continue;
+    const tabela = TABELA_DO_CAMPO[campo];
+
+    if (supabaseEnabled && supabase) {
+      // Uma a uma: um registro problemático não pode derrubar o resto
+      for (const linha of linhas) {
+        try {
+          await upsert(tabela, linha as WithId);
+          gravados++;
+        } catch {
+          falhas++;
+        }
+      }
+    } else {
+      localBackend.saveAll(tabela, linhas);
+      gravados += linhas.length;
+    }
+  }
+
+  return { gravados, falhas };
+}
+
 export const db = {
   online: supabaseEnabled,
 
