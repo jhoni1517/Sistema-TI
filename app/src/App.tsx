@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ShieldOff } from "lucide-react";
 import { AppProvider } from "./store/AppStore";
+import { AvisoProvider } from "./components/Aviso";
 import { Layout } from "./components/Layout";
 import { Login } from "./pages/Login";
 import { Dashboard } from "./pages/Dashboard";
@@ -14,7 +15,7 @@ import { Relatorios } from "./pages/Relatorios";
 import { Config } from "./pages/Config";
 import { Rastreio } from "./pages/Rastreio";
 import { SemPerfil } from "./pages/SemPerfil";
-import { carregarSessao, sair, pode, type Sessao } from "./lib/auth";
+import { carregarSessao, carregarChaveLoja, sair, pode, type Sessao } from "./lib/auth";
 import { definirLoja, limparCacheLocal } from "./lib/db";
 import { supabase, supabaseEnabled } from "./lib/supabase";
 
@@ -57,8 +58,11 @@ const AreaProtegida: React.FC = () => {
 
   const revalidar = useCallback(async () => {
     const s = await carregarSessao();
-    setSessao(s);
     definirLoja(s?.perfil?.loja_id ?? null);
+    // A chave precisa estar pronta ANTES das telas pedirem dados, senão a
+    // primeira leitura das OS viria com a senha ilegível.
+    await carregarChaveLoja(s?.perfil?.loja_id ?? null);
+    setSessao(s);
     setVerificando(false);
   }, []);
 
@@ -110,6 +114,7 @@ const AreaProtegida: React.FC = () => {
 };
 
 const App: React.FC = () => (
+  <AvisoProvider>
   <HashRouter>
     <Routes>
       {/* Acompanhamento público — não exige login e não expõe dados sensíveis */}
@@ -118,6 +123,7 @@ const App: React.FC = () => (
       <Route path="/*" element={<AreaProtegida />} />
     </Routes>
   </HashRouter>
+  </AvisoProvider>
 );
 
 export default App;

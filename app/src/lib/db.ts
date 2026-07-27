@@ -1,4 +1,5 @@
 import { supabase, supabaseEnabled } from "./supabase";
+import { proteger, revelar, estaCifrado } from "./cripto";
 import type {
   Cliente,
   OrdemServico,
@@ -72,12 +73,47 @@ const localBackend = {
   },
 };
 
+/* ---------- Campos sigilosos ----------
+ * A senha e o padrão de desbloqueio do aparelho sobem cifrados e descem
+ * decifrados aqui, no único ponto por onde todos os dados passam. Assim
+ * nenhuma tela precisa lembrar de proteger nada — e não há como esquecer.
+ */
+const SIGILOSOS: Partial<Record<TableName, string[]>> = {
+  ordens: ["senhaAparelho", "padraoDesbloqueio"],
+};
+
+async function cifrarLinha<T>(table: TableName, row: T): Promise<T> {
+  const campos = SIGILOSOS[table];
+  if (!campos) return row;
+  const copia = { ...row } as Record<string, unknown>;
+  for (const campo of campos) {
+    const v = copia[campo];
+    if (typeof v === "string" && v) copia[campo] = await proteger(v);
+  }
+  return copia as T;
+}
+
+async function decifrarLinhas<T>(table: TableName, rows: T[]): Promise<T[]> {
+  const campos = SIGILOSOS[table];
+  if (!campos) return rows;
+  return Promise.all(
+    rows.map(async (row) => {
+      const copia = { ...row } as Record<string, unknown>;
+      for (const campo of campos) {
+        const v = copia[campo];
+        if (estaCifrado(v as string)) copia[campo] = await revelar(v as string);
+      }
+      return copia as T;
+    })
+  );
+}
+
 // ---------- API pública ----------
 async function getAll<T extends WithId>(table: TableName): Promise<T[]> {
   if (supabaseEnabled && supabase) {
     const { data, error } = await supabase.from(table).select("*");
     if (error) throw error;
-    return (data as T[]) || [];
+    return decifrarLinhas(table, (data as T[]) || []);
   }
   return localBackend.list<T>(table);
 }
@@ -92,14 +128,16 @@ async function upsert<T extends WithId>(table: TableName, row: T): Promise<T> {
       );
     }
     // carimba a loja do usuário — sem isso o banco rejeita a gravação
-    const payload = { ...row, lojaId: lojaAtual };
+    const payload = await cifrarLinha(table, { ...row, lojaId: lojaAtual });
     const { data, error } = await supabase
       .from(table)
       .upsert(payload)
       .select()
       .single();
     if (error) throw error;
-    return data as T;
+    // devolve para a tela já em texto claro, como ela espera
+    const [volta] = await decifrarLinhas(table, [data as T]);
+    return volta;
   }
   const rows = localBackend.list<T>(table);
   const idx = rows.findIndex((r) => r.id === row.id);

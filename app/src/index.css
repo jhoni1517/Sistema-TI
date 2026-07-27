@@ -41,9 +41,36 @@ body {
   color: #e2e8f0;
 }
 
+/* ====== MOVIMENTO ======
+   Animações curtas o bastante para não atrasar o atendimento no balcão.
+   Quem pede menos movimento no sistema operacional recebe tudo estático. */
+@keyframes entrada {
+  from { opacity: 0; transform: translateY(6px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes surgir {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes brilho {
+  100% { transform: translateX(100%); }
+}
+
+.animar-entrada { animation: entrada 0.18s ease-out both; }
+.animar-surgir  { animation: surgir 0.15s ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
 @layer components {
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97];
   }
   .btn-primary {
     @apply btn bg-brand-600 text-white hover:bg-brand-700 focus:ring-brand-500;
@@ -61,10 +88,25 @@ body {
     @apply btn text-slate-600 hover:bg-slate-100;
   }
   .card {
-    @apply rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200;
+    @apply rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200 transition-shadow duration-200 hover:shadow-md;
   }
   .input {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500;
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30;
+  }
+  /* Espaço reservado enquanto os dados chegam da nuvem */
+  .esqueleto {
+    @apply relative overflow-hidden rounded-lg bg-slate-200/70;
+  }
+  .esqueleto::after {
+    content: "";
+    @apply absolute inset-0 -translate-x-full;
+    background-image: linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0) 0,
+      rgba(255, 255, 255, 0.45) 50%,
+      rgba(255, 255, 255, 0) 100%
+    );
+    animation: brilho 1.4s infinite;
   }
   .label {
     @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500;
@@ -104,11 +146,26 @@ body {
 .dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #26314a; }
 .dark .ring-slate-200 { --tw-ring-color: #26314a; }
 .dark .ring-slate-300 { --tw-ring-color: #334155; }
+.dark .text-slate-400 { color: #7b8aa3; }
 /* Hovers */
 .dark .hover\:bg-slate-50:hover { background-color: rgba(38, 49, 74, 0.5); }
 .dark .hover\:bg-slate-100:hover { background-color: #26314a; }
 .dark .hover\:bg-slate-200:hover { background-color: #334155; }
 /* Caixas de busca/filtro com fundo branco viram escuras via .bg-white acima */
+/* Faixas coloridas de aviso ficavam claras demais no escuro e "furavam" a tela */
+.dark .bg-amber-50 { background-color: #2a2011; }
+.dark .bg-emerald-50 { background-color: #0f2418; }
+.dark .bg-red-50 { background-color: #2a1416; }
+.dark .bg-blue-50 { background-color: #111f38; }
+.dark .bg-brand-50 { background-color: rgb(var(--brand-900) / 0.35); }
+.dark .text-amber-700 { color: #fbbf24; }
+.dark .text-emerald-700 { color: #34d399; }
+.dark .text-red-700 { color: #f87171; }
+.dark .text-brand-700 { color: rgb(var(--brand-300)); }
+.dark .border-amber-200 { border-color: #4a3a17; }
+.dark .border-emerald-200 { border-color: #17402c; }
+.dark .border-red-200 { border-color: #4a2024; }
+.dark .esqueleto { @apply bg-slate-700/50; }
 
 ::-webkit-scrollbar {
   width: 10px;

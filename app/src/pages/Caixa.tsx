@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { aviso } from "../components/Aviso";
 import {
   Plus,
   ArrowDownCircle,
@@ -275,7 +276,7 @@ const MovimentoModal: React.FC<{
     .slice(0, 8);
 
   const salvar = () => {
-    if (valor <= 0) return alert("Informe um valor válido.");
+    if (valor <= 0) return aviso.alerta("Informe um valor válido.");
     const catFinal = categoria === "Outro" ? catCustom.trim() || "Outro" : categoria;
     onSave(
       {

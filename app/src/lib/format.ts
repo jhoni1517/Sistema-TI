@@ -51,6 +51,26 @@ export const whatsappLink = (telefone: string, mensagem: string): string => {
   return `https://wa.me/${full}?text=${encodeURIComponent(mensagem)}`;
 };
 
+/**
+ * Nome fixo da janela do WhatsApp.
+ * Com um alvo nomeado, o navegador REAPROVEITA a mesma aba em vez de abrir
+ * uma nova a cada OS enviada — no fim do dia isso é a diferença entre uma
+ * aba e quarenta.
+ */
+const JANELA_WHATSAPP = "sistema-ti-whatsapp";
+
+/** Abre a conversa reusando a aba do WhatsApp que já estiver aberta */
+export const abrirWhatsapp = (telefone: string, mensagem: string): void => {
+  const janela = window.open(whatsappLink(telefone, mensagem), JANELA_WHATSAPP);
+  // Traz a aba existente para a frente; alguns navegadores bloqueiam o focus
+  // silenciosamente, e nesse caso a navegação sozinha já resolve.
+  try {
+    janela?.focus();
+  } catch {
+    /* sem foco, mas a mensagem já foi carregada na aba certa */
+  }
+};
+
 /** Código público de acompanhamento a partir do número da OS */
 export const codigoOS = (numero: number): string =>
   `OS${numero.toString().padStart(5, "0")}`;

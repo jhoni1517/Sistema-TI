@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { aviso } from "../components/Aviso";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Search,
@@ -105,7 +106,7 @@ export const Rastreio: React.FC = () => {
       if (error || data === false) throw new Error();
       await consultar();
     } catch {
-      alert("Não foi possível registrar sua resposta. Tente novamente.");
+      aviso.erro("Não foi possível registrar sua resposta. Tente novamente.");
     } finally {
       setEnviando(false);
     }

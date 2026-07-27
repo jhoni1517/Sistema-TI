@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { aviso } from "../components/Aviso";
 import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle } from "../components/ui";
@@ -63,7 +64,7 @@ export const Estoque: React.FC = () => {
 
   const salvar = async () => {
     if (!editando) return;
-    if (!editando.nome.trim()) return alert("Informe o nome do produto.");
+    if (!editando.nome.trim()) return aviso.alerta("Informe o nome do produto.");
     // grava os textos de categoria/fornecedor para exibição/compatibilidade
     const p = {
       ...editando,
@@ -74,7 +75,7 @@ export const Estoque: React.FC = () => {
       await saveProduto(p);
       setEditando(null);
     } catch (e) {
-      alert("Não foi possível salvar o produto.\n\n" + (e instanceof Error ? e.message : String(e)) + "\n\nSe você usa a nuvem, confira se rodou o comando SQL de atualização das tabelas.");
+      aviso.erro("Não foi possível salvar o produto.\n\n" + (e instanceof Error ? e.message : String(e)) + "\n\nSe você usa a nuvem, confira se rodou o comando SQL de atualização das tabelas.");
     }
   };
 
@@ -287,12 +288,12 @@ const FornecedoresManager: React.FC<{
 
   const salvar = async () => {
     if (!edit) return;
-    if (!edit.nome.trim()) return alert("Informe o nome do fornecedor.");
+    if (!edit.nome.trim()) return aviso.alerta("Informe o nome do fornecedor.");
     try {
       await onSave(edit);
       setEdit(null);
     } catch (e) {
-      alert("Erro ao salvar: " + (e instanceof Error ? e.message : String(e)));
+      aviso.erro("Erro ao salvar: " + (e instanceof Error ? e.message : String(e)));
     }
   };
 

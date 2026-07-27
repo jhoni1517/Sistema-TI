@@ -1,4 +1,5 @@
 import { supabase, supabaseEnabled } from "./supabase";
+import { definirChaveLoja } from "./cripto";
 
 export type Papel = "dono" | "gerente" | "tecnico" | "atendente";
 
@@ -73,6 +74,36 @@ export async function carregarSessao(): Promise<Sessao | null> {
     email: user.email || "",
     perfil: (perfil as Perfil) || null,
   };
+}
+
+/**
+ * Busca a chave de criptografia da loja e a entrega ao módulo de cripto.
+ * A política de acesso do banco só devolve a linha da própria loja, então
+ * uma loja nunca alcança a chave da outra.
+ */
+export async function carregarChaveLoja(lojaId: string | null): Promise<void> {
+  if (!supabase || !lojaId) {
+    await definirChaveLoja(null);
+    return;
+  }
+  const { data } = await supabase
+    .from("lojas")
+    .select("chave_cripto")
+    .eq("id", lojaId)
+    .maybeSingle();
+  await definirChaveLoja((data as { chave_cripto?: string } | null)?.chave_cripto ?? null);
+}
+
+/** Deixa registrado quem abriu a senha de um aparelho, e quando */
+export async function registrarAcessoSigilo(lojaId: string, osNumero: number): Promise<void> {
+  if (!supabase) return;
+  const { data } = await supabase.auth.getUser();
+  if (!data?.user) return;
+  await supabase.from("acessos_sigilo").insert({
+    lojaId,
+    usuario_id: data.user.id,
+    os_numero: osNumero,
+  });
 }
 
 export async function entrar(email: string, senha: string): Promise<void> {

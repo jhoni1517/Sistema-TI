@@ -24,12 +24,13 @@ const DEFAULT_CONFIG: Config = {
   telefoneLoja: "",
   enderecoLoja: "",
   cnpj: "",
-  senhaAcesso: "1234",
+  senhaAcesso: "",
   tema: "claro",
   corDestaque: "azul",
   comissaoPadrao: 0,
   taxaArmazenamentoDia: 0,
   diasAbandono: 90,
+  limparSenhaNaEntrega: true,
 };
 
 interface AppState {

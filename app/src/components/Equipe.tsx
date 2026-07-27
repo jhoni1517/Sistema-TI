@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { aviso } from "./Aviso";
 import {
   UserPlus,
   Users,
@@ -84,7 +85,7 @@ export const Equipe: React.FC<{
 
   const remover = async (p: Perfil) => {
     if (!supabase) return;
-    if (p.id === meuId) return alert("Você não pode remover o seu próprio acesso.");
+    if (p.id === meuId) return aviso.alerta("Você não pode remover o seu próprio acesso.");
     if (!confirm(`Remover o acesso de ${p.nome || "este usuário"}?`)) return;
     await supabase.from("perfis").delete().eq("id", p.id);
     carregar();

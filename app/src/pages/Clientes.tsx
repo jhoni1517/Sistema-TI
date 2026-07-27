@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { aviso } from "../components/Aviso";
 import { Plus, Search, Pencil, Trash2, Users, Phone, MessageCircle, Wrench } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle } from "../components/ui";
@@ -37,7 +38,7 @@ export const Clientes: React.FC = () => {
 
   const salvar = async () => {
     if (!editando) return;
-    if (!editando.nome.trim()) return alert("Informe o nome do cliente.");
+    if (!editando.nome.trim()) return aviso.alerta("Informe o nome do cliente.");
     await saveCliente(editando);
     setEditando(null);
   };
