@@ -3,11 +3,26 @@ import { OS_STATUS_META } from "./types";
 import { brl, formatDate, formatDateTime, codigoOS } from "./format";
 import { totalPecas, totalOS, receitaBruta, totalDespesas, totalSangrias } from "./calc";
 
+/**
+ * Escapa texto antes de entrar no HTML do recibo.
+ *
+ * Sem isto, um cliente chamado "Silva & Cia" ou um defeito descrito como
+ * "tela < 5 polegadas" quebram a marcação e o recibo sai torto ou com
+ * pedaços faltando. Também fecha a porta para alguém colar HTML num campo
+ * de texto e alterar o que o recibo mostra.
+ */
+const esc = (v?: string | number | null): string =>
+  String(v ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+
 const cab = (config: Config) => `
   <div class="head">
-    <h1>${config.nomeLoja || "Assistência Técnica"}</h1>
-    ${config.enderecoLoja ? `<p>${config.enderecoLoja}</p>` : ""}
-    <p>${[config.telefoneLoja, config.cnpj].filter(Boolean).join(" · ")}</p>
+    <h1>${esc(config.nomeLoja) || "Assistência Técnica"}</h1>
+    ${config.enderecoLoja ? `<p>${esc(config.enderecoLoja)}</p>` : ""}
+    <p>${[config.telefoneLoja, config.cnpj].filter(Boolean).map(esc).join(" · ")}</p>
   </div>`;
 
 export function reciboOS(
@@ -25,13 +40,14 @@ export function reciboOS(
       ? ` Após esse prazo, será cobrada taxa de armazenamento/guarda de ${brl(taxa)} por dia.`
       : "") +
     ` Decorrido o prazo legal sem retirada, o aparelho poderá ser vendido para custear o serviço/armazenamento ou descartado, nos termos da legislação vigente. O cliente declara ciência destas condições.`;
-  const itens = os.pecas
+  const pecas = os.pecas || [];
+  const itens = pecas
     .map(
       (p) => `<tr>
-        <td>${p.descricao || "-"}</td>
-        <td class="center">${p.quantidade}</td>
-        <td class="right">${brl(p.precoUnit)}</td>
-        <td class="right">${brl(p.precoUnit * p.quantidade)}</td>
+        <td>${esc(p.descricao) || "-"}</td>
+        <td class="center">${esc(p.quantidade)}</td>
+        <td class="right">${brl(Number(p.precoUnit) || 0)}</td>
+        <td class="right">${brl((Number(p.precoUnit) || 0) * (Number(p.quantidade) || 0))}</td>
       </tr>`
     )
     .join("");
@@ -48,29 +64,29 @@ export function reciboOS(
       incluirCliente
         ? `<div class="box" style="flex:1">
       <div class="label">Cliente</div>
-      <div class="val"><b>${cliente?.nome || "-"}</b></div>
+      <div class="val"><b>${esc(cliente?.nome) || "-"}</b></div>
       <div class="label">Contato</div>
-      <div class="val">${[cliente?.telefone, cliente?.cpf].filter(Boolean).join(" · ") || "-"}</div>
+      <div class="val">${[cliente?.telefone, cliente?.cpf].filter(Boolean).map(esc).join(" · ") || "-"}</div>
     </div>`
         : ""
     }
     <div class="box" style="flex:1">
       <div class="label">Aparelho</div>
-      <div class="val"><b>${[os.tipoAparelho, os.marca, os.modelo].filter(Boolean).join(" ")}</b></div>
+      <div class="val"><b>${[os.tipoAparelho, os.marca, os.modelo].filter(Boolean).map(esc).join(" ")}</b></div>
       <div class="label">Cor / IMEI / Série</div>
-      <div class="val">${[os.cor, os.imeiSerial].filter(Boolean).join(" · ") || "-"}</div>
-      ${os.acessorios ? `<div class="label">Acessórios</div><div class="val">${os.acessorios}</div>` : ""}
+      <div class="val">${[os.cor, os.imeiSerial].filter(Boolean).map(esc).join(" · ") || "-"}</div>
+      ${os.acessorios ? `<div class="label">Acessórios</div><div class="val">${esc(os.acessorios)}</div>` : ""}
     </div>
   </div>
 
   <div class="box">
     <div class="label">Defeito relatado</div>
-    <div class="val">${os.defeitoRelatado || "-"}</div>
-    ${os.defeitoConstatado ? `<div class="label">Laudo técnico</div><div class="val">${os.defeitoConstatado}</div>` : ""}
+    <div class="val">${esc(os.defeitoRelatado) || "-"}</div>
+    ${os.defeitoConstatado ? `<div class="label">Laudo técnico</div><div class="val">${esc(os.defeitoConstatado)}</div>` : ""}
   </div>
 
   ${
-    os.pecas.length
+    pecas.length
       ? `<table>
           <thead><tr><th>Peça / Serviço</th><th class="center">Qtd</th><th class="right">Preço</th><th class="right">Subtotal</th></tr></thead>
           <tbody>${itens}</tbody>
@@ -85,7 +101,7 @@ export function reciboOS(
     <div class="line grand"><span>Total</span><span>${brl(totalOS(os))}</span></div>
   </div>
 
-  ${os.tecnico ? `<div class="muted" style="margin-top:10px">Técnico responsável: ${os.tecnico}</div>` : ""}
+  ${os.tecnico ? `<div class="muted" style="margin-top:10px">Técnico responsável: ${esc(os.tecnico)}</div>` : ""}
 
   <div class="box" style="margin-top:14px">
     <div class="label">Termo de guarda e retirada</div>
@@ -94,7 +110,7 @@ export function reciboOS(
 
   <div class="sign">
     <div>Assinatura do cliente</div>
-    <div>${config.nomeLoja || "Assistência"}</div>
+    <div>${esc(config.nomeLoja) || "Assistência"}</div>
   </div>`;
 }
 
@@ -123,7 +139,7 @@ export function reciboFechamento(
     .map(
       (m) => `<tr>
         <td>${formatDateTime(m.data)}</td>
-        <td>${m.descricao}</td>
+        <td>${esc(m.descricao)}</td>
         <td style="text-transform:capitalize">${m.tipo === "entrada" ? "Entrada" : m.tipo === "sangria" ? "Sangria" : "Saída"}</td>
         <td class="right">${m.tipo === "entrada" ? "" : "- "}${brl(m.valor)}</td>
       </tr>`
@@ -160,6 +176,6 @@ export function reciboFechamento(
 
   <div class="sign">
     <div>Conferido por</div>
-    <div>${config.nomeLoja || "Responsável"}</div>
+    <div>${esc(config.nomeLoja) || "Responsável"}</div>
   </div>`;
 }

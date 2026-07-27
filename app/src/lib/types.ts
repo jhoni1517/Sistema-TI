@@ -204,6 +204,14 @@ export interface MovimentoCaixa {
   formaPagamento: FormaPagamento;
   osId?: ID;
   custoRelacionado?: number; // custo das peças para cálculo de lucro
+  /**
+   * Saída que é COMPRA DE ESTOQUE, não despesa do resultado.
+   * Comprar uma peça não é perder dinheiro — é trocar dinheiro por peça. O
+   * custo dela só vira resultado quando a peça é vendida (aí entra em
+   * custoRelacionado). Sem esta distinção, a mesma peça é descontada duas
+   * vezes do lucro.
+   */
+  compraEstoque?: boolean;
   data: string;
   sessaoId?: ID;
 }

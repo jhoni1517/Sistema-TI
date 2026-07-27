@@ -266,6 +266,8 @@ export const Cotacoes: React.FC<{
         categoria: "Compra de peça",
         formaPagamento: "pix",
         sessaoId: sessaoAberta?.id,
+        // Reposição de estoque: sai do caixa, mas não é despesa do resultado
+        compraEstoque: true,
         // Sem custoRelacionado aqui: ele existe para marcar o custo embutido
         // numa ENTRADA. Numa saída, o lucro já desconta pelo próprio valor —
         // preencher os dois faria a compra ser descontada duas vezes.

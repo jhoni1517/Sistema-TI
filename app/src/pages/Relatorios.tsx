@@ -14,11 +14,11 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { TrendingUp, DollarSign, Percent, Wrench, Users } from "lucide-react";
+import { TrendingUp, DollarSign, Percent, Wrench, Users, Package } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { SectionTitle } from "../components/ui";
 import { brl, monthKey } from "../lib/format";
-import { receitaBruta, totalDespesas, custoProdutos, lucroLiquido, totalOS } from "../lib/calc";
+import { receitaBruta, despesasOperacionais, comprasEstoque, custoProdutos, lucroLiquido, totalOS } from "../lib/calc";
 import { accentHex, isDark } from "../lib/themes";
 import { OS_STATUS_META, type OSStatus } from "../lib/types";
 
@@ -63,7 +63,9 @@ export const Relatorios: React.FC = () => {
       const movs = movimentos.filter((m) => monthKey(m.data) === chave);
       const receita = receitaBruta(movs);
       const custo = custoProdutos(movs);
-      const despesa = totalDespesas(movs);
+      // Só despesas do mês: reposição de estoque entra no resultado quando
+      // a peça é vendida, não quando é comprada.
+      const despesa = despesasOperacionais(movs);
       const [ano, mes] = chave.split("-");
       return {
         mes: `${MESES[+mes - 1]}/${ano.slice(2)}`,
@@ -78,11 +80,12 @@ export const Relatorios: React.FC = () => {
   const totais = useMemo(() => {
     const receita = receitaBruta(movimentos);
     const custo = custoProdutos(movimentos);
-    const despesa = totalDespesas(movimentos);
+    const despesa = despesasOperacionais(movimentos);
+    const estoque = comprasEstoque(movimentos);
     const bruto = receita - custo;
     const liquido = lucroLiquido(movimentos);
     const margem = receita > 0 ? (liquido / receita) * 100 : 0;
-    return { receita, custo, despesa, bruto, liquido, margem };
+    return { receita, custo, despesa, estoque, bruto, liquido, margem };
   }, [movimentos]);
 
   const porStatus = useMemo(() => {
@@ -120,9 +123,22 @@ export const Relatorios: React.FC = () => {
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KPI label="Receita bruta" value={brl(totais.receita)} icon={<DollarSign size={18} />} accent="text-slate-800" />
         <KPI label="Lucro bruto" value={brl(totais.bruto)} icon={<TrendingUp size={18} />} accent="text-blue-600" sub={`Custo peças: ${brl(totais.custo)}`} />
-        <KPI label="Lucro líquido" value={brl(totais.liquido)} icon={<TrendingUp size={18} />} accent="text-emerald-600" sub={`Despesas: ${brl(totais.despesa)}`} />
+        <KPI label="Lucro líquido" value={brl(totais.liquido)} icon={<TrendingUp size={18} />} accent="text-emerald-600" sub={`Despesas do mês: ${brl(totais.despesa)}`} />
         <KPI label="Margem líquida" value={`${totais.margem.toFixed(1)}%`} icon={<Percent size={18} />} accent="text-purple-600" />
       </div>
+
+      {/* Compra de estoque fica separada do resultado, e isso precisa estar
+          explícito — senão o dono acha que sumiu dinheiro do relatório. */}
+      {totais.estoque > 0 && (
+        <div className="mb-6 flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 p-3 text-sm text-slate-600">
+          <Package size={16} className="shrink-0 text-slate-400" />
+          <span>
+            <b>{brl(totais.estoque)}</b> foram investidos em reposição de estoque
+            no período. Esse valor saiu do caixa, mas não conta como despesa
+            aqui: o custo da peça entra no resultado quando ela é vendida.
+          </span>
+        </div>
+      )}
 
       {/* Evolução de faturamento */}
       <div className="card mb-5">
