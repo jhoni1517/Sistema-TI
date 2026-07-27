@@ -30,6 +30,39 @@ export const OS_STATUS_META: Record<
 
 export type TipoPessoa = "fisica" | "juridica";
 
+/**
+ * Classificação de risco do cliente.
+ *
+ * É registro interno da loja, baseado no histórico dela com aquela pessoa.
+ * Nunca aparece no recibo nem na página pública de acompanhamento: serve
+ * para o atendente decidir na hora, não para constranger ninguém no balcão.
+ */
+export type Classificacao = "normal" | "atencao" | "bloqueado";
+
+export const CLASSIFICACAO_META: Record<
+  Classificacao,
+  { label: string; cor: string; corPonto: string; descricao: string }
+> = {
+  normal: {
+    label: "Normal",
+    cor: "bg-emerald-100 text-emerald-700",
+    corPonto: "bg-emerald-500",
+    descricao: "Sem restrição",
+  },
+  atencao: {
+    label: "Atenção",
+    cor: "bg-amber-100 text-amber-700",
+    corPonto: "bg-amber-500",
+    descricao: "Atende, mas o sistema avisa antes de abrir a OS",
+  },
+  bloqueado: {
+    label: "Bloqueado",
+    cor: "bg-red-100 text-red-700",
+    corPonto: "bg-red-500",
+    descricao: "Não abre nova OS sem autorização do dono",
+  },
+};
+
 export interface Cliente {
   id: ID;
   nome: string; // pessoa física: nome; jurídica: razão social
@@ -42,6 +75,11 @@ export interface Cliente {
   tipoPessoa?: TipoPessoa; // ausente = física (cadastros antigos)
   nomeFantasia?: string; // só jurídica
   inscricaoEstadual?: string; // só jurídica
+  /** Classificação de risco (ausente = normal) */
+  classificacao?: Classificacao;
+  /** Por que foi classificado assim. Obrigatório fora do normal. */
+  motivoClassificacao?: string;
+  classificadoEm?: string;
   criadoEm: string;
 }
 
