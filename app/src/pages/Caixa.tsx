@@ -286,6 +286,11 @@ const MovimentoModal: React.FC<{
         descricao: descricao || titulo,
         valor,
         formaPagamento: forma,
+        // Compra de peça é reposição de estoque, não despesa do mês: o custo
+        // entra no resultado quando a peça for vendida.
+        compraEstoque:
+          tipo === "saida" &&
+          ["Compra de peça", "Fornecedor"].includes(categoria),
         data: nowISO(),
       },
       tipo === "entrada" && prodId ? { produtoId: prodId, quantidade, baixa, custo: prodCusto * quantidade } : undefined

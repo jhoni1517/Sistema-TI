@@ -35,9 +35,9 @@ export const formatDateTime = (iso?: string): string => {
   });
 };
 
-export const monthKey = (iso: string): string => iso.slice(0, 7); // YYYY-MM
+export const monthKey = (iso?: string | null): string => txt(iso).slice(0, 7); // YYYY-MM
 
-export const dayKey = (iso: string): string => iso.slice(0, 10); // YYYY-MM-DD
+export const dayKey = (iso?: string | null): string => txt(iso).slice(0, 10); // YYYY-MM-DD
 
 export const isToday = (iso?: string): boolean => {
   if (!iso) return false;
