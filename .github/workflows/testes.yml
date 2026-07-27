@@ -1,0 +1,33 @@
+# Roda os testes e o build a cada push e a cada pull request.
+#
+# Existe porque três bugs de dinheiro escaparam para produção em um único
+# dia — lucro descontado duas vezes, venda sem lançamento no caixa e peça
+# sem baixa de estoque. Todos tinham teste escrito; nenhum rodava sozinho.
+name: Testes
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  testes:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - run: npm ci
+
+      # O build também é verificação: já subiu commit com erro de tipo que
+      # o tsc isolado não pegava.
+      - run: npm test
+      - run: npm run build

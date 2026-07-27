@@ -99,8 +99,15 @@ drop policy if exists "avisos_contas_ler" on avisos_contas;
 create policy "avisos_contas_ler" on avisos_contas
   for select to authenticated using ("lojaId" = loja_atual());
 
+-- ---------- Serviço no cadastro de produtos ----------
+-- Formatação, instalação e limpeza não têm estoque. Sem esta marca, o
+-- atendente digitava 99999999999 na quantidade para o item não ficar
+-- vermelho, e o valor do estoque ia para a casa dos trilhões.
+alter table produtos add column if not exists servico boolean default false;
+
 -- =====================================================================
 -- DEPOIS DE RODAR:
 --   Aparece o menu "Contas a Pagar", com contas fixas, lembretes,
---   relatório de gastos e objetivos.
+--   relatório de gastos e objetivos. No cadastro de produto passa a
+--   existir a opção "É um serviço, não uma peça".
 -- =====================================================================

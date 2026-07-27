@@ -82,7 +82,7 @@ const novaOS = (numero: number): OrdemServico => ({
 });
 
 export const OrdensServico: React.FC = () => {
-  const { ordens, clientes, produtos, sessoes, config, saveOrdem, removeOrdem, saveMovimento, saveProduto, saveFiado } = useApp();
+  const { ordens, clientes, produtos, sessoes, movimentos, fiados, config, saveOrdem, removeOrdem, saveMovimento, saveProduto, saveFiado } = useApp();
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<OSStatus | "todas" | "abertas">("abertas");
   const [editando, setEditando] = useState<OrdemServico | null>(null);
@@ -177,6 +177,8 @@ export const OrdensServico: React.FC = () => {
         if (nome) semVinculo.push(txt(p.descricao));
         continue;
       }
+      // Serviço não tem estoque para descontar
+      if (prod.servico) continue;
       await saveProduto({
         ...prod,
         quantidade: Math.max(0, (Number(prod.quantidade) || 0) - (Number(p.quantidade) || 0)),
@@ -326,6 +328,10 @@ export const OrdensServico: React.FC = () => {
           clienteNome={nomeCliente(detalhe.clienteId)}
           cliente={cliente(detalhe.clienteId)}
           config={config}
+          pagamentoRegistrado={
+            movimentos.some((m) => m.osId === detalhe.id) ||
+            fiados.some((f) => f.osId === detalhe.id)
+          }
           historicoAparelho={
             detalhe.imeiSerial?.trim()
               ? ordens.filter(
@@ -374,9 +380,21 @@ export const OrdensServico: React.FC = () => {
                 sessaoId: sessaoAberta?.id,
                 data: nowISO(),
               });
-              await baixarEstoqueEEntregar(detalhe);
+              if (detalhe.status === "entregue") {
+                // OS já entregue: não dá para saber se a baixa foi feita, e
+                // descontar duas vezes estraga o estoque. Quem estava no
+                // balcão sabe a resposta — então perguntamos.
+                const baixar = confirm(
+                  "Descontar as peças do estoque agora?\n\n" +
+                    "OK = as peças ainda NÃO foram descontadas.\n" +
+                    "Cancelar = o estoque já está certo."
+                );
+                if (baixar) await baixarEstoqueEEntregar(detalhe);
+              } else {
+                await baixarEstoqueEEntregar(detalhe);
+              }
               setDetalhe(null);
-              aviso.sucesso(`${brl(valor)} lançado no caixa e OS entregue.`);
+              aviso.sucesso(`${brl(valor)} lançado no caixa.`);
             } catch (e) {
               aviso.erro(
                 "Não foi possível registrar o pagamento:\n\n" +
@@ -649,8 +667,10 @@ const OSDetalhe: React.FC<{
   onExcluir: () => void;
   onReceber: (forma: FormaPagamento) => void;
   onFiado: () => void;
+  /** Já existe lançamento no caixa ou fiado para esta OS? */
+  pagamentoRegistrado: boolean;
   historicoAparelho: OrdemServico[];
-}> = ({ os, clienteNome, cliente, config, onClose, onStatus, onAvisar, onEditar, onExcluir, onReceber, onFiado, historicoAparelho }) => {
+}> = ({ os, clienteNome, cliente, config, onClose, onStatus, onAvisar, onEditar, onExcluir, onReceber, onFiado, pagamentoRegistrado, historicoAparelho }) => {
   const [forma, setForma] = useState<FormaPagamento>("dinheiro");
   const [incluirCliente, setIncluirCliente] = useState(true);
 
@@ -835,6 +855,38 @@ const OSDetalhe: React.FC<{
         </div>
 
         <p className="text-center text-xs text-slate-400">{config.nomeLoja}</p>
+
+        {/* Entregue mas sem nenhum pagamento registrado: precisa de saída */}
+        {os.status === "entregue" && !pagamentoRegistrado && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 no-print">
+            <p className="mb-2 flex items-center gap-2 text-sm font-semibold text-amber-800">
+              <AlertTriangle size={16} /> Esta OS foi entregue sem registro de pagamento
+            </p>
+            <p className="mb-3 text-xs text-amber-700">
+              Nada entrou no caixa e o estoque pode não ter sido baixado. Registre
+              agora para a conta ficar certa.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                className="input !w-auto !py-1.5 text-sm"
+                value={forma}
+                onChange={(e) => setForma(e.target.value as FormaPagamento)}
+              >
+                <option value="dinheiro">Dinheiro</option>
+                <option value="pix">Pix</option>
+                <option value="debito">Débito</option>
+                <option value="credito">Crédito</option>
+                <option value="transferencia">Transferência</option>
+              </select>
+              <button className="btn-success !py-1.5 text-sm" onClick={() => onReceber(forma)}>
+                Registrar {brl(totalOS(os))} no caixa
+              </button>
+              <button className="btn-secondary !py-1.5 text-sm" onClick={onFiado}>
+                <HandCoins size={15} /> Lançar como fiado
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Receber pagamento */}
         {os.status !== "entregue" && os.status !== "cancelada" && (
