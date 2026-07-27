@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { BuscaGlobal } from "./BuscaGlobal";
+import { AvisoAssinatura } from "./AvisoAssinatura";
 import {
   LayoutDashboard,
   Wrench,
@@ -15,6 +16,8 @@ import {
   Cloud,
   HardDrive,
   Search,
+  CreditCard,
+  Building2,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { pode, NOME_PAPEL, type Sessao } from "../lib/auth";
@@ -27,6 +30,7 @@ const nav = [
   { to: "/caixa", label: "Caixa", icon: Wallet, recurso: "caixa" },
   { to: "/a-receber", label: "A Receber (Fiado)", icon: HandCoins, recurso: "fiado" },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3, recurso: "relatorios" },
+  { to: "/assinatura", label: "Assinatura", icon: CreditCard, recurso: "config" },
   { to: "/config", label: "Configurações", icon: Settings, recurso: "config" },
 ];
 
@@ -105,6 +109,12 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
         <nav className="space-y-1 p-3">
           {nav
             .filter((item) => item.recurso === "*" || pode(sessao?.perfil?.papel, item.recurso))
+            .concat(
+              // Só quem administra o sistema enxerga o painel de lojas
+              sessao?.perfil?.super_admin
+                ? [{ to: "/lojas", label: "Lojas assinantes", icon: Building2, recurso: "*" }]
+                : []
+            )
             .map((item) => (
             <NavLink
               key={item.to}
@@ -151,6 +161,7 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
 
       {/* Conteúdo */}
       <div className="flex min-w-0 flex-1 flex-col">
+        <AvisoAssinatura />
         <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/80 px-4 backdrop-blur lg:hidden no-print">
           <button
             onClick={() => setOpen(true)}
