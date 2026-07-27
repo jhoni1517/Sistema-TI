@@ -201,6 +201,18 @@ export const OrdensServico: React.FC = () => {
     });
   };
 
+  /**
+   * OS entregue sem nenhum lançamento de dinheiro.
+   *
+   * Fica visível já na lista porque o caminho errado (salvar a OS achando
+   * que isso conclui a venda) é fácil demais de tomar — e o prejuízo só
+   * aparece no fechamento do mês, quando ninguém lembra mais.
+   */
+  const semPagamento = (o: OrdemServico): boolean =>
+    o.status === "entregue" &&
+    !movimentos.some((m) => m.osId === o.id) &&
+    !fiados.some((f) => f.osId === o.id);
+
   const avisarCliente = (o: OrdemServico) => {
     const c = cliente(o.clienteId);
     if (!txt(c?.telefone)) return aviso.alerta("Cliente sem telefone cadastrado.");
@@ -266,6 +278,15 @@ export const OrdensServico: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-xs font-bold text-slate-400">{codigoOS(o.numero)}</span>
                   <span className={`badge ${OS_STATUS_META[o.status].color}`}>{OS_STATUS_META[o.status].label}</span>
+                  {semPagamento(o) && (
+                    <button
+                      className="badge bg-amber-100 text-amber-800 hover:bg-amber-200"
+                      onClick={() => setDetalhe(o)}
+                      title="Nada foi lançado no caixa para esta OS"
+                    >
+                      <AlertTriangle size={12} /> Sem pagamento — receber
+                    </button>
+                  )}
                   {(() => {
                     const dias = diasEmPosse(o);
                     const t = taxaArmazenamento(o, config.taxaArmazenamentoDia || 0, config.diasAbandono || 90);
