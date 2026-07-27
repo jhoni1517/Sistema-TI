@@ -112,6 +112,24 @@ async function decifrarLinhas<T>(table: TableName, rows: T[]): Promise<T[]> {
   );
 }
 
+/**
+ * O banco recusa a gravação quando a assinatura está vencida — a política
+ * de escrita exige loja_pode_gravar(). O erro que volta do PostgREST fala
+ * em "row-level security policy", o que não diz nada para quem está no
+ * balcão. Aqui ele vira uma frase que a pessoa entende e resolve.
+ */
+function traduzirErroGravacao(error: { message?: string; code?: string }): Error {
+  const msg = error?.message || "";
+  if (error?.code === "42501" || /row-level security|violates row-level/i.test(msg)) {
+    return new Error(
+      "Não foi possível salvar: a assinatura do sistema está vencida. " +
+        "Você continua consultando e imprimindo tudo normalmente — " +
+        "acerte a mensalidade em Assinatura para voltar a cadastrar."
+    );
+  }
+  return new Error(msg || "Não foi possível salvar.");
+}
+
 // ---------- API pública ----------
 async function getAll<T extends WithId>(table: TableName): Promise<T[]> {
   if (supabaseEnabled && supabase) {
@@ -138,7 +156,7 @@ async function upsert<T extends WithId>(table: TableName, row: T): Promise<T> {
       .upsert(payload)
       .select()
       .single();
-    if (error) throw error;
+    if (error) throw traduzirErroGravacao(error);
     // devolve para a tela já em texto claro, como ela espera
     const [volta] = await decifrarLinhas(table, [data as T]);
     return volta;
@@ -154,7 +172,7 @@ async function upsert<T extends WithId>(table: TableName, row: T): Promise<T> {
 async function remove(table: TableName, id: string): Promise<void> {
   if (supabaseEnabled && supabase) {
     const { error } = await supabase.from(table).delete().eq("id", id);
-    if (error) throw error;
+    if (error) throw traduzirErroGravacao(error);
     return;
   }
   const rows = localBackend.list<WithId>(table);

@@ -15,6 +15,8 @@ import { Relatorios } from "./pages/Relatorios";
 import { Config } from "./pages/Config";
 import { Rastreio } from "./pages/Rastreio";
 import { SemPerfil } from "./pages/SemPerfil";
+import { Lojas } from "./pages/Lojas";
+import { Assinatura } from "./pages/Assinatura";
 import { carregarSessao, carregarChaveLoja, sair, pode, type Sessao } from "./lib/auth";
 import { definirLoja, limparCacheLocal } from "./lib/db";
 import { supabase, supabaseEnabled } from "./lib/supabase";
@@ -106,6 +108,9 @@ const AreaProtegida: React.FC = () => {
           <Route path="a-receber" element={<Protegida recurso="fiado" papel={papel}><AReceber /></Protegida>} />
           <Route path="relatorios" element={<Protegida recurso="relatorios" papel={papel}><Relatorios /></Protegida>} />
           <Route path="config" element={<Protegida recurso="config" papel={papel}><Config /></Protegida>} />
+          <Route path="assinatura" element={<Protegida recurso="config" papel={papel}><Assinatura /></Protegida>} />
+          {/* Painel de quem administra o sistema inteiro */}
+          {sessao.perfil.super_admin && <Route path="lojas" element={<Lojas />} />}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
