@@ -264,7 +264,9 @@ export async function importarTudo(
         }
       }
     } else {
-      localBackend.saveAll(tabela, linhas);
+      // O tipo da união não estreita por campo aqui; o formato é validado
+      // na leitura do arquivo, antes de chegar nesta função.
+      localBackend.saveAll(tabela, linhas as WithId[]);
       gravados += linhas.length;
     }
   }
