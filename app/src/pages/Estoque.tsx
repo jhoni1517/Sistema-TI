@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { aviso } from "../components/Aviso";
-import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck, FileQuestion } from "lucide-react";
+import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck, FileQuestion, Wrench } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle } from "../components/ui";
 import { Cotacoes } from "../components/Cotacoes";
@@ -52,7 +52,7 @@ export const Estoque: React.FC = () => {
     const b = busca.toLowerCase();
     return [...produtos]
       .filter((p) => [p.nome, p.sku, nomeCat(p), nomeForn(p)].map(txt).join(" ").toLowerCase().includes(b))
-      .filter((p) => (soBaixo ? p.quantidade <= p.estoqueMinimo : true))
+      .filter((p) => (soBaixo ? !p.servico && p.quantidade <= p.estoqueMinimo : true))
       .sort((a, b) => txt(a.nome).localeCompare(txt(b.nome)));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [produtos, busca, soBaixo, categorias]);
@@ -66,7 +66,7 @@ export const Estoque: React.FC = () => {
   const emFalta = useMemo(
     () =>
       produtos
-        .filter((p) => p.quantidade <= p.estoqueMinimo)
+        .filter((p) => !p.servico && p.quantidade <= p.estoqueMinimo)
         .slice(0, 10)
         .map((p) => ({
           produtoId: p.id,
@@ -77,10 +77,12 @@ export const Estoque: React.FC = () => {
   );
 
   const resumo = useMemo(() => {
-    const valorCusto = produtos.reduce((s, p) => s + p.custo * p.quantidade, 0);
-    const valorVenda = produtos.reduce((s, p) => s + p.preco * p.quantidade, 0);
-    const baixos = produtos.filter((p) => p.quantidade <= p.estoqueMinimo).length;
-    return { valorCusto, valorVenda, baixos, itens: produtos.length };
+    // Serviço não é mercadoria: não vale nada em prateleira e nunca acaba.
+    const fisicos = produtos.filter((p) => !p.servico);
+    const valorCusto = fisicos.reduce((s, p) => s + (Number(p.custo) || 0) * (Number(p.quantidade) || 0), 0);
+    const valorVenda = fisicos.reduce((s, p) => s + (Number(p.preco) || 0) * (Number(p.quantidade) || 0), 0);
+    const baixos = fisicos.filter((p) => (Number(p.quantidade) || 0) <= (Number(p.estoqueMinimo) || 0)).length;
+    return { valorCusto, valorVenda, baixos, itens: produtos.length, servicos: produtos.length - fisicos.length };
   }, [produtos]);
 
   const salvar = async () => {
@@ -169,7 +171,7 @@ export const Estoque: React.FC = () => {
             </thead>
             <tbody>
               {lista.map((p) => {
-                const baixo = p.quantidade <= p.estoqueMinimo;
+                const baixo = !p.servico && p.quantidade <= p.estoqueMinimo;
                 const margem = p.preco - p.custo;
                 return (
                   <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50">
@@ -178,10 +180,16 @@ export const Estoque: React.FC = () => {
                       <p className="text-xs text-slate-400">{nomeCat(p)}{p.sku ? ` · ${p.sku}` : ""}</p>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className={`badge ${baixo ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"}`}>
-                        {p.quantidade}
-                        {baixo && <AlertTriangle size={12} />}
-                      </span>
+                      {p.servico ? (
+                        <span className="badge bg-brand-50 text-brand-700">
+                          <Wrench size={11} /> Serviço
+                        </span>
+                      ) : (
+                        <span className={`badge ${baixo ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-600"}`}>
+                          {p.quantidade}
+                          {baixo && <AlertTriangle size={12} />}
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right text-slate-500">{brl(p.custo)}</td>
                     <td className="px-4 py-3 text-right font-semibold text-slate-800">{brl(p.preco)}</td>
@@ -250,12 +258,33 @@ export const Estoque: React.FC = () => {
             <Field label="Código / SKU">
               <input className="input" value={editando.sku} onChange={(e) => setEditando({ ...editando, sku: e.target.value })} />
             </Field>
-            <Field label="Quantidade">
-              <input type="number" className="input" value={editando.quantidade} onChange={(e) => setEditando({ ...editando, quantidade: +e.target.value })} />
-            </Field>
-            <Field label="Estoque mínimo (alerta)">
-              <input type="number" className="input" value={editando.estoqueMinimo} onChange={(e) => setEditando({ ...editando, estoqueMinimo: +e.target.value })} />
-            </Field>
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-slate-50 p-3 sm:col-span-2">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4"
+                checked={editando.servico === true}
+                onChange={(e) => setEditando({ ...editando, servico: e.target.checked })}
+              />
+              <span className="text-sm">
+                <b className="text-slate-700">É um serviço, não uma peça</b>
+                <span className="mt-0.5 block text-xs text-slate-500">
+                  Formatação, instalação, limpeza. Não tem quantidade, nunca
+                  aparece como estoque baixo e não é descontado ao vender.
+                </span>
+              </span>
+            </label>
+
+            {!editando.servico && (
+              <>
+                <Field label="Quantidade">
+                  <input type="number" className="input" value={editando.quantidade} onChange={(e) => setEditando({ ...editando, quantidade: +e.target.value })} />
+                </Field>
+                <Field label="Estoque mínimo (alerta)">
+                  <input type="number" className="input" value={editando.estoqueMinimo} onChange={(e) => setEditando({ ...editando, estoqueMinimo: +e.target.value })} />
+                </Field>
+              </>
+            )}
             <Field label="Custo (R$)">
               <input type="number" className="input" value={editando.custo} onChange={(e) => setEditando({ ...editando, custo: +e.target.value })} />
             </Field>

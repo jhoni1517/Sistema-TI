@@ -171,7 +171,7 @@ export const Caixa: React.FC = () => {
             await saveMovimento({ ...m, sessaoId: sessaoAberta?.id, custoRelacionado: extra?.custo });
             if (extra?.baixa && extra.produtoId) {
               const prod = produtos.find((p) => p.id === extra.produtoId);
-              if (prod) {
+              if (prod && !prod.servico) {
                 await saveProduto({
                   ...prod,
                   quantidade: Math.max(0, prod.quantidade - (extra.quantidade || 1)),

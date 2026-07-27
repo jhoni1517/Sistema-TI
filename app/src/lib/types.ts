@@ -130,6 +130,14 @@ export interface Produto {
   preco: number; // preço de venda
   fornecedor?: string; // texto livre (compatibilidade)
   fornecedorId?: ID; // fornecedor cadastrado
+  /**
+   * Serviço (formatação, instalação, limpeza) em vez de peça física.
+   * Não tem estoque: não entra no valor do inventário, nunca aparece como
+   * "estoque baixo" e não é descontado quando vendido. Sem isso o
+   * atendente digitava 99999999999 na quantidade para o item não ficar
+   * vermelho, e o valor do estoque ia para a casa dos trilhões.
+   */
+  servico?: boolean;
   criadoEm: string;
 }
 
