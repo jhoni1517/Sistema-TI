@@ -18,6 +18,9 @@ export interface Loja {
   valor_mensal?: number | null;
   bloqueada?: boolean | null;
   observacoes?: string | null;
+  whatsapp?: string | null;
+  /** Isenta de mensalidade (a loja de quem administra o sistema) */
+  isento?: boolean | null;
   ultimoPagamento?: string | null;
   criadoEm?: string | null;
 }
@@ -52,6 +55,8 @@ export const diasParaVencer = (venceEm?: string | null): number | null => {
  */
 export function situacaoDe(loja: Loja, diasTolerancia = 5): Situacao {
   if (loja.bloqueada) return "bloqueada";
+  // Loja isenta (a sua) nunca vence — não faz sentido cobrar de si mesmo
+  if (loja.isento) return "ativa";
   if (!loja.venceEm) return "ativa";
   const dias = diasParaVencer(loja.venceEm) ?? 0;
   if (dias >= 0) return "ativa";
@@ -84,7 +89,7 @@ export async function listarLojas(): Promise<Loja[]> {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("lojas")
-    .select('id, nome, "venceEm", valor_mensal, bloqueada, observacoes, "ultimoPagamento", "criadoEm"')
+    .select('id, nome, "venceEm", valor_mensal, bloqueada, isento, observacoes, whatsapp, "ultimoPagamento", "criadoEm"')
     .order("criadoEm", { ascending: false });
   if (error) throw new Error(error.message);
   return (data as Loja[]) || [];
@@ -95,7 +100,7 @@ export async function minhaLoja(lojaId: string): Promise<Loja | null> {
   if (!supabase) return null;
   const { data } = await supabase
     .from("lojas")
-    .select('id, nome, "venceEm", valor_mensal, bloqueada, "ultimoPagamento", "criadoEm"')
+    .select('id, nome, "venceEm", valor_mensal, bloqueada, isento, "ultimoPagamento", "criadoEm"')
     .eq("id", lojaId)
     .maybeSingle();
   return (data as Loja) || null;

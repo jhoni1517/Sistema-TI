@@ -16,20 +16,52 @@ import type {
  * comprar caro por pressa.
  */
 
-/** Último preço pago por um item, opcionalmente restrito a um fornecedor */
+/** O registro é do mesmo item? (por id quando há, senão pelo nome) */
+const mesmoItem = (
+  p: PrecoFornecedor,
+  item: { produtoId?: string; descricao: string }
+): boolean =>
+  item.produtoId && p.produtoId
+    ? p.produtoId === item.produtoId
+    : txt(p.descricao).trim().toLowerCase() === txt(item.descricao).trim().toLowerCase();
+
+const maisRecentePrimeiro = (a: PrecoFornecedor, b: PrecoFornecedor) =>
+  txt(b.data).localeCompare(txt(a.data));
+
+/**
+ * Último preço EFETIVAMENTE PAGO por um item.
+ * Cotações recusadas ficam de fora: o que ancora a negociação é o que a
+ * loja pagou, não o que alguém pediu e não fechou.
+ */
 export function ultimoPreco(
   precos: PrecoFornecedor[],
   item: { produtoId?: string; descricao: string },
   fornecedorId?: string
 ): PrecoFornecedor | null {
-  const alvo = txt(item.descricao).trim().toLowerCase();
   const candidatos = precos
     .filter((p) => {
       if (fornecedorId && p.fornecedorId !== fornecedorId) return false;
-      if (item.produtoId && p.produtoId) return p.produtoId === item.produtoId;
-      return txt(p.descricao).trim().toLowerCase() === alvo;
+      if (p.comprado === false) return false; // só compra de verdade
+      return mesmoItem(p, item);
     })
-    .sort((a, b) => txt(b.data).localeCompare(txt(a.data)));
+    .sort(maisRecentePrimeiro);
+  return candidatos[0] || null;
+}
+
+/**
+ * Última referência conhecida — comprada OU só cotada.
+ * Serve para itens que a loja nunca comprou mas já pediu preço: continua
+ * valendo como base de comparação na cotação seguinte.
+ */
+export function ultimaReferencia(
+  precos: PrecoFornecedor[],
+  item: { produtoId?: string; descricao: string },
+  fornecedorId?: string
+): PrecoFornecedor | null {
+  const candidatos = precos
+    .filter((p) => (fornecedorId ? p.fornecedorId === fornecedorId : true))
+    .filter((p) => mesmoItem(p, item))
+    .sort(maisRecentePrimeiro);
   return candidatos[0] || null;
 }
 
@@ -38,13 +70,8 @@ export function melhorPreco(
   precos: PrecoFornecedor[],
   item: { produtoId?: string; descricao: string }
 ): PrecoFornecedor | null {
-  const alvo = txt(item.descricao).trim().toLowerCase();
   const candidatos = precos
-    .filter((p) =>
-      item.produtoId && p.produtoId
-        ? p.produtoId === item.produtoId
-        : txt(p.descricao).trim().toLowerCase() === alvo
-    )
+    .filter((p) => p.comprado !== false && mesmoItem(p, item))
     .sort((a, b) => (a.preco || 0) - (b.preco || 0));
   return candidatos[0] || null;
 }
@@ -84,8 +111,10 @@ export function mensagemFornecedor(
     .filter((i) => txt(i.descricao).trim())
     .map((i, idx) => {
       const qtd = Number(i.quantidade) || 1;
-      const ref = ultimoPreco(precos, i, cotacao.fornecedorId);
-      const nota = ref ? `\n   _(última compra: ${brl(ref.preco)})_` : "";
+      const ref = ultimaReferencia(precos, i, cotacao.fornecedorId);
+      const nota = ref
+        ? `\n   _(${ref.comprado === false ? "cotado antes" : "última compra"}: ${brl(ref.preco)})_`
+        : "";
       return `${idx + 1}. ${txt(i.descricao)} — *${qtd} un.*${nota}`;
     });
 
@@ -97,11 +126,12 @@ export function mensagemFornecedor(
     partes.push(`*Observações:*\n${txt(cotacao.observacoes).trim()}`);
   }
 
+  // Lista objetiva, sem perguntas soltas: o fornecedor responde item a item
   partes.push(
-    "Poderia me confirmar:\n" +
-      "1️⃣ Tem em estoque?\n" +
-      "2️⃣ Qual o valor unitário?\n" +
-      "3️⃣ Em quantos dias entrega?"
+    "Me confirme, por favor:\n" +
+      "- Disponibilidade em estoque\n" +
+      "- Valor unitário\n" +
+      "- Prazo de entrega"
   );
 
   partes.push("Obrigado!");

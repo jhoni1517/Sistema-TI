@@ -68,6 +68,22 @@ export const Assinatura: React.FC = () => {
     );
   }
 
+  // A loja de quem administra o sistema não paga a si mesma
+  if (loja?.isento) {
+    return (
+      <div className="max-w-2xl">
+        <SectionTitle title="Assinatura" subtitle="Situação do seu plano" />
+        <div className="card border-l-4 border-l-brand-500">
+          <span className="badge bg-brand-100 text-brand-700">Isenta</span>
+          <p className="mt-3 text-sm text-slate-600">
+            Esta é a loja de quem administra o sistema. Não há mensalidade nem
+            prazo de vencimento — o acesso nunca é travado.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-2xl">
       <SectionTitle title="Assinatura" subtitle="Situação do seu plano e pagamento" />

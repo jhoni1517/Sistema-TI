@@ -37,8 +37,13 @@ create table if not exists precos_fornecedor (
   preco numeric not null default 0,
   quantidade numeric not null default 1,
   data text,
+  -- false = apenas cotado (referência); true = comprado de fato
+  comprado boolean default true,
   "lojaId" uuid
 );
+
+-- Para bancos criados antes desta coluna existir
+alter table precos_fornecedor add column if not exists comprado boolean default true;
 
 create index if not exists cotacoes_loja_idx on cotacoes ("lojaId");
 create index if not exists precos_loja_idx on precos_fornecedor ("lojaId");

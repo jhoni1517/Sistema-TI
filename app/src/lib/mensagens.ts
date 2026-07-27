@@ -32,7 +32,7 @@ const blocoOrcamento = (o: OrdemServico): string => {
       const qtd = Number(p.quantidade) || 1;
       const unit = Number(p.precoUnit) || 0;
       linhas.push(
-        `• ${txt(p.descricao)}${qtd > 1 ? ` (${qtd}x)` : ""} — ${brl(unit * qtd)}`
+        `- ${txt(p.descricao)}${qtd > 1 ? ` (${qtd}x)` : ""} — ${brl(unit * qtd)}`
       );
     }
   }
@@ -40,7 +40,7 @@ const blocoOrcamento = (o: OrdemServico): string => {
   const mao = Number(o.maoDeObra) || 0;
   if (mao > 0) {
     if (linhas.length > 0) linhas.push("");
-    linhas.push(`*Mão de obra*\n• Serviço técnico — ${brl(mao)}`);
+    linhas.push(`*Mão de obra*\n- Serviço técnico — ${brl(mao)}`);
   }
 
   const desconto = Number(o.desconto) || 0;
@@ -61,19 +61,19 @@ const chamada = (o: OrdemServico, temLink: boolean): string => {
     case "aguardando_aprovacao":
       return totalOS(o) > 0
         ? temLink
-          ? "Podemos seguir com o serviço? Você aprova por aqui mesmo ou pelo link acima."
-          : "Podemos seguir com o serviço? É só responder esta mensagem com *SIM* ou *NÃO*."
+          ? "Para autorizar o serviço, aprove pelo link acima ou responda *SIM* por aqui."
+          : "Para autorizar o serviço, responda *SIM* por aqui. Se preferir não fazer, responda *NÃO*."
         : "Assim que fecharmos o orçamento, enviamos os valores para sua aprovação.";
     case "pronta":
-      return "Seu aparelho já está pronto para retirada. Nosso horário de atendimento é o normal da loja.";
+      return "Seu aparelho está pronto para retirada, dentro do nosso horário de atendimento.";
     case "em_reparo":
-      return "Já estamos com o serviço em andamento. Avisamos assim que ficar pronto.";
+      return "O serviço está em andamento. Avisamos assim que ficar pronto.";
     case "em_analise":
-      return "Estamos analisando o aparelho e em breve enviamos o diagnóstico com os valores.";
+      return "Estamos analisando o aparelho. Em breve enviamos o diagnóstico com os valores.";
     case "entregue":
-      return "Obrigado pela confiança! Qualquer coisa relacionada a este serviço, é só chamar.";
+      return "Obrigado pela confiança! Qualquer coisa sobre este serviço, é só chamar.";
     case "cancelada":
-      return "O serviço foi cancelado. O aparelho está disponível para retirada.";
+      return "O serviço foi cancelado e o aparelho está disponível para retirada.";
     default:
       return "Qualquer dúvida, estamos à disposição.";
   }
@@ -91,21 +91,21 @@ export function mensagemCliente(
 
   const nome = primeiroNome(cliente?.nome);
   partes.push(
-    `${nome ? `Olá, ${nome}!` : "Olá!"} Segue a atualização da sua ordem de serviço *${codigoOS(o.numero)}*.`
+    `${nome ? `Olá, ${nome}!` : "Olá!"} Atualização da sua ordem de serviço *${codigoOS(o.numero)}*.`
   );
 
   const aparelho = aparelhoDe(o);
-  if (aparelho) partes.push(`📱 *Aparelho:* ${aparelho}`);
+  if (aparelho) partes.push(`*Aparelho:* ${aparelho}`);
 
-  partes.push(`📍 *Situação:* ${OS_STATUS_META[o.status].label}`);
+  partes.push(`*Situação:* ${OS_STATUS_META[o.status].label}`);
 
   // O que o cliente nos contou — mostra que foi anotado direito
   const relatado = txt(o.defeitoRelatado).trim();
-  if (relatado) partes.push(`*Problema relatado por você:*\n${relatado}`);
+  if (relatado) partes.push(`*Problema relatado:*\n${relatado}`);
 
   // O que o técnico encontrou — é isto que faltava na mensagem antiga
   const constatado = txt(o.defeitoConstatado).trim();
-  if (constatado) partes.push(`*O que encontramos na análise:*\n${constatado}`);
+  if (constatado) partes.push(`*O que encontramos:*\n${constatado}`);
 
   // Orçamento só nas etapas em que ele existe de fato
   const mostraValores =
@@ -122,7 +122,7 @@ export function mensagemCliente(
   }
 
   if (linkRastreio) {
-    partes.push(`🔗 Acompanhe pelo link:\n${linkRastreio}`);
+    partes.push(`*Acompanhe em tempo real:*\n${linkRastreio}`);
   }
 
   partes.push(chamada(o, !!linkRastreio));

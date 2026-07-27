@@ -9,10 +9,12 @@ import {
   Search,
   CalendarClock,
   Wallet,
+  MessageCircle,
 } from "lucide-react";
 import { aviso } from "../components/Aviso";
 import { SectionTitle, Field, Modal, EmptyState } from "../components/ui";
-import { brl, formatDate, txt } from "../lib/format";
+import { brl, formatDate, txt, abrirWhatsapp } from "../lib/format";
+import { mensagemCobranca, tipoDoAviso, AVISO_META } from "../lib/cobranca";
 import {
   listarLojas,
   carregarSistemaConfig,
@@ -76,6 +78,7 @@ export const Lojas: React.FC = () => {
     let problema = 0;
     let receita = 0;
     for (const l of lojas) {
+      if (l.isento) continue; // a sua própria loja não é receita
       const s = situacaoDe(l, tolerancia);
       if (s === "ativa" || s === "tolerancia") {
         ativas++;
@@ -86,6 +89,32 @@ export const Lojas: React.FC = () => {
     }
     return { ativas, problema, receita };
   }, [lojas, tolerancia]);
+
+  /**
+   * Abre o WhatsApp com a cobrança pronta, no tom certo para a situação:
+   * lembrete antes de vencer, aviso no dia, e depois do travamento o texto
+   * que deixa claro que nenhum dado foi apagado.
+   */
+  const cobrar = (l: Loja) => {
+    const dias = diasParaVencer(l.venceEm);
+    const tipo = tipoDoAviso(dias, tolerancia);
+    if (!tipo) return aviso.info("Esta loja está em dia — nada a cobrar.");
+
+    const tel = txt(l.whatsapp).replace(/\D/g, "");
+    if (tel.length < 10) {
+      return aviso.alerta("Preencha o WhatsApp desta loja para cobrar com um clique.");
+    }
+    abrirWhatsapp(
+      tel,
+      mensagemCobranca(tipo, {
+        nomeLoja: txt(l.nome),
+        valor: l.valor_mensal,
+        dias,
+        chavePix: cfg.chave_pix,
+        titularPix: cfg.titular_pix,
+      })
+    );
+  };
 
   const pagar = async (l: Loja, meses: number) => {
     if (!confirm(`Confirmar ${meses} mês(es) de pagamento para "${l.nome}"?`)) return;
@@ -111,6 +140,15 @@ export const Lojas: React.FC = () => {
     try {
       await definirBloqueio(l.id, bloquear);
       carregar();
+    } catch (e) {
+      aviso.erro(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const mudarWhatsapp = async (l: Loja, whatsapp: string) => {
+    try {
+      await atualizarLoja(l.id, { whatsapp });
+      setLojas((prev) => prev.map((x) => (x.id === l.id ? { ...x, whatsapp } : x)));
     } catch (e) {
       aviso.erro(e instanceof Error ? e.message : String(e));
     }
@@ -209,9 +247,21 @@ export const Lojas: React.FC = () => {
                     <span className={`badge ${SITUACAO_META[s].color}`}>
                       {SITUACAO_META[s].label}
                     </span>
+                    {l.isento ? (
+                      <span className="badge bg-brand-100 text-brand-700">Sua loja · isenta</span>
+                    ) : (
+                      (() => {
+                        const t = tipoDoAviso(dias, tolerancia);
+                        return t && s === "ativa" ? (
+                          <span className={`badge ${AVISO_META[t].cor}`}>{AVISO_META[t].label}</span>
+                        ) : null;
+                      })()
+                    )}
                   </div>
                   <p className="mt-0.5 text-xs text-slate-500">
-                    {l.venceEm ? (
+                    {l.isento ? (
+                      "Sem cobrança"
+                    ) : l.venceEm ? (
                       <>
                         Vence {formatDate(l.venceEm)}
                         {dias !== null && (
@@ -231,6 +281,14 @@ export const Lojas: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-1.5">
+                  <input
+                    className="input !w-36 !py-1.5 text-sm"
+                    placeholder="WhatsApp"
+                    defaultValue={txt(l.whatsapp)}
+                    onBlur={(e) => {
+                      if (e.target.value !== txt(l.whatsapp)) mudarWhatsapp(l, e.target.value);
+                    }}
+                  />
                   <span className="text-xs text-slate-400">R$</span>
                   <input
                     type="number"
@@ -243,7 +301,12 @@ export const Lojas: React.FC = () => {
                   />
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className={`flex flex-wrap gap-2 ${l.isento ? "hidden" : ""}`}>
+                  {!l.isento && tipoDoAviso(dias, tolerancia) && (
+                    <button className="btn-secondary !py-1.5 text-xs" onClick={() => cobrar(l)}>
+                      <MessageCircle size={14} /> Cobrar
+                    </button>
+                  )}
                   <button className="btn-success !py-1.5 text-xs" onClick={() => pagar(l, 1)}>
                     <CheckCircle2 size={14} /> Pagou 1 mês
                   </button>

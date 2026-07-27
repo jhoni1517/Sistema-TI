@@ -75,6 +75,7 @@ export const Cotacoes: React.FC<{
     precos,
     fornecedores,
     produtos,
+    sessoes,
     config,
     saveCotacao,
     removeCotacao,
@@ -85,6 +86,8 @@ export const Cotacoes: React.FC<{
 
   const [editando, setEditando] = useState<Cotacao | null>(null);
   const [respondendo, setRespondendo] = useState<Cotacao | null>(null);
+  const [comprando, setComprando] = useState<Cotacao | null>(null);
+  const [escolhidos, setEscolhidos] = useState<Set<number>>(new Set());
 
   const proximoNumero = useMemo(
     () => (cotacoes.reduce((m, c) => Math.max(m, c.numero || 0), 0) || 0) + 1,
@@ -140,28 +143,65 @@ export const Cotacoes: React.FC<{
     if (!c.enviadoEm) await saveCotacao({ ...c, enviadoEm: nowISO() });
   };
 
-  /** Registra a resposta do fornecedor e guarda os preços no histórico */
+  /**
+   * Registra a resposta do fornecedor.
+   * Todo preço informado entra no histórico como REFERÊNCIA (comprado =
+   * false), mesmo o de item que você não vai levar. Da próxima vez que
+   * cotar essa peça, o valor já aparece como base de comparação.
+   */
   const salvarResposta = async () => {
     if (!respondendo) return;
-    await saveCotacao({
-      ...respondendo,
-      status: "respondida",
-      respondidoEm: nowISO(),
-    });
-    setRespondendo(null);
-    aviso.sucesso("Resposta registrada.");
+    try {
+      await saveCotacao({
+        ...respondendo,
+        status: "respondida",
+        respondidoEm: nowISO(),
+      });
+      for (const item of respondendo.itens) {
+        const preco = Number(item.precoUnit) || 0;
+        if (preco <= 0) continue;
+        await savePreco({
+          id: uid(),
+          produtoId: item.produtoId,
+          descricao: txt(item.descricao).trim(),
+          fornecedorId: respondendo.fornecedorId,
+          preco,
+          quantidade: Number(item.quantidade) || 1,
+          data: nowISO(),
+          comprado: false,
+        });
+      }
+      setRespondendo(null);
+      aviso.sucesso("Resposta registrada. Os valores ficam de referência para as próximas cotações.");
+    } catch (e) {
+      aviso.erro(e instanceof Error ? e.message : String(e));
+    }
   };
 
-  /** Converte a cotação em estoque, histórico de preço e saída de caixa */
-  const comprar = async (c: Cotacao) => {
-    const itens = c.itens.filter((i) => (Number(i.precoUnit) || 0) > 0);
-    if (itens.length === 0) {
+  /** Abre a seleção do que foi realmente comprado */
+  const abrirCompra = (c: Cotacao) => {
+    const comPreco = c.itens
+      .map((i, idx) => ({ i, idx }))
+      .filter(({ i }) => (Number(i.precoUnit) || 0) > 0);
+    if (comPreco.length === 0) {
       return aviso.alerta("Registre a resposta do fornecedor antes de comprar.");
     }
-    const total = totalCotacao(c);
-    if (!confirm(`Dar entrada de ${itens.length} item(ns) no estoque e lançar ${brl(total)} como saída de caixa?`)) {
-      return;
-    }
+    // Começa com tudo marcado: o caso comum é levar tudo que tem em estoque
+    setEscolhidos(new Set(comPreco.filter(({ i }) => i.temEstoque !== false).map(({ idx }) => idx)));
+    setComprando(c);
+  };
+
+  /** Converte APENAS os itens escolhidos em estoque, histórico e saída de caixa */
+  const comprar = async () => {
+    const c = comprando;
+    if (!c) return;
+    const itens = c.itens.filter((i, idx) => escolhidos.has(idx) && (Number(i.precoUnit) || 0) > 0);
+    if (itens.length === 0) return aviso.alerta("Escolha pelo menos um item.");
+
+    const total = itens.reduce(
+      (s2, i) => s2 + (Number(i.precoUnit) || 0) * (Number(i.quantidade) || 0),
+      0
+    );
 
     try {
       for (const item of itens) {
@@ -178,7 +218,7 @@ export const Cotacoes: React.FC<{
             fornecedorId: c.fornecedorId,
           } as Produto);
         }
-        // guarda o preço para virar o "último valor pago" da próxima cotação
+        // agora sim como COMPRA: é este valor que vira "última compra"
         await savePreco({
           id: uid(),
           produtoId: existente?.id || item.produtoId,
@@ -187,9 +227,13 @@ export const Cotacoes: React.FC<{
           preco: Number(item.precoUnit) || 0,
           quantidade: Number(item.quantidade) || 1,
           data: nowISO(),
+          comprado: true,
         });
       }
 
+      // Amarra à sessão de caixa aberta: sem isto o dinheiro sai do caixa
+      // mas não aparece no fechamento do dia, e a conta nunca bate.
+      const sessaoAberta = sessoes.find((s) => !s.fechadoEm);
       await saveMovimento({
         id: uid(),
         tipo: "saida",
@@ -197,11 +241,21 @@ export const Cotacoes: React.FC<{
         descricao: `Compra de peças — ${nomeForn(c.fornecedorId)}`,
         categoria: "Compra de peça",
         formaPagamento: "pix",
+        sessaoId: sessaoAberta?.id,
+        // Sem custoRelacionado aqui: ele existe para marcar o custo embutido
+        // numa ENTRADA. Numa saída, o lucro já desconta pelo próprio valor —
+        // preencher os dois faria a compra ser descontada duas vezes.
         data: nowISO(),
       });
 
       await saveCotacao({ ...c, status: "comprada", compradoEm: nowISO() });
-      aviso.sucesso("Estoque atualizado e saída lançada no caixa.");
+      setComprando(null);
+      aviso.sucesso(
+        `${itens.length} item(ns) no estoque e ${brl(total)} lançado no caixa.` +
+          (itens.length < c.itens.length
+            ? " Os demais ficaram só como referência de preço."
+            : "")
+      );
     } catch (e) {
       aviso.erro(
         "Não foi possível concluir a compra.\n\n" +
@@ -305,7 +359,7 @@ export const Cotacoes: React.FC<{
                       </>
                     )}
                     {c.status === "respondida" && (
-                      <button className="btn-success !py-1.5 text-xs" onClick={() => comprar(c)}>
+                      <button className="btn-success !py-1.5 text-xs" onClick={() => abrirCompra(c)}>
                         <ShoppingCart size={14} /> Comprei
                       </button>
                     )}
@@ -451,6 +505,102 @@ export const Cotacoes: React.FC<{
                 onChange={(e) => setEditando({ ...editando, observacoes: e.target.value })}
               />
             </Field>
+          </div>
+        )}
+      </Modal>
+
+      {/* ---------- Escolher o que foi realmente comprado ---------- */}
+      <Modal
+        open={!!comprando}
+        onClose={() => setComprando(null)}
+        title="O que você comprou"
+        footer={
+          <>
+            <button className="btn-secondary" onClick={() => setComprando(null)}>
+              Cancelar
+            </button>
+            <button className="btn-success" onClick={comprar}>
+              <ShoppingCart size={16} /> Confirmar compra
+            </button>
+          </>
+        }
+      >
+        {comprando && (
+          <div>
+            <p className="mb-4 text-sm text-slate-500">
+              Marque só o que você levou. Os itens desmarcados não entram no
+              estoque nem no caixa — o preço deles fica guardado como
+              referência para as próximas cotações.
+            </p>
+
+            <div className="space-y-2">
+              {comprando.itens.map((item, idx) => {
+                const preco = Number(item.precoUnit) || 0;
+                const qtd = Number(item.quantidade) || 1;
+                const marcado = escolhidos.has(idx);
+                const semPreco = preco <= 0;
+                return (
+                  <label
+                    key={idx}
+                    className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition ${
+                      semPreco
+                        ? "cursor-not-allowed border-slate-200 opacity-50"
+                        : marcado
+                          ? "border-emerald-300 bg-emerald-50"
+                          : "border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 shrink-0"
+                      disabled={semPreco}
+                      checked={marcado}
+                      onChange={(e) => {
+                        const novo = new Set(escolhidos);
+                        if (e.target.checked) novo.add(idx);
+                        else novo.delete(idx);
+                        setEscolhidos(novo);
+                      }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold text-slate-800">
+                        {txt(item.descricao)}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {qtd} un.
+                        {item.temEstoque === false && " · fornecedor sem estoque"}
+                        {item.prazoDias ? ` · entrega em ${item.prazoDias}d` : ""}
+                        {semPreco && " · sem preço informado"}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-sm font-bold text-slate-700">
+                      {brl(preco * qtd)}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 flex items-center justify-between rounded-xl bg-slate-50 p-3">
+              <span className="text-sm text-slate-600">
+                {escolhidos.size} de {comprando.itens.length} selecionado(s)
+              </span>
+              <span className="text-lg font-bold text-slate-800">
+                {brl(
+                  comprando.itens.reduce(
+                    (s2, i, idx) =>
+                      escolhidos.has(idx)
+                        ? s2 + (Number(i.precoUnit) || 0) * (Number(i.quantidade) || 0)
+                        : s2,
+                    0
+                  )
+                )}
+              </span>
+            </div>
+
+            <p className="mt-3 text-xs text-slate-400">
+              O valor selecionado entra como saída no caixa aberto.
+            </p>
           </div>
         )}
       </Modal>

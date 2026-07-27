@@ -14,6 +14,7 @@ import { minhaSituacao, minhaLoja, diasParaVencer, type Situacao } from "../lib/
 export const AvisoAssinatura: React.FC = () => {
   const [situacao, setSituacao] = useState<Situacao | null>(null);
   const [dias, setDias] = useState<number | null>(null);
+  const [isento, setIsento] = useState(false);
 
   useEffect(() => {
     let vivo = true;
@@ -26,7 +27,9 @@ export const AvisoAssinatura: React.FC = () => {
       const id = obterLoja();
       if (!id) return;
       const loja = await minhaLoja(id);
-      if (vivo) setDias(diasParaVencer(loja?.venceEm));
+      if (!vivo) return;
+      setIsento(!!loja?.isento);
+      setDias(diasParaVencer(loja?.venceEm));
     })();
     return () => {
       vivo = false;
@@ -34,6 +37,8 @@ export const AvisoAssinatura: React.FC = () => {
   }, []);
 
   if (!situacao) return null;
+  // Loja isenta (a do administrador do sistema) nunca é cobrada
+  if (isento) return null;
 
   // Em dia e longe do vencimento: não polui a tela
   if (situacao === "ativa" && (dias === null || dias > 5)) return null;

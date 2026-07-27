@@ -19,11 +19,21 @@ alter table lojas add column if not exists valor_mensal numeric default 0;
 alter table lojas add column if not exists bloqueada boolean default false;
 alter table lojas add column if not exists observacoes text;
 alter table lojas add column if not exists "ultimoPagamento" timestamptz;
+-- WhatsApp do responsável pela loja, usado pelo botão "Cobrar"
+alter table lojas add column if not exists whatsapp text;
+-- Loja isenta de mensalidade. A SUA loja entra aqui: seria absurdo o
+-- sistema travar o próprio dono por falta de pagamento a si mesmo.
+alter table lojas add column if not exists isento boolean default false;
 
 -- Lojas que já existem entram com 14 dias de teste a partir de hoje
 update lojas
    set "venceEm" = now() + interval '14 days'
  where "venceEm" is null;
+
+-- A loja de quem administra o sistema nunca é cobrada
+update lojas
+   set isento = true
+ where id in (select loja_id from perfis where coalesce(super_admin, false));
 
 -- ---------- 2. Configuração do sistema (sua, não das lojas) ----------
 -- Uma linha só. As lojas LEEM (precisam ver a chave Pix para pagar),
@@ -69,15 +79,20 @@ as $$
 declare
   v_vence timestamptz;
   v_bloqueada boolean;
+  v_isento boolean;
   v_tolerancia integer;
 begin
-  select l."venceEm", coalesce(l.bloqueada, false)
-    into v_vence, v_bloqueada
+  -- Quem administra o sistema nunca é travado pela própria régua
+  if sou_super_admin() then return 'ativa'; end if;
+
+  select l."venceEm", coalesce(l.bloqueada, false), coalesce(l.isento, false)
+    into v_vence, v_bloqueada, v_isento
     from lojas l
    where l.id = loja_atual();
 
   if not found then return 'bloqueada'; end if;
   if v_bloqueada then return 'bloqueada'; end if;
+  if v_isento then return 'ativa'; end if;
   if v_vence is null then return 'ativa'; end if;
 
   select coalesce(dias_tolerancia, 5) into v_tolerancia from sistema_config where id;
@@ -225,3 +240,25 @@ grant execute on function registrar_pagamento(uuid, integer, numeric) to authent
 --   3. Use "Liberar nova loja" em Configurações -> Equipe para cada
 --      cliente novo. Ele começa com 14 dias de teste automaticamente.
 -- =====================================================================
+
+-- ---------- 7. Registro dos avisos já enviados ----------
+-- Sem isto, a rotina diária mandaria o mesmo aviso todo santo dia até a
+-- loja pagar. O gatilho é loja + tipo + data de vencimento: quando a loja
+-- renova, a referência muda e o ciclo recomeça sozinho.
+create table if not exists avisos_cobranca (
+  id uuid primary key default gen_random_uuid(),
+  loja_id uuid not null references lojas (id) on delete cascade,
+  tipo text not null,
+  referencia text not null,
+  "criadoEm" timestamptz not null default now(),
+  unique (loja_id, tipo, referencia)
+);
+
+alter table avisos_cobranca enable row level security;
+
+-- Só o administrador do sistema lê. A rotina do servidor usa a chave
+-- service_role, que não passa por estas políticas.
+drop policy if exists "avisos_admin" on avisos_cobranca;
+create policy "avisos_admin" on avisos_cobranca
+  for select to authenticated
+  using (sou_super_admin());
