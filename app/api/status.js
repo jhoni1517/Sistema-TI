@@ -1,14 +1,58 @@
-// Diagnóstico do robô do WhatsApp.
-// Abra no navegador: https://SEU-SITE/api/status
-// Mostra o que está configurado e testa a gravação no banco.
-// Nunca expõe os valores das chaves — apenas se existem e um trecho final.
+/**
+ * Diagnóstico da instalação.
+ *
+ * PRECISA DE CHAVE. Antes ele respondia para qualquer um que abrisse o
+ * endereço, e junto vinham os últimos lançamentos do caixa, o id do chat do
+ * Telegram e o número do WhatsApp. Ou seja: um diagnóstico que era, na
+ * prática, uma janela para dentro da loja. Página de diagnóstico aberta é
+ * um clássico — some no meio do sistema e ninguém lembra que existe.
+ *
+ * Como abrir:
+ *   https://SEU-SITE/api/status?chave=<o valor de CRON_SECRET>
+ *
+ * Sem a chave ele confirma só que a função está publicada, que é o que
+ * interessa saber de fora.
+ *
+ * Nunca mostra o valor de chave nenhuma — só se existe.
+ */
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 
 const fim = (v) => (v ? "..." + String(v).slice(-6) : null);
 
+/** Comparação de tamanho fixo, para não vazar o tamanho da chave pelo tempo. */
+const iguais = (a, b) => {
+  const x = String(a || "");
+  const y = String(b || "");
+  if (x.length !== y.length) return false;
+  let d = 0;
+  for (let i = 0; i < x.length; i++) d |= x.charCodeAt(i) ^ y.charCodeAt(i);
+  return d === 0;
+};
+
 export default async function handler(req, res) {
+  const segredo = process.env.CRON_SECRET;
+  const enviada =
+    (req.query && req.query.chave) ||
+    (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
+
+  if (!segredo || !iguais(enviada, segredo)) {
+    res.setHeader("content-type", "application/json; charset=utf-8");
+    return res.status(401).send(
+      JSON.stringify(
+        {
+          funcao: "ok — a função está publicada e respondendo",
+          diagnostico: segredo
+            ? "protegido — abra com ?chave=<o valor de CRON_SECRET>"
+            : "indisponível — falta CRON_SECRET nas variáveis do Vercel",
+        },
+        null,
+        2
+      )
+    );
+  }
+
   const out = {
     funcao: "ok — a função está publicada e respondendo",
     configuracao: {
@@ -101,6 +145,14 @@ export default async function handler(req, res) {
 
   // 4) Diz em português o que falta, com o efeito prático de cada falta.
   // Uma lista de true/false não ajuda quem está no meio da configuração.
+  // Colar o NOME da variável no campo do valor é escorregão comum, e o erro
+  // que aparece depois ("Failed to parse URL from ...") não entrega a causa.
+  if (SUPABASE_URL && !/^https:\/\/[^/]+\.supabase\.co\/?$/.test(SUPABASE_URL.trim())) {
+    out.pendencias.push(
+      `SUPABASE_URL não parece um endereço do Supabase (recebi "${SUPABASE_URL}"). ` +
+        "O valor certo é https://SEU-PROJETO.supabase.co, sem barra no fim."
+    );
+  }
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     out.pendencias.push(
       "SUPABASE_SERVICE_ROLE_KEY não está no Vercel: o aviso diário de mensalidade e de contas a pagar não dispara, e 'Liberar senha' não funciona."

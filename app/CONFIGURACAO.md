@@ -4,8 +4,14 @@ Checklist do que precisa estar configurado fora do código. Cada item diz o
 que quebra quando ele falta — porque a maioria dessas falhas é silenciosa, e
 silêncio parece "está tudo bem".
 
-Confira tudo de uma vez em **https://sistema-ti-caixa.vercel.app/api/status**.
-O campo `pendencias` lista em português o que ainda falta.
+Confira tudo de uma vez em
+**https://sistema-ti-caixa.vercel.app/api/status?chave=SEU_CRON_SECRET**
+(troque pelo valor que você pôs em `CRON_SECRET`). O campo `pendencias`
+lista em português o que ainda falta.
+
+Sem a chave a página só confirma que a função está publicada. Ela mostra os
+últimos lançamentos do caixa e os identificadores dos robôs — não é coisa
+para ficar aberta na internet.
 
 ---
 
