@@ -11,14 +11,24 @@ import {
   Trash2,
   Printer,
   Search,
+  Receipt,
+  History,
+  ListOrdered,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, SectionTitle, EmptyState } from "../components/ui";
-import { uid, nowISO, brl, formatDateTime, isToday, txt } from "../lib/format";
-import { receitaBruta, totalDespesas, totalSangrias } from "../lib/calc";
+import { uid, nowISO, brl, formatDate, formatDateTime, txt } from "../lib/format";
 import { printHTML } from "../lib/print";
-import { reciboFechamento } from "../lib/recibo";
-import type { MovimentoCaixa, TipoMovimento, FormaPagamento, SessaoCaixa, Produto } from "../lib/types";
+import { reciboFechamento, reciboVenda } from "../lib/recibo";
+import {
+  resumoCaixa,
+  movimentosDaSessao,
+  sessoesFechadas,
+  sessaoAberta as achaSessaoAberta,
+  conferencia,
+  CONFERENCIA_META,
+} from "../lib/caixa";
+import type { MovimentoCaixa, TipoMovimento, FormaPagamento, SessaoCaixa, Produto, Cliente } from "../lib/types";
 
 const CATS_ENTRADA = ["Venda", "Serviço", "OS", "Sinal / Entrada", "Outro"];
 const CATS_SAIDA = ["Despesa", "Compra de peça", "Fornecedor", "Aluguel", "Energia", "Água", "Internet", "Salário", "Marketing", "Outro"];
@@ -31,23 +41,27 @@ interface Extra {
 }
 
 export const Caixa: React.FC = () => {
-  const { movimentos, sessoes, produtos, config, saveMovimento, removeMovimento, saveSessao, saveProduto } = useApp();
+  const { movimentos, sessoes, produtos, clientes, config, saveMovimento, removeMovimento, saveSessao, saveProduto } = useApp();
   const [modal, setModal] = useState<TipoMovimento | null>(null);
   const [abrindo, setAbrindo] = useState(false);
   const [fechando, setFechando] = useState(false);
+  const [aba, setAba] = useState<"movimentos" | "fechamentos">("movimentos");
+  const [verSessao, setVerSessao] = useState<SessaoCaixa | null>(null);
 
-  const sessaoAberta = useMemo(() => sessoes.find((s) => !s.fechadoEm) || null, [sessoes]);
+  const sessaoAberta = useMemo(() => achaSessaoAberta(sessoes), [sessoes]);
 
-  const movsSessao = useMemo(() => {
-    if (sessaoAberta) return movimentos.filter((m) => m.sessaoId === sessaoAberta.id);
-    return movimentos.filter((m) => isToday(m.data));
-  }, [movimentos, sessaoAberta]);
+  const movsSessao = useMemo(
+    () => movimentosDaSessao(sessaoAberta, movimentos),
+    [movimentos, sessaoAberta]
+  );
 
-  const entradas = receitaBruta(movsSessao);
-  const saidas = totalDespesas(movsSessao);
-  const sangrias = totalSangrias(movsSessao);
-  const abertura = sessaoAberta?.valorAbertura || 0;
-  const saldo = abertura + entradas - saidas - sangrias;
+  const resumo = useMemo(
+    () => resumoCaixa(sessaoAberta, movsSessao),
+    [sessaoAberta, movsSessao]
+  );
+  const { entradas, saidas, sangrias, abertura, saldo } = resumo;
+
+  const fechadas = useMemo(() => sessoesFechadas(sessoes), [sessoes]);
 
   const listaMovs = useMemo(
     () => [...movimentos].sort((a, b) => txt(b.data).localeCompare(txt(a.data))).slice(0, 100),
@@ -60,14 +74,42 @@ export const Caixa: React.FC = () => {
     setAbrindo(false);
   };
 
-  const confirmarFechamento = async () => {
+  const confirmarFechamento = async (contado?: number) => {
     if (!sessaoAberta) return;
-    await saveSessao({ ...sessaoAberta, fechadoEm: nowISO(), valorFechamento: saldo });
-    setFechando(false);
+    try {
+      await saveSessao({
+        ...sessaoAberta,
+        fechadoEm: nowISO(),
+        valorFechamento: saldo,
+        // Só grava a contagem se a pessoa realmente contou. Gravar o saldo
+        // calculado aqui faria o sistema concordar consigo mesmo para sempre
+        // e a quebra de caixa nunca apareceria.
+        valorContado: typeof contado === "number" ? contado : undefined,
+      });
+      setFechando(false);
+      aviso.sucesso("Caixa fechado. O resumo fica guardado na aba Fechamentos.");
+    } catch (e) {
+      aviso.erro(
+        "Não foi possível fechar o caixa:\n\n" + (e instanceof Error ? e.message : String(e))
+      );
+    }
   };
 
   const imprimirResumo = () => {
     printHTML(reciboFechamento(sessaoAberta, movsSessao, config), "Fechamento de caixa");
+  };
+
+  /** Recibo da compra, para o cliente levar. Nada de despesa nem sangria. */
+  const imprimirVenda = (m: MovimentoCaixa) => {
+    const cli = clientes.find((c) => c.id === m.clienteId);
+    printHTML(reciboVenda(m, config, cli), "Recibo de venda");
+  };
+
+  const imprimirFechamentoAntigo = (s: SessaoCaixa) => {
+    printHTML(
+      reciboFechamento(s, movimentosDaSessao(s, movimentos), config),
+      "Fechamento de caixa"
+    );
   };
 
   return (
@@ -106,8 +148,35 @@ export const Caixa: React.FC = () => {
         <button className="btn-secondary" onClick={() => setModal("sangria")}><Scissors size={16} /> Sangria</button>
       </div>
 
-      {/* Movimentações */}
-      <h2 className="mb-3 font-bold text-slate-700">Últimas movimentações</h2>
+      {/* Abas: o dia a dia e o histórico de conferência */}
+      <div className="mb-4 flex gap-2">
+        {([
+          { k: "movimentos", nome: "Movimentações", icon: <ListOrdered size={15} /> },
+          { k: "fechamentos", nome: `Fechamentos (${fechadas.length})`, icon: <History size={15} /> },
+        ] as const).map((t) => (
+          <button
+            key={t.k}
+            onClick={() => setAba(t.k)}
+            className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold transition-colors ${
+              aba === t.k
+                ? "bg-brand-600 text-white"
+                : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+            }`}
+          >
+            {t.icon} {t.nome}
+          </button>
+        ))}
+      </div>
+
+      {aba === "fechamentos" ? (
+        <Fechamentos
+          sessoes={fechadas}
+          movimentos={movimentos}
+          onVer={setVerSessao}
+          onImprimir={imprimirFechamentoAntigo}
+        />
+      ) : (
+      <>
       {listaMovs.length === 0 ? (
         <EmptyState icon={<Wallet size={48} />} title="Nenhuma movimentação" hint="Registre entradas e saídas do caixa." />
       ) : (
@@ -146,9 +215,22 @@ export const Caixa: React.FC = () => {
                     {m.tipo === "entrada" ? "+" : "-"} {brl(m.valor)}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button className="btn-ghost !p-1.5 text-red-400" onClick={() => { if (confirm("Excluir movimentação?")) removeMovimento(m.id); }}>
-                      <Trash2 size={14} />
-                    </button>
+                    <div className="flex justify-end gap-1">
+                      {/* Recibo só de venda: despesa e sangria são conta da
+                          loja, não têm o que entregar para cliente nenhum. */}
+                      {m.tipo === "entrada" && (
+                        <button
+                          className="btn-ghost !p-1.5 text-brand-600"
+                          title="Imprimir recibo para o cliente"
+                          onClick={() => imprimirVenda(m)}
+                        >
+                          <Receipt size={14} />
+                        </button>
+                      )}
+                      <button className="btn-ghost !p-1.5 text-red-400" title="Excluir" onClick={() => { if (confirm("Excluir movimentação?")) removeMovimento(m.id); }}>
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -156,12 +238,15 @@ export const Caixa: React.FC = () => {
           </table>
         </div>
       )}
+      </>
+      )}
 
       <AbrirCaixaModal open={abrindo} onClose={() => setAbrindo(false)} onConfirm={abrirCaixa} />
 
       <MovimentoModal
         tipo={modal}
         produtos={produtos}
+        clientes={clientes}
         onClose={() => setModal(null)}
         onSave={async (m, extra) => {
           try {
@@ -190,6 +275,15 @@ export const Caixa: React.FC = () => {
           }
         }}
       />
+
+      {verSessao && (
+        <DetalheFechamento
+          sessao={verSessao}
+          movimentos={movimentos}
+          onClose={() => setVerSessao(null)}
+          onImprimir={() => imprimirFechamentoAntigo(verSessao)}
+        />
+      )}
 
       {/* Fechamento de caixa */}
       {fechando && sessaoAberta && (
@@ -233,9 +327,10 @@ const AbrirCaixaModal: React.FC<{ open: boolean; onClose: () => void; onConfirm:
 const MovimentoModal: React.FC<{
   tipo: TipoMovimento | null;
   produtos: Produto[];
+  clientes: Cliente[];
   onClose: () => void;
   onSave: (m: MovimentoCaixa, extra?: Extra) => void;
-}> = ({ tipo, produtos, onClose, onSave }) => {
+}> = ({ tipo, produtos, clientes, onClose, onSave }) => {
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState(0);
   const [categoria, setCategoria] = useState("");
@@ -248,6 +343,7 @@ const MovimentoModal: React.FC<{
   const [baixa, setBaixa] = useState(true);
   const [buscaProd, setBuscaProd] = useState("");
   const [abertoProd, setAbertoProd] = useState(false);
+  const [clienteId, setClienteId] = useState("");
 
   React.useEffect(() => {
     if (tipo) {
@@ -261,6 +357,7 @@ const MovimentoModal: React.FC<{
       setQuantidade(1);
       setBaixa(true);
       setBuscaProd("");
+      setClienteId("");
     }
   }, [tipo]);
 
@@ -304,6 +401,7 @@ const MovimentoModal: React.FC<{
         descricao: descricao || titulo,
         valor,
         formaPagamento: forma,
+        clienteId: tipo === "entrada" && clienteId ? clienteId : undefined,
         // Compra de peça é reposição de estoque, não despesa do mês: o custo
         // entra no resultado quando a peça for vendida.
         compraEstoque:
@@ -395,6 +493,28 @@ const MovimentoModal: React.FC<{
             </select>
           </Field>
         )}
+
+        {/* Cliente é opcional: no balcão, parar a fila para cadastrar
+            alguém que só quer um cabo é o caminho para ninguém usar. Quando
+            informado, o nome sai no recibo. */}
+        {tipo === "entrada" && clientes.length > 0 && (
+          <Field label="Cliente (opcional, sai no recibo)">
+            <select
+              className="input"
+              value={clienteId}
+              onChange={(e) => setClienteId(e.target.value)}
+            >
+              <option value="">Sem cliente</option>
+              {[...clientes]
+                .sort((a, b) => txt(a.nome).localeCompare(txt(b.nome)))
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.nome}
+                  </option>
+                ))}
+            </select>
+          </Field>
+        )}
       </div>
     </Modal>
   );
@@ -410,7 +530,7 @@ const FecharCaixaModal: React.FC<{
   movs: MovimentoCaixa[];
   onImprimir: () => void;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (contado?: number) => void;
 }> = ({ abertura, entradas, saidas, sangrias, saldo, movs, onImprimir, onClose, onConfirm }) => {
   const formas = useMemo(() => {
     const map: Record<string, number> = {};
@@ -418,13 +538,20 @@ const FecharCaixaModal: React.FC<{
     return Object.entries(map);
   }, [movs]);
 
+  // Texto, e não número, porque campo vazio precisa ser diferente de zero:
+  // "não contei" e "contei e deu zero" são conclusões bem diferentes.
+  const [contadoTxt, setContadoTxt] = useState("");
+  const contado = contadoTxt.trim() === "" ? undefined : Number(contadoTxt.replace(",", "."));
+  const invalido = contado !== undefined && Number.isNaN(contado);
+  const diferenca = contado === undefined || invalido ? undefined : Math.round((contado - saldo) * 100) / 100 + 0;
+
   return (
     <Modal open onClose={onClose} title="Fechamento de caixa" maxWidth="max-w-lg"
       footer={
         <>
           <button className="btn-secondary" onClick={onImprimir}><Printer size={16} /> Imprimir</button>
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-danger" onClick={onConfirm}><Lock size={16} /> Confirmar fechamento</button>
+          <button className="btn-danger" disabled={invalido} onClick={() => onConfirm(contado)}><Lock size={16} /> Confirmar fechamento</button>
         </>
       }
     >
@@ -455,7 +582,220 @@ const FecharCaixaModal: React.FC<{
           )}
         </div>
 
-        <p className="text-xs text-slate-400">Confira o dinheiro na gaveta com o saldo esperado antes de confirmar. Você pode imprimir este resumo para arquivar.</p>
+        {/* Contagem da gaveta: é o que transforma o fechamento em conferência
+            de verdade. Sem isso o sistema só concorda consigo mesmo. */}
+        <div>
+          <label className="label">Dinheiro contado na gaveta (opcional)</label>
+          <input
+            className="input"
+            inputMode="decimal"
+            placeholder={`Esperado: ${brl(saldo)}`}
+            value={contadoTxt}
+            onChange={(e) => setContadoTxt(e.target.value)}
+          />
+          {invalido && (
+            <p className="mt-1 text-xs font-medium text-red-600">
+              Valor inválido. Use apenas números, com vírgula nos centavos.
+            </p>
+          )}
+          {diferenca !== undefined && (
+            <p
+              className={`mt-1 text-sm font-semibold ${
+                Math.abs(diferenca) <= 0.5
+                  ? "text-emerald-600"
+                  : diferenca > 0
+                    ? "text-amber-600"
+                    : "text-red-600"
+              }`}
+            >
+              {Math.abs(diferenca) <= 0.5
+                ? "Bateu com o esperado."
+                : diferenca > 0
+                  ? `Sobrou ${brl(diferenca)} na gaveta.`
+                  : `Faltou ${brl(Math.abs(diferenca))} na gaveta.`}
+            </p>
+          )}
+          <p className="mt-1 text-xs text-slate-400">
+            Em branco, o caixa fecha sem conferência — e a diferença do dia
+            não fica registrada.
+          </p>
+        </div>
+      </div>
+    </Modal>
+  );
+};
+
+/**
+ * Histórico de fechamentos.
+ *
+ * Antes o caixa só abria e fechava: a sessão de ontem sumia da tela e não
+ * havia como conferir depois. Quem precisa bater o dinheiro no fim do dia —
+ * ou explicar uma diferença três dias atrás — não tinha onde olhar.
+ */
+const Fechamentos: React.FC<{
+  sessoes: SessaoCaixa[];
+  movimentos: MovimentoCaixa[];
+  onVer: (s: SessaoCaixa) => void;
+  onImprimir: (s: SessaoCaixa) => void;
+}> = ({ sessoes, movimentos, onVer, onImprimir }) => {
+  if (sessoes.length === 0) {
+    return (
+      <EmptyState
+        icon={<History size={48} />}
+        title="Nenhum caixa fechado ainda"
+        hint="Ao fechar o caixa, o resumo do dia fica guardado aqui para conferência."
+      />
+    );
+  }
+  return (
+    <div className="space-y-2">
+      {sessoes.map((s) => {
+        const r = resumoCaixa(s, movimentosDaSessao(s, movimentos));
+        const conf = conferencia(r);
+        return (
+          <div key={s.id} className="card flex flex-wrap items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="flex flex-wrap items-center gap-2 font-semibold text-slate-800">
+                {formatDate(s.abertoEm)}
+                <span className={`badge ${CONFERENCIA_META[conf].cor}`}>
+                  {CONFERENCIA_META[conf].label}
+                  {r.diferenca !== undefined && conf !== "certo" && (
+                    <> {r.diferenca > 0 ? "+" : "-"} {brl(Math.abs(r.diferenca))}</>
+                  )}
+                </span>
+              </p>
+              <p className="text-xs text-slate-500">
+                {formatDateTime(s.abertoEm)} até {s.fechadoEm ? formatDateTime(s.fechadoEm) : "-"}
+                {" · "}
+                {r.quantidade} movimentação(ões)
+              </p>
+            </div>
+
+            <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
+              <span className="text-emerald-600">+ {brl(r.entradas)}</span>
+              <span className="text-red-600">- {brl(r.saidas + r.sangrias)}</span>
+              <span className="font-bold text-slate-800">{brl(r.saldo)}</span>
+            </div>
+
+            <div className="flex gap-1">
+              <button className="btn-secondary !py-1.5 text-xs" onClick={() => onVer(s)}>
+                Ver
+              </button>
+              <button className="btn-ghost !p-2" title="Imprimir" onClick={() => onImprimir(s)}>
+                <Printer size={15} />
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+/** Detalhe de um fechamento antigo, com a lista completa de movimentos */
+const DetalheFechamento: React.FC<{
+  sessao: SessaoCaixa;
+  movimentos: MovimentoCaixa[];
+  onClose: () => void;
+  onImprimir: () => void;
+}> = ({ sessao, movimentos, onClose, onImprimir }) => {
+  const movs = movimentosDaSessao(sessao, movimentos);
+  const r = resumoCaixa(sessao, movs);
+  const conf = conferencia(r);
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title={`Caixa de ${formatDate(sessao.abertoEm)}`}
+      maxWidth="max-w-2xl"
+      footer={
+        <>
+          <button className="btn-secondary" onClick={onImprimir}>
+            <Printer size={16} /> Imprimir
+          </button>
+          <button className="btn-primary" onClick={onClose}>
+            Fechar
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-4">
+        <p className="text-sm text-slate-500">
+          Aberto em {formatDateTime(sessao.abertoEm)} · fechado em{" "}
+          {sessao.fechadoEm ? formatDateTime(sessao.fechadoEm) : "-"}
+        </p>
+
+        <div className="rounded-xl bg-slate-50 p-4">
+          <Linha label="Abertura (troco)" value={brl(r.abertura)} />
+          <Linha label="Entradas" value={`+ ${brl(r.entradas)}`} cls="text-emerald-600" />
+          <Linha label="Saídas / despesas" value={`- ${brl(r.saidas)}`} cls="text-red-600" />
+          <Linha label="Sangrias" value={`- ${brl(r.sangrias)}`} cls="text-amber-600" />
+          <div className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2 text-lg font-bold">
+            <span>Saldo esperado</span>
+            <span>{brl(r.saldo)}</span>
+          </div>
+          {r.contado !== undefined && (
+            <>
+              <Linha label="Contado na gaveta" value={brl(r.contado)} />
+              <div className="mt-1 flex items-center justify-between">
+                <span className={`badge ${CONFERENCIA_META[conf].cor}`}>
+                  {CONFERENCIA_META[conf].label}
+                </span>
+                <span className="font-bold text-slate-700">
+                  {(r.diferenca || 0) > 0 ? "+" : (r.diferenca || 0) < 0 ? "-" : ""}{" "}
+                  {brl(Math.abs(r.diferenca || 0))}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+
+        {Object.keys(r.porForma).length > 0 && (
+          <div>
+            <p className="label">Entradas por forma de pagamento</p>
+            <div className="rounded-lg border border-slate-200 p-3">
+              {Object.entries(r.porForma).map(([f, v]) => (
+                <div key={f} className="flex justify-between py-0.5 text-sm">
+                  <span className="capitalize text-slate-600">{f}</span>
+                  <span className="font-semibold text-slate-800">{brl(v)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div>
+          <p className="label">Movimentações ({movs.length})</p>
+          {movs.length === 0 ? (
+            <p className="text-sm text-slate-400">Nenhuma movimentação nesta sessão.</p>
+          ) : (
+            <div className="max-h-72 overflow-y-auto overscroll-contain rounded-lg border border-slate-200">
+              {[...movs]
+                .sort((a, b) => txt(a.data).localeCompare(txt(b.data)))
+                .map((m) => (
+                  <div
+                    key={m.id}
+                    className="flex items-center justify-between border-b border-slate-100 px-3 py-2 text-sm last:border-0"
+                  >
+                    <span className="min-w-0 flex-1 truncate">
+                      <span className="text-slate-700">{m.descricao}</span>
+                      <span className="ml-2 text-xs text-slate-400">
+                        {formatDateTime(m.data)}
+                      </span>
+                    </span>
+                    <span
+                      className={`shrink-0 font-semibold ${
+                        m.tipo === "entrada" ? "text-emerald-600" : "text-red-600"
+                      }`}
+                    >
+                      {m.tipo === "entrada" ? "+" : "-"} {brl(m.valor)}
+                    </span>
+                  </div>
+                ))}
+            </div>
+          )}
+        </div>
       </div>
     </Modal>
   );

@@ -356,6 +356,8 @@ export interface MovimentoCaixa {
   valor: number;
   formaPagamento: FormaPagamento;
   osId?: ID;
+  /** Para quem foi a venda. Sai no recibo que o cliente leva. */
+  clienteId?: ID;
   custoRelacionado?: number; // custo das peças para cálculo de lucro
   /**
    * Saída que é COMPRA DE ESTOQUE, não despesa do resultado.
@@ -374,7 +376,17 @@ export interface SessaoCaixa {
   abertoEm: string;
   fechadoEm?: string;
   valorAbertura: number;
+  /** Saldo que o sistema calculou no fechamento */
   valorFechamento?: number;
+  /**
+   * Dinheiro realmente contado na gaveta.
+   *
+   * Sem este campo não existe quebra de caixa: o sistema guardava o valor
+   * que ele mesmo calculou e concordava consigo próprio para sempre. A
+   * diferença entre contado e esperado é justamente o que se procura na
+   * conferência do fim do dia.
+   */
+  valorContado?: number;
   observacoes?: string;
 }
 
