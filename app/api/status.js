@@ -20,7 +20,12 @@ export default async function handler(req, res) {
       whatsappPhoneId: process.env.WHATSAPP_PHONE_ID || null,
       whatsappVerifyToken: !!process.env.WHATSAPP_VERIFY_TOKEN,
       tokenTerminaEm: fim(process.env.WHATSAPP_TOKEN),
+      // O robô diário de cobrança e o gerador de link de senha usam a chave
+      // de serviço. Sem ela nada dispara, e o silêncio parece "está tudo bem".
+      supabaseServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      cronSecret: !!process.env.CRON_SECRET,
     },
+    pendencias: [],
     banco: "não testado",
     telegram: "não testado",
     whatsapp: "não testado",
@@ -93,6 +98,25 @@ export default async function handler(req, res) {
   } else {
     out.whatsapp = "ERRO — faltam WHATSAPP_TOKEN / WHATSAPP_PHONE_ID no Vercel";
   }
+
+  // 4) Diz em português o que falta, com o efeito prático de cada falta.
+  // Uma lista de true/false não ajuda quem está no meio da configuração.
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    out.pendencias.push(
+      "SUPABASE_SERVICE_ROLE_KEY não está no Vercel: o aviso diário de mensalidade e de contas a pagar não dispara, e 'Liberar senha' não funciona."
+    );
+  }
+  if (!process.env.CRON_SECRET) {
+    out.pendencias.push(
+      "CRON_SECRET não está no Vercel: /api/cobranca fica aberto para qualquer um chamar."
+    );
+  }
+  if (!process.env.TELEGRAM_CHAT_ID) {
+    out.pendencias.push(
+      "TELEGRAM_CHAT_ID não está no Vercel: o aviso diário não sabe para quem mandar."
+    );
+  }
+  if (out.pendencias.length === 0) out.pendencias.push("nenhuma — está tudo configurado");
 
   res.setHeader("content-type", "application/json; charset=utf-8");
   res.status(200).send(JSON.stringify(out, null, 2));

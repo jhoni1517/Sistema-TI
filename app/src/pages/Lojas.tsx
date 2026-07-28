@@ -10,10 +10,13 @@ import {
   CalendarClock,
   Wallet,
   MessageCircle,
+  KeyRound,
+  Copy,
 } from "lucide-react";
 import { aviso } from "../components/Aviso";
 import { SectionTitle, Field, Modal, EmptyState } from "../components/ui";
 import { brl, formatDate, txt, abrirWhatsapp } from "../lib/format";
+import { gerarLinkDeSenha } from "../lib/auth";
 import { mensagemCobranca, tipoDoAviso, AVISO_META } from "../lib/cobranca";
 import {
   listarLojas,
@@ -42,6 +45,9 @@ export const Lojas: React.FC = () => {
   const [busca, setBusca] = useState("");
   const [ajustes, setAjustes] = useState(false);
   const [erro, setErro] = useState("");
+  const [senha, setSenha] = useState<{ email: string; link: string; gerando: boolean } | null>(
+    null
+  );
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -163,6 +169,23 @@ export const Lojas: React.FC = () => {
     }
   };
 
+  /**
+   * Gera o link de troca de senha e deixa pronto para copiar.
+   * É a saída para quando o e-mail não chega — o que hoje é o normal,
+   * porque o SMTP próprio ainda não está configurado.
+   */
+  const gerarSenha = async () => {
+    if (!senha) return;
+    setSenha({ ...senha, gerando: true, link: "" });
+    try {
+      const link = await gerarLinkDeSenha(senha.email);
+      setSenha({ email: senha.email, link, gerando: false });
+    } catch (e) {
+      setSenha({ ...senha, gerando: false });
+      aviso.erro(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   const salvarAjustes = async () => {
     try {
       await salvarSistemaConfig(cfg);
@@ -179,9 +202,17 @@ export const Lojas: React.FC = () => {
         title="Lojas assinantes"
         subtitle="Quem usa o sistema, quem está em dia e quem atrasou"
         action={
-          <button className="btn-secondary" onClick={() => setAjustes(true)}>
-            <Settings2 size={18} /> Ajustes do sistema
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="btn-secondary"
+              onClick={() => setSenha({ email: "", link: "", gerando: false })}
+            >
+              <KeyRound size={18} /> Liberar senha
+            </button>
+            <button className="btn-secondary" onClick={() => setAjustes(true)}>
+              <Settings2 size={18} /> Ajustes do sistema
+            </button>
+          </div>
         }
       />
 
@@ -333,6 +364,77 @@ export const Lojas: React.FC = () => {
           })}
         </div>
       )}
+
+      {/* ---------- Liberar senha de uma loja ---------- */}
+      <Modal
+        open={!!senha}
+        onClose={() => setSenha(null)}
+        title="Liberar troca de senha"
+        footer={
+          <>
+            <button className="btn-secondary" onClick={() => setSenha(null)}>
+              Fechar
+            </button>
+            <button className="btn-primary" onClick={gerarSenha} disabled={senha?.gerando}>
+              <KeyRound size={16} /> {senha?.gerando ? "Gerando..." : "Gerar link"}
+            </button>
+          </>
+        }
+      >
+        <p className="mb-4 text-sm text-slate-500">
+          Para quando a loja perdeu a senha e o e-mail de recuperação não chega.
+          O link é do próprio Supabase, vale uma vez só e expira em 1 hora.
+          Mande pelo WhatsApp e confirme com quem pediu antes — quem tem o link
+          entra na conta.
+        </p>
+        <Field label="E-mail da conta">
+          <input
+            className="input"
+            type="email"
+            autoFocus
+            placeholder="loja@exemplo.com"
+            value={senha?.email || ""}
+            onChange={(e) => senha && setSenha({ ...senha, email: e.target.value, link: "" })}
+            onKeyDown={(e) => e.key === "Enter" && gerarSenha()}
+          />
+        </Field>
+
+        {senha?.link && (
+          <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+            <p className="text-sm font-semibold text-emerald-800">Link pronto</p>
+            <p className="mt-1 break-all rounded bg-white p-2 text-xs text-slate-600">
+              {senha.link}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                className="btn-secondary !py-1.5 text-xs"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(senha.link);
+                    aviso.sucesso("Link copiado.");
+                  } catch {
+                    aviso.alerta("Não consegui copiar. Selecione o texto e copie na mão.");
+                  }
+                }}
+              >
+                <Copy size={14} /> Copiar
+              </button>
+              <button
+                className="btn-success !py-1.5 text-xs"
+                onClick={() =>
+                  abrirWhatsapp(
+                    "",
+                    `Link para você criar uma senha nova no Sistema TI:\n\n${senha.link}\n\n` +
+                      "Vale uma vez só e expira em 1 hora. Não repasse para ninguém."
+                  )
+                }
+              >
+                <MessageCircle size={14} /> Enviar no WhatsApp
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* ---------- Ajustes do sistema ---------- */}
       <Modal

@@ -47,6 +47,9 @@ export const isToday = (iso?: string): boolean => {
 /** Limpa telefone e monta link do WhatsApp com mensagem pronta */
 export const whatsappLink = (telefone: string, mensagem: string): string => {
   const num = telefone.replace(/\D/g, "");
+  // Sem número, o wa.me abre a lista de contatos com o texto pronto. Montar
+  // "wa.me/55" nesse caso levaria para um número inexistente.
+  if (!num) return `https://wa.me/?text=${encodeURIComponent(mensagem)}`;
   const full = num.startsWith("55") ? num : `55${num}`;
   return `https://wa.me/${full}?text=${encodeURIComponent(mensagem)}`;
 };
