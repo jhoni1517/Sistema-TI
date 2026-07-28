@@ -118,7 +118,8 @@ https://supabase.com/dashboard/project/nviagibefxqtognowqwe/sql/new:
 5. `supabase-migracao-cotacoes.sql`
 6. `supabase-migracao-assinatura.sql`
 7. `supabase-migracao-contas.sql`
-8. `supabase-corrigir-colunas.sql`
+8. `supabase-migracao-agenda.sql`
+9. `supabase-corrigir-colunas.sql`
 
 O último é seguro rodar quantas vezes quiser e é o primeiro lugar a olhar
 quando aparecer `Could not find the 'xxx' column of 'yyy' in the schema

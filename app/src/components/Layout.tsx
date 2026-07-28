@@ -19,6 +19,7 @@ import {
   CreditCard,
   Building2,
   Receipt,
+  CalendarDays,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { pode, NOME_PAPEL, type Sessao } from "../lib/auth";
@@ -26,6 +27,7 @@ import { pode, NOME_PAPEL, type Sessao } from "../lib/auth";
 const nav = [
   { to: "/", label: "Painel", icon: LayoutDashboard, end: true, recurso: "*" },
   { to: "/ordens", label: "Ordens de Serviço", icon: Wrench, recurso: "os" },
+  { to: "/agenda", label: "Agenda", icon: CalendarDays, recurso: "*" },
   { to: "/clientes", label: "Clientes", icon: Users, recurso: "clientes" },
   { to: "/estoque", label: "Estoque", icon: Package, recurso: "estoque" },
   { to: "/caixa", label: "Caixa", icon: Wallet, recurso: "caixa" },
@@ -44,6 +46,33 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
   const [open, setOpen] = useState(false);
   const [busca, setBusca] = useState(false);
   const navigate = useNavigate();
+
+  /**
+   * Com o menu aberto no celular, a página de trás não pode rolar.
+   *
+   * Sem isto acontece a "rolagem em cadeia": o dedo rola a lista da esquerda,
+   * ela acaba, e o navegador continua rolando o conteúdo de trás. Você fecha
+   * o menu e a tela está em outro lugar, sem ter pedido nada.
+   *
+   * Trava por posição fixa em vez de overflow:hidden porque o Safari do
+   * iPhone ignora o segundo. Guardar e devolver o scrollY evita o pulo para
+   * o topo ao fechar.
+   */
+  useEffect(() => {
+    if (!open) return;
+    const y = window.scrollY;
+    const corpo = document.body.style;
+    const anterior = { position: corpo.position, top: corpo.top, width: corpo.width };
+    corpo.position = "fixed";
+    corpo.top = `-${y}px`;
+    corpo.width = "100%";
+    return () => {
+      corpo.position = anterior.position;
+      corpo.top = anterior.top;
+      corpo.width = anterior.width;
+      window.scrollTo(0, y);
+    };
+  }, [open]);
 
   // Atalho Ctrl+K / Cmd+K abre a busca global
   useEffect(() => {
@@ -69,13 +98,15 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 transform bg-slate-900 text-slate-300 transition-transform lg:static lg:translate-x-0 ${
+        // overscroll-contain corta a rolagem em cadeia: chegando ao fim da
+        // lista, o gesto morre aqui em vez de arrastar a página de trás.
+        className={`fixed inset-y-0 left-0 z-40 flex w-64 transform flex-col overflow-y-auto overscroll-contain bg-slate-900 text-slate-300 transition-transform lg:static lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex h-16 items-center gap-2 border-b border-slate-800 px-5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 font-bold text-white">
-            TI
+        <div className="flex h-16 shrink-0 items-center gap-2 border-b border-slate-800 px-5">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 to-orange-600">
+            <Wrench size={18} className="text-stone-900" strokeWidth={2.5} />
           </div>
           <div className="truncate">
             <p className="truncate text-sm font-bold text-white">
@@ -95,7 +126,7 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
           </div>
         </div>
 
-        <div className="px-3 pt-3">
+        <div className="shrink-0 px-3 pt-3">
           <button
             onClick={() => setBusca(true)}
             className="flex w-full items-center gap-2 rounded-lg bg-slate-800 px-3 py-2 text-sm text-slate-400 hover:bg-slate-700 hover:text-slate-200"
@@ -108,7 +139,7 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
           </button>
         </div>
 
-        <nav className="space-y-1 p-3">
+        <nav className="flex-1 space-y-1 p-3">
           {nav
             .filter((item) => item.recurso === "*" || pode(sessao?.perfil?.papel, item.recurso))
             .concat(
@@ -137,7 +168,10 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
           ))}
         </nav>
 
-        <div className="absolute bottom-0 w-full border-t border-slate-800 p-3">
+        {/* mt-auto em vez de absolute bottom-0: numa tela baixa o bloco
+            absoluto cobria os últimos itens do menu, e eles ficavam
+            inalcançáveis porque a lista também não rolava. */}
+        <div className="mt-auto shrink-0 border-t border-slate-800 p-3">
           {sessao && (
             <div className="mb-2 px-3">
               <p className="truncate text-xs font-semibold text-slate-300">

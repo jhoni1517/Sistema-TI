@@ -47,6 +47,8 @@ alter table clientes add column if not exists "inscricaoEstadual" text;
 alter table clientes add column if not exists classificacao text;
 alter table clientes add column if not exists "motivoClassificacao" text;
 alter table clientes add column if not exists "classificadoEm" text;
+-- Aniversário: a Agenda monta o evento sozinha a partir daqui, todo ano.
+alter table clientes add column if not exists nascimento text;
 
 -- ---------- Fiado ----------
 alter table fiados add column if not exists vencimento text;

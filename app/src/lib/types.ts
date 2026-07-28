@@ -80,6 +80,8 @@ export interface Cliente {
   /** Por que foi classificado assim. Obrigatório fora do normal. */
   motivoClassificacao?: string;
   classificadoEm?: string;
+  /** Aniversário (AAAA-MM-DD). O ano pode ser qualquer um: só o dia importa. */
+  nascimento?: string;
   criadoEm: string;
 }
 
@@ -389,6 +391,85 @@ export interface Fiado {
   pagamentos: PagamentoFiado[];
   quitado: boolean;
   vencimento?: string;
+  criadoEm: string;
+}
+
+/**
+ * Agenda da loja.
+ *
+ * Serve para o que não cabe em OS nem em conta a pagar: visita técnica
+ * marcada, aniversário de cliente, entrega combinada, reunião com
+ * fornecedor. O que separa agenda de lista de tarefas é a HORA — atendimento
+ * externo sem horário não serve para nada.
+ */
+export type TipoEvento =
+  | "atendimento"
+  | "aniversario"
+  | "entrega"
+  | "reuniao"
+  | "lembrete";
+
+export const TIPO_EVENTO_META: Record<
+  TipoEvento,
+  { label: string; cor: string; corPonto: string; descricao: string }
+> = {
+  atendimento: {
+    label: "Atendimento externo",
+    cor: "bg-blue-100 text-blue-700",
+    corPonto: "bg-blue-500",
+    descricao: "Visita na casa ou na empresa do cliente",
+  },
+  entrega: {
+    label: "Entrega",
+    cor: "bg-emerald-100 text-emerald-700",
+    corPonto: "bg-emerald-500",
+    descricao: "Levar ou buscar aparelho combinado",
+  },
+  aniversario: {
+    label: "Aniversário",
+    cor: "bg-pink-100 text-pink-700",
+    corPonto: "bg-pink-500",
+    descricao: "Data do cliente, para mandar uma mensagem",
+  },
+  reuniao: {
+    label: "Reunião",
+    cor: "bg-violet-100 text-violet-700",
+    corPonto: "bg-violet-500",
+    descricao: "Fornecedor, contador, parceria",
+  },
+  lembrete: {
+    label: "Lembrete",
+    cor: "bg-amber-100 text-amber-700",
+    corPonto: "bg-amber-500",
+    descricao: "Qualquer coisa que não pode ser esquecida",
+  },
+};
+
+/** Com que frequência o evento se repete */
+export type RepetirEvento = "nenhuma" | "semanal" | "mensal" | "anual";
+
+export const REPETIR_META: Record<RepetirEvento, { label: string }> = {
+  nenhuma: { label: "Não repete" },
+  semanal: { label: "Toda semana" },
+  mensal: { label: "Todo mês" },
+  anual: { label: "Todo ano" },
+};
+
+export interface Evento {
+  id: ID;
+  titulo: string;
+  tipo: TipoEvento;
+  /** AAAA-MM-DD. Sem hora aqui: fuso já estragou data demais neste sistema. */
+  data: string;
+  /** HH:MM. Vazio = o dia todo. */
+  hora?: string;
+  clienteId?: ID;
+  local?: string;
+  observacoes?: string;
+  repetir?: RepetirEvento;
+  /** Quantos dias antes começar a avisar. 0 = só no dia. */
+  avisarDiasAntes?: number;
+  concluido?: boolean;
   criadoEm: string;
 }
 
