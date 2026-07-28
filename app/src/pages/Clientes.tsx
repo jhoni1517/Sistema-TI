@@ -324,6 +324,17 @@ export const Clientes: React.FC = () => {
                 onChange={(e) => setEditando({ ...editando, endereco: e.target.value })}
               />
             </Field>
+            <Field label={juridica ? "Fundação da empresa" : "Aniversário"}>
+              <input
+                type="date"
+                className="input"
+                value={editando.nascimento || ""}
+                onChange={(e) => setEditando({ ...editando, nascimento: e.target.value })}
+              />
+              <p className="mt-1 text-xs text-slate-400">
+                Aparece sozinho na Agenda todo ano. Se não souber o ano, use 1900.
+              </p>
+            </Field>
             <Field label="Observações" className="sm:col-span-2">
               <textarea
                 className="input"

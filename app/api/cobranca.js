@@ -162,11 +162,13 @@ export default async function handler(req, res) {
     }
 
     const contas = await avisarContas();
+    const agenda = await avisarAgenda();
 
     return res.status(200).json({
       ok: true,
       enviados: enviou ? novos.length : 0,
       contas,
+      agenda,
       telegram: enviou ? "enviado" : "não configurado ou falhou",
     });
   } catch (e) {
@@ -245,4 +247,120 @@ async function avisarContas() {
   });
 
   return `${novos.length} lembrete(s) enviado(s)`;
+}
+
+/**
+ * Lembrete da agenda do dia.
+ *
+ * Só o que acontece HOJE e o que já entrou na antecedência pedida. Agenda
+ * que manda a semana inteira todo dia vira ruído, e ruído a pessoa silencia.
+ *
+ * Sem tabela de controle aqui: o compromisso do dia pode ser lembrado de
+ * novo amanhã se ainda não foi concluído, ao contrário da conta, que só
+ * precisa ser cobrada uma vez por vencimento.
+ */
+async function avisarAgenda() {
+  let eventos;
+  try {
+    eventos = await sb(
+      'eventos?select=id,titulo,tipo,data,hora,local,repetir,"avisarDiasAntes",concluido&concluido=is.false'
+    );
+  } catch {
+    return "tabela de eventos ainda não existe";
+  }
+
+  const hoje = new Date().toISOString().slice(0, 10);
+  const doDia = [];
+  const chegando = [];
+
+  for (const e of eventos || []) {
+    const data = proximaData(e, hoje);
+    if (!data) continue;
+    const dias = diasAte(data + "T00:00:00Z");
+    if (dias < 0) continue;
+    const antecedencia = Number(e.avisarDiasAntes ?? 0);
+    if (dias > antecedencia) continue;
+
+    const linha = `• ${e.hora ? e.hora + " " : ""}${e.titulo}` +
+      (e.local ? ` — ${e.local}` : "") +
+      (dias > 0 ? ` (em ${dias}d)` : "");
+    (dias === 0 ? doDia : chegando).push(linha);
+  }
+
+  // Aniversários avisam na véspera: dá tempo de separar um brinde.
+  const parabens = await aniversariosProximos(hoje);
+
+  if (doDia.length === 0 && chegando.length === 0 && parabens.length === 0) {
+    return "nada na agenda";
+  }
+
+  const partes = ["*Agenda*"];
+  if (doDia.length) partes.push(`HOJE\n${doDia.join("\n")}`);
+  if (chegando.length) partes.push(`CHEGANDO\n${chegando.join("\n")}`);
+  if (parabens.length) partes.push(`ANIVERSÁRIOS\n${parabens.join("\n")}`);
+
+  const ok = await enviarTelegram(partes.join("\n\n"));
+  return ok ? `${doDia.length + chegando.length + parabens.length} item(ns)` : "telegram não configurado";
+}
+
+/** Próxima data do evento, respeitando a repetição. Espelha src/lib/agenda.ts */
+function proximaData(evento, hoje) {
+  const inicio = String(evento.data || "").slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(inicio)) return null;
+  const repetir = evento.repetir || "nenhuma";
+  if (repetir === "nenhuma") return inicio >= hoje ? inicio : null;
+
+  const diaOriginal = Number(inicio.slice(8, 10));
+  let atual = inicio;
+  for (let i = 0; i < 400; i++) {
+    if (atual >= hoje) return atual;
+    const proxima = avancarData(atual, repetir, diaOriginal);
+    if (proxima <= atual) return null;
+    atual = proxima;
+  }
+  return null;
+}
+
+/** Espelha avancar() de src/lib/agenda.ts — um teste compara os dois */
+function avancarData(data, repetir, diaOriginal) {
+  const base = new Date(data + "T00:00:00Z");
+  if (Number.isNaN(base.getTime()) || repetir === "nenhuma") return data;
+  if (repetir === "semanal") {
+    base.setUTCDate(base.getUTCDate() + 7);
+    return base.toISOString().slice(0, 10);
+  }
+  const passo = repetir === "anual" ? 12 : 1;
+  const dia = diaOriginal || base.getUTCDate();
+  const alvoMes = base.getUTCMonth() + passo;
+  const ano = base.getUTCFullYear() + Math.floor(alvoMes / 12);
+  const mes0 = ((alvoMes % 12) + 12) % 12;
+  const ultimo = new Date(Date.UTC(ano, mes0 + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(ano, mes0, Math.min(dia, ultimo))).toISOString().slice(0, 10);
+}
+
+/** Clientes que fazem aniversário hoje ou amanhã */
+async function aniversariosProximos(hoje) {
+  let clientes;
+  try {
+    clientes = await sb("clientes?select=nome,nascimento&nascimento=not.is.null");
+  } catch {
+    return [];
+  }
+  const ano = Number(hoje.slice(0, 4));
+  const saida = [];
+  for (const c of clientes || []) {
+    const n = String(c.nascimento || "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(n)) continue;
+    const mes0 = Number(n.slice(5, 7)) - 1;
+    const ultimo = new Date(Date.UTC(ano, mes0 + 1, 0)).getUTCDate();
+    const data = new Date(
+      Date.UTC(ano, mes0, Math.min(Number(n.slice(8, 10)), ultimo))
+    )
+      .toISOString()
+      .slice(0, 10);
+    const dias = diasAte(data + "T00:00:00Z");
+    if (dias === 0) saida.push(`• ${c.nome} faz aniversário hoje`);
+    else if (dias === 1) saida.push(`• ${c.nome} faz aniversário amanhã`);
+  }
+  return saida;
 }

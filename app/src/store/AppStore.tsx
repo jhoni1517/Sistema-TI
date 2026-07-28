@@ -20,6 +20,7 @@ import type {
   PrecoFornecedor,
   ContaPagar,
   Meta,
+  Evento,
   Config,
 } from "../lib/types";
 
@@ -52,6 +53,7 @@ interface AppState {
   precos: PrecoFornecedor[];
   contas: ContaPagar[];
   metas: Meta[];
+  eventos: Evento[];
   config: Config;
   // ações
   reload: () => Promise<void>;
@@ -71,6 +73,8 @@ interface AppState {
   saveFornecedor: (f: Fornecedor) => Promise<void>;
   saveConta: (c: ContaPagar) => Promise<void>;
   removeConta: (id: string) => Promise<void>;
+  saveEvento: (e: Evento) => Promise<void>;
+  removeEvento: (id: string) => Promise<void>;
   saveMeta: (m: Meta) => Promise<void>;
   removeMeta: (id: string) => Promise<void>;
   saveCotacao: (c: Cotacao) => Promise<void>;
@@ -114,6 +118,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [precos, setPrecos] = useState<PrecoFornecedor[]>([]);
   const [contas, setContas] = useState<ContaPagar[]>([]);
   const [metas, setMetas] = useState<Meta[]>([]);
+  const [eventos, setEventos] = useState<Evento[]>([]);
   const [config, setConfig] = useState<Config>(loadConfig());
 
   // Aplica o tema (cor + claro/escuro) e reage à mudança do sistema no modo "auto"
@@ -130,7 +135,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [c, o, p, m, s, f, cat, forn, cot, prc, cts, mts] = await Promise.all([
+      const [c, o, p, m, s, f, cat, forn, cot, prc, cts, mts, evs] = await Promise.all([
         db.clientes.all(),
         db.ordens.all(),
         db.produtos.all(),
@@ -143,6 +148,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         db.precos.all(),
         db.contas.all(),
         db.metas.all(),
+        db.eventos.all(),
       ]);
       setClientes(c);
       setOrdens(o);
@@ -156,6 +162,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       setPrecos(prc);
       setContas(cts);
       setMetas(mts);
+      setEventos(evs);
       // Configurações da loja vindas da nuvem (nome, senha, etc.) — mantém aparência local
       const cloudCfg = await db.config.get();
       if (cloudCfg) setConfig((prev) => ({ ...prev, ...cloudCfg }));
@@ -356,6 +363,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     await db.contas.remove(id);
     setContas((prev) => prev.filter((x) => x.id !== id));
   };
+  const saveEvento = async (e: Evento) => {
+    await db.eventos.save(e);
+    setEventos((prev) => {
+      const i = prev.findIndex((x) => x.id === e.id);
+      if (i >= 0) {
+        const n = [...prev];
+        n[i] = e;
+        return n;
+      }
+      return [...prev, e];
+    });
+  };
+  const removeEvento = async (id: string) => {
+    await db.eventos.remove(id);
+    setEventos((prev) => prev.filter((x) => x.id !== id));
+  };
   const saveMeta = async (m: Meta) => {
     await db.metas.save(m);
     setMetas((prev) => {
@@ -406,6 +429,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     precos,
     contas,
     metas,
+    eventos,
     config,
     reload,
     saveCliente,
@@ -425,6 +449,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     removeFornecedor,
     saveConta,
     removeConta,
+    saveEvento,
+    removeEvento,
     saveMeta,
     removeMeta,
     saveCotacao,
