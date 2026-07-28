@@ -13,6 +13,10 @@
 -- Este arquivo repete TODAS as colunas opcionais que o sistema usa. É
 -- seguro rodar quantas vezes quiser: "if not exists" não altera o que já
 -- está certo e não apaga nada.
+--
+-- Ele resolve COLUNA que falta. Não resolve FUNÇÃO desatualizada: se o erro
+-- citar situacao_loja, loja_pode_gravar ou registrar_pagamento, rode de novo
+-- o supabase-migracao-assinatura.sql inteiro, que também é repetível.
 -- =====================================================================
 
 -- ---------- Movimentos de caixa ----------
@@ -51,6 +55,16 @@ alter table fiados add column if not exists "osId" text;
 -- ---------- Sessões de caixa ----------
 alter table sessoes add column if not exists observacoes text;
 alter table sessoes add column if not exists "valorFechamento" numeric;
+
+-- ---------- Lojas (assinatura) ----------
+-- Quem rodou o supabase-migracao-assinatura.sql antes destas colunas
+-- existirem cai em "column lojas.isento does not exist" ao abrir Lojas.
+alter table lojas add column if not exists "venceEm" timestamptz;
+alter table lojas add column if not exists valor_mensal numeric default 0;
+alter table lojas add column if not exists bloqueada boolean default false;
+alter table lojas add column if not exists "ultimoPagamento" timestamptz;
+alter table lojas add column if not exists whatsapp text;
+alter table lojas add column if not exists isento boolean default false;
 
 -- ---------- Confere o resultado ----------
 -- Deve listar compraEstoque, custoRelacionado, osId e sessaoId.
