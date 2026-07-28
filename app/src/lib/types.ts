@@ -1,3 +1,5 @@
+import type { Ramo } from "./ramos";
+
 // ==== Tipos de domínio do Sistema TI ====
 
 export type ID = string;
@@ -475,6 +477,12 @@ export interface Evento {
 
 export interface Config {
   nomeLoja: string;
+  /**
+   * Ramo de atividade da loja. Decide o vocabulário das telas e quais
+   * módulos aparecem. Ausente = assistência técnica, que é como o sistema
+   * nasceu — nenhuma loja existente pode acordar diferente de ontem.
+   */
+  ramo?: Ramo;
   telefoneLoja: string;
   enderecoLoja: string;
   cnpj: string;
