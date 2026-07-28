@@ -85,7 +85,12 @@ export default async function handler(req, res) {
       );
       if (r.ok) {
         const linhas = await r.json();
-        out.banco = "ok — consegui ler a tabela de movimentos";
+        // A leitura aqui é com a chave PÚBLICA e sem ninguém logado. Vir
+        // vazio é o resultado certo: prova que o RLS está barrando. Lista
+        // cheia aqui seria o problema, não o contrário.
+        out.banco =
+          `ok — o banco respondeu. Vieram ${linhas.length} linha(s) com a chave pública` +
+          (linhas.length === 0 ? "; vazio é o esperado, é o RLS barrando." : ".");
         out.ultimosLancamentos = linhas;
       } else {
         out.banco = `ERRO ao ler (${r.status}): ${await r.text()}`;
