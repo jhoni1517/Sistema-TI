@@ -23,10 +23,22 @@ import {
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { pode, NOME_PAPEL, type Sessao } from "../lib/auth";
+import { temModulo, vocabulario, type Modulo } from "../lib/ramos";
 
-const nav = [
+/**
+ * Menu. "modulo" liga o item ao ramo da loja: item sem modulo aparece para
+ * todo mundo. É aqui que uma pizzaria deixa de ver "Ordens de Serviço".
+ */
+const nav: Array<{
+  to: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  end?: boolean;
+  recurso: string;
+  modulo?: Modulo;
+}> = [
   { to: "/", label: "Painel", icon: LayoutDashboard, end: true, recurso: "*" },
-  { to: "/ordens", label: "Ordens de Serviço", icon: Wrench, recurso: "os" },
+  { to: "/ordens", label: "Ordens de Serviço", icon: Wrench, recurso: "os", modulo: "os" },
   { to: "/agenda", label: "Agenda", icon: CalendarDays, recurso: "*" },
   { to: "/clientes", label: "Clientes", icon: Users, recurso: "clientes" },
   { to: "/estoque", label: "Estoque", icon: Package, recurso: "estoque" },
@@ -142,6 +154,15 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
         <nav className="flex-1 space-y-1 p-3">
           {nav
             .filter((item) => item.recurso === "*" || pode(sessao?.perfil?.papel, item.recurso))
+            // Módulo que não é do ramo desta loja nem aparece no menu
+            .filter((item) => !item.modulo || temModulo(config.ramo, item.modulo))
+            .map((item) =>
+              // "Ordens de Serviço" numa pizzaria seria ridículo; o nome do
+              // documento central vem do ramo.
+              item.modulo === "os"
+                ? { ...item, label: vocabulario(config.ramo).ordemPlural }
+                : item
+            )
             .concat(
               // Só quem administra o sistema enxerga o painel de lojas
               sessao?.perfil?.super_admin
