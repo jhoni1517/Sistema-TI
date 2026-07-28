@@ -25,6 +25,8 @@ alter table movimentos add column if not exists "compraEstoque" boolean default 
 alter table movimentos add column if not exists "custoRelacionado" numeric default 0;
 alter table movimentos add column if not exists "sessaoId" text;
 alter table movimentos add column if not exists "osId" text;
+-- Para quem foi a venda: sai no recibo que o cliente leva.
+alter table movimentos add column if not exists "clienteId" text;
 
 -- ---------- Ordens de serviço ----------
 alter table ordens add column if not exists "aprovadoEm" text;
@@ -57,6 +59,9 @@ alter table fiados add column if not exists "osId" text;
 -- ---------- Sessões de caixa ----------
 alter table sessoes add column if not exists observacoes text;
 alter table sessoes add column if not exists "valorFechamento" numeric;
+-- Dinheiro contado na gaveta. Sem ele não existe quebra de caixa: o sistema
+-- guardava o valor que ele mesmo calculou e concordava consigo para sempre.
+alter table sessoes add column if not exists "valorContado" numeric;
 
 -- ---------- Lojas (assinatura) ----------
 -- Quem rodou o supabase-migracao-assinatura.sql antes destas colunas

@@ -1,7 +1,8 @@
 import type { OrdemServico, Config, MovimentoCaixa, SessaoCaixa } from "./types";
 import { OS_STATUS_META } from "./types";
 import { brl, formatDate, formatDateTime, codigoOS } from "./format";
-import { totalPecas, totalOS, receitaBruta, totalDespesas, totalSangrias } from "./calc";
+import { totalPecas, totalOS } from "./calc";
+import { resumoCaixa, conferencia, CONFERENCIA_META } from "./caixa";
 
 /**
  * Escapa texto antes de entrar no HTML do recibo.
@@ -114,23 +115,79 @@ export function reciboOS(
   </div>`;
 }
 
+/**
+ * Recibo de uma venda, para entregar ao cliente.
+ *
+ * É outro documento que o fechamento de caixa: aquele é conferência interna
+ * e mostra o dia inteiro, inclusive despesas e sangrias — coisa que nenhum
+ * cliente pode levar para casa. Aqui sai só a compra dele.
+ */
+export function reciboVenda(
+  mov: MovimentoCaixa,
+  config: Config,
+  cliente?: { nome?: string; telefone?: string; cpf?: string }
+): string {
+  const valor = Number(mov.valor) || 0;
+  return `
+  ${cab(config)}
+  <h2 class="center" style="margin-bottom:6px">Recibo de Venda</h2>
+  <p class="center muted" style="margin-bottom:14px">
+    ${formatDateTime(mov.data)}
+  </p>
+
+  ${
+    cliente?.nome
+      ? `<div class="box">
+          <div class="label">Cliente</div>
+          <div class="val"><b>${esc(cliente.nome)}</b></div>
+          ${
+            cliente.telefone || cliente.cpf
+              ? `<div class="val muted">${[cliente.telefone, cliente.cpf].filter(Boolean).map(esc).join(" · ")}</div>`
+              : ""
+          }
+        </div>`
+      : ""
+  }
+
+  <table>
+    <thead><tr><th>Descrição</th><th class="right">Valor</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>${esc(mov.descricao) || "Venda"}</td>
+        <td class="right">${brl(valor)}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="tot">
+    <div class="line"><span>Forma de pagamento</span><span style="text-transform:capitalize">${esc(mov.formaPagamento)}</span></div>
+    <div class="line grand"><span>Total</span><span>${brl(valor)}</span></div>
+  </div>
+
+  <p style="margin-top:14px;font-size:12px">
+    Recebemos de ${cliente?.nome ? `<b>${esc(cliente.nome)}</b>` : "_____________________________"}
+    a importância de <b>${brl(valor)}</b> referente ao descrito acima.
+  </p>
+
+  <div class="sign">
+    <div>Cliente</div>
+    <div>${esc(config.nomeLoja) || "Loja"}</div>
+  </div>`;
+}
+
 export function reciboFechamento(
   sessao: SessaoCaixa | null,
   movimentos: MovimentoCaixa[],
   config: Config
 ): string {
-  const entradas = receitaBruta(movimentos);
-  const saidas = totalDespesas(movimentos);
-  const sangrias = totalSangrias(movimentos);
-  const abertura = sessao?.valorAbertura || 0;
-  const saldo = abertura + entradas - saidas - sangrias;
+  // A conta vem de lib/caixa.ts, a mesma que a tela usa. Recibo com número
+  // diferente do que estava na tela é o pior tipo de erro: ninguém sabe em
+  // qual acreditar.
+  const r = resumoCaixa(sessao, movimentos);
+  const { abertura, entradas, saidas, sangrias, saldo } = r;
+  const conf = conferencia(r);
 
-  // por forma de pagamento (só entradas)
-  const formas: Record<string, number> = {};
-  movimentos
-    .filter((m) => m.tipo === "entrada")
-    .forEach((m) => (formas[m.formaPagamento] = (formas[m.formaPagamento] || 0) + m.valor));
-  const linhasFormas = Object.entries(formas)
+  const linhasFormas = Object.entries(r.porForma)
     .map(([f, v]) => `<div class="line"><span style="text-transform:capitalize">${f}</span><span>${brl(v)}</span></div>`)
     .join("");
 
@@ -161,6 +218,14 @@ export function reciboFechamento(
         <div class="line"><span>Saídas</span><span>- ${brl(saidas)}</span></div>
         <div class="line"><span>Sangrias</span><span>- ${brl(sangrias)}</span></div>
         <div class="line grand"><span>Saldo em caixa</span><span>${brl(saldo)}</span></div>
+        ${
+          r.contado !== undefined
+            ? `<div class="line"><span>Contado na gaveta</span><span>${brl(r.contado)}</span></div>
+               <div class="line"><b>${CONFERENCIA_META[conf].label}</b><b>${
+                 (r.diferenca || 0) > 0 ? "+ " : (r.diferenca || 0) < 0 ? "- " : ""
+               }${brl(Math.abs(r.diferenca || 0))}</b></div>`
+            : ""
+        }
       </div>
     </div>
     <div class="box" style="flex:1">
