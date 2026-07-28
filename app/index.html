@@ -3,8 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <!-- PNG para os navegadores que ainda ignoram favicon em SVG -->
+    <link rel="alternate icon" type="image/png" sizes="32x32" href="./favicon-32.png" />
+    <!-- O iPhone não lê o manifest para o ícone da tela inicial; sem isto ele
+         usa um retrato borrado da página. -->
+    <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="Sistema TI" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#2563eb" />
+    <meta name="theme-color" content="#ea580c" />
     <meta name="description" content="Sistema de Caixa e Ordens de Serviço para assistência técnica de informática e celulares" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
