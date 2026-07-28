@@ -255,6 +255,30 @@ export async function sairDeTodosOsAparelhos(): Promise<void> {
   if (error) throw new Error(traduzErro(error.message));
 }
 
+/**
+ * Gera o link de redefinição de senha sem passar por e-mail.
+ *
+ * Serve para quando o SMTP não está configurado ou o e-mail não chega: o dono
+ * do sistema gera o link e manda pelo WhatsApp. Quem valida se você pode
+ * fazer isso é o servidor, não esta função — aqui só mandamos o token da
+ * sessão junto.
+ */
+export async function gerarLinkDeSenha(email: string): Promise<string> {
+  if (!supabase) throw new Error("Nuvem não configurada.");
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new Error("Sessão expirada. Entre de novo.");
+
+  const r = await fetch("/api/recuperar", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ email, redirectTo: window.location.origin }),
+  });
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(body?.erro || `Falhou (${r.status}).`);
+  return body.link as string;
+}
+
 export async function recuperarSenha(email: string): Promise<void> {
   if (!supabase) throw new Error("Nuvem não configurada.");
   const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
