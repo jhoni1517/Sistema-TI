@@ -137,8 +137,10 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-brand-900 p-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-600 shadow-lg">
-            <Wrench className="text-white" size={30} />
+          {/* Mesma marca do ícone do app: quem toca no âmbar na tela inicial
+              precisa cair numa tela que confirma que abriu o app certo. */}
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 shadow-lg">
+            <Wrench className="text-stone-900" size={30} strokeWidth={2.5} />
           </div>
           <h1 className="text-2xl font-bold text-white">Sistema TI</h1>
           <p className="text-sm text-slate-400">Caixa &amp; Ordens de Serviço</p>

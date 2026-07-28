@@ -6,7 +6,9 @@
 //
 //   - navegação (HTML)  -> rede primeiro, cache só quando estiver sem internet
 //   - assets com hash   -> cache primeiro (o nome muda a cada build, é seguro)
-const CACHE = "sistema-ti-v3";
+// Sobe a versão a cada troca de arquivo estático sem hash no nome — os ícones
+// são o caso típico: o nome não muda, e sem isso o favicon velho fica preso.
+const CACHE = "sistema-ti-v4";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
