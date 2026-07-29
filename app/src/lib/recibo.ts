@@ -1,8 +1,9 @@
-import type { OrdemServico, Config, MovimentoCaixa, SessaoCaixa } from "./types";
+import type { OrdemServico, Config, MovimentoCaixa, SessaoCaixa, Venda } from "./types";
 import { OS_STATUS_META } from "./types";
 import { brl, formatDate, formatDateTime, codigoOS, txt } from "./format";
 import { totalPecas, totalOS } from "./calc";
 import { resumoCaixa, conferencia, CONFERENCIA_META } from "./caixa";
+import { subtotalItem, subtotalVenda, totalVenda, trocoDe } from "./pdv";
 
 /**
  * Escapa texto antes de entrar no HTML do recibo.
@@ -189,6 +190,76 @@ export function reciboVenda(
     <div>Cliente</div>
     <div>${esc(config.nomeLoja) || "Loja"}</div>
   </div>`;
+}
+
+/**
+ * Cupom da venda de balcão, com os itens.
+ *
+ * Diferente do reciboVenda, que descreve um lançamento avulso do caixa:
+ * aqui existe carrinho, e o cliente confere item por item. Sem os itens o
+ * cupom não serve para trocar nem devolver mercadoria.
+ */
+export function reciboPDV(
+  v: Venda,
+  config: Config,
+  cliente?: { nome?: string; telefone?: string; cpf?: string }
+): string {
+  const bruto = subtotalVenda(v.itens || []);
+  const total = totalVenda(v);
+  const desconto = Math.max(0, Number(v.desconto) || 0);
+  const recebido = Number(v.valorRecebido) || 0;
+
+  const linhas = (v.itens || [])
+    .map(
+      (i) => `<tr>
+        <td>${esc(i.descricao)}</td>
+        <td class="center">${
+          i.porPeso
+            ? `${Number(i.quantidade).toFixed(3).replace(".", ",")} kg`
+            : esc(i.quantidade)
+        }</td>
+        <td class="right">${brl(Number(i.precoUnit) || 0)}${i.porPeso ? "/kg" : ""}</td>
+        <td class="right">${brl(subtotalItem(i))}</td>
+      </tr>`
+    )
+    .join("");
+
+  return `
+  ${cab(config)}
+  <h2 class="center" style="margin-bottom:6px">Cupom de Venda ${esc(v.numero)}</h2>
+  <p class="center muted" style="margin-bottom:14px">${formatDateTime(v.criadoEm)}</p>
+
+  ${
+    cliente?.nome
+      ? `<div class="box"><div class="label">Cliente</div><div class="val"><b>${esc(
+          cliente.nome
+        )}</b></div></div>`
+      : ""
+  }
+
+  <table>
+    <thead><tr><th>Item</th><th class="center">Qtd</th><th class="right">Preço</th><th class="right">Total</th></tr></thead>
+    <tbody>${linhas || '<tr><td colspan="4" class="center muted">Sem itens</td></tr>'}</tbody>
+  </table>
+
+  <div class="tot">
+    ${desconto > 0 ? `<div class="line"><span>Subtotal</span><span>${brl(bruto)}</span></div>` : ""}
+    ${desconto > 0 ? `<div class="line"><span>Desconto</span><span>- ${brl(desconto)}</span></div>` : ""}
+    <div class="line grand"><span>Total</span><span>${brl(total)}</span></div>
+    <div class="line"><span>Pagamento</span><span style="text-transform:capitalize">${esc(
+      v.formaPagamento
+    )}</span></div>
+    ${
+      v.formaPagamento === "dinheiro" && recebido > 0
+        ? `<div class="line"><span>Recebido</span><span>${brl(recebido)}</span></div>
+           <div class="line"><span>Troco</span><span>${brl(trocoDe(total, recebido))}</span></div>`
+        : ""
+    }
+  </div>
+
+  <p class="center muted" style="margin-top:14px;font-size:11px">
+    Documento sem valor fiscal. Guarde para troca ou devolucao.
+  </p>`;
 }
 
 export function reciboFechamento(

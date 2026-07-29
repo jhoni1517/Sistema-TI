@@ -180,6 +180,15 @@ export interface Produto {
    * vermelho, e o valor do estoque ia para a casa dos trilhões.
    */
   servico?: boolean;
+  /** Código de barras — é por ele que o leitor do balcão acha o produto */
+  codigoBarras?: string;
+  /**
+   * Vendido por quilo. O campo "preco" passa a ser o preço do QUILO, e a
+   * quantidade vendida é fracionária (0,315 kg). Mercearia e açougue.
+   */
+  porPeso?: boolean;
+  /** Vencimento do lote (AAAA-MM-DD). Vira alerta no estoque. */
+  validade?: string;
   criadoEm: string;
 }
 
@@ -369,6 +378,43 @@ export interface MovimentoCaixa {
   compraEstoque?: boolean;
   data: string;
   sessaoId?: ID;
+}
+
+/**
+ * Venda de balcão (PDV).
+ *
+ * Existe como registro próprio, e não só como uma linha no caixa, porque
+ * numa mercearia o que importa é O QUE saiu, não apenas quanto entrou. Sem
+ * os itens não há como saber o que mais vende, reimprimir um cupom nem
+ * conferir uma devolução.
+ *
+ * O dinheiro continua no caixa, num único movimento por venda — é uma venda
+ * só, e uma linha por item deixaria o extrato ilegível.
+ */
+export interface ItemVenda {
+  produtoId?: ID;
+  descricao: string;
+  /** Unidades, ou quilos quando o produto é vendido por peso */
+  quantidade: number;
+  /** Preço da unidade, ou do quilo */
+  precoUnit: number;
+  custoUnit: number;
+  porPeso?: boolean;
+}
+
+export interface Venda {
+  id: ID;
+  numero: number;
+  itens: ItemVenda[];
+  desconto: number;
+  formaPagamento: FormaPagamento;
+  /** Dinheiro entregue pelo cliente, para calcular o troco */
+  valorRecebido?: number;
+  clienteId?: ID;
+  /** Lançamento correspondente no caixa */
+  movimentoId?: ID;
+  sessaoId?: ID;
+  criadoEm: string;
 }
 
 export interface SessaoCaixa {

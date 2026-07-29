@@ -14,6 +14,7 @@ import type {
   ContaPagar,
   Meta,
   Evento,
+  Venda,
 } from "./types";
 
 /**
@@ -40,7 +41,8 @@ type TableName =
   | "precos_fornecedor"
   | "contas_pagar"
   | "metas"
-  | "eventos";
+  | "eventos"
+  | "vendas";
 
 interface WithId {
   id: string;
@@ -228,6 +230,7 @@ export interface DumpLoja {
   contas?: ContaPagar[];
   metas?: Meta[];
   eventos?: Evento[];
+  vendas?: Venda[];
 }
 
 const TABELA_DO_CAMPO: Record<keyof DumpLoja, TableName> = {
@@ -244,6 +247,7 @@ const TABELA_DO_CAMPO: Record<keyof DumpLoja, TableName> = {
   contas: "contas_pagar",
   metas: "metas",
   eventos: "eventos",
+  vendas: "vendas",
 };
 
 /**
@@ -353,6 +357,11 @@ export const db = {
     all: () => getAll<Evento>("eventos"),
     save: (e: Evento) => upsert("eventos", e),
     remove: (id: string) => remove("eventos", id),
+  },
+  vendas: {
+    all: () => getAll<Venda>("vendas"),
+    save: (v: Venda) => upsert("vendas", v),
+    remove: (id: string) => remove("vendas", id),
   },
   // Configurações da loja compartilhadas na nuvem (uma linha por loja)
   config: {
