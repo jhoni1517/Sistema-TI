@@ -13,7 +13,7 @@ import {
   FileQuestion,
 } from "lucide-react";
 import { aviso } from "./Aviso";
-import { Modal, Field, EmptyState } from "./ui";
+import { Modal, Field, EmptyState, InputNumero } from "./ui";
 import { useApp } from "../store/AppStore";
 import { uid, nowISO, brl, formatDate, txt, abrirWhatsapp } from "../lib/format";
 import {
@@ -473,14 +473,13 @@ export const Cotacoes: React.FC<{
                             setEditando({ ...editando, itens });
                           }}
                         />
-                        <input
-                          type="number"
+                        <InputNumero
                           min={1}
                           className="input !w-20"
                           value={item.quantidade}
-                          onChange={(e) => {
+                          onChange={(v) => {
                             const itens = [...editando.itens];
-                            itens[idx] = { ...item, quantidade: +e.target.value };
+                            itens[idx] = { ...item, quantidade: v ?? 1 };
                             setEditando({ ...editando, itens });
                           }}
                         />
@@ -677,20 +676,17 @@ export const Cotacoes: React.FC<{
 
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Field label="Valor unitário (R$)">
-                      <input
-                        type="number"
-                        step="0.01"
+                      <InputNumero
                         className="input"
-                        value={item.precoUnit ?? ""}
-                        onChange={(e) => atualizar({ precoUnit: +e.target.value })}
+                        value={item.precoUnit}
+                        onChange={(v) => atualizar({ precoUnit: (v ?? 0) })}
                       />
                     </Field>
                     <Field label="Prazo de entrega (dias)">
-                      <input
-                        type="number"
+                      <InputNumero
                         className="input"
-                        value={item.prazoDias ?? ""}
-                        onChange={(e) => atualizar({ prazoDias: +e.target.value })}
+                        value={item.prazoDias}
+                        onChange={(v) => atualizar({ prazoDias: (v ?? 0) })}
                       />
                     </Field>
                   </div>

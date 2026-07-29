@@ -16,7 +16,7 @@ import {
   ListOrdered,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
-import { Modal, Field, SectionTitle, EmptyState } from "../components/ui";
+import { Modal, Field, SectionTitle, EmptyState, InputNumero } from "../components/ui";
 import { uid, nowISO, brl, formatDate, formatDateTime, txt } from "../lib/format";
 import { printHTML } from "../lib/print";
 import { reciboFechamento, reciboVenda } from "../lib/recibo";
@@ -317,7 +317,7 @@ const AbrirCaixaModal: React.FC<{ open: boolean; onClose: () => void; onConfirm:
       footer={<><button className="btn-secondary" onClick={onClose}>Cancelar</button><button className="btn-success" onClick={() => onConfirm(valor)}>Abrir caixa</button></>}
     >
       <Field label="Valor de abertura (troco inicial)">
-        <input type="number" autoFocus className="input" value={valor} onChange={(e) => setValor(+e.target.value)} />
+        <InputNumero autoFocus value={valor} onChange={(v) => setValor(v ?? 0)} />
       </Field>
     </Modal>
   );
@@ -449,7 +449,7 @@ const MovimentoModal: React.FC<{
         {tipo === "entrada" && prodId && (
           <div className="grid grid-cols-2 items-end gap-4">
             <Field label="Quantidade">
-              <input type="number" min={1} className="input" value={quantidade} onChange={(e) => setQtd(Math.max(1, +e.target.value))} />
+              <InputNumero min={1} value={quantidade} onChange={(v) => setQtd(Math.max(1, v ?? 1))} />
             </Field>
             <label className="flex items-center gap-2 pb-2 text-sm text-slate-600">
               <input type="checkbox" className="h-4 w-4" checked={baixa} onChange={(e) => setBaixa(e.target.checked)} />
@@ -464,7 +464,7 @@ const MovimentoModal: React.FC<{
 
         <div className="grid grid-cols-2 gap-4">
           <Field label="Valor (R$)">
-            <input type="number" className="input" value={valor} onChange={(e) => setValor(+e.target.value)} />
+            <InputNumero value={valor} onChange={(v) => setValor(v ?? 0)} />
           </Field>
           {tipo !== "sangria" && (
             <Field label="Categoria">

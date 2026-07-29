@@ -1,5 +1,6 @@
 import React from "react";
 import { X } from "lucide-react";
+import { paraNumero, paraTexto } from "../lib/format";
 
 export const Modal: React.FC<{
   open: boolean;
@@ -72,3 +73,74 @@ export const SectionTitle: React.FC<{
     {action}
   </div>
 );
+
+/**
+ * Campo numérico que deixa apagar o zero.
+ *
+ * Com `<input type="number">` controlado por `value={n}` e
+ * `onChange={e => set(+e.target.value)}`, apagar o conteúdo virava zero na
+ * mesma tecla — `+""` é 0 — e o campo reescrevia "0" na tela. Para trocar um
+ * valor era preciso digitar outro número ANTES de apagar o antigo.
+ *
+ * Aqui o texto digitado é guardado como texto enquanto o campo está em uso,
+ * e só vira número para quem chama. Campo vazio devolve `undefined`, e a
+ * tela decide se isso é zero ou "não informado" — as duas coisas existem.
+ *
+ * É `type="text"` com `inputMode="decimal"` de propósito: o teclado do
+ * celular é o mesmo, e some o comportamento do `type="number"` de mudar o
+ * valor quando a roda do mouse passa por cima do campo.
+ */
+export const InputNumero: React.FC<{
+  value?: number | null;
+  onChange: (v: number | undefined) => void;
+  className?: string;
+  placeholder?: string;
+  autoFocus?: boolean;
+  disabled?: boolean;
+  min?: number;
+  max?: number;
+  onBlur?: () => void;
+}> = ({ value, onChange, className, placeholder, autoFocus, disabled, min, max, onBlur }) => {
+  const [texto, setTexto] = React.useState(() => paraTexto(value ?? undefined));
+
+  // Só reescreve o campo quando o valor de fora REALMENTE mudou. Sem esta
+  // guarda, digitar "1," seria substituído por "1" a cada tecla.
+  React.useEffect(() => {
+    const atual = paraNumero(texto);
+    const vindo = value === null ? undefined : value;
+    if (atual !== vindo) setTexto(paraTexto(vindo));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value]);
+
+  const digitou = (bruto: string) => {
+    // Deixa passar só o que pode fazer parte de um número, para o campo não
+    // aceitar letra e depois "esquecer" o que a pessoa digitou.
+    const limpo = bruto.replace(/[^\d.,-]/g, "");
+    setTexto(limpo);
+    const n = paraNumero(limpo);
+    if (n === undefined) return onChange(undefined);
+    if (min !== undefined && n < min) return onChange(min);
+    if (max !== undefined && n > max) return onChange(max);
+    onChange(n);
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      className={className || "input"}
+      placeholder={placeholder}
+      autoFocus={autoFocus}
+      disabled={disabled}
+      value={texto}
+      onChange={(e) => digitou(e.target.value)}
+      onBlur={() => {
+        // Ao sair do campo, normaliza a exibição: "5," vira "5", e o que
+        // ficou fora do limite aparece já corrigido.
+        const n = paraNumero(texto);
+        setTexto(paraTexto(n === undefined ? undefined : (value ?? n)));
+        onBlur?.();
+      }}
+    />
+  );
+};

@@ -27,7 +27,7 @@ import {
   Power,
 } from "lucide-react";
 import { aviso } from "../components/Aviso";
-import { Modal, Field, SectionTitle, EmptyState } from "../components/ui";
+import { Modal, Field, SectionTitle, EmptyState, InputNumero } from "../components/ui";
 import { useApp } from "../store/AppStore";
 import { uid, nowISO, brl, formatDate, txt } from "../lib/format";
 import { accentHex, isDark } from "../lib/themes";
@@ -662,12 +662,10 @@ export const Contas: React.FC = () => {
             </Field>
 
             <Field label="Valor (R$) *">
-              <input
-                type="number"
-                step="0.01"
+              <InputNumero
                 className="input"
-                value={editando.valor || ""}
-                onChange={(e) => setEditando({ ...editando, valor: +e.target.value })}
+                value={editando.valor}
+                onChange={(v) => setEditando({ ...editando, valor: (v ?? 0) })}
               />
             </Field>
 
@@ -697,13 +695,12 @@ export const Contas: React.FC = () => {
             </Field>
 
             <Field label="Avisar quantos dias antes">
-              <input
-                type="number"
+              <InputNumero
                 min={0}
                 max={30}
                 className="input"
                 value={editando.lembreteDias}
-                onChange={(e) => setEditando({ ...editando, lembreteDias: +e.target.value })}
+                onChange={(v) => setEditando({ ...editando, lembreteDias: (v ?? 0) })}
               />
             </Field>
 
@@ -778,12 +775,10 @@ export const Contas: React.FC = () => {
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Valor pago (R$)">
-                <input
-                  type="number"
-                  step="0.01"
+                <InputNumero
                   className="input"
-                  value={valorPg || ""}
-                  onChange={(e) => setValorPg(+e.target.value)}
+                  value={valorPg}
+                  onChange={(v) => setValorPg((v ?? 0))}
                 />
               </Field>
               <Field label="Forma de pagamento">
@@ -877,11 +872,10 @@ export const Contas: React.FC = () => {
             </Field>
 
             <Field label={META_META[editMeta.tipo].dinheiro ? "Valor alvo (R$) *" : "Quantidade *"}>
-              <input
-                type="number"
+              <InputNumero
                 className="input"
-                value={editMeta.alvo || ""}
-                onChange={(e) => setEditMeta({ ...editMeta, alvo: +e.target.value })}
+                value={editMeta.alvo}
+                onChange={(v) => setEditMeta({ ...editMeta, alvo: (v ?? 0) })}
               />
             </Field>
 

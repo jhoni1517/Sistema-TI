@@ -1,6 +1,6 @@
 import type { OrdemServico, Config, MovimentoCaixa, SessaoCaixa } from "./types";
 import { OS_STATUS_META } from "./types";
-import { brl, formatDate, formatDateTime, codigoOS } from "./format";
+import { brl, formatDate, formatDateTime, codigoOS, txt } from "./format";
 import { totalPecas, totalOS } from "./calc";
 import { resumoCaixa, conferencia, CONFERENCIA_META } from "./caixa";
 
@@ -108,6 +108,22 @@ export function reciboOS(
     <div class="label">Termo de guarda e retirada</div>
     <div style="font-size:11px;color:#333">${termoGuarda}</div>
   </div>
+
+  ${
+    // Só no comprovante da entrega: o cliente está com o aparelho na mão e
+    // satisfeito. É o único momento em que pedir avaliação faz sentido.
+    os.status === "entregue" && txt(config.linkAvaliacao).trim()
+      ? `<div class="box" style="margin-top:14px;text-align:center">
+          <div style="font-size:12px">
+            Seu feedback é importante para a ${esc(config.nomeLoja) || "nossa loja"}.
+            Poste uma avaliação no nosso perfil.
+          </div>
+          <div style="font-size:11px;word-break:break-all;margin-top:4px">${esc(
+            txt(config.linkAvaliacao).trim()
+          )}</div>
+        </div>`
+      : ""
+  }
 
   <div class="sign">
     <div>Assinatura do cliente</div>

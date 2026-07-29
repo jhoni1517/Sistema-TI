@@ -3,7 +3,7 @@ import { aviso } from "../components/Aviso";
 import { Store, KeyRound, Cloud, Download, Upload, Save, Database, Palette, Sun, Moon, Monitor, Percent, FileText, ShieldCheck } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { RAMOS, RAMO_META, ramoDe } from "../lib/ramos";
-import { Field, SectionTitle } from "../components/ui";
+import { Field, SectionTitle, InputNumero } from "../components/ui";
 import { ACCENTS, ACCENT_KEYS } from "../lib/themes";
 import { Equipe } from "../components/Equipe";
 import { MinhaConta } from "../components/MinhaConta";
@@ -175,10 +175,24 @@ export const Config: React.FC = () => {
         <p className="mb-4 text-sm text-slate-500">Aparece no rodapé do recibo da OS. Após o prazo, o aparelho pode ser vendido para custear o serviço ou descartado, conforme a lei.</p>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Prazo para retirada (dias)">
-            <input type="number" className="input" value={form.diasAbandono ?? 90} onChange={(e) => setForm({ ...form, diasAbandono: +e.target.value })} />
+            <InputNumero value={form.diasAbandono ?? 90} onChange={(v) => setForm({ ...form, diasAbandono: v })} />
+          </Field>
+          <Field label="Link para o cliente avaliar a loja" className="sm:col-span-2">
+            <input
+              className="input"
+              placeholder="https://g.page/r/.../review"
+              value={form.linkAvaliacao || ""}
+              onChange={(e) => setForm({ ...form, linkAvaliacao: e.target.value })}
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              Entra na mensagem de WhatsApp e no recibo, mas só quando a OS é
+              ENTREGUE. Pedir estrela antes de o serviço terminar é pedir no
+              pior momento. No Google Meu Negócio: Início, botão Avaliações,
+              Obtenha mais avaliações, e copie o link.
+            </p>
           </Field>
           <Field label="Taxa de armazenamento por dia (R$)">
-            <input type="number" className="input" value={form.taxaArmazenamentoDia ?? 0} onChange={(e) => setForm({ ...form, taxaArmazenamentoDia: +e.target.value })} />
+            <InputNumero value={form.taxaArmazenamentoDia ?? 0} onChange={(v) => setForm({ ...form, taxaArmazenamentoDia: v })} />
           </Field>
         </div>
       </div>
@@ -200,7 +214,7 @@ export const Config: React.FC = () => {
         <h3 className="mb-4 flex items-center gap-2 font-bold text-slate-700"><KeyRound size={18} /> Operação</h3>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Comissão padrão do técnico (%)">
-            <input type="number" className="input" value={form.comissaoPadrao ?? 0} onChange={(e) => setForm({ ...form, comissaoPadrao: +e.target.value })} />
+            <InputNumero value={form.comissaoPadrao ?? 0} onChange={(v) => setForm({ ...form, comissaoPadrao: v })} />
           </Field>
         </div>
         <p className="mt-3 text-xs text-slate-500">
