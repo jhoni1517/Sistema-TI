@@ -144,3 +144,26 @@ export const documentoValido = (v?: string | null): boolean => {
   if (d.length === 14) return cnpjValido(d);
   return false;
 };
+
+/**
+ * Texto digitado -> número.
+ *
+ * Existe porque `+e.target.value` transforma campo vazio em zero, e aí o
+ * input controlado devolve "0" na tela no mesmo instante: apagar o zero
+ * ficava impossível, e a pessoa tinha que digitar outro número antes de
+ * conseguir tirar ele. Aqui o vazio continua vazio, e quem decide o que
+ * fazer com isso é quem chama.
+ *
+ * Aceita vírgula porque o teclado do celular brasileiro oferece vírgula, e
+ * "12,50" virava NaN.
+ */
+export const paraNumero = (texto: string): number | undefined => {
+  const limpo = txt(texto).replace(/\s/g, "").replace(",", ".");
+  if (limpo === "" || limpo === "-" || limpo === "." || limpo === "-.") return undefined;
+  const n = Number(limpo);
+  return Number.isFinite(n) ? n : undefined;
+};
+
+/** Número -> texto do campo. Undefined e NaN viram campo vazio, não "0". */
+export const paraTexto = (v?: number | null): string =>
+  v === undefined || v === null || Number.isNaN(v) ? "" : String(v);

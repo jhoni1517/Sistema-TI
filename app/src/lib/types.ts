@@ -514,4 +514,12 @@ export interface Config {
    * sem nenhuma utilidade. Ligado por padrão.
    */
   limparSenhaNaEntrega?: boolean;
+  /**
+   * Link para o cliente avaliar a loja (Google, por exemplo).
+   *
+   * Entra na mensagem de entrega e no recibo. Só na ENTREGA: pedir estrela
+   * antes de o serviço terminar é pedir no pior momento possível, e uma
+   * avaliação ruim colhida no meio do caminho fica lá para sempre.
+   */
+  linkAvaliacao?: string;
 }

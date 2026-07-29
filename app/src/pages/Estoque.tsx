@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { aviso } from "../components/Aviso";
 import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck, FileQuestion, Wrench } from "lucide-react";
 import { useApp } from "../store/AppStore";
-import { Modal, Field, EmptyState, SectionTitle } from "../components/ui";
+import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { Cotacoes } from "../components/Cotacoes";
 import { uid, nowISO, brl, txt } from "../lib/format";
 import type { Produto, Categoria, Fornecedor } from "../lib/types";
@@ -278,18 +278,34 @@ export const Estoque: React.FC = () => {
             {!editando.servico && (
               <>
                 <Field label="Quantidade">
-                  <input type="number" className="input" value={editando.quantidade} onChange={(e) => setEditando({ ...editando, quantidade: +e.target.value })} />
+                  <InputNumero
+                    className="input"
+                    value={editando.quantidade}
+                    onChange={(v) => setEditando({ ...editando, quantidade: (v ?? 0) })}
+                  />
                 </Field>
                 <Field label="Estoque mínimo (alerta)">
-                  <input type="number" className="input" value={editando.estoqueMinimo} onChange={(e) => setEditando({ ...editando, estoqueMinimo: +e.target.value })} />
+                  <InputNumero
+                    className="input"
+                    value={editando.estoqueMinimo}
+                    onChange={(v) => setEditando({ ...editando, estoqueMinimo: (v ?? 0) })}
+                  />
                 </Field>
               </>
             )}
             <Field label="Custo (R$)">
-              <input type="number" className="input" value={editando.custo} onChange={(e) => setEditando({ ...editando, custo: +e.target.value })} />
+              <InputNumero
+                className="input"
+                value={editando.custo}
+                onChange={(v) => setEditando({ ...editando, custo: (v ?? 0) })}
+              />
             </Field>
             <Field label="Preço de venda (R$)">
-              <input type="number" className="input" value={editando.preco} onChange={(e) => setEditando({ ...editando, preco: +e.target.value })} />
+              <InputNumero
+                className="input"
+                value={editando.preco}
+                onChange={(v) => setEditando({ ...editando, preco: (v ?? 0) })}
+              />
             </Field>
             <Field label="Fornecedor" className="sm:col-span-2">
               <select

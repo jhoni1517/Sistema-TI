@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import { aviso } from "../components/Aviso";
 import { useApp } from "../store/AppStore";
-import { Modal, Field, EmptyState, SectionTitle } from "../components/ui";
+import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { uid, nowISO, txt, formatDate, abrirWhatsapp } from "../lib/format";
 import { hojeISO, soData, diasAteVencer } from "../lib/contas";
 import {
@@ -480,14 +480,13 @@ export const Agenda: React.FC = () => {
               </select>
             </Field>
             <Field label="Avisar quantos dias antes">
-              <input
-                type="number"
+              <InputNumero
                 min={0}
                 max={30}
                 className="input"
                 value={editando.avisarDiasAntes ?? 0}
-                onChange={(e) =>
-                  setEditando({ ...editando, avisarDiasAntes: Math.max(0, +e.target.value) })
+                onChange={(v) =>
+                  setEditando({ ...editando, avisarDiasAntes: Math.max(0, (v ?? 0)) })
                 }
               />
               <p className="mt-1 text-xs text-slate-400">0 = avisa só no dia</p>

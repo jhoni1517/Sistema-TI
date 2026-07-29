@@ -10,7 +10,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
-import { Modal, Field, EmptyState, SectionTitle } from "../components/ui";
+import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { uid, nowISO, brl, formatDate, abrirWhatsapp, txt } from "../lib/format";
 import { saldoFiado, pagoFiado } from "../lib/calc";
 import type { Fiado, FormaPagamento } from "../lib/types";
@@ -216,7 +216,7 @@ export const AReceber: React.FC = () => {
             </Field>
             <div className="grid grid-cols-2 gap-4">
               <Field label="Valor (R$) *">
-                <input type="number" className="input" value={novo.valor} onChange={(e) => setNovo({ ...novo, valor: +e.target.value })} />
+                <InputNumero value={novo.valor} onChange={(v) => setNovo({ ...novo, valor: v ?? 0 })} />
               </Field>
               <Field label="Vencimento">
                 <input type="date" className="input" value={novo.vencimento} onChange={(e) => setNovo({ ...novo, vencimento: e.target.value })} />
@@ -265,7 +265,7 @@ const ReceberModal: React.FC<{
         </div>
         <div className="grid grid-cols-2 gap-4">
           <Field label="Valor a receber">
-            <input type="number" autoFocus className="input" value={valor} onChange={(e) => setValor(+e.target.value)} />
+            <InputNumero autoFocus value={valor} onChange={(v) => setValor(v ?? 0)} />
           </Field>
           <Field label="Forma">
             <select className="input" value={forma} onChange={(e) => setForma(e.target.value as FormaPagamento)}>

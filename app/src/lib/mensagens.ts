@@ -79,6 +79,22 @@ const chamada = (o: OrdemServico, temLink: boolean): string => {
   }
 };
 
+/**
+ * Convite para avaliar a loja.
+ *
+ * Sem emoji: em alguns aparelhos elas chegam como "?" e sujam justamente a
+ * mensagem que deveria causar boa impressão.
+ */
+export function pedidoDeAvaliacao(o: OrdemServico, config: Config): string {
+  const link = txt(config.linkAvaliacao).trim();
+  if (!link || o.status !== "entregue") return "";
+  const loja = txt(config.nomeLoja).trim() || "nossa loja";
+  return (
+    `Seu feedback é importante para a ${loja}. ` +
+    `Poste uma avaliação no nosso perfil.\n${link}`
+  );
+}
+
 export function mensagemCliente(
   o: OrdemServico,
   cliente: Cliente | undefined,
@@ -126,6 +142,12 @@ export function mensagemCliente(
   }
 
   partes.push(chamada(o, !!linkRastreio));
+
+  // Pedido de avaliação só na entrega. Pedir estrela antes de o serviço
+  // terminar é pedir no pior momento, e nota ruim colhida no meio do caminho
+  // fica lá para sempre.
+  const avaliacao = pedidoDeAvaliacao(o, config);
+  if (avaliacao) partes.push(avaliacao);
 
   return partes.join("\n\n");
 }

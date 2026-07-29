@@ -14,7 +14,7 @@ import {
   Copy,
 } from "lucide-react";
 import { aviso } from "../components/Aviso";
-import { SectionTitle, Field, Modal, EmptyState } from "../components/ui";
+import { SectionTitle, Field, Modal, EmptyState, InputNumero } from "../components/ui";
 import { brl, formatDate, txt, abrirWhatsapp } from "../lib/format";
 import { gerarLinkDeSenha } from "../lib/auth";
 import { mensagemCobranca, tipoDoAviso, AVISO_META } from "../lib/cobranca";
@@ -38,6 +38,32 @@ import {
  * para quem tem super_admin, e as políticas do banco recusam qualquer
  * tentativa vinda de outra conta.
  */
+/**
+ * Valor da mensalidade, gravado só ao sair do campo.
+ *
+ * Precisa de estado próprio porque a gravação é por linha da lista: um
+ * campo controlado pelo valor da loja reescreveria o texto a cada tecla, e
+ * apagar para digitar outro número ficava impossível.
+ */
+const ValorMensal: React.FC<{ valor: number; onSalvar: (v: number) => void }> = ({
+  valor,
+  onSalvar,
+}) => {
+  const [v, setV] = useState<number | undefined>(valor);
+  useEffect(() => setV(valor), [valor]);
+  return (
+    <InputNumero
+      className="input !w-24 !py-1.5 text-sm"
+      value={v}
+      onChange={setV}
+      onBlur={() => {
+      if (v !== undefined && v !== valor) onSalvar(v);
+      if (v === undefined) setV(valor);
+      }}
+    />
+  );
+};
+
 export const Lojas: React.FC = () => {
   const [lojas, setLojas] = useState<Loja[]>([]);
   const [cfg, setCfg] = useState<SistemaConfig>({});
@@ -321,14 +347,9 @@ export const Lojas: React.FC = () => {
                     }}
                   />
                   <span className="text-xs text-slate-400">R$</span>
-                  <input
-                    type="number"
-                    className="input !w-24 !py-1.5 text-sm"
-                    defaultValue={Number(l.valor_mensal) || 0}
-                    onBlur={(e) => {
-                      const v = +e.target.value;
-                      if (v !== (Number(l.valor_mensal) || 0)) mudarValor(l, v);
-                    }}
+                  <ValorMensal
+                    valor={Number(l.valor_mensal) || 0}
+                    onSalvar={(v) => mudarValor(l, v)}
                   />
                 </div>
 
@@ -480,27 +501,24 @@ export const Lojas: React.FC = () => {
             />
           </Field>
           <Field label="Valor mensal padrão (R$)">
-            <input
-              type="number"
+            <InputNumero
               className="input"
               value={cfg.valor_padrao ?? 79}
-              onChange={(e) => setCfg({ ...cfg, valor_padrao: +e.target.value })}
+              onChange={(v) => setCfg({ ...cfg, valor_padrao: (v ?? 0) })}
             />
           </Field>
           <Field label="Dias de teste grátis">
-            <input
-              type="number"
+            <InputNumero
               className="input"
               value={cfg.dias_teste ?? 14}
-              onChange={(e) => setCfg({ ...cfg, dias_teste: +e.target.value })}
+              onChange={(v) => setCfg({ ...cfg, dias_teste: (v ?? 0) })}
             />
           </Field>
           <Field label="Dias de tolerância após vencer" className="sm:col-span-2">
-            <input
-              type="number"
+            <InputNumero
               className="input"
               value={cfg.dias_tolerancia ?? 5}
-              onChange={(e) => setCfg({ ...cfg, dias_tolerancia: +e.target.value })}
+              onChange={(v) => setCfg({ ...cfg, dias_tolerancia: (v ?? 0) })}
             />
             <p className="mt-1 text-xs text-slate-400">
               Passado este prazo, a loja continua consultando e imprimindo, mas

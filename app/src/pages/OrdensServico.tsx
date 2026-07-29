@@ -23,7 +23,7 @@ import {
   ShieldAlert,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
-import { Modal, Field, EmptyState, SectionTitle } from "../components/ui";
+import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { PatternLock } from "../components/PatternLock";
 import { printHTML } from "../lib/print";
 import { obterLoja } from "../lib/db";
@@ -678,15 +678,28 @@ const OSForm: React.FC<{
                 </div>
                 <div className="col-span-3 sm:col-span-1">
                   <label className="label">Qtd</label>
-                  <input type="number" min={1} className="input" value={p.quantidade} onChange={(e) => setPeca(i, { ...p, quantidade: +e.target.value })} />
+                  <InputNumero
+                    min={1}
+                    className="input"
+                    value={p.quantidade}
+                    onChange={(v) => setPeca(i, { ...p, quantidade: (v ?? 0) })}
+                  />
                 </div>
                 <div className="col-span-4 sm:col-span-1">
                   <label className="label">Custo</label>
-                  <input type="number" className="input" value={p.custoUnit} onChange={(e) => setPeca(i, { ...p, custoUnit: +e.target.value })} />
+                  <InputNumero
+                    className="input"
+                    value={p.custoUnit}
+                    onChange={(v) => setPeca(i, { ...p, custoUnit: (v ?? 0) })}
+                  />
                 </div>
                 <div className="col-span-4 sm:col-span-2">
                   <label className="label">Preço</label>
-                  <input type="number" className="input" value={p.precoUnit} onChange={(e) => setPeca(i, { ...p, precoUnit: +e.target.value })} />
+                  <InputNumero
+                    className="input"
+                    value={p.precoUnit}
+                    onChange={(v) => setPeca(i, { ...p, precoUnit: (v ?? 0) })}
+                  />
                 </div>
                 <div className="col-span-1">
                   <button className="btn-ghost !p-2 text-red-500" onClick={() => delPeca(i)}>
@@ -704,10 +717,18 @@ const OSForm: React.FC<{
         {/* Financeiro */}
         <div className="grid gap-4 sm:grid-cols-3">
           <Field label="Mão de obra (R$)">
-            <input type="number" className="input" value={os.maoDeObra} onChange={(e) => setOs({ ...os, maoDeObra: +e.target.value })} />
+            <InputNumero
+              className="input"
+              value={os.maoDeObra}
+              onChange={(v) => setOs({ ...os, maoDeObra: (v ?? 0) })}
+            />
           </Field>
           <Field label="Desconto (R$)">
-            <input type="number" className="input" value={os.desconto} onChange={(e) => setOs({ ...os, desconto: +e.target.value })} />
+            <InputNumero
+              className="input"
+              value={os.desconto}
+              onChange={(v) => setOs({ ...os, desconto: (v ?? 0) })}
+            />
           </Field>
           <Field label="Técnico responsável">
             <input className="input" value={os.tecnico} onChange={(e) => setOs({ ...os, tecnico: e.target.value })} />
