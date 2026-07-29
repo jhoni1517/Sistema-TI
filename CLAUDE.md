@@ -73,6 +73,18 @@ Ao acrescentar um campo opcional num tipo: acrescente a coluna em
 `supabase-corrigir-colunas.sql` no mesmo commit. O `esquema.test.ts` lê os
 tipos e o SQL e falha dizendo qual coluna falta.
 
+### Uma tabela com problema não pode zerar a tela
+
+A carga usava `Promise.all`, que rejeita no primeiro erro e descarta todos
+os outros resultados. Uma migração nova ainda não rodada apagava clientes,
+estoque, caixa e o nome da loja da tela ao mesmo tempo — e o `catch` só
+escrevia no console. A tela ficava idêntica à de um sistema que perdeu os
+dados.
+
+Leitura é sempre `Promise.allSettled`, e falha de carga aparece na tela.
+Sem isso não há como o usuário diferenciar "está vazio" de "não carregou".
+Ver `carga.test.ts`.
+
 ### Gravação sem tratamento de erro é a pior classe de bug
 
 Erro que aparece na tela custa cinco minutos. Erro engolido custa uma

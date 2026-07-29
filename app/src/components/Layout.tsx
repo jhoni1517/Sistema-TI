@@ -21,6 +21,8 @@ import {
   Receipt,
   CalendarDays,
   ShoppingCart,
+  RefreshCw,
+  AlertTriangle,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { pode, NOME_PAPEL, type Sessao } from "../lib/auth";
@@ -56,7 +58,7 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
   onLogout,
   sessao,
 }) => {
-  const { config, online } = useApp();
+  const { config, online, erroCarga, loading, reload } = useApp();
   const [open, setOpen] = useState(false);
   const [busca, setBusca] = useState(false);
   const navigate = useNavigate();
@@ -205,6 +207,17 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
               </p>
             </div>
           )}
+          {/* Buscar dado novo sem recarregar a página. Antes só acontecia ao
+              trocar de aba, e quem fica com a tela aberta no balcão não via
+              o que outro aparelho lançou. */}
+          <button
+            onClick={() => reload()}
+            disabled={loading}
+            className="mb-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white disabled:opacity-40"
+          >
+            <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+            {loading ? "Atualizando..." : "Atualizar dados"}
+          </button>
           <button
             onClick={() => {
               onLogout();
@@ -230,6 +243,14 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
           </button>
           <span className="flex-1 truncate font-bold text-slate-800">{config.nomeLoja}</span>
           <button
+            onClick={() => reload()}
+            className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 disabled:opacity-40"
+            title="Atualizar dados"
+            disabled={loading}
+          >
+            <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+          </button>
+          <button
             onClick={() => setBusca(true)}
             className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"
             title="Buscar"
@@ -237,6 +258,24 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
             <Search size={20} />
           </button>
         </header>
+
+        {/* Carga incompleta precisa aparecer, e ficar aparecendo. Tela zerada
+            sem aviso é indistinguível de sistema que apagou os dados — e o
+            susto é o mesmo. */}
+        {erroCarga && (
+          <div className="mx-4 mt-4 rounded-lg border border-red-200 bg-red-50 p-3 sm:mx-6 lg:mx-8 no-print">
+            <p className="flex items-center gap-2 text-sm font-bold text-red-800">
+              <AlertTriangle size={16} /> Parte dos dados não carregou
+            </p>
+            <p className="mt-1 whitespace-pre-line text-sm text-red-700">{erroCarga}</p>
+            <p className="mt-1 text-xs text-red-600">
+              O que está no banco continua lá. A tela é que está incompleta.
+            </p>
+            <button className="btn-secondary mt-2 !py-1.5 text-xs" onClick={() => reload()}>
+              <RefreshCw size={14} /> Tentar de novo
+            </button>
+          </div>
+        )}
 
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
           <Outlet />

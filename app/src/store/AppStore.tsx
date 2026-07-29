@@ -6,6 +6,7 @@ import React, {
   useCallback,
 } from "react";
 import { db } from "../lib/db";
+import { aviso } from "../components/Aviso";
 import { aplicarTema } from "../lib/themes";
 import type {
   Cliente,
@@ -57,6 +58,14 @@ interface AppState {
   eventos: Evento[];
   vendas: Venda[];
   config: Config;
+  /**
+   * O que falhou na última carga.
+   *
+   * Existe para a tela conseguir separar "está vazio" de "não carregou".
+   * Sem essa distinção, uma falha de leitura tem exatamente a mesma cara de
+   * um sistema que apagou tudo — e o susto é o mesmo.
+   */
+  erroCarga: string;
   // ações
   reload: () => Promise<void>;
   saveCliente: (c: Cliente) => Promise<void>;
@@ -122,6 +131,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [contas, setContas] = useState<ContaPagar[]>([]);
   const [metas, setMetas] = useState<Meta[]>([]);
   const [eventos, setEventos] = useState<Evento[]>([]);
+  /** Mensagem do que não carregou. Vazio = carregou tudo. */
+  const [erroCarga, setErroCarga] = useState("");
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [config, setConfig] = useState<Config>(loadConfig());
 
@@ -136,47 +147,73 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     return () => mq.removeEventListener("change", handler);
   }, [config.tema, config.corDestaque]);
 
+  /**
+   * Carrega tudo, e uma tabela com problema NÃO derruba as outras.
+   *
+   * Isto já aconteceu de verdade: uma migração nova ainda não rodada fazia a
+   * leitura daquela tabela falhar, o Promise.all rejeitava no primeiro erro
+   * e descartava TODOS os outros resultados. A tela abria com o nome padrão
+   * da loja e tudo zerado, sem uma linha de aviso — igualzinho a um sistema
+   * que apagou os dados. Era só o carregamento que tinha morrido.
+   *
+   * Duas regras vieram daí:
+   *   1. allSettled, não all: cada tabela é independente.
+   *   2. Falha aparece na tela. Erro de carga engolido vira "sumiu tudo".
+   */
   const reload = useCallback(async () => {
     setLoading(true);
+    setErroCarga("");
+
+    const fontes = [
+      { nome: "clientes", carregar: db.clientes.all, aplicar: setClientes },
+      { nome: "ordens", carregar: db.ordens.all, aplicar: setOrdens },
+      { nome: "produtos", carregar: db.produtos.all, aplicar: setProdutos },
+      { nome: "movimentos", carregar: db.movimentos.all, aplicar: setMovimentos },
+      { nome: "sessões", carregar: db.sessoes.all, aplicar: setSessoes },
+      { nome: "fiados", carregar: db.fiados.all, aplicar: setFiados },
+      { nome: "categorias", carregar: db.categorias.all, aplicar: setCategorias },
+      { nome: "fornecedores", carregar: db.fornecedores.all, aplicar: setFornecedores },
+      { nome: "cotações", carregar: db.cotacoes.all, aplicar: setCotacoes },
+      { nome: "preços", carregar: db.precos.all, aplicar: setPrecos },
+      { nome: "contas", carregar: db.contas.all, aplicar: setContas },
+      { nome: "metas", carregar: db.metas.all, aplicar: setMetas },
+      { nome: "agenda", carregar: db.eventos.all, aplicar: setEventos },
+      { nome: "vendas", carregar: db.vendas.all, aplicar: setVendas },
+    ] as const;
+
+    const resultados = await Promise.allSettled(fontes.map((f) => f.carregar()));
+    const falhas: string[] = [];
+
+    resultados.forEach((r, i) => {
+      if (r.status === "fulfilled") {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (fontes[i].aplicar as any)(r.value);
+      } else {
+        const msg = r.reason instanceof Error ? r.reason.message : String(r.reason);
+        console.error(`Falha ao carregar ${fontes[i].nome}:`, r.reason);
+        falhas.push(msg);
+      }
+    });
+
+    // Configurações da loja vindas da nuvem (nome, senha, etc.) — mantém aparência local
     try {
-      const [c, o, p, m, s, f, cat, forn, cot, prc, cts, mts, evs, vds] = await Promise.all([
-        db.clientes.all(),
-        db.ordens.all(),
-        db.produtos.all(),
-        db.movimentos.all(),
-        db.sessoes.all(),
-        db.fiados.all(),
-        db.categorias.all(),
-        db.fornecedores.all(),
-        db.cotacoes.all(),
-        db.precos.all(),
-        db.contas.all(),
-        db.metas.all(),
-        db.eventos.all(),
-        db.vendas.all(),
-      ]);
-      setClientes(c);
-      setOrdens(o);
-      setProdutos(p);
-      setMovimentos(m);
-      setSessoes(s);
-      setFiados(f);
-      setCategorias(cat);
-      setFornecedores(forn);
-      setCotacoes(cot);
-      setPrecos(prc);
-      setContas(cts);
-      setMetas(mts);
-      setEventos(evs);
-      setVendas(vds);
-      // Configurações da loja vindas da nuvem (nome, senha, etc.) — mantém aparência local
       const cloudCfg = await db.config.get();
       if (cloudCfg) setConfig((prev) => ({ ...prev, ...cloudCfg }));
     } catch (e) {
-      console.error("Erro ao carregar dados:", e);
-    } finally {
-      setLoading(false);
+      console.error("Falha ao carregar a configuração da loja:", e);
     }
+
+    if (falhas.length > 0) {
+      const unicas = [...new Set(falhas)];
+      setErroCarga(unicas.join("\n\n"));
+      aviso.erro(
+        (falhas.length === 1
+          ? "Uma parte dos dados não carregou:\n\n"
+          : `${falhas.length} partes dos dados não carregaram:\n\n`) + unicas.join("\n\n")
+      );
+    }
+
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -450,6 +487,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     eventos,
     vendas,
     config,
+    erroCarga,
     reload,
     saveCliente,
     removeCliente,

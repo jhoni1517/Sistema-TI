@@ -163,11 +163,29 @@ function traduzirErroGravacao(error: { message?: string; code?: string }): Error
   return new Error(msg || "Não foi possível salvar.");
 }
 
+/**
+ * Erro de LEITURA em português, dizendo qual tabela e o que fazer.
+ *
+ * "relation public.vendas does not exist" não significa nada para quem está
+ * no balcão vendo a tela zerada. E tabela que falta é sempre a mesma
+ * história: migração nova que ainda não foi rodada.
+ */
+function traduzirErroLeitura(table: string, error: { message?: string; code?: string }): Error {
+  const msg = error?.message || "";
+  if (error?.code === "42P01" || /does not exist|not find the table|schema cache/i.test(msg)) {
+    return new Error(
+      `A tabela "${table}" ainda não existe no banco. Rode a migração que falta ` +
+        `(app/CONFIGURACAO.md lista a ordem) — os dados das outras telas estão a salvo.`
+    );
+  }
+  return new Error(`Não foi possível carregar "${table}": ${msg || "erro desconhecido"}`);
+}
+
 // ---------- API pública ----------
 async function getAll<T extends WithId>(table: TableName): Promise<T[]> {
   if (supabaseEnabled && supabase) {
     const { data, error } = await supabase.from(table).select("*");
-    if (error) throw error;
+    if (error) throw traduzirErroLeitura(table, error);
     return decifrarLinhas(table, (data as T[]) || []);
   }
   return localBackend.list<T>(table);
