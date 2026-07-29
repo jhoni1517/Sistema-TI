@@ -21,6 +21,7 @@ import type {
   ContaPagar,
   Meta,
   Evento,
+  Venda,
   Config,
 } from "../lib/types";
 
@@ -54,6 +55,7 @@ interface AppState {
   contas: ContaPagar[];
   metas: Meta[];
   eventos: Evento[];
+  vendas: Venda[];
   config: Config;
   // ações
   reload: () => Promise<void>;
@@ -75,6 +77,7 @@ interface AppState {
   removeConta: (id: string) => Promise<void>;
   saveEvento: (e: Evento) => Promise<void>;
   removeEvento: (id: string) => Promise<void>;
+  saveVenda: (v: Venda) => Promise<void>;
   saveMeta: (m: Meta) => Promise<void>;
   removeMeta: (id: string) => Promise<void>;
   saveCotacao: (c: Cotacao) => Promise<void>;
@@ -119,6 +122,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [contas, setContas] = useState<ContaPagar[]>([]);
   const [metas, setMetas] = useState<Meta[]>([]);
   const [eventos, setEventos] = useState<Evento[]>([]);
+  const [vendas, setVendas] = useState<Venda[]>([]);
   const [config, setConfig] = useState<Config>(loadConfig());
 
   // Aplica o tema (cor + claro/escuro) e reage à mudança do sistema no modo "auto"
@@ -135,7 +139,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      const [c, o, p, m, s, f, cat, forn, cot, prc, cts, mts, evs] = await Promise.all([
+      const [c, o, p, m, s, f, cat, forn, cot, prc, cts, mts, evs, vds] = await Promise.all([
         db.clientes.all(),
         db.ordens.all(),
         db.produtos.all(),
@@ -149,6 +153,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         db.contas.all(),
         db.metas.all(),
         db.eventos.all(),
+        db.vendas.all(),
       ]);
       setClientes(c);
       setOrdens(o);
@@ -163,6 +168,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
       setContas(cts);
       setMetas(mts);
       setEventos(evs);
+      setVendas(vds);
       // Configurações da loja vindas da nuvem (nome, senha, etc.) — mantém aparência local
       const cloudCfg = await db.config.get();
       if (cloudCfg) setConfig((prev) => ({ ...prev, ...cloudCfg }));
@@ -379,6 +385,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     await db.eventos.remove(id);
     setEventos((prev) => prev.filter((x) => x.id !== id));
   };
+  const saveVenda = async (v: Venda) => {
+    await db.vendas.save(v);
+    setVendas((prev) => {
+      const i = prev.findIndex((x) => x.id === v.id);
+      if (i >= 0) {
+        const n = [...prev];
+        n[i] = v;
+        return n;
+      }
+      return [...prev, v];
+    });
+  };
   const saveMeta = async (m: Meta) => {
     await db.metas.save(m);
     setMetas((prev) => {
@@ -430,6 +448,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     contas,
     metas,
     eventos,
+    vendas,
     config,
     reload,
     saveCliente,
@@ -451,6 +470,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     removeConta,
     saveEvento,
     removeEvento,
+    saveVenda,
     saveMeta,
     removeMeta,
     saveCotacao,

@@ -20,6 +20,7 @@ import {
   Building2,
   Receipt,
   CalendarDays,
+  ShoppingCart,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { pode, NOME_PAPEL, type Sessao } from "../lib/auth";
@@ -39,6 +40,7 @@ const nav: Array<{
 }> = [
   { to: "/", label: "Painel", icon: LayoutDashboard, end: true, recurso: "*" },
   { to: "/ordens", label: "Ordens de Serviço", icon: Wrench, recurso: "os", modulo: "os" },
+  { to: "/pdv", label: "Frente de caixa", icon: ShoppingCart, recurso: "caixa", modulo: "pdv" },
   { to: "/agenda", label: "Agenda", icon: CalendarDays, recurso: "*" },
   { to: "/clientes", label: "Clientes", icon: Users, recurso: "clientes" },
   { to: "/estoque", label: "Estoque", icon: Package, recurso: "estoque" },

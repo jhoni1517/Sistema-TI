@@ -1,10 +1,12 @@
 import React, { useMemo, useState } from "react";
 import { aviso } from "../components/Aviso";
-import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck, FileQuestion, Wrench } from "lucide-react";
+import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck, FileQuestion, Wrench, CalendarX } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
+import { temRecurso } from "../lib/ramos";
+import { situacaoValidade, produtosVencendo, VALIDADE_META } from "../lib/pdv";
 import { Cotacoes } from "../components/Cotacoes";
-import { uid, nowISO, brl, txt } from "../lib/format";
+import { uid, nowISO, brl, txt, formatDate } from "../lib/format";
 import type { Produto, Categoria, Fornecedor } from "../lib/types";
 
 const vazio = (): Produto => ({
@@ -24,7 +26,7 @@ const vazio = (): Produto => ({
 });
 
 export const Estoque: React.FC = () => {
-  const { produtos, categorias, fornecedores, cotacoes, saveProduto, removeProduto, saveCategoria, removeCategoria, saveFornecedor, removeFornecedor } = useApp();
+  const { produtos, categorias, fornecedores, cotacoes, config, saveProduto, removeProduto, saveCategoria, removeCategoria, saveFornecedor, removeFornecedor } = useApp();
   const [busca, setBusca] = useState("");
   const [editando, setEditando] = useState<Produto | null>(null);
   const [soBaixo, setSoBaixo] = useState(false);
@@ -85,6 +87,8 @@ export const Estoque: React.FC = () => {
     return { valorCusto, valorVenda, baixos, itens: produtos.length, servicos: produtos.length - fisicos.length };
   }, [produtos]);
 
+  const vencendo = useMemo(() => produtosVencendo(produtos), [produtos]);
+
   const salvar = async () => {
     if (!editando) return;
     if (!editando.nome.trim()) return aviso.alerta("Informe o nome do produto.");
@@ -129,6 +133,33 @@ export const Estoque: React.FC = () => {
           </div>
         }
       />
+
+      {/* Vencimento: só para quem vende coisa que estraga */}
+      {temRecurso(config.ramo, "validade") && vencendo.length > 0 && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p className="flex items-center gap-2 text-sm font-bold text-amber-800">
+            <CalendarX size={16} /> {vencendo.length} produto(s) vencido(s) ou vencendo
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {vencendo.slice(0, 8).map((p) => {
+              const v = situacaoValidade(p);
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => setEditando(p)}
+                  className={`badge ${VALIDADE_META[v].cor} hover:opacity-80`}
+                >
+                  {p.nome} · {formatDate(p.validade)}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-2 text-xs text-amber-700">
+            Avisamos com uma semana de folga: descobrir no dia do vencimento
+            não deixa tempo de promover e vender.
+          </p>
+        </div>
+      )}
 
       {/* Resumo */}
       <div className="mb-5 grid gap-3 sm:grid-cols-4">
@@ -176,8 +207,23 @@ export const Estoque: React.FC = () => {
                 return (
                   <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="px-4 py-3">
-                      <p className="font-semibold text-slate-800">{p.nome}</p>
-                      <p className="text-xs text-slate-400">{nomeCat(p)}{p.sku ? ` · ${p.sku}` : ""}</p>
+                      <p className="flex flex-wrap items-center gap-1.5 font-semibold text-slate-800">
+                        {p.nome}
+                        {(() => {
+                          const v = situacaoValidade(p);
+                          return v === "vencido" || v === "vence_perto" ? (
+                            <span className={`badge ${VALIDADE_META[v].cor}`}>
+                              {VALIDADE_META[v].label}
+                            </span>
+                          ) : null;
+                        })()}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {nomeCat(p)}
+                        {p.sku ? ` · ${p.sku}` : ""}
+                        {p.porPeso ? " · por kg" : ""}
+                        {p.validade ? ` · vence ${formatDate(p.validade)}` : ""}
+                      </p>
                     </td>
                     <td className="px-4 py-3 text-center">
                       {p.servico ? (
@@ -259,6 +305,33 @@ export const Estoque: React.FC = () => {
               <input className="input" value={editando.sku} onChange={(e) => setEditando({ ...editando, sku: e.target.value })} />
             </Field>
 
+            {/* Recursos do ramo: só aparecem para quem realmente usa */}
+            {(temRecurso(config.ramo, "peso") || temRecurso(config.ramo, "validade")) && (
+              <Field label="Código de barras">
+                <input
+                  className="input"
+                  inputMode="numeric"
+                  placeholder="Passe o leitor aqui"
+                  value={editando.codigoBarras || ""}
+                  onChange={(e) => setEditando({ ...editando, codigoBarras: e.target.value })}
+                />
+                <p className="mt-1 text-xs text-slate-400">
+                  É por ele que a frente de caixa acha o produto no leitor.
+                </p>
+              </Field>
+            )}
+
+            {temRecurso(config.ramo, "validade") && (
+              <Field label="Validade">
+                <input
+                  type="date"
+                  className="input"
+                  value={editando.validade || ""}
+                  onChange={(e) => setEditando({ ...editando, validade: e.target.value })}
+                />
+              </Field>
+            )}
+
             <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-slate-50 p-3 sm:col-span-2">
               <input
                 type="checkbox"
@@ -275,9 +348,27 @@ export const Estoque: React.FC = () => {
               </span>
             </label>
 
+            {temRecurso(config.ramo, "peso") && !editando.servico && (
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-slate-50 p-3 sm:col-span-2">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4"
+                  checked={editando.porPeso === true}
+                  onChange={(e) => setEditando({ ...editando, porPeso: e.target.checked })}
+                />
+                <span className="text-sm">
+                  <b className="text-slate-700">Vendido por quilo</b>
+                  <span className="mt-0.5 block text-xs text-slate-500">
+                    O preço passa a ser o do QUILO, e a quantidade vendida vira
+                    fracionária (0,315 kg). Frios, carnes, granel.
+                  </span>
+                </span>
+              </label>
+            )}
+
             {!editando.servico && (
               <>
-                <Field label="Quantidade">
+                <Field label={editando.porPeso ? "Quantidade em estoque (kg)" : "Quantidade"}>
                   <InputNumero
                     className="input"
                     value={editando.quantidade}
@@ -293,14 +384,14 @@ export const Estoque: React.FC = () => {
                 </Field>
               </>
             )}
-            <Field label="Custo (R$)">
+            <Field label={editando.porPeso ? "Custo por quilo (R$)" : "Custo (R$)"}>
               <InputNumero
                 className="input"
                 value={editando.custo}
                 onChange={(v) => setEditando({ ...editando, custo: (v ?? 0) })}
               />
             </Field>
-            <Field label="Preço de venda (R$)">
+            <Field label={editando.porPeso ? "Preço por quilo (R$)" : "Preço de venda (R$)"}>
               <InputNumero
                 className="input"
                 value={editando.preco}

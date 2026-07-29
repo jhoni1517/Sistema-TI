@@ -40,6 +40,10 @@ alter table produtos add column if not exists "categoriaId" text;
 alter table produtos add column if not exists "subcategoriaId" text;
 alter table produtos add column if not exists "fornecedorId" text;
 alter table produtos add column if not exists servico boolean default false;
+-- Frente de caixa: leitor de código de barras, venda por quilo e validade.
+alter table produtos add column if not exists "codigoBarras" text;
+alter table produtos add column if not exists "porPeso" boolean default false;
+alter table produtos add column if not exists validade text;
 
 -- ---------- Clientes ----------
 alter table clientes add column if not exists "tipoPessoa" text default 'fisica';
