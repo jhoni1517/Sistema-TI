@@ -48,10 +48,13 @@ create trigger trg_protege_ramo_loja
 -- ---------- Migra o que já estava na configuração ----------
 -- Quem já tinha escolhido um ramo em Configurações continua com ele: a
 -- mudança não pode tirar da loja o que ela já estava usando.
+-- O cast é obrigatório: lojas.id é uuid e configuracoes.id é text, porque a
+-- configuração nasceu antes do multi-loja e guarda a chave como string.
+-- Sem ele o Postgres para com "operator does not exist: text = uuid".
 update lojas l
    set ramo = c.dados ->> 'ramo'
   from configuracoes c
- where c.id = l.id
+ where c.id = l.id::text
    and l.ramo is null
    and c.dados ->> 'ramo' in ('assistencia', 'mercearia', 'pizzaria', 'bebidas');
 
