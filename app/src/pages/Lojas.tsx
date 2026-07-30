@@ -17,6 +17,7 @@ import { aviso } from "../components/Aviso";
 import { SectionTitle, Field, Modal, EmptyState, InputNumero } from "../components/ui";
 import { brl, formatDate, txt, abrirWhatsapp } from "../lib/format";
 import { gerarLinkDeSenha } from "../lib/auth";
+import { RAMOS, RAMO_META, ramoDe } from "../lib/ramos";
 import { mensagemCobranca, tipoDoAviso, AVISO_META } from "../lib/cobranca";
 import {
   listarLojas,
@@ -186,6 +187,26 @@ export const Lojas: React.FC = () => {
     }
   };
 
+  const mudarRamo = async (l: Loja, ramo: string) => {
+    if (ramoDe(l.ramo) === ramo) return;
+    if (
+      !confirm(
+        `Mudar "${l.nome}" para ${RAMO_META[ramoDe(ramo)].label}?\n\n` +
+          "As telas que não pertencem ao novo plano deixam de aparecer para ela. " +
+          "Nenhum dado é apagado: o que sai do menu continua guardado."
+      )
+    ) {
+      return;
+    }
+    try {
+      await atualizarLoja(l.id, { ramo });
+      setLojas((prev) => prev.map((x) => (x.id === l.id ? { ...x, ramo } : x)));
+      aviso.sucesso(`${l.nome} agora usa ${RAMO_META[ramoDe(ramo)].label}.`);
+    } catch (e) {
+      aviso.erro(e instanceof Error ? e.message : String(e));
+    }
+  };
+
   const mudarValor = async (l: Loja, valor: number) => {
     try {
       await atualizarLoja(l.id, { valor_mensal: valor });
@@ -346,6 +367,19 @@ export const Lojas: React.FC = () => {
                       if (e.target.value !== txt(l.whatsapp)) mudarWhatsapp(l, e.target.value);
                     }}
                   />
+                  {/* O plano é o que foi vendido. Muda só aqui, e o banco
+                      recusa a troca vinda da própria loja. */}
+                  <select
+                    className="input !w-40 !py-1.5 text-sm"
+                    value={ramoDe(l.ramo)}
+                    onChange={(e) => mudarRamo(l, e.target.value)}
+                  >
+                    {RAMOS.map((r) => (
+                      <option key={r} value={r}>
+                        {RAMO_META[r].label}
+                      </option>
+                    ))}
+                  </select>
                   <span className="text-xs text-slate-400">R$</span>
                   <ValorMensal
                     valor={Number(l.valor_mensal) || 0}
