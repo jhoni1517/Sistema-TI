@@ -382,6 +382,29 @@ export const db = {
     remove: (id: string) => remove("vendas", id),
   },
   // Configurações da loja compartilhadas na nuvem (uma linha por loja)
+  /**
+   * A loja, do jeito que o sistema precisa dela na tela.
+   *
+   * O ramo mora aqui, e não na configuração, porque é O QUE FOI VENDIDO:
+   * a configuração a própria loja edita, e quem contratou mercearia podia
+   * virar pizzaria sozinho. Um gatilho no banco recusa a troca por quem não
+   * é o administrador do sistema.
+   */
+  loja: {
+    async ramo(): Promise<string | null> {
+      if (!supabaseEnabled || !supabase || !lojaAtual) return null;
+      const { data, error } = await supabase
+        .from("lojas")
+        .select("ramo")
+        .eq("id", lojaAtual)
+        .maybeSingle();
+      // Coluna ainda não criada não pode derrubar a carga: a loja continua
+      // funcionando como assistência até a migração rodar.
+      if (error) return null;
+      return (data?.ramo as string) || null;
+    },
+  },
+
   config: {
     async get(): Promise<Record<string, unknown> | null> {
       if (!supabaseEnabled || !supabase || !lojaAtual) return null;

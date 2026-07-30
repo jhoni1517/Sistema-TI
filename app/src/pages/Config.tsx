@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { aviso } from "../components/Aviso";
 import { Store, KeyRound, Cloud, Download, Upload, Save, Database, Palette, Sun, Moon, Monitor, Percent, FileText, ShieldCheck } from "lucide-react";
 import { useApp } from "../store/AppStore";
-import { RAMOS, RAMO_META, ramoDe, temRecurso } from "../lib/ramos";
+import { RAMO_META, temRecurso } from "../lib/ramos";
 import { Field, SectionTitle, InputNumero } from "../components/ui";
 import { ACCENTS, ACCENT_KEYS } from "../lib/themes";
 import { Equipe } from "../components/Equipe";
@@ -12,7 +12,7 @@ import { importarTudo, type DumpLoja } from "../lib/db";
 import type { Config as ConfigType } from "../lib/types";
 
 export const Config: React.FC = () => {
-  const { config, saveConfig, reload, clientes, ordens, produtos, movimentos, sessoes, fiados, categorias, fornecedores, cotacoes, precos } = useApp();
+  const { config, saveConfig, reload, ramoContratado, clientes, ordens, produtos, movimentos, sessoes, fiados, categorias, fornecedores, cotacoes, precos } = useApp();
   const [form, setForm] = useState<ConfigType>(config);
   const [salvo, setSalvo] = useState(false);
   const [importando, setImportando] = useState(false);
@@ -138,32 +138,32 @@ export const Config: React.FC = () => {
             <input className="input" value={form.enderecoLoja} onChange={(e) => setForm({ ...form, enderecoLoja: e.target.value })} />
           </Field>
 
-          {/* O ramo decide o vocabulário das telas e quais módulos aparecem */}
+          {/* O ramo é o que a loja CONTRATOU, não uma preferência: quem
+              comprou mercearia podia se virar pizzaria sozinho e usar o que
+              não pagou. Quem muda é o administrador do sistema, e o banco
+              recusa a troca vinda daqui. */}
           <div className="sm:col-span-2">
-            <label className="label">Ramo de atividade</label>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {RAMOS.map((r) => {
-                const meta = RAMO_META[r];
-                const ativo = ramoDe(form.ramo) === r;
-                return (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => setForm({ ...form, ramo: r })}
-                    className={`rounded-lg border px-3 py-2.5 text-left transition ${
-                      ativo ? "border-brand-500 bg-brand-50" : "border-slate-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    <span className="block text-sm font-semibold text-slate-700">{meta.label}</span>
-                    <span className="mt-0.5 block text-xs text-slate-500">{meta.descricao}</span>
-                  </button>
-                );
-              })}
+            <label className="label">Seu sistema</label>
+            <div className="flex flex-wrap items-center gap-3 rounded-lg bg-slate-50 p-3">
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-slate-800">
+                  {RAMO_META[ramoContratado].label}
+                </p>
+                <p className="text-xs text-slate-500">
+                  {RAMO_META[ramoContratado].descricao}
+                </p>
+              </div>
+              {sessao?.perfil?.super_admin ? (
+                <span className="badge bg-brand-100 text-brand-700">
+                  Troque em Lojas assinantes
+                </span>
+              ) : (
+                <span className="badge bg-slate-200 text-slate-600">Plano contratado</span>
+              )}
             </div>
             <p className="mt-2 text-xs text-slate-400">
-              Muda o nome das telas e esconde o que não serve para o seu tipo de
-              loja. Nenhum dado é apagado ao trocar — o que some do menu continua
-              guardado.
+              Para conhecer os outros tipos de sistema ou trocar de plano, fale
+              com o suporte. Nada do que você cadastrou se perde na troca.
             </p>
           </div>
         </div>
@@ -177,7 +177,7 @@ export const Config: React.FC = () => {
           <Field label="Prazo para retirada (dias)">
             <InputNumero value={form.diasAbandono ?? 90} onChange={(v) => setForm({ ...form, diasAbandono: v })} />
           </Field>
-          {temRecurso(ramoDe(form.ramo), "peso") && (
+          {temRecurso(ramoContratado, "peso") && (
             <Field label="A balança grava o quê na etiqueta?" className="sm:col-span-2">
               <div className="grid max-w-md grid-cols-2 gap-2">
                 {([

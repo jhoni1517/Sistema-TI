@@ -8,7 +8,7 @@ import React, {
 import { db } from "../lib/db";
 import { aviso } from "../components/Aviso";
 import { aplicarTema } from "../lib/themes";
-import { ramoEfetivo, lerRamoAparelho, definirRamoAparelho, type Ramo } from "../lib/ramos";
+import { ramoDe, lerRamoAparelho, definirRamoAparelho, type Ramo } from "../lib/ramos";
 import type {
   Cliente,
   OrdemServico,
@@ -75,8 +75,10 @@ interface AppState {
    * direto — senão a escolha local não teria efeito em metade do sistema.
    */
   ramo: Ramo;
-  /** Escolha local, quando existe. Null = seguindo a loja. */
+  /** Escolha local, quando existe. Só o administrador do sistema tem. */
   ramoAparelho: Ramo | null;
+  /** O que a loja contratou. É o que vale para ela, sem exceção. */
+  ramoContratado: Ramo;
   trocarRamoAparelho: (r: Ramo | null) => void;
   // ações
   reload: () => Promise<void>;
@@ -126,9 +128,11 @@ function loadConfig(): Config {
   return DEFAULT_CONFIG;
 }
 
-export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
-  children,
-}) => {
+export const AppProvider: React.FC<{
+  children: React.ReactNode;
+  /** Só o administrador do sistema pode ver o sistema como outro ramo */
+  souSuperAdmin?: boolean;
+}> = ({ children, souSuperAdmin }) => {
   const [loading, setLoading] = useState(true);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [ordens, setOrdens] = useState<OrdemServico[]>([]);
@@ -146,6 +150,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   /** Mensagem do que não carregou. Vazio = carregou tudo. */
   const [erroCarga, setErroCarga] = useState("");
   const [ramoAparelho, setRamoAparelho] = useState<Ramo | null>(() => lerRamoAparelho());
+  /** Ramo CONTRATADO, vindo da loja. Nulo = assistência, como o sistema nasceu. */
+  const [ramoLoja, setRamoLoja] = useState<string | null>(null);
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [config, setConfig] = useState<Config>(loadConfig());
 
@@ -207,6 +213,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
         falhas.push(msg);
       }
     });
+
+    // O ramo contratado vem da loja, não da configuração: é o que foi
+    // vendido, e a loja não muda sozinha.
+    try {
+      setRamoLoja(await db.loja.ramo());
+    } catch (e) {
+      console.error("Falha ao carregar o ramo da loja:", e);
+    }
 
     // Configurações da loja vindas da nuvem (nome, senha, etc.) — mantém aparência local
     try {
@@ -506,8 +520,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     vendas,
     config,
     erroCarga,
-    ramo: ramoAparelho ?? ramoEfetivo(config.ramo),
-    ramoAparelho,
+    // A prévia do aparelho só vale para quem administra o sistema. Para a
+    // loja, o que manda é o que ela contratou — senão bastaria escolher
+    // outro tipo na tela de entrada para usar o que não pagou.
+    ramo: souSuperAdmin ? (ramoAparelho ?? ramoDe(ramoLoja)) : ramoDe(ramoLoja),
+    ramoAparelho: souSuperAdmin ? ramoAparelho : null,
+    ramoContratado: ramoDe(ramoLoja),
     trocarRamoAparelho,
     reload,
     saveCliente,

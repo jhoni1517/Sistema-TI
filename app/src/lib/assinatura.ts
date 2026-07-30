@@ -21,6 +21,12 @@ export interface Loja {
   whatsapp?: string | null;
   /** Isenta de mensalidade (a loja de quem administra o sistema) */
   isento?: boolean | null;
+  /**
+   * Ramo CONTRATADO: é o que a loja pagou e o que ela consegue usar.
+   * Só o administrador do sistema altera — um gatilho no banco recusa a
+   * troca vinda da própria loja.
+   */
+  ramo?: string | null;
   ultimoPagamento?: string | null;
   criadoEm?: string | null;
 }
@@ -89,7 +95,7 @@ export async function listarLojas(): Promise<Loja[]> {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("lojas")
-    .select('id, nome, "venceEm", valor_mensal, bloqueada, isento, observacoes, whatsapp, "ultimoPagamento", "criadoEm"')
+    .select('id, nome, "venceEm", valor_mensal, bloqueada, isento, ramo, observacoes, whatsapp, "ultimoPagamento", "criadoEm"')
     .order("criadoEm", { ascending: false });
   if (error) throw new Error(error.message);
   return (data as Loja[]) || [];

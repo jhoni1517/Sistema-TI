@@ -22,6 +22,9 @@ import { Lojas } from "./pages/Lojas";
 import { Assinatura } from "./pages/Assinatura";
 import { carregarSessao, carregarChaveLoja, sair, pode, type Sessao } from "./lib/auth";
 import { definirLoja, limparCacheLocal } from "./lib/db";
+import { useApp } from "./store/AppStore";
+import { temModulo, type Modulo } from "./lib/ramos";
+import { ForaDoPlano } from "./components/ForaDoPlano";
 import { supabase, supabaseEnabled } from "./lib/supabase";
 
 const Carregando: React.FC = () => (
@@ -54,6 +57,22 @@ const Protegida: React.FC<{ recurso: string; papel?: string; children: React.Rea
   children,
 }) => {
   if (!pode(papel as never, recurso)) return <Navigate to="/" replace />;
+  return <>{children}</>;
+};
+
+/**
+ * Bloqueia a rota de um módulo que a loja não contratou.
+ *
+ * Esconder do menu não basta: o endereço continua digitável, e link de
+ * WhatsApp circula. A tela explica em vez de redirecionar calado — quem cai
+ * aqui é cliente pagante que abriu a porta errada.
+ */
+const DoPlano: React.FC<{ modulo: Modulo; children: React.ReactNode }> = ({
+  modulo,
+  children,
+}) => {
+  const { ramo } = useApp();
+  if (!temModulo(ramo, modulo)) return <ForaDoPlano modulo={modulo} />;
   return <>{children}</>;
 };
 
@@ -100,18 +119,18 @@ const AreaProtegida: React.FC = () => {
   const papel = sessao.perfil.papel;
 
   return (
-    <AppProvider>
+    <AppProvider souSuperAdmin={sessao.perfil.super_admin === true}>
       <Routes>
         <Route element={<Layout onLogout={logout} sessao={sessao} />}>
           <Route index element={<Dashboard />} />
-          <Route path="ordens" element={<Protegida recurso="os" papel={papel}><OrdensServico /></Protegida>} />
+          <Route path="ordens" element={<Protegida recurso="os" papel={papel}><DoPlano modulo="os"><OrdensServico /></DoPlano></Protegida>} />
           <Route path="clientes" element={<Protegida recurso="clientes" papel={papel}><Clientes /></Protegida>} />
           <Route path="estoque" element={<Protegida recurso="estoque" papel={papel}><Estoque /></Protegida>} />
           <Route path="caixa" element={<Protegida recurso="caixa" papel={papel}><Caixa /></Protegida>} />
           <Route path="a-receber" element={<Protegida recurso="fiado" papel={papel}><AReceber /></Protegida>} />
           <Route path="contas" element={<Protegida recurso="caixa" papel={papel}><Contas /></Protegida>} />
           <Route path="agenda" element={<Agenda />} />
-          <Route path="pdv" element={<Protegida recurso="caixa" papel={papel}><PDV /></Protegida>} />
+          <Route path="pdv" element={<Protegida recurso="caixa" papel={papel}><DoPlano modulo="pdv"><PDV /></DoPlano></Protegida>} />
           <Route path="relatorios" element={<Protegida recurso="relatorios" papel={papel}><Relatorios /></Protegida>} />
           <Route path="config" element={<Protegida recurso="config" papel={papel}><Config /></Protegida>} />
           <Route path="assinatura" element={<Protegida recurso="config" papel={papel}><Assinatura /></Protegida>} />

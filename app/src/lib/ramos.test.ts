@@ -139,3 +139,75 @@ describe("ramo escolhido no aparelho", () => {
     expect(ramoEfetivo("pizzaria")).toBe("pizzaria");
   });
 });
+
+/**
+ * Trava do que a loja consegue usar.
+ *
+ * O ramo saiu da configuração da loja e virou o QUE FOI VENDIDO. Antes ele
+ * morava no JSON de configurações, que a própria loja edita: quem contratou
+ * mercearia podia se virar pizzaria sozinho e usar o que não pagou.
+ *
+ * Aqui está a parte da regra que vive no código. A outra metade é um gatilho
+ * no banco (supabase-migracao-ramo-loja.sql), porque tela não é trava.
+ */
+describe("plano contratado", () => {
+  beforeEach(() => memoria.clear());
+
+  /** Mesma conta que o AppStore faz para decidir o que aparece */
+  const ramoQueVale = (contratado: string | null, souSuperAdmin: boolean): string =>
+    souSuperAdmin ? (lerRamoAparelho() ?? ramoDe(contratado)) : ramoDe(contratado);
+
+  it("a loja vê o que contratou, e só isso", () => {
+    expect(ramoQueVale("mercearia", false)).toBe("mercearia");
+    expect(temModulo(ramoQueVale("mercearia", false), "pdv")).toBe(true);
+    expect(temModulo(ramoQueVale("mercearia", false), "os")).toBe(false);
+    expect(temModulo(ramoQueVale("mercearia", false), "mesas")).toBe(false);
+  });
+
+  it("escolher outro tipo na tela de entrada não libera nada para a loja", () => {
+    // Sem esta regra bastaria clicar em "Pizzaria" antes de entrar para usar
+    // o que não foi pago.
+    definirRamoAparelho("pizzaria");
+    expect(ramoQueVale("mercearia", false)).toBe("mercearia");
+    expect(temModulo(ramoQueVale("mercearia", false), "mesas")).toBe(false);
+  });
+
+  it("o administrador do sistema continua conseguindo demonstrar", () => {
+    definirRamoAparelho("pizzaria");
+    expect(ramoQueVale("assistencia", true)).toBe("pizzaria");
+  });
+
+  it("loja sem ramo gravado continua na assistência", () => {
+    // Toda loja criada antes deste campo. Nenhuma pode acordar sem as OS.
+    expect(ramoQueVale(null, false)).toBe("assistencia");
+    expect(temModulo(ramoQueVale(null, false), "os")).toBe(true);
+  });
+
+  it("ramo inventado no banco não vira passe livre", () => {
+    expect(ramoQueVale("tudo", false)).toBe("assistencia");
+    expect(temModulo(ramoQueVale("tudo", false), "pdv")).toBe(false);
+  });
+
+  it("cada plano entrega algo que nenhum outro entrega", () => {
+    // Se dois planos fossem idênticos não haveria o que vender separado, e a
+    // trava não faria sentido.
+    //
+    // Módulos E recursos contam: mercearia não tem tela exclusiva nenhuma —
+    // ela divide o PDV com pizzaria e adega — e mesmo assim é um sistema
+    // diferente, por causa da balança e da validade. Foi por isso que este
+    // teste falhou na primeira escrita: a régua estava só nos módulos.
+    for (const r of RAMOS) {
+      const meu = [...RAMO_META[r].modulos, ...RAMO_META[r].recursos];
+      const dosOutros = new Set(
+        RAMOS.filter((x) => x !== r).flatMap((x) => [
+          ...RAMO_META[x].modulos,
+          ...RAMO_META[x].recursos,
+        ])
+      );
+      expect(
+        meu.some((item) => !dosOutros.has(item as never)),
+        `${r} entrega exatamente o mesmo que os outros`
+      ).toBe(true);
+    }
+  });
+});

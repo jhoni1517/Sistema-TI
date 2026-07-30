@@ -79,6 +79,9 @@ alter table lojas add column if not exists bloqueada boolean default false;
 alter table lojas add column if not exists "ultimoPagamento" timestamptz;
 alter table lojas add column if not exists whatsapp text;
 alter table lojas add column if not exists isento boolean default false;
+-- Ramo CONTRATADO. Só o administrador do sistema muda; um gatilho recusa a
+-- troca vinda da própria loja (ver supabase-migracao-ramo-loja.sql).
+alter table lojas add column if not exists ramo text;
 
 -- ---------- Confere o resultado ----------
 -- Deve listar compraEstoque, custoRelacionado, osId e sessaoId.
