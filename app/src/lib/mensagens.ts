@@ -1,6 +1,13 @@
 import { brl, codigoOS, txt } from "./format";
 import { totalOS, totalPecas, totalComOpcao } from "./calc";
-import { escolhasDoCliente, itensInclusos, subtotalPeca } from "./orcamento";
+import {
+  nomesDasOpcoes,
+  temOpcoes,
+  opcaoAtual,
+  itensInclusos,
+  pecasDaOpcao,
+  subtotalPeca,
+} from "./orcamento";
 import {
   OS_STATUS_META,
   type OrdemServico,
@@ -19,11 +26,11 @@ import {
  *    quando tem conteúdo de verdade.
  *
  * 2. Quando a OS oferecia caminhos diferentes para o mesmo conserto — fonte
- *    de 500W ou de 200W — a mensagem listava os dois em sequência e somava
- *    tudo. O cliente lia um orçamento cobrando as duas fontes, e o texto
- *    virava um bloco só, sem onde descansar o olho. Agora alternativa vira
- *    um bloco de escolha, com o TOTAL DO SERVIÇO de cada opção — que é o
- *    número em cima do qual ele decide, não o preço da peça solta.
+ *    de 500W mais SSD, ou só a fonte de 200W — a mensagem listava tudo em
+ *    sequência e somava. O cliente lia um orçamento cobrando as duas fontes,
+ *    e o texto virava um bloco só, sem onde descansar o olho. Agora cada
+ *    orçamento é um bloco, com o TOTAL DO SERVIÇO — que é o número em cima
+ *    do qual ele decide, não o preço da peça solta.
  *
  * Sem emoji: em alguns aparelhos elas chegam como "?" e sujam justamente a
  * mensagem que deveria causar boa impressão.
@@ -47,6 +54,17 @@ const linhaItem = (p: PecaOS): string => {
 };
 
 /**
+ * Cabeçalho de um orçamento alternativo.
+ *
+ * O nome é livre — a loja pode chamar de "Opção 1" ou de "Completo". Quando
+ * já vem numerado, numerar de novo daria "OPÇÃO 1 - OPÇÃO 1".
+ */
+const tituloOpcao = (nome: string, posicao: number): string =>
+  /^op[çc][ãa]o\b/i.test(nome.trim())
+    ? `*${txt(nome).toUpperCase()}*`
+    : `*OPÇÃO ${posicao} - ${txt(nome).toUpperCase()}*`;
+
+/**
  * Orçamento discriminado: o cliente vê no que o dinheiro dele vai.
  *
  * Volta em blocos separados para o WhatsApp respirar. Cada bloco vira um
@@ -54,15 +72,14 @@ const linhaItem = (p: PecaOS): string => {
  */
 export function blocosOrcamento(o: OrdemServico): string[] {
   const blocos: string[] = [];
-  const escolhas = escolhasDoCliente(o);
-  const fixos = itensInclusos(o).filter(temDescricao);
+  const nomes = nomesDasOpcoes(o);
+  const varios = nomes.length >= 2;
+  const comuns = itensInclusos(o).filter(temDescricao);
 
-  // Com alternativas em jogo, o cabeçalho precisa deixar claro que o que vem
-  // antes vale em qualquer caso. Sem isso o cliente acha que está somando.
-  const rotuloFixos = escolhas.length > 0 ? "*JÁ INCLUSO EM QUALQUER OPÇÃO*" : "*ORÇAMENTO*";
-
-  const linhas: string[] = [rotuloFixos];
-  for (const p of fixos) linhas.push(linhaItem(p));
+  // Com mais de um orçamento na mesa, o cabeçalho precisa deixar claro que o
+  // que vem antes vale em qualquer caso. Sem isso o cliente acha que soma.
+  const linhas: string[] = [varios ? "*JÁ INCLUSO EM QUALQUER OPÇÃO*" : "*ORÇAMENTO*"];
+  for (const p of comuns) linhas.push(linhaItem(p));
 
   const mao = Number(o.maoDeObra) || 0;
   if (mao > 0) linhas.push(`- Mão de obra — ${brl(mao)}`);
@@ -72,52 +89,43 @@ export function blocosOrcamento(o: OrdemServico): string[] {
 
   if (linhas.length > 1) blocos.push(linhas.join("\n"));
 
-  // Com mais de um grupo de escolha, "total do serviço" por opção mentiria:
-  // ele depende também do que o cliente escolher no outro grupo.
-  const totalPorOpcao = escolhas.length === 1;
-
-  for (const g of escolhas) {
-    const titulo = `*ESCOLHA - ${txt(g.nome).toUpperCase()}*`;
-    const partes = [
-      titulo,
-      "As opções abaixo resolvem o mesmo problema. Escolha uma:",
-      "",
-    ];
-    g.itens.forEach((p, i) => {
-      partes.push(`*Opção ${i + 1} - ${txt(p.descricao) || "Sem descrição"}*`);
-      partes.push(`Peça: ${brl(subtotalPeca(p))}`);
-      if (totalPorOpcao) {
-        partes.push(`Total do serviço: *${brl(totalComOpcao(o, p))}*`);
+  if (!varios) {
+    // Um orçamento só: as peças da opção única entram na lista de sempre.
+    const total = totalOS(o);
+    if (nomes.length === 1) {
+      const soltos = pecasDaOpcao(o, nomes[0]).filter(temDescricao).map(linhaItem);
+      if (soltos.length > 0) {
+        blocos[0] = [blocos[0] || "*ORÇAMENTO*", ...soltos].join("\n");
       }
-      if (g.escolhida === p) partes.push("Nossa sugestão.");
-      if (i < g.itens.length - 1) partes.push("");
-    });
-    blocos.push(partes.join("\n"));
+    }
+    if (total > 0) blocos.push(`*TOTAL: ${brl(total)}*`);
+    return blocos;
   }
 
-  const total = totalOS(o);
-  if (escolhas.length === 0) {
-    if (total > 0) blocos.push(`*TOTAL: ${brl(total)}*`);
-  } else if (!totalPorOpcao && total > 0) {
-    blocos.push(`*TOTAL COM AS OPÇÕES SUGERIDAS: ${brl(total)}*`);
-  }
+  const escolhida = opcaoAtual(o);
+  nomes.forEach((nome, i) => {
+    const itens = pecasDaOpcao(o, nome).filter(temDescricao);
+    const partes = [tituloOpcao(nome, i + 1)];
+    for (const p of itens) partes.push(linhaItem(p));
+    // O total do serviço INTEIRO, não a soma das peças da opção: é sobre este
+    // número que o cliente decide, e ele não tem como somar de cabeça a mão
+    // de obra e o que é comum às duas.
+    partes.push(`Total do serviço: *${brl(totalComOpcao(o, nome))}*`);
+    if (nome === escolhida) partes.push("Nossa sugestão.");
+    blocos.push(partes.join("\n"));
+  });
 
   return blocos;
 }
 
 /** Frase de fechamento de acordo com a etapa em que a OS está */
 const chamada = (o: OrdemServico, temLink: boolean): string => {
-  const escolhas = escolhasDoCliente(o);
-
   switch (o.status) {
     case "aguardando_aprovacao":
-      if (escolhas.length > 0) {
+      if (temOpcoes(o)) {
         // Aprovar sem dizer qual opção é o mesmo problema de antes, só que
-        // por escrito: alguém teria que adivinhar qual peça comprar.
-        const como =
-          escolhas.length === 1
-            ? "Responda com o número da opção que prefere"
-            : "Responda dizendo qual opção prefere em cada escolha";
+        // por escrito: alguém teria que adivinhar quais peças comprar.
+        const como = "Responda com o número da opção que prefere";
         return temLink
           ? `${como}, ou escolha e aprove direto pelo link acima.`
           : `${como} e já autorizamos o serviço.`;
@@ -198,7 +206,7 @@ export function mensagemCliente(
     ["aguardando_aprovacao", "aprovada", "em_reparo", "pronta", "entregue"].includes(
       o.status
     ) &&
-    (totalOS(o) > 0 || totalPecas(o) > 0 || escolhasDoCliente(o).length > 0);
+    (totalOS(o) > 0 || totalPecas(o) > 0 || temOpcoes(o));
   if (mostraValores) partes.push(...blocosOrcamento(o));
 
   if (o.status === "pronta" && txt(o.observacoes).trim()) {

@@ -33,6 +33,8 @@ alter table ordens add column if not exists "aprovadoEm" text;
 alter table ordens add column if not exists "recusadoEm" text;
 alter table ordens add column if not exists "assinaturaCliente" text;
 alter table ordens add column if not exists "prontaEm" text;
+-- Qual dos orçamentos o cliente escolheu, quando a OS oferece mais de um.
+alter table ordens add column if not exists "opcaoEscolhida" text;
 alter table ordens add column if not exists "entregueEm" text;
 
 -- ---------- Produtos ----------

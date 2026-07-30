@@ -124,9 +124,10 @@ https://supabase.com/dashboard/project/nviagibefxqtognowqwe/sql/new:
 11. `supabase-migracao-opcoes-os.sql`
 12. `supabase-corrigir-colunas.sql`
 
-O de número 11 é o que faz a página do cliente entender alternativas no
-orçamento ("fonte de 500W ou de 200W"). Sem ele, a página soma as duas e
-mostra um valor maior do que o da tela da loja. Ele também guarda as funções
+O de número 11 é o que faz a página do cliente entender mais de um orçamento
+na mesma OS ("fonte de 500W mais SSD" contra "só a fonte de 200W"). Sem ele,
+a página soma tudo e mostra um valor maior do que o da tela da loja. Ele
+também guarda as funções
 `consultar_os` e `responder_orcamento`, que saíram do
 `supabase-migracao-seguranca.sql` justamente para não voltarem à versão
 antiga quando aquele arquivo for rodado de novo.

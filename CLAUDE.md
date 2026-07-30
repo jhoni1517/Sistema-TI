@@ -117,20 +117,25 @@ Repor peça é troca de dinheiro por mercadoria; vira custo quando a peça é
 vendida (CMV). Contar como despesa **e** como custo mostrava lucro negativo
 numa venda lucrativa. Ver `ehCompraEstoque` em `lib/calc.ts`.
 
-### Duas alternativas no orçamento nunca somam
+### Orçamentos alternativos nunca somam
 
-Fonte de 500W ou de 200W é uma escolha, não uma lista de compras. As duas
-peças na mesma lista faziam o sistema somar tudo: o cliente recebia um
-orçamento cobrando as duas fontes, e a loja parecia estar empurrando o dobro.
+"Fonte de 500W mais SSD" ou "só a fonte de 200W" é uma escolha, não uma lista
+de compras. Tudo na mesma lista fazia o sistema somar tudo: o cliente recebia
+um orçamento cobrando as duas fontes, e a loja parecia empurrar o dobro.
 
-Peça com `opcao` preenchida entra num grupo e **só a `escolhida` conta** — em
-dinheiro, no estoque e na mensagem. A mesma regra existe em SQL (a página
-pública do cliente calcula o total sozinha); duas regras diferentes
-mostrariam dois valores para o mesmo orçamento. Ver `lib/orcamento.ts` e
-`supabase-migracao-opcoes-os.sql`.
+A unidade de escolha é o **orçamento inteiro**, não a peça — cada caminho
+costuma ter mais de uma peça. Peça com `opcao` vazia entra em qualquer
+cenário; peça com `opcao` preenchida pertence àquele orçamento;
+`OrdemServico.opcaoEscolhida` guarda a decisão, e sem decisão vale o
+primeiro, que é a sugestão da loja (total zerado seria menor que qualquer
+cenário real).
 
-Cobrar com escolha em aberto é bloqueado: o preço da alternativa pendente
-fica fora do total e a peça não baixa do estoque.
+A mesma conta existe em SQL — a página pública do cliente calcula o total
+sozinha, e duas regras diferentes mostrariam dois valores para o mesmo
+orçamento. Ver `lib/orcamento.ts` e `supabase-migracao-opcoes-os.sql`.
+
+Antes de cobrar, o sistema pergunta se a escolha não foi confirmada: cobrar
+pela sugestão achando que é decisão do cliente só aparece no fechamento.
 
 ### Serviço não tem estoque
 

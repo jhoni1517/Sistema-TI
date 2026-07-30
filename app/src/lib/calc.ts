@@ -1,21 +1,22 @@
-import type { OrdemServico, MovimentoCaixa, Fiado, PecaOS } from "./types";
+import type { OrdemServico, MovimentoCaixa, Fiado } from "./types";
 import {
   pecasEfetivas,
   subtotalPeca,
   custoDaPeca,
-  opcoesPendentes,
-  comOpcaoEscolhida,
+  nomesDasOpcoes,
+  escolhaConfirmada,
+  comOpcao,
 } from "./orcamento";
 
 /** Número seguro: a nuvem devolve nulo em coluna vazia */
 const n = (v?: number | null): number => (Number(v) || 0);
 
 /**
- * Só as peças que valem contam.
+ * Só as peças do orçamento escolhido contam.
  *
- * Quando a OS oferece alternativas — fonte de 500W ou de 200W — somar as
- * duas cobrava do cliente um conserto que ele não vai levar. Ver
- * lib/orcamento.ts.
+ * Quando a OS oferece caminhos diferentes — fonte de 500W mais SSD, ou só a
+ * fonte de 200W — somar todos cobrava do cliente um conserto que ele não vai
+ * levar. Ver lib/orcamento.ts.
  */
 export const totalPecas = (o: OrdemServico): number =>
   pecasEfetivas(o).reduce((s, p) => s + subtotalPeca(p), 0);
@@ -26,32 +27,32 @@ export const custoPecas = (o: OrdemServico): number =>
 export const totalOS = (o: OrdemServico): number =>
   totalPecas(o) + n(o.maoDeObra) - n(o.desconto);
 
-/** Quanto sai o serviço se o cliente escolher esta alternativa */
-export const totalComOpcao = (o: OrdemServico, escolha: PecaOS): number =>
-  totalOS(comOpcaoEscolhida(o, escolha));
+/** Quanto sai o serviço inteiro com este orçamento */
+export const totalComOpcao = (o: OrdemServico, nome: string): number =>
+  totalOS(comOpcao(o, nome));
+
+/** Custo da loja com este orçamento — é o que decide se a opção dá lucro */
+export const custoComOpcao = (o: OrdemServico, nome: string): number =>
+  custoPecas(comOpcao(o, nome));
 
 /**
- * Faixa de preço enquanto o cliente não escolheu.
+ * Do mais barato ao mais caro entre os orçamentos oferecidos.
  *
- * Sem isto a tela mostrava um total mais baixo do que qualquer cenário real:
- * alternativa não escolhida não entra na conta, então uma OS com duas fontes
- * pendentes aparecia como se as fontes fossem de graça.
+ * Serve para dizer "o serviço sai de X a Y" enquanto o cliente não responde.
+ * `definido` conta se a escolha já foi confirmada — sem isso a loja cobrava
+ * pela sugestão achando que era decisão do cliente.
  */
 export const faixaOS = (
   o: OrdemServico
 ): { minimo: number; maximo: number; definido: boolean } => {
-  const base = totalOS(o);
-  const pendentes = opcoesPendentes(o);
-  if (pendentes.length === 0) return { minimo: base, maximo: base, definido: true };
-
-  let minimo = base;
-  let maximo = base;
-  for (const g of pendentes) {
-    const valores = g.itens.map(subtotalPeca);
-    minimo += Math.min(...valores);
-    maximo += Math.max(...valores);
+  const nomes = nomesDasOpcoes(o);
+  const definido = escolhaConfirmada(o);
+  if (nomes.length < 2) {
+    const t = totalOS(o);
+    return { minimo: t, maximo: t, definido };
   }
-  return { minimo, maximo, definido: false };
+  const totais = nomes.map((nome) => totalComOpcao(o, nome));
+  return { minimo: Math.min(...totais), maximo: Math.max(...totais), definido };
 };
 
 export const lucroOS = (o: OrdemServico): number =>

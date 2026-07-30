@@ -95,13 +95,10 @@ export interface PecaOS {
   custoUnit: number; // custo para a loja
   precoUnit: number; // preço cobrado do cliente
   /**
-   * Nome do grupo de alternativas ("Fonte", "Tela"). Vazio = peça fixa.
-   * Duas peças no mesmo grupo são caminhos diferentes para o mesmo conserto,
-   * e o cliente escolhe UM. Ver lib/orcamento.ts.
+   * A qual orçamento a peça pertence ("Opção 1", "Completo"). Vazio = entra
+   * em qualquer um. Ver lib/orcamento.ts.
    */
   opcao?: string;
-  /** Dentro do grupo, é esta que vale em dinheiro e no estoque */
-  escolhida?: boolean;
 }
 
 export interface HistoricoOS {
@@ -131,6 +128,11 @@ export interface OrdemServico {
   checklist: Record<string, boolean>;
   // Financeiro
   pecas: PecaOS[];
+  /**
+   * Qual dos orçamentos o cliente escolheu. Vazio = ninguém decidiu ainda, e
+   * vale o primeiro, que é a sugestão da loja. Ver lib/orcamento.ts.
+   */
+  opcaoEscolhida?: string;
   maoDeObra: number;
   desconto: number;
   // Fluxo

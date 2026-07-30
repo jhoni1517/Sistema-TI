@@ -39,12 +39,20 @@ import {
   diasEmPosse,
   taxaArmazenamento,
   faixaOS,
+  totalComOpcao,
+  custoComOpcao,
 } from "../lib/calc";
 import {
-  grupoDaPeca,
-  escolherOpcao,
+  opcaoDaPeca,
+  nomesDasOpcoes,
+  opcaoAtual,
+  escolhaConfirmada,
+  comOpcao,
+  proximoNomeDeOpcao,
+  renomearOpcao,
+  removerOpcao,
+  juntarEmUmOrcamento,
   pecasEfetivas,
-  opcoesPendentes,
 } from "../lib/orcamento";
 import {
   OS_STATUS_META,
@@ -250,19 +258,17 @@ export const OrdensServico: React.FC = () => {
     !fiados.some((f) => f.osId === o.id);
 
   /**
-   * Cobrar com alternativa em aberto é cobrar errado de propósito: o preço
-   * da peça pendente fica fora do total, e o estoque não baixa. Melhor parar
-   * aqui do que descobrir no fechamento do mês.
+   * Cobrar sem saber qual orçamento o cliente aceitou é cobrar pela sugestão
+   * da loja. Pergunta em vez de assumir: quem está no balcão sabe a resposta,
+   * e o erro só apareceria no fechamento do mês.
    */
   const escolhaPendente = (o: OrdemServico): boolean => {
-    const pendentes = opcoesPendentes(o);
-    if (pendentes.length === 0) return false;
-    aviso.alerta(
-      `Falta marcar qual alternativa o cliente escolheu em: ${pendentes
-        .map((g) => g.nome)
-        .join(", ")}. Edite a OS e marque a opção escolhida.`
+    if (escolhaConfirmada(o)) return false;
+    return !confirm(
+      `O cliente não registrou qual opção quer.\n\n` +
+        `Cobrar pela opção "${opcaoAtual(o)}" (${brl(totalOS(o))})?\n\n` +
+        "Cancelar para editar a OS e marcar a opção certa."
     );
-    return true;
   };
 
   const avisarCliente = (o: OrdemServico) => {
@@ -534,10 +540,14 @@ const OSForm: React.FC<{
   onClose: () => void;
 }> = ({ os, setOs, clientes, produtos, onSave, onClose }) => {
   const trava = travaAtendimento(clientes.find((c) => c.id === os.clienteId));
-  const addPeca = () =>
+
+  const addPeca = (opcao?: string) =>
     setOs({
       ...os,
-      pecas: [...os.pecas, { descricao: "", quantidade: 1, custoUnit: 0, precoUnit: 0 }],
+      pecas: [
+        ...os.pecas,
+        { descricao: "", quantidade: 1, custoUnit: 0, precoUnit: 0, opcao },
+      ],
     });
   const setPeca = (i: number, p: PecaOS) => {
     const n = [...os.pecas];
@@ -546,27 +556,61 @@ const OSForm: React.FC<{
   };
   const delPeca = (i: number) => setOs({ ...os, pecas: os.pecas.filter((_, x) => x !== i) });
 
-  /** Nomes de grupo já usados nesta OS, para o campo sugerir em vez de exigir digitação */
-  const gruposUsados = [...new Set(os.pecas.map(grupoDaPeca).filter(Boolean))];
-
+  const nomes = nomesDasOpcoes(os);
   /**
-   * Define o grupo de alternativas de uma peça.
+   * Um orçamento ou vários — a decisão que o atendente toma ANTES de digitar.
    *
-   * Ao criar um grupo, esta peça já entra marcada se ninguém no grupo estiver
-   * — senão o preço dela sumia do total no instante em que o nome era
-   * digitado, e parecia que o sistema tinha perdido o valor.
+   * Ela não é um campo gravado: é o próprio conteúdo da OS. Guardar um "modo"
+   * separado das peças criaria a chance de os dois discordarem, e aí não dá
+   * para saber qual dos dois está certo.
    */
-  const setOpcao = (i: number, nome: string) => {
-    const grupo = nome.trim();
-    const jaTemEscolhida =
-      !!grupo && os.pecas.some((p, x) => x !== i && grupoDaPeca(p) === grupo && p.escolhida);
-    setPeca(i, { ...os.pecas[i], opcao: grupo || undefined, escolhida: grupo ? !jaTemEscolhida : undefined });
+  const varios = nomes.length > 0;
+  const escolhida = opcaoAtual(os);
+  const faixa = faixaOS(os);
+
+  /** Começa a oferecer opções: duas, que é o mínimo para haver escolha */
+  const usarVariosOrcamentos = () => {
+    const a = "Opção 1";
+    const b = "Opção 2";
+    setOs({
+      ...os,
+      // As peças que já estavam digitadas continuam valendo para as duas —
+      // jogá-las numa opção obrigaria a redigitar tudo na outra.
+      pecas: [
+        ...os.pecas,
+        { descricao: "", quantidade: 1, custoUnit: 0, precoUnit: 0, opcao: a },
+        { descricao: "", quantidade: 1, custoUnit: 0, precoUnit: 0, opcao: b },
+      ],
+      opcaoEscolhida: undefined,
+    });
   };
 
-  /** Marca esta alternativa e desmarca as concorrentes do mesmo grupo */
-  const escolher = (i: number) => setOs(escolherOpcao(os, i));
+  const usarOrcamentoUnico = () => {
+    if (
+      varios &&
+      !confirm(
+        "Voltar para um orçamento só?\n\nAs peças das opções passam a somar todas juntas. Nenhuma peça é apagada."
+      )
+    )
+      return;
+    setOs(juntarEmUmOrcamento(os));
+  };
 
-  const faixa = faixaOS(os);
+  const addOpcao = () => addPeca(proximoNomeDeOpcao(os));
+
+  const renomear = (nome: string) => {
+    const novo = prompt("Nome desta opção (aparece para o cliente):", nome);
+    if (novo === null) return;
+    if (!novo.trim()) return aviso.alerta("A opção precisa de um nome.");
+    if (novo.trim() !== nome && nomes.includes(novo.trim()))
+      return aviso.alerta("Já existe uma opção com esse nome.");
+    setOs(renomearOpcao(os, nome, novo));
+  };
+
+  const remover = (nome: string) => {
+    if (!confirm(`Apagar a "${nome}" e as peças dela?`)) return;
+    setOs(removerOpcao(os, nome));
+  };
 
   const vincularProduto = (i: number, produtoId: string) => {
     const prod = produtos.find((p) => p.id === produtoId);
@@ -579,6 +623,67 @@ const OSForm: React.FC<{
       custoUnit: prod.custo,
     });
   };
+
+  /**
+   * Uma linha de peça. Vira função porque a mesma linha aparece na lista
+   * única e dentro de cada opção — duas cópias divergiriam na primeira
+   * mudança de campo.
+   */
+  const linhaPeca = (p: PecaOS, i: number) => (
+    <div key={i} className="grid grid-cols-12 items-end gap-2">
+      <div className="col-span-12 sm:col-span-4">
+        <label className="label">Descrição</label>
+        <input
+          className="input"
+          value={p.descricao}
+          onChange={(e) => setPeca(i, { ...p, descricao: e.target.value })}
+        />
+      </div>
+      <div className="col-span-6 sm:col-span-3">
+        <label className="label">Do estoque</label>
+        <select
+          className="input"
+          value={p.produtoId || ""}
+          onChange={(e) => vincularProduto(i, e.target.value)}
+        >
+          <option value="">Manual</option>
+          {produtos.map((pr) => (
+            <option key={pr.id} value={pr.id}>{pr.nome}</option>
+          ))}
+        </select>
+      </div>
+      <div className="col-span-3 sm:col-span-1">
+        <label className="label">Qtd</label>
+        <InputNumero
+          min={1}
+          className="input"
+          value={p.quantidade}
+          onChange={(v) => setPeca(i, { ...p, quantidade: v ?? 0 })}
+        />
+      </div>
+      <div className="col-span-4 sm:col-span-1">
+        <label className="label">Custo</label>
+        <InputNumero
+          className="input"
+          value={p.custoUnit}
+          onChange={(v) => setPeca(i, { ...p, custoUnit: v ?? 0 })}
+        />
+      </div>
+      <div className="col-span-4 sm:col-span-2">
+        <label className="label">Preço</label>
+        <InputNumero
+          className="input"
+          value={p.precoUnit}
+          onChange={(v) => setPeca(i, { ...p, precoUnit: v ?? 0 })}
+        />
+      </div>
+      <div className="col-span-1">
+        <button className="btn-ghost !p-2 text-red-500" onClick={() => delPeca(i)}>
+          <Trash size={16} />
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <Modal
@@ -716,96 +821,112 @@ const OSForm: React.FC<{
         {/* Peças */}
         <fieldset className="rounded-xl border border-slate-200 p-4">
           <legend className="px-2 text-sm font-bold text-slate-600">Peças e produtos</legend>
-          <p className="mb-2 text-xs text-slate-500">
-            Para dar alternativas ao cliente — fonte de 500W ou de 200W — dê o
-            mesmo nome de opção às duas. Só a escolhida entra no total e baixa
-            do estoque.
-          </p>
-          <datalist id="grupos-opcao-os">
-            {gruposUsados.map((g) => (
-              <option key={g} value={g} />
-            ))}
-          </datalist>
-          <div className="space-y-2">
-            {os.pecas.map((p, i) => (
-              <div
-                key={i}
-                className="grid grid-cols-12 items-end gap-2 border-t border-slate-100 pt-2 first:border-0 first:pt-0"
-              >
-                <div className="col-span-12 sm:col-span-4">
-                  <label className="label">Descrição</label>
-                  <input className="input" value={p.descricao} onChange={(e) => setPeca(i, { ...p, descricao: e.target.value })} />
-                </div>
-                <div className="col-span-6 sm:col-span-3">
-                  <label className="label">Do estoque</label>
-                  <select className="input" value={p.produtoId || ""} onChange={(e) => vincularProduto(i, e.target.value)}>
-                    <option value="">Manual</option>
-                    {produtos.map((pr) => (
-                      <option key={pr.id} value={pr.id}>{pr.nome}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-span-3 sm:col-span-1">
-                  <label className="label">Qtd</label>
-                  <InputNumero
-                    min={1}
-                    className="input"
-                    value={p.quantidade}
-                    onChange={(v) => setPeca(i, { ...p, quantidade: (v ?? 0) })}
-                  />
-                </div>
-                <div className="col-span-4 sm:col-span-1">
-                  <label className="label">Custo</label>
-                  <InputNumero
-                    className="input"
-                    value={p.custoUnit}
-                    onChange={(v) => setPeca(i, { ...p, custoUnit: (v ?? 0) })}
-                  />
-                </div>
-                <div className="col-span-4 sm:col-span-2">
-                  <label className="label">Preço</label>
-                  <InputNumero
-                    className="input"
-                    value={p.precoUnit}
-                    onChange={(v) => setPeca(i, { ...p, precoUnit: (v ?? 0) })}
-                  />
-                </div>
-                <div className="col-span-1">
-                  <button className="btn-ghost !p-2 text-red-500" onClick={() => delPeca(i)}>
-                    <Trash size={16} />
-                  </button>
-                </div>
 
-                {/* Alternativa: fica numa linha própria para não espremer a
-                    peça normal, que é o caso da esmagadora maioria. */}
-                <div className="col-span-12 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                  <span className="text-slate-400">Opção:</span>
-                  <input
-                    className="input !w-44 !py-1 !text-xs"
-                    list="grupos-opcao-os"
-                    placeholder="entra sempre"
-                    value={p.opcao || ""}
-                    onChange={(e) => setOpcao(i, e.target.value)}
-                  />
-                  {grupoDaPeca(p) && (
-                    <label className="flex cursor-pointer items-center gap-1.5 text-slate-600">
+          {/*
+            A escolha vem antes de digitar: um orçamento ou vários. Decidir
+            depois obriga a remexer peça por peça, e cada opção pode ter mais
+            de uma peça (fonte E SSD), não só uma alternativa isolada.
+          */}
+          <div className="mb-3 flex flex-wrap gap-2 text-xs">
+            <button
+              type="button"
+              onClick={usarOrcamentoUnico}
+              className={`rounded-full px-3 py-1.5 font-semibold ${
+                varios ? "bg-white text-slate-600 ring-1 ring-slate-200" : "bg-brand-600 text-white"
+              }`}
+            >
+              Orçamento único
+            </button>
+            <button
+              type="button"
+              onClick={varios ? undefined : usarVariosOrcamentos}
+              className={`rounded-full px-3 py-1.5 font-semibold ${
+                varios ? "bg-brand-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200"
+              }`}
+            >
+              Mais de uma opção para o cliente
+            </button>
+          </div>
+
+          {varios ? (
+            <div className="space-y-4">
+              <div>
+                <p className="label">Entra em qualquer opção</p>
+                <div className="space-y-2">
+                  {os.pecas.map((p, i) =>
+                    opcaoDaPeca(p) ? null : linhaPeca(p, i)
+                  )}
+                </div>
+                <button
+                  className="btn-secondary mt-2 !py-1.5 text-xs"
+                  onClick={() => addPeca(undefined)}
+                >
+                  <Plus size={14} /> Item comum
+                </button>
+              </div>
+
+              {nomes.map((nome) => (
+                <div
+                  key={nome}
+                  className={`rounded-xl border-2 p-3 ${
+                    nome === escolhida ? "border-brand-400 bg-brand-50/40" : "border-slate-200"
+                  }`}
+                >
+                  <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <label className="flex cursor-pointer items-center gap-1.5 text-sm font-bold text-slate-700">
                       <input
                         type="radio"
                         className="accent-brand-600"
-                        name={`escolha-${grupoDaPeca(p)}`}
-                        checked={!!p.escolhida}
-                        onChange={() => escolher(i)}
+                        name="opcao-escolhida-os"
+                        checked={nome === escolhida}
+                        onChange={() => setOs(comOpcao(os, nome))}
                       />
-                      Escolhida pelo cliente
+                      {nome}
                     </label>
-                  )}
+                    <button className="btn-ghost !p-1 text-xs" onClick={() => renomear(nome)}>
+                      <Pencil size={13} /> Renomear
+                    </button>
+                    <button className="btn-ghost !p-1 text-xs text-red-500" onClick={() => remover(nome)}>
+                      <Trash size={13} /> Apagar opção
+                    </button>
+                    <span className="ml-auto text-sm">
+                      Serviço com esta opção:{" "}
+                      <b className="text-slate-800">{brl(totalComOpcao(os, nome))}</b>
+                      <span className="ml-2 text-xs text-slate-500">
+                        lucro {brl(totalComOpcao(os, nome) - custoComOpcao(os, nome))}
+                      </span>
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {os.pecas.map((p, i) => (opcaoDaPeca(p) === nome ? linhaPeca(p, i) : null))}
+                  </div>
+                  <button
+                    className="btn-secondary mt-2 !py-1.5 text-xs"
+                    onClick={() => addPeca(nome)}
+                  >
+                    <Plus size={14} /> Peça nesta opção
+                  </button>
                 </div>
-              </div>
-            ))}
-          </div>
-          <button className="btn-secondary mt-3 !py-1.5 text-xs" onClick={addPeca}>
-            <Plus size={14} /> Adicionar peça
-          </button>
+              ))}
+
+              <button className="btn-secondary !py-1.5 text-xs" onClick={addOpcao}>
+                <Plus size={14} /> Adicionar outra opção
+              </button>
+
+              <p className="text-xs text-slate-500">
+                O marcado é o que a loja sugere. O cliente troca pelo link de
+                acompanhamento, e só a opção escolhida entra no total e baixa
+                do estoque.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">{os.pecas.map(linhaPeca)}</div>
+              <button className="btn-secondary mt-3 !py-1.5 text-xs" onClick={() => addPeca()}>
+                <Plus size={14} /> Adicionar peça
+              </button>
+            </>
+          )}
         </fieldset>
 
         {/* Financeiro */}
@@ -836,12 +957,13 @@ const OSForm: React.FC<{
             <span>Total: <b className="text-lg text-slate-800">{brl(totalOS(os))}</b></span>
             <span>Lucro: <b className="text-emerald-600">{brl(lucroOS(os))}</b></span>
           </div>
-          {/* Sem este aviso o total aparecia mais baixo do que qualquer
-              cenário real: alternativa sem escolha não entra na conta. */}
+          {/* O total mostra a opção sugerida. Sem este aviso a loja cobrava
+              pela sugestão achando que era decisão do cliente. */}
           {!faixa.definido && (
             <p className="mt-2 text-right text-xs text-amber-700">
-              Falta escolher uma alternativa. O serviço vai sair de{" "}
-              <b>{brl(faixa.minimo)}</b> a <b>{brl(faixa.maximo)}</b>.
+              O cliente ainda não escolheu. O serviço vai sair de{" "}
+              <b>{brl(faixa.minimo)}</b> a <b>{brl(faixa.maximo)}</b> — o total
+              acima é o da opção sugerida (<b>{escolhida}</b>).
             </p>
           )}
         </div>
@@ -1031,9 +1153,10 @@ const OSDetalhe: React.FC<{
               </thead>
               <tbody>
                 {os.pecas.map((p, i) => {
-                  // Alternativa recusada continua à vista, mas apagada: some
-                  // do total sem sumir do histórico do orçamento.
-                  const recusada = !!grupoDaPeca(p) && !p.escolhida;
+                  // Opção recusada continua à vista, mas apagada: some do
+                  // total sem sumir do histórico do orçamento.
+                  const nome = opcaoDaPeca(p);
+                  const recusada = !!nome && nome !== opcaoAtual(os);
                   return (
                     <tr
                       key={i}
@@ -1041,11 +1164,7 @@ const OSDetalhe: React.FC<{
                     >
                       <td className="py-1.5">
                         {p.descricao}
-                        {grupoDaPeca(p) && (
-                          <span className="ml-1.5 text-xs no-underline">
-                            ({p.escolhida ? "opção escolhida" : "opção não escolhida"})
-                          </span>
-                        )}
+                        {nome && <span className="ml-1.5 text-xs no-underline">({nome})</span>}
                       </td>
                       <td className="py-1.5 text-center">{p.quantidade}</td>
                       <td className="py-1.5 text-right">{brl(p.precoUnit)}</td>
