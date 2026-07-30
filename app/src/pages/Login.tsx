@@ -11,6 +11,13 @@ import {
   CONVITE_PENDENTE,
 } from "../lib/auth";
 import { supabaseEnabled } from "../lib/supabase";
+import {
+  RAMOS,
+  RAMO_META,
+  lerRamoAparelho,
+  definirRamoAparelho,
+  type Ramo,
+} from "../lib/ramos";
 
 type Modo = "entrar" | "criar" | "recuperar";
 
@@ -32,6 +39,21 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
   const [carregando, setCarregando] = useState(false);
   const [precisaConfirmar, setPrecisaConfirmar] = useState(false);
   const [diag, setDiag] = useState("");
+  /**
+   * Tipo de loja escolhido aqui na porta.
+   *
+   * Vale só neste aparelho e não grava nada: serve para demonstrar o sistema
+   * a um cliente novo e para experimentar sem medo. Trocar o ramo dentro de
+   * Configurações mexe na loja de verdade — foi assim que as ordens de
+   * serviço sumiram da tela do dono numa tentativa de só dar uma olhada.
+   */
+  const [ramo, setRamo] = useState<Ramo | null>(() => lerRamoAparelho());
+
+  const escolherRamo = (r: Ramo) => {
+    const novo = ramo === r ? null : r;
+    setRamo(novo);
+    definirRamoAparelho(novo);
+  };
 
   const forca = forcaSenha(senha);
 
@@ -143,7 +165,37 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
             <Wrench className="text-stone-900" size={30} strokeWidth={2.5} />
           </div>
           <h1 className="text-2xl font-bold text-white">Sistema TI</h1>
-          <p className="text-sm text-slate-400">Caixa &amp; Ordens de Serviço</p>
+          <p className="text-sm text-slate-400">
+            {ramo ? RAMO_META[ramo].descricao : "Caixa, estoque e atendimento"}
+          </p>
+        </div>
+
+        {/* Tipo de loja, antes de entrar. Não grava nada e vale só aqui. */}
+        <div className="mb-4">
+          <p className="mb-2 text-center text-xs uppercase tracking-wide text-slate-500">
+            Tipo de loja
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {RAMOS.map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => escolherRamo(r)}
+                className={`rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition ${
+                  ramo === r
+                    ? "border-amber-400 bg-amber-400/15 text-amber-200"
+                    : "border-slate-700 text-slate-300 hover:border-slate-500 hover:bg-white/5"
+                }`}
+              >
+                {RAMO_META[r].label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-center text-xs text-slate-500">
+            {ramo
+              ? "Vale só neste aparelho. A configuração da sua loja não muda."
+              : "Opcional. Sem escolher, entra como a sua loja está configurada."}
+          </p>
         </div>
 
         <form onSubmit={enviar} className="rounded-2xl bg-white p-6 shadow-2xl">

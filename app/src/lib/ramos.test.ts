@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import {
   RAMOS,
   RAMO_META,
@@ -6,6 +6,9 @@ import {
   temModulo,
   temRecurso,
   vocabulario,
+  ramoEfetivo,
+  lerRamoAparelho,
+  definirRamoAparelho,
 } from "./ramos";
 
 describe("ramos", () => {
@@ -94,5 +97,45 @@ describe("ramos", () => {
     for (const m of ["os", "rastreio", "pdv", "delivery", "mesas", "producao"]) {
       expect(usados.has(m as never), `módulo ${m} não é de nenhum ramo`).toBe(true);
     }
+  });
+});
+
+/**
+ * localStorage de mentira: os testes de lib rodam em node, sem navegador.
+ * Um jsdom inteiro só para guardar quatro strings deixaria a suíte lenta
+ * para todo mundo — e o que precisa ser testado aqui é a regra, não o
+ * navegador.
+ */
+const memoria = new Map<string, string>();
+(globalThis as { localStorage?: unknown }).localStorage = {
+  getItem: (k: string) => memoria.get(k) ?? null,
+  setItem: (k: string, v: string) => void memoria.set(k, v),
+  removeItem: (k: string) => void memoria.delete(k),
+  clear: () => memoria.clear(),
+};
+
+describe("ramo escolhido no aparelho", () => {
+  beforeEach(() => memoria.clear());
+
+  it("sem escolha local, vale o ramo da loja", () => {
+    expect(ramoEfetivo("pizzaria")).toBe("pizzaria");
+    expect(ramoEfetivo(undefined)).toBe("assistencia");
+  });
+
+  it("a escolha do aparelho ganha da loja", () => {
+    definirRamoAparelho("mercearia");
+    expect(ramoEfetivo("assistencia")).toBe("mercearia");
+  });
+
+  it("dá para voltar ao normal sem mexer na loja", () => {
+    definirRamoAparelho("mercearia");
+    definirRamoAparelho(null);
+    expect(ramoEfetivo("assistencia")).toBe("assistencia");
+  });
+
+  it("valor estragado no armazenamento não derruba a tela", () => {
+    memoria.set("sistema-ti:ramo-aparelho", "padaria");
+    expect(lerRamoAparelho()).toBeNull();
+    expect(ramoEfetivo("pizzaria")).toBe("pizzaria");
   });
 });

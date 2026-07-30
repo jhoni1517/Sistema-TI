@@ -148,3 +148,46 @@ export const temRecurso = (ramo: string | undefined | null, recurso: Recurso): b
 /** As palavras deste ramo */
 export const vocabulario = (ramo?: string | null): Vocabulario =>
   RAMO_META[ramoDe(ramo)].vocabulario;
+
+/* ------------------------------------------------------------------ */
+/* Ramo escolhido no aparelho                                          */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Ramo escolhido na tela de entrada, válido só NESTE aparelho.
+ *
+ * Existe porque trocar o ramo em Configurações mexe na loja de verdade: o
+ * dono queria só ver como fica uma mercearia e acabou escondendo as próprias
+ * ordens de serviço. Aqui a escolha é local — não grava nada na loja, não
+ * alcança os outros aparelhos e não altera dado nenhum.
+ *
+ * Serve para demonstrar o sistema a um cliente novo e para experimentar sem
+ * medo. A configuração definitiva da loja continua sendo a de Configurações.
+ */
+const CHAVE_APARELHO = "sistema-ti:ramo-aparelho";
+
+export function lerRamoAparelho(): Ramo | null {
+  try {
+    const v = localStorage.getItem(CHAVE_APARELHO);
+    return v && RAMOS.includes(v as Ramo) ? (v as Ramo) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function definirRamoAparelho(r: Ramo | null): void {
+  try {
+    if (r) localStorage.setItem(CHAVE_APARELHO, r);
+    else localStorage.removeItem(CHAVE_APARELHO);
+  } catch {
+    /* aparelho sem armazenamento: a escolha simplesmente não persiste */
+  }
+}
+
+/**
+ * Qual ramo vale agora.
+ * A escolha do aparelho ganha da loja — é ela que a pessoa acabou de fazer,
+ * e é a única que ela consegue desfazer sem mexer na configuração da loja.
+ */
+export const ramoEfetivo = (ramoDaLoja?: string | null): Ramo =>
+  lerRamoAparelho() ?? ramoDe(ramoDaLoja);
