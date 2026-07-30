@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { pode, NOME_PAPEL, type Sessao } from "../lib/auth";
-import { temModulo, vocabulario, type Modulo } from "../lib/ramos";
+import { temModulo, vocabulario, RAMO_META, type Modulo } from "../lib/ramos";
 
 /**
  * Menu. "modulo" liga o item ao ramo da loja: item sem modulo aparece para
@@ -58,7 +58,7 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
   onLogout,
   sessao,
 }) => {
-  const { config, online, erroCarga, loading, reload } = useApp();
+  const { config, online, erroCarga, loading, reload, ramo, ramoAparelho, trocarRamoAparelho } = useApp();
   const [open, setOpen] = useState(false);
   const [busca, setBusca] = useState(false);
   const navigate = useNavigate();
@@ -159,12 +159,12 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
           {nav
             .filter((item) => item.recurso === "*" || pode(sessao?.perfil?.papel, item.recurso))
             // Módulo que não é do ramo desta loja nem aparece no menu
-            .filter((item) => !item.modulo || temModulo(config.ramo, item.modulo))
+            .filter((item) => !item.modulo || temModulo(ramo, item.modulo))
             .map((item) =>
               // "Ordens de Serviço" numa pizzaria seria ridículo; o nome do
               // documento central vem do ramo.
               item.modulo === "os"
-                ? { ...item, label: vocabulario(config.ramo).ordemPlural }
+                ? { ...item, label: vocabulario(ramo).ordemPlural }
                 : item
             )
             .concat(
@@ -258,6 +258,23 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
             <Search size={20} />
           </button>
         </header>
+
+        {/* Visão local ligada: precisa ficar evidente, senão a pessoa acha
+            que o sistema mudou sozinho e vai procurar o que não existe. */}
+        {ramoAparelho && (
+          <div className="mx-4 mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 sm:mx-6 lg:mx-8 no-print">
+            <span className="flex-1 text-sm text-blue-800">
+              Você está vendo o sistema como <b>{RAMO_META[ramoAparelho].label}</b>.
+              É só neste aparelho — a configuração da sua loja não mudou.
+            </span>
+            <button
+              className="btn-secondary !py-1.5 text-xs"
+              onClick={() => trocarRamoAparelho(null)}
+            >
+              Voltar ao normal
+            </button>
+          </div>
+        )}
 
         {/* Carga incompleta precisa aparecer, e ficar aparecendo. Tela zerada
             sem aviso é indistinguível de sistema que apagou os dados — e o

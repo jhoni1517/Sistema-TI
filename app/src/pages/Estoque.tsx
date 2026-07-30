@@ -26,7 +26,7 @@ const vazio = (): Produto => ({
 });
 
 export const Estoque: React.FC = () => {
-  const { produtos, categorias, fornecedores, cotacoes, config, saveProduto, removeProduto, saveCategoria, removeCategoria, saveFornecedor, removeFornecedor } = useApp();
+  const { produtos, categorias, fornecedores, cotacoes, ramo, saveProduto, removeProduto, saveCategoria, removeCategoria, saveFornecedor, removeFornecedor } = useApp();
   const [busca, setBusca] = useState("");
   const [editando, setEditando] = useState<Produto | null>(null);
   const [soBaixo, setSoBaixo] = useState(false);
@@ -135,7 +135,7 @@ export const Estoque: React.FC = () => {
       />
 
       {/* Vencimento: só para quem vende coisa que estraga */}
-      {temRecurso(config.ramo, "validade") && vencendo.length > 0 && (
+      {temRecurso(ramo, "validade") && vencendo.length > 0 && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
           <p className="flex items-center gap-2 text-sm font-bold text-amber-800">
             <CalendarX size={16} /> {vencendo.length} produto(s) vencido(s) ou vencendo
@@ -306,7 +306,7 @@ export const Estoque: React.FC = () => {
             </Field>
 
             {/* Recursos do ramo: só aparecem para quem realmente usa */}
-            {(temRecurso(config.ramo, "peso") || temRecurso(config.ramo, "validade")) && (
+            {(temRecurso(ramo, "peso") || temRecurso(ramo, "validade")) && (
               <Field label="Código de barras">
                 <input
                   className="input"
@@ -321,7 +321,7 @@ export const Estoque: React.FC = () => {
               </Field>
             )}
 
-            {temRecurso(config.ramo, "validade") && (
+            {temRecurso(ramo, "validade") && (
               <Field label="Validade">
                 <input
                   type="date"
@@ -348,7 +348,7 @@ export const Estoque: React.FC = () => {
               </span>
             </label>
 
-            {temRecurso(config.ramo, "peso") && !editando.servico && (
+            {temRecurso(ramo, "peso") && !editando.servico && (
               <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-slate-50 p-3 sm:col-span-2">
                 <input
                   type="checkbox"

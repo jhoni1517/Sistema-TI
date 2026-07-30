@@ -8,6 +8,7 @@ import React, {
 import { db } from "../lib/db";
 import { aviso } from "../components/Aviso";
 import { aplicarTema } from "../lib/themes";
+import { ramoEfetivo, lerRamoAparelho, definirRamoAparelho, type Ramo } from "../lib/ramos";
 import type {
   Cliente,
   OrdemServico,
@@ -66,6 +67,17 @@ interface AppState {
    * um sistema que apagou tudo — e o susto é o mesmo.
    */
   erroCarga: string;
+  /**
+   * Ramo que vale na tela agora.
+   *
+   * Pode vir da loja (Configurações) ou da escolha feita na tela de entrada,
+   * que só vale neste aparelho. Toda tela usa ESTE campo, nunca config.ramo
+   * direto — senão a escolha local não teria efeito em metade do sistema.
+   */
+  ramo: Ramo;
+  /** Escolha local, quando existe. Null = seguindo a loja. */
+  ramoAparelho: Ramo | null;
+  trocarRamoAparelho: (r: Ramo | null) => void;
   // ações
   reload: () => Promise<void>;
   saveCliente: (c: Cliente) => Promise<void>;
@@ -133,6 +145,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
   const [eventos, setEventos] = useState<Evento[]>([]);
   /** Mensagem do que não carregou. Vazio = carregou tudo. */
   const [erroCarga, setErroCarga] = useState("");
+  const [ramoAparelho, setRamoAparelho] = useState<Ramo | null>(() => lerRamoAparelho());
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [config, setConfig] = useState<Config>(loadConfig());
 
@@ -422,6 +435,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     await db.eventos.remove(id);
     setEventos((prev) => prev.filter((x) => x.id !== id));
   };
+  const trocarRamoAparelho = (r: Ramo | null) => {
+    definirRamoAparelho(r);
+    setRamoAparelho(r);
+  };
+
   const saveVenda = async (v: Venda) => {
     await db.vendas.save(v);
     setVendas((prev) => {
@@ -488,6 +506,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({
     vendas,
     config,
     erroCarga,
+    ramo: ramoAparelho ?? ramoEfetivo(config.ramo),
+    ramoAparelho,
+    trocarRamoAparelho,
     reload,
     saveCliente,
     removeCliente,
