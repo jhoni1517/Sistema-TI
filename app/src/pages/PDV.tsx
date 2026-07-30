@@ -19,6 +19,12 @@ import { printHTML } from "../lib/print";
 import { reciboPDV } from "../lib/recibo";
 import { sessaoAberta as achaSessaoAberta } from "../lib/caixa";
 import {
+  lerEtiqueta,
+  produtoDaEtiqueta,
+  quantidadeDaEtiqueta,
+  ehEtiquetaBalanca,
+} from "../lib/balanca";
+import {
   subtotalItem,
   subtotalVenda,
   totalVenda,
@@ -92,11 +98,11 @@ export const PDV: React.FC = () => {
     [vendas]
   );
 
-  const addProduto = (p: Produto) => {
-    // Peso entra com 1 kg e o campo fica editável na linha — a balança
-    // manda o valor depois, e digitar na própria linha é mais rápido do que
-    // abrir uma janela para cada pesagem.
-    setItens((prev) => adicionar(prev, itemDoProduto(p, 1)));
+  const addProduto = (p: Produto, quantidade = 1) => {
+    // Sem etiqueta de balança, peso entra com 1 kg e o campo fica editável
+    // na linha — digitar ali é mais rápido do que abrir uma janela por
+    // pesagem. Com etiqueta, a quantidade já vem certa e ninguém digita.
+    setItens((prev) => adicionar(prev, itemDoProduto(p, quantidade)));
     setTermo("");
     focarBusca();
 
@@ -114,6 +120,38 @@ export const PDV: React.FC = () => {
   const lerCodigo = () => {
     const t = termo.trim();
     if (!t) return;
+
+    // Etiqueta de balança vem primeiro: ela é única por pacote, então nunca
+    // vai casar com um código de barras cadastrado. Se caísse na busca
+    // comum, o operador levaria "nada encontrado" a cada pesagem.
+    if (ehEtiquetaBalanca(t)) {
+      const etiqueta = lerEtiqueta(t, config.formatoBalanca || "peso");
+      if (!etiqueta) {
+        setTermo("");
+        focarBusca();
+        return aviso.alerta(
+          "Etiqueta de balança ilegível — o dígito verificador não fecha. Passe o produto de novo."
+        );
+      }
+      const p = produtoDaEtiqueta(produtos, etiqueta);
+      if (!p) {
+        setTermo("");
+        focarBusca();
+        return aviso.alerta(
+          `Nenhum produto com o código de balança ${etiqueta.codigo}. Cadastre esse código em Estoque.`
+        );
+      }
+      const qtd = quantidadeDaEtiqueta(etiqueta, Number(p.preco) || 0);
+      if (qtd <= 0) {
+        setTermo("");
+        focarBusca();
+        return aviso.alerta(
+          `${p.nome} está sem preço por quilo cadastrado — não dá para calcular o peso.`
+        );
+      }
+      return addProduto({ ...p, porPeso: true }, qtd);
+    }
+
     const p = buscarProduto(produtos, t);
     if (p) return addProduto(p);
     if (sugestoes.length === 1) return addProduto(sugestoes[0]);

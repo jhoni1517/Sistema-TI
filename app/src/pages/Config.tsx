@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { aviso } from "../components/Aviso";
 import { Store, KeyRound, Cloud, Download, Upload, Save, Database, Palette, Sun, Moon, Monitor, Percent, FileText, ShieldCheck } from "lucide-react";
 import { useApp } from "../store/AppStore";
-import { RAMOS, RAMO_META, ramoDe } from "../lib/ramos";
+import { RAMOS, RAMO_META, ramoDe, temRecurso } from "../lib/ramos";
 import { Field, SectionTitle, InputNumero } from "../components/ui";
 import { ACCENTS, ACCENT_KEYS } from "../lib/themes";
 import { Equipe } from "../components/Equipe";
@@ -177,6 +177,35 @@ export const Config: React.FC = () => {
           <Field label="Prazo para retirada (dias)">
             <InputNumero value={form.diasAbandono ?? 90} onChange={(v) => setForm({ ...form, diasAbandono: v })} />
           </Field>
+          {temRecurso(ramoDe(form.ramo), "peso") && (
+            <Field label="A balança grava o quê na etiqueta?" className="sm:col-span-2">
+              <div className="grid max-w-md grid-cols-2 gap-2">
+                {([
+                  { k: "peso", nome: "Peso (gramas)" },
+                  { k: "preco", nome: "Preço (centavos)" },
+                ] as const).map((f) => (
+                  <button
+                    key={f.k}
+                    type="button"
+                    onClick={() => setForm({ ...form, formatoBalanca: f.k })}
+                    className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${
+                      (form.formatoBalanca || "peso") === f.k
+                        ? "border-brand-500 bg-brand-50 text-brand-700"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {f.nome}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1 text-xs text-slate-400">
+                As duas formas existem. Se o peso lançado sair mil vezes maior ou
+                menor do que devia, é este ajuste que está trocado — a sequência
+                de dígitos é a mesma nos dois formatos.
+              </p>
+            </Field>
+          )}
+
           <Field label="Link para o cliente avaliar a loja" className="sm:col-span-2">
             <input
               className="input"

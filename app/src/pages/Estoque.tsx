@@ -321,6 +321,22 @@ export const Estoque: React.FC = () => {
               </Field>
             )}
 
+            {temRecurso(ramo, "peso") && editando.porPeso && (
+              <Field label="Código na balança">
+                <input
+                  className="input"
+                  inputMode="numeric"
+                  placeholder="Ex.: 123"
+                  value={editando.codigoBalanca || ""}
+                  onChange={(e) => setEditando({ ...editando, codigoBalanca: e.target.value })}
+                />
+                <p className="mt-1 text-xs text-slate-400">
+                  O número curto que este produto tem na balança do balcão. É por
+                  ele que a frente de caixa reconhece a etiqueta e já lança o peso.
+                </p>
+              </Field>
+            )}
+
             {temRecurso(ramo, "validade") && (
               <Field label="Validade">
                 <input

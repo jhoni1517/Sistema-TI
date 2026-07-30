@@ -38,6 +38,10 @@ alter table produtos add column if not exists "codigoBarras" text;
 alter table produtos add column if not exists "porPeso" boolean default false;
 -- Vencimento do lote. Vira alerta no estoque.
 alter table produtos add column if not exists validade text;
+-- Código curto do produto na balança. A etiqueta impressa é única por
+-- pacote (traz o peso dentro); o que se repete entre elas é este número.
+alter table produtos add column if not exists "codigoBalanca" text;
+create index if not exists produtos_balanca_idx on produtos ("lojaId", "codigoBalanca");
 
 -- Busca por código de barras precisa ser rápida: é o caminho do leitor.
 create index if not exists produtos_codigo_idx on produtos ("lojaId", "codigoBarras");

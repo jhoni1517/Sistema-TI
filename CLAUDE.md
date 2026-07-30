@@ -59,6 +59,9 @@ um campo a mais numa tela que já existe.
 IMEI, garantia, peso e validade parecem módulos e não são. Na dúvida: se não
 tem endereço próprio no menu, é recurso.
 
+`app/NICHOS.md` tem o levantamento do que os sistemas líderes de cada ramo
+fazem, o que já está feito aqui e em que ordem vale atacar o resto.
+
 ## As regras que vieram de bug, não de livro
 
 Cada uma destas custou uma tarde. Não são preferências.

@@ -1,4 +1,5 @@
 import type { Ramo } from "./ramos";
+import type { FormatoBalanca } from "./balanca";
 
 // ==== Tipos de domínio do Sistema TI ====
 
@@ -189,6 +190,14 @@ export interface Produto {
   porPeso?: boolean;
   /** Vencimento do lote (AAAA-MM-DD). Vira alerta no estoque. */
   validade?: string;
+  /**
+   * Código curto que este produto tem na balança do balcão.
+   *
+   * É diferente do código de barras de fábrica: a etiqueta que a balança
+   * imprime é única por pacote (traz o peso dentro), e o que se repete entre
+   * elas é só este número.
+   */
+  codigoBalanca?: string;
   criadoEm: string;
 }
 
@@ -568,4 +577,10 @@ export interface Config {
    * avaliação ruim colhida no meio do caminho fica lá para sempre.
    */
   linkAvaliacao?: string;
+  /**
+   * Como a balança do balcão grava a etiqueta: peso em gramas ou preço em
+   * centavos. As duas existem no mercado e a sequência de dígitos é a mesma
+   * — ler no formato errado não dá erro, dá um número plausível e errado.
+   */
+  formatoBalanca?: FormatoBalanca;
 }
