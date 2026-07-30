@@ -1,16 +1,58 @@
-import type { OrdemServico, MovimentoCaixa, Fiado } from "./types";
+import type { OrdemServico, MovimentoCaixa, Fiado, PecaOS } from "./types";
+import {
+  pecasEfetivas,
+  subtotalPeca,
+  custoDaPeca,
+  opcoesPendentes,
+  comOpcaoEscolhida,
+} from "./orcamento";
 
 /** Número seguro: a nuvem devolve nulo em coluna vazia */
 const n = (v?: number | null): number => (Number(v) || 0);
 
+/**
+ * Só as peças que valem contam.
+ *
+ * Quando a OS oferece alternativas — fonte de 500W ou de 200W — somar as
+ * duas cobrava do cliente um conserto que ele não vai levar. Ver
+ * lib/orcamento.ts.
+ */
 export const totalPecas = (o: OrdemServico): number =>
-  (o.pecas || []).reduce((s, p) => s + n(p.precoUnit) * n(p.quantidade), 0);
+  pecasEfetivas(o).reduce((s, p) => s + subtotalPeca(p), 0);
 
 export const custoPecas = (o: OrdemServico): number =>
-  (o.pecas || []).reduce((s, p) => s + n(p.custoUnit) * n(p.quantidade), 0);
+  pecasEfetivas(o).reduce((s, p) => s + custoDaPeca(p), 0);
 
 export const totalOS = (o: OrdemServico): number =>
   totalPecas(o) + n(o.maoDeObra) - n(o.desconto);
+
+/** Quanto sai o serviço se o cliente escolher esta alternativa */
+export const totalComOpcao = (o: OrdemServico, escolha: PecaOS): number =>
+  totalOS(comOpcaoEscolhida(o, escolha));
+
+/**
+ * Faixa de preço enquanto o cliente não escolheu.
+ *
+ * Sem isto a tela mostrava um total mais baixo do que qualquer cenário real:
+ * alternativa não escolhida não entra na conta, então uma OS com duas fontes
+ * pendentes aparecia como se as fontes fossem de graça.
+ */
+export const faixaOS = (
+  o: OrdemServico
+): { minimo: number; maximo: number; definido: boolean } => {
+  const base = totalOS(o);
+  const pendentes = opcoesPendentes(o);
+  if (pendentes.length === 0) return { minimo: base, maximo: base, definido: true };
+
+  let minimo = base;
+  let maximo = base;
+  for (const g of pendentes) {
+    const valores = g.itens.map(subtotalPeca);
+    minimo += Math.min(...valores);
+    maximo += Math.max(...valores);
+  }
+  return { minimo, maximo, definido: false };
+};
 
 export const lucroOS = (o: OrdemServico): number =>
   totalOS(o) - custoPecas(o);

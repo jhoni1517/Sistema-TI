@@ -117,6 +117,21 @@ Repor peça é troca de dinheiro por mercadoria; vira custo quando a peça é
 vendida (CMV). Contar como despesa **e** como custo mostrava lucro negativo
 numa venda lucrativa. Ver `ehCompraEstoque` em `lib/calc.ts`.
 
+### Duas alternativas no orçamento nunca somam
+
+Fonte de 500W ou de 200W é uma escolha, não uma lista de compras. As duas
+peças na mesma lista faziam o sistema somar tudo: o cliente recebia um
+orçamento cobrando as duas fontes, e a loja parecia estar empurrando o dobro.
+
+Peça com `opcao` preenchida entra num grupo e **só a `escolhida` conta** — em
+dinheiro, no estoque e na mensagem. A mesma regra existe em SQL (a página
+pública do cliente calcula o total sozinha); duas regras diferentes
+mostrariam dois valores para o mesmo orçamento. Ver `lib/orcamento.ts` e
+`supabase-migracao-opcoes-os.sql`.
+
+Cobrar com escolha em aberto é bloqueado: o preço da alternativa pendente
+fica fora do total e a peça não baixa do estoque.
+
 ### Serviço não tem estoque
 
 `Produto.servico` existe porque o atendente digitava 99999999999 na

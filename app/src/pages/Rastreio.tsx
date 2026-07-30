@@ -10,6 +10,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   ShieldCheck,
+  ListChecks,
 } from "lucide-react";
 import { supabase, supabaseEnabled } from "../lib/supabase";
 import { brl, formatDateTime, codigoOS } from "../lib/format";
@@ -25,6 +26,20 @@ const FLUXO: OSStatus[] = [
   "entregue",
 ];
 
+/**
+ * Uma alternativa do orçamento, como o servidor devolve.
+ *
+ * O índice é a identidade: peça dentro do jsonb não tem id próprio, e casar
+ * por descrição erra quando duas opções se chamam igual.
+ */
+interface OpcaoPublica {
+  indice: number;
+  grupo: string;
+  descricao: string;
+  valor: number;
+  escolhida: boolean;
+}
+
 /** Dados mínimos que o cliente pode ver — nada além disso sai do servidor */
 interface OSPublica {
   numero: number;
@@ -33,8 +48,23 @@ interface OSPublica {
   modelo: string | null;
   primeiroNome: string | null;
   total: number | null;
+  opcoes: OpcaoPublica[] | null;
   atualizadoEm: string | null;
 }
+
+/** Alternativas agrupadas, na ordem em que a loja montou o orçamento */
+const agrupar = (opcoes: OpcaoPublica[]): { nome: string; itens: OpcaoPublica[] }[] => {
+  const mapa = new Map<string, OpcaoPublica[]>();
+  for (const o of opcoes) {
+    const lista = mapa.get(o.grupo);
+    if (lista) lista.push(o);
+    else mapa.set(o.grupo, [o]);
+  }
+  // Grupo de um item só não é escolha, é item: ele já está somado no total.
+  return [...mapa]
+    .map(([nome, itens]) => ({ nome, itens }))
+    .filter((g) => g.itens.length >= 2);
+};
 
 /** A loja vem do link; sem ela a consulta não retorna nada */
 const lojaDoLink = (): string =>
@@ -48,6 +78,8 @@ export const Rastreio: React.FC = () => {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
+  /** Grupo de alternativas -> índice da opção que o cliente marcou */
+  const [escolhas, setEscolhas] = useState<Record<string, number>>({});
   const loja = lojaDoLink();
 
   const numero = codigo ? parseInt(codigo.replace(/\D/g, ""), 10) : 0;
@@ -71,7 +103,15 @@ export const Rastreio: React.FC = () => {
         setOs(null);
         setErro("Ordem não encontrada.");
       } else {
-        setOs(linha as OSPublica);
+        const publica = linha as OSPublica;
+        setOs(publica);
+        // A sugestão da loja já vem marcada; o cliente troca se quiser.
+        const marcadas: Record<string, number> = {};
+        for (const g of agrupar(publica.opcoes || [])) {
+          const sugerida = g.itens.find((i) => i.escolhida);
+          if (sugerida) marcadas[g.nome] = sugerida.indice;
+        }
+        setEscolhas(marcadas);
       }
     } catch {
       setErro("Não foi possível consultar agora. Tente novamente em instantes.");
@@ -90,10 +130,54 @@ export const Rastreio: React.FC = () => {
     if (n) navigate(`/rastreio/${codigoOS(n)}?loja=${loja}`);
   };
 
+  const grupos = agrupar(os?.opcoes || []);
+  const faltaEscolher = grupos.filter((g) => escolhas[g.nome] === undefined);
+
+  /**
+   * Total com o que está marcado agora.
+   *
+   * O servidor manda o total já com a sugestão da loja somada. Ao trocar de
+   * opção é preciso tirar a que estava contada e pôr a nova — sem isso o
+   * cliente aprovava vendo um valor e recebia outro.
+   */
+  const totalEscolhido = (): number => {
+    let t = Number(os?.total) || 0;
+    for (const g of grupos) {
+      const contada = g.itens.find((i) => i.escolhida);
+      const marcada = g.itens.find((i) => i.indice === escolhas[g.nome]);
+      t -= Number(contada?.valor) || 0;
+      t += Number(marcada?.valor) || 0;
+    }
+    return t;
+  };
+
+  /**
+   * Índices que vão para o banco.
+   *
+   * Precisa listar TODAS as alternativas que valem, não só as que o cliente
+   * marcou: o servidor regrava a marcação de todas de uma vez, e uma opção
+   * de grupo único ficaria desmarcada — sumindo do orçamento no exato
+   * momento da aprovação.
+   */
+  const indicesEscolhidos = (): number[] => {
+    const escolhiveis = new Set(grupos.map((g) => g.nome));
+    return (os?.opcoes || [])
+      .filter((i) =>
+        escolhiveis.has(i.grupo) ? escolhas[i.grupo] === i.indice : i.escolhida
+      )
+      .map((i) => i.indice);
+  };
+
   const decidir = async (aprovar: boolean) => {
     if (!os || enviando || !supabase) return;
+    if (aprovar && faltaEscolher.length > 0) {
+      aviso.erro(
+        `Escolha uma opção em: ${faltaEscolher.map((g) => g.nome).join(", ")}.`
+      );
+      return;
+    }
     const texto = aprovar
-      ? "Confirma a APROVAÇÃO do orçamento e a execução do serviço?"
+      ? `Confirma a APROVAÇÃO do orçamento de ${brl(totalEscolhido())} e a execução do serviço?`
       : "Confirma que NÃO deseja realizar o serviço?";
     if (!confirm(texto)) return;
     setEnviando(true);
@@ -102,6 +186,7 @@ export const Rastreio: React.FC = () => {
         p_loja: loja,
         p_numero: os.numero,
         p_aprovar: aprovar,
+        p_escolhas: indicesEscolhidos(),
       });
       if (error || data === false) throw new Error();
       await consultar();
@@ -168,10 +253,59 @@ export const Rastreio: React.FC = () => {
                 <p className="mt-1 text-sm opacity-90">{meta.cliente}</p>
               </div>
 
+              {/*
+                Escolha das alternativas. Vem ANTES do valor porque é ela que
+                define o valor: mostrar o total primeiro e a escolha depois
+                fazia o número mudar debaixo do olho do cliente.
+              */}
+              {grupos.map((g) => (
+                <div key={g.nome} className="mb-5 rounded-xl border border-brand-200 bg-brand-50 p-4">
+                  <p className="flex items-center gap-1.5 text-sm font-bold text-brand-800">
+                    <ListChecks size={16} /> Escolha: {g.nome}
+                  </p>
+                  <p className="mb-3 mt-0.5 text-xs text-brand-700">
+                    As opções abaixo resolvem o mesmo problema.
+                  </p>
+                  <div className="space-y-2">
+                    {g.itens.map((i) => {
+                      const marcada = escolhas[g.nome] === i.indice;
+                      return (
+                        <label
+                          key={i.indice}
+                          className={`flex cursor-pointer items-center gap-3 rounded-lg border-2 bg-white p-3 ${
+                            marcada ? "border-brand-600" : "border-slate-200"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name={`opcao-${g.nome}`}
+                            className="h-4 w-4 shrink-0 accent-brand-600"
+                            checked={marcada}
+                            onChange={() =>
+                              setEscolhas((e) => ({ ...e, [g.nome]: i.indice }))
+                            }
+                          />
+                          <span className="flex-1 text-sm text-slate-700">
+                            {i.descricao || "Opção"}
+                          </span>
+                          <span className="shrink-0 text-sm font-bold text-slate-800">
+                            {brl(Number(i.valor) || 0)}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+
               {os.total != null && os.total > 0 && (
                 <div className="mb-5 rounded-xl bg-emerald-50 p-4 text-center">
-                  <p className="text-sm text-emerald-700">Valor do serviço</p>
-                  <p className="text-2xl font-bold text-emerald-700">{brl(Number(os.total))}</p>
+                  <p className="text-sm text-emerald-700">
+                    {grupos.length > 0 ? "Total com a opção escolhida" : "Valor do serviço"}
+                  </p>
+                  <p className="text-2xl font-bold text-emerald-700">
+                    {brl(totalEscolhido())}
+                  </p>
                 </div>
               )}
 
@@ -180,8 +314,18 @@ export const Rastreio: React.FC = () => {
                   <p className="mb-3 text-center text-sm font-semibold text-amber-800">
                     Podemos executar o serviço?
                   </p>
+                  {faltaEscolher.length > 0 && (
+                    <p className="mb-3 text-center text-xs text-amber-700">
+                      Antes de aprovar, escolha uma opção em{" "}
+                      {faltaEscolher.map((g) => g.nome).join(", ")}.
+                    </p>
+                  )}
                   <div className="flex gap-2">
-                    <button className="btn-success flex-1" disabled={enviando} onClick={() => decidir(true)}>
+                    <button
+                      className="btn-success flex-1"
+                      disabled={enviando || faltaEscolher.length > 0}
+                      onClick={() => decidir(true)}
+                    >
                       <ThumbsUp size={16} /> Aprovar
                     </button>
                     <button className="btn-secondary flex-1" disabled={enviando} onClick={() => decidir(false)}>

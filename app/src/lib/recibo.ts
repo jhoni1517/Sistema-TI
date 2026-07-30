@@ -2,6 +2,7 @@ import type { OrdemServico, Config, MovimentoCaixa, SessaoCaixa, Venda } from ".
 import { OS_STATUS_META } from "./types";
 import { brl, formatDate, formatDateTime, codigoOS, txt } from "./format";
 import { totalPecas, totalOS } from "./calc";
+import { grupoDaPeca, subtotalPeca } from "./orcamento";
 import { resumoCaixa, conferencia, CONFERENCIA_META } from "./caixa";
 import { subtotalItem, subtotalVenda, totalVenda, trocoDe } from "./pdv";
 
@@ -42,16 +43,22 @@ export function reciboOS(
       ? ` Após esse prazo, será cobrada taxa de armazenamento/guarda de ${brl(taxa)} por dia.`
       : "") +
     ` Decorrido o prazo legal sem retirada, o aparelho poderá ser vendido para custear o serviço/armazenamento ou descartado, nos termos da legislação vigente. O cliente declara ciência destas condições.`;
+  // Alternativa recusada sai riscada em vez de sumir: o cliente assina um
+  // documento que mostra as opções que teve e a que ele escolheu.
   const pecas = os.pecas || [];
   const itens = pecas
-    .map(
-      (p) => `<tr>
-        <td>${esc(p.descricao) || "-"}</td>
+    .map((p) => {
+      const recusada = !!grupoDaPeca(p) && !p.escolhida;
+      const marca = grupoDaPeca(p)
+        ? ` <span class="muted">(${p.escolhida ? "opção escolhida" : "opção não escolhida"})</span>`
+        : "";
+      return `<tr${recusada ? ' style="color:#999;text-decoration:line-through"' : ""}>
+        <td>${esc(p.descricao) || "-"}${marca}</td>
         <td class="center">${esc(p.quantidade)}</td>
         <td class="right">${brl(Number(p.precoUnit) || 0)}</td>
-        <td class="right">${brl((Number(p.precoUnit) || 0) * (Number(p.quantidade) || 0))}</td>
-      </tr>`
-    )
+        <td class="right">${brl(subtotalPeca(p))}</td>
+      </tr>`;
+    })
     .join("");
 
   return `

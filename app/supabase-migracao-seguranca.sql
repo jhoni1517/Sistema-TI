@@ -152,71 +152,18 @@ create policy "perfis_gerenciar" on perfis
 -- ---------- 6. Acompanhamento público (sem expor nada sensível) ----------
 -- O cliente consulta pelo código da OS e recebe SOMENTE o status.
 -- Senhas do aparelho, custos e dados de outros clientes nunca saem daqui.
-create or replace function consultar_os(p_loja uuid, p_numero integer)
-returns table (
-  numero integer,
-  status text,
-  marca text,
-  modelo text,
-  "primeiroNome" text,
-  total numeric,
-  "atualizadoEm" text
-)
-language sql stable security definer set search_path = public
-as $$
-  select
-    o.numero,
-    o.status,
-    o.marca,
-    o.modelo,
-    split_part(coalesce(c.nome, ''), ' ', 1) as "primeiroNome",
-    case
-      when o.status in ('pronta', 'aguardando_aprovacao')
-      then coalesce(o."maoDeObra", 0) - coalesce(o.desconto, 0) + coalesce((
-        select sum((p ->> 'precoUnit')::numeric * (p ->> 'quantidade')::numeric)
-        from jsonb_array_elements(coalesce(o.pecas, '[]'::jsonb)) p
-      ), 0)
-      else null
-    end as total,
-    o."atualizadoEm"
-  from ordens o
-  left join clientes c on c.id = o."clienteId"
-  where o."lojaId" = p_loja and o.numero = p_numero
-  limit 1;
-$$;
-
--- O cliente pode aprovar ou recusar o orçamento — e só isso.
-create or replace function responder_orcamento(
-  p_loja uuid, p_numero integer, p_aprovar boolean
-)
-returns boolean
-language plpgsql volatile security definer set search_path = public
-as $$
-declare afetadas int;
-begin
-  update ordens
-     set status = case when p_aprovar then 'aprovada' else 'cancelada' end,
-         "aprovadoEm" = case when p_aprovar then now()::text else "aprovadoEm" end,
-         "recusadoEm" = case when p_aprovar then "recusadoEm" else now()::text end,
-         "atualizadoEm" = now()::text,
-         historico = coalesce(historico, '[]'::jsonb) || jsonb_build_object(
-           'data', now()::text,
-           'status', case when p_aprovar then 'aprovada' else 'cancelada' end,
-           'nota', case when p_aprovar then 'Aprovado pelo cliente'
-                        else 'Recusado pelo cliente' end
-         )
-   where "lojaId" = p_loja
-     and numero = p_numero
-     -- trava: só responde enquanto estiver aguardando aprovação
-     and status = 'aguardando_aprovacao';
-  get diagnostics afetadas = row_count;
-  return afetadas > 0;
-end $$;
-
-revoke all on function consultar_os(uuid, integer) from public;
-revoke all on function responder_orcamento(uuid, integer, boolean) from public;
-grant execute on function consultar_os(uuid, integer) to anon, authenticated;
-grant execute on function responder_orcamento(uuid, integer, boolean) to anon, authenticated;
+--
+-- As funções consultar_os e responder_orcamento MORAM AGORA em
+-- supabase-migracao-opcoes-os.sql, e não mais aqui.
+--
+-- O motivo é prático: elas mudaram para entender as alternativas do
+-- orçamento (fonte de 500W ou de 200W). Se a versão antiga continuasse
+-- neste arquivo, rodar de novo o supabase-migracao-seguranca.sql — que é
+-- exatamente o que a documentação manda fazer quando aparece erro de função
+-- desatualizada — devolveria a versão velha e a página do cliente voltaria
+-- a somar as duas fontes.
+--
+-- Rode o supabase-migracao-opcoes-os.sql depois deste.
 
 -- =====================================================================
 -- DEPOIS DE RODAR:

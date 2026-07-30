@@ -94,6 +94,14 @@ export interface PecaOS {
   quantidade: number;
   custoUnit: number; // custo para a loja
   precoUnit: number; // preço cobrado do cliente
+  /**
+   * Nome do grupo de alternativas ("Fonte", "Tela"). Vazio = peça fixa.
+   * Duas peças no mesmo grupo são caminhos diferentes para o mesmo conserto,
+   * e o cliente escolhe UM. Ver lib/orcamento.ts.
+   */
+  opcao?: string;
+  /** Dentro do grupo, é esta que vale em dinheiro e no estoque */
+  escolhida?: boolean;
 }
 
 export interface HistoricoOS {

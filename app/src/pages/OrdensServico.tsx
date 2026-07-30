@@ -31,7 +31,21 @@ import { registrarAcessoSigilo } from "../lib/auth";
 import { reciboOS } from "../lib/recibo";
 import { mensagemCliente } from "../lib/mensagens";
 import { uid, nowISO, brl, abrirWhatsapp, formatDateTime, codigoOS, txt } from "../lib/format";
-import { totalOS, totalPecas, custoPecas, lucroOS, diasEmPosse, taxaArmazenamento } from "../lib/calc";
+import {
+  totalOS,
+  totalPecas,
+  custoPecas,
+  lucroOS,
+  diasEmPosse,
+  taxaArmazenamento,
+  faixaOS,
+} from "../lib/calc";
+import {
+  grupoDaPeca,
+  escolherOpcao,
+  pecasEfetivas,
+  opcoesPendentes,
+} from "../lib/orcamento";
 import {
   OS_STATUS_META,
   CLASSIFICACAO_META,
@@ -187,7 +201,9 @@ export const OrdensServico: React.FC = () => {
   const baixarEstoqueEEntregar = async (o: OrdemServico) => {
     const semVinculo: string[] = [];
 
-    for (const p of o.pecas || []) {
+    // Só a alternativa escolhida sai da prateleira. Baixar as duas fontes
+    // deixaria uma delas sumida do estoque sem nunca ter sido vendida.
+    for (const p of pecasEfetivas(o)) {
       const nome = txt(p.descricao).trim().toLowerCase();
       const prod =
         (p.produtoId && produtos.find((x) => x.id === p.produtoId)) ||
@@ -232,6 +248,22 @@ export const OrdensServico: React.FC = () => {
     o.status === "entregue" &&
     !movimentos.some((m) => m.osId === o.id) &&
     !fiados.some((f) => f.osId === o.id);
+
+  /**
+   * Cobrar com alternativa em aberto é cobrar errado de propósito: o preço
+   * da peça pendente fica fora do total, e o estoque não baixa. Melhor parar
+   * aqui do que descobrir no fechamento do mês.
+   */
+  const escolhaPendente = (o: OrdemServico): boolean => {
+    const pendentes = opcoesPendentes(o);
+    if (pendentes.length === 0) return false;
+    aviso.alerta(
+      `Falta marcar qual alternativa o cliente escolheu em: ${pendentes
+        .map((g) => g.nome)
+        .join(", ")}. Edite a OS e marque a opção escolhida.`
+    );
+    return true;
+  };
 
   const avisarCliente = (o: OrdemServico) => {
     const c = cliente(o.clienteId);
@@ -409,6 +441,7 @@ export const OrdensServico: React.FC = () => {
             }
           }}
           onReceber={async (forma) => {
+            if (escolhaPendente(detalhe)) return;
             const valor = totalOS(detalhe);
             if (!(valor > 0)) {
               return aviso.alerta(
@@ -458,6 +491,7 @@ export const OrdensServico: React.FC = () => {
             }
           }}
           onFiado={async () => {
+            if (escolhaPendente(detalhe)) return;
             try {
               await saveFiado({
                 id: uid(),
@@ -511,6 +545,28 @@ const OSForm: React.FC<{
     setOs({ ...os, pecas: n });
   };
   const delPeca = (i: number) => setOs({ ...os, pecas: os.pecas.filter((_, x) => x !== i) });
+
+  /** Nomes de grupo já usados nesta OS, para o campo sugerir em vez de exigir digitação */
+  const gruposUsados = [...new Set(os.pecas.map(grupoDaPeca).filter(Boolean))];
+
+  /**
+   * Define o grupo de alternativas de uma peça.
+   *
+   * Ao criar um grupo, esta peça já entra marcada se ninguém no grupo estiver
+   * — senão o preço dela sumia do total no instante em que o nome era
+   * digitado, e parecia que o sistema tinha perdido o valor.
+   */
+  const setOpcao = (i: number, nome: string) => {
+    const grupo = nome.trim();
+    const jaTemEscolhida =
+      !!grupo && os.pecas.some((p, x) => x !== i && grupoDaPeca(p) === grupo && p.escolhida);
+    setPeca(i, { ...os.pecas[i], opcao: grupo || undefined, escolhida: grupo ? !jaTemEscolhida : undefined });
+  };
+
+  /** Marca esta alternativa e desmarca as concorrentes do mesmo grupo */
+  const escolher = (i: number) => setOs(escolherOpcao(os, i));
+
+  const faixa = faixaOS(os);
 
   const vincularProduto = (i: number, produtoId: string) => {
     const prod = produtos.find((p) => p.id === produtoId);
@@ -660,9 +716,22 @@ const OSForm: React.FC<{
         {/* Peças */}
         <fieldset className="rounded-xl border border-slate-200 p-4">
           <legend className="px-2 text-sm font-bold text-slate-600">Peças e produtos</legend>
+          <p className="mb-2 text-xs text-slate-500">
+            Para dar alternativas ao cliente — fonte de 500W ou de 200W — dê o
+            mesmo nome de opção às duas. Só a escolhida entra no total e baixa
+            do estoque.
+          </p>
+          <datalist id="grupos-opcao-os">
+            {gruposUsados.map((g) => (
+              <option key={g} value={g} />
+            ))}
+          </datalist>
           <div className="space-y-2">
             {os.pecas.map((p, i) => (
-              <div key={i} className="grid grid-cols-12 items-end gap-2">
+              <div
+                key={i}
+                className="grid grid-cols-12 items-end gap-2 border-t border-slate-100 pt-2 first:border-0 first:pt-0"
+              >
                 <div className="col-span-12 sm:col-span-4">
                   <label className="label">Descrição</label>
                   <input className="input" value={p.descricao} onChange={(e) => setPeca(i, { ...p, descricao: e.target.value })} />
@@ -706,6 +775,31 @@ const OSForm: React.FC<{
                     <Trash size={16} />
                   </button>
                 </div>
+
+                {/* Alternativa: fica numa linha própria para não espremer a
+                    peça normal, que é o caso da esmagadora maioria. */}
+                <div className="col-span-12 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                  <span className="text-slate-400">Opção:</span>
+                  <input
+                    className="input !w-44 !py-1 !text-xs"
+                    list="grupos-opcao-os"
+                    placeholder="entra sempre"
+                    value={p.opcao || ""}
+                    onChange={(e) => setOpcao(i, e.target.value)}
+                  />
+                  {grupoDaPeca(p) && (
+                    <label className="flex cursor-pointer items-center gap-1.5 text-slate-600">
+                      <input
+                        type="radio"
+                        className="accent-brand-600"
+                        name={`escolha-${grupoDaPeca(p)}`}
+                        checked={!!p.escolhida}
+                        onChange={() => escolher(i)}
+                      />
+                      Escolhida pelo cliente
+                    </label>
+                  )}
+                </div>
               </div>
             ))}
           </div>
@@ -735,11 +829,21 @@ const OSForm: React.FC<{
           </Field>
         </div>
 
-        <div className="flex flex-wrap justify-end gap-6 rounded-xl bg-slate-50 p-4 text-sm">
-          <span>Peças: <b>{brl(totalPecas(os))}</b></span>
-          <span>Custo: <b className="text-red-600">{brl(custoPecas(os))}</b></span>
-          <span>Total: <b className="text-lg text-slate-800">{brl(totalOS(os))}</b></span>
-          <span>Lucro: <b className="text-emerald-600">{brl(lucroOS(os))}</b></span>
+        <div className="rounded-xl bg-slate-50 p-4 text-sm">
+          <div className="flex flex-wrap justify-end gap-6">
+            <span>Peças: <b>{brl(totalPecas(os))}</b></span>
+            <span>Custo: <b className="text-red-600">{brl(custoPecas(os))}</b></span>
+            <span>Total: <b className="text-lg text-slate-800">{brl(totalOS(os))}</b></span>
+            <span>Lucro: <b className="text-emerald-600">{brl(lucroOS(os))}</b></span>
+          </div>
+          {/* Sem este aviso o total aparecia mais baixo do que qualquer
+              cenário real: alternativa sem escolha não entra na conta. */}
+          {!faixa.definido && (
+            <p className="mt-2 text-right text-xs text-amber-700">
+              Falta escolher uma alternativa. O serviço vai sair de{" "}
+              <b>{brl(faixa.minimo)}</b> a <b>{brl(faixa.maximo)}</b>.
+            </p>
+          )}
         </div>
 
         <Field label="Observações internas">
@@ -926,14 +1030,29 @@ const OSDetalhe: React.FC<{
                 </tr>
               </thead>
               <tbody>
-                {os.pecas.map((p, i) => (
-                  <tr key={i} className="border-b border-slate-100">
-                    <td className="py-1.5">{p.descricao}</td>
-                    <td className="py-1.5 text-center">{p.quantidade}</td>
-                    <td className="py-1.5 text-right">{brl(p.precoUnit)}</td>
-                    <td className="py-1.5 text-right">{brl(p.precoUnit * p.quantidade)}</td>
-                  </tr>
-                ))}
+                {os.pecas.map((p, i) => {
+                  // Alternativa recusada continua à vista, mas apagada: some
+                  // do total sem sumir do histórico do orçamento.
+                  const recusada = !!grupoDaPeca(p) && !p.escolhida;
+                  return (
+                    <tr
+                      key={i}
+                      className={`border-b border-slate-100 ${recusada ? "text-slate-400 line-through" : ""}`}
+                    >
+                      <td className="py-1.5">
+                        {p.descricao}
+                        {grupoDaPeca(p) && (
+                          <span className="ml-1.5 text-xs no-underline">
+                            ({p.escolhida ? "opção escolhida" : "opção não escolhida"})
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-1.5 text-center">{p.quantidade}</td>
+                      <td className="py-1.5 text-right">{brl(p.precoUnit)}</td>
+                      <td className="py-1.5 text-right">{brl(p.precoUnit * p.quantidade)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
