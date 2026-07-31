@@ -59,17 +59,28 @@ export interface Dados {
  * entre uma e outra. O cupom existe, a mercadoria saiu, e o caixa não sabe.
  */
 function vendasSemCaixa(d: Dados): Achado[] {
-  const comMovimento = new Set(
-    d.movimentos.map((m) => txt(m.descricao)).filter(Boolean)
-  );
   const porId = new Set(d.movimentos.map((m) => m.id));
+
+  /*
+   * Índice por NÚMERO da venda, montado uma vez.
+   *
+   * A primeira versão varria a lista de movimentos inteira para cada venda,
+   * procurando por prefixo. Com 3.000 vendas e 3.000 movimentos são nove
+   * milhões de comparações de texto — meio segundo travando o painel, a cada
+   * venda registrada. Numa loja com dois anos de histórico, a tela não abria.
+   */
+  const numerosComMovimento = new Set<string>();
+  for (const m of d.movimentos) {
+    const achado = txt(m.descricao).match(/^Venda (\d+) /);
+    if (achado) numerosComMovimento.add(achado[1]);
+  }
 
   return d.vendas
     .filter((v) => {
       if (v.movimentoId && porId.has(v.movimentoId)) return false;
-      // Vendas antigas não guardavam o vínculo: casa pela descrição, que é
-      // como o movimento é escrito ("Venda 12 (3 item(ns))").
-      return ![...comMovimento].some((desc) => desc.startsWith(`Venda ${v.numero} `));
+      // Vendas antigas não guardavam o vínculo: casa pelo número dentro da
+      // descrição, que é como o movimento é escrito ("Venda 12 (3 item(ns))").
+      return !numerosComMovimento.has(String(v.numero));
     })
     .map((v) => ({
       gravidade: "erro" as const,
@@ -94,12 +105,14 @@ function vendasSemCaixa(d: Dados): Achado[] {
  * "entregue" no seletor em vez de usar Receber.
  */
 function ordensSemPagamento(d: Dados): Achado[] {
+  // Índices montados uma vez, pelo mesmo motivo do de cima: procurar dentro
+  // da lista para cada ordem é quadrático e trava o painel.
+  const comMovimento = new Set(d.movimentos.map((m) => m.osId).filter(Boolean));
+  const comFiado = new Set(d.fiados.map((f) => f.osId).filter(Boolean));
+
   return d.ordens
     .filter((o) => o.status === "entregue" && totalOS(o) > 0)
-    .filter(
-      (o) =>
-        !d.movimentos.some((m) => m.osId === o.id) && !d.fiados.some((f) => f.osId === o.id)
-    )
+    .filter((o) => !comMovimento.has(o.id) && !comFiado.has(o.id))
     .map((o) => ({
       gravidade: "erro" as const,
       tipo: "os-sem-pagamento",
