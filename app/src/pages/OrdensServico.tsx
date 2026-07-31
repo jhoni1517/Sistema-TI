@@ -169,7 +169,16 @@ export const OrdensServico: React.FC = () => {
       if (!ok) return;
     }
 
-    await saveOrdem({ ...editando, atualizadoEm: nowISO() });
+    try {
+      await saveOrdem({ ...editando, atualizadoEm: nowISO() });
+    } catch (e) {
+      // Sem isto a janela fechava como se tivesse gravado. Coluna faltando
+      // ou assinatura vencida derrubam a gravação em silêncio, e a OS que o
+      // cliente acabou de abrir simplesmente não existe.
+      return aviso.erro(
+        "Não foi possível salvar a OS:\n\n" + (e instanceof Error ? e.message : String(e))
+      );
+    }
     if (nova && trava.avisa) {
       aviso.alerta(`${trava.titulo}. Motivo: ${trava.motivo}`);
     }
@@ -204,7 +213,13 @@ export const OrdensServico: React.FC = () => {
       atualizadoEm: nowISO(),
       historico: [...o.historico, { data: nowISO(), status }],
     };
-    await saveOrdem(atualizado);
+    try {
+      await saveOrdem(atualizado);
+    } catch (e) {
+      return aviso.erro(
+        "Não foi possível mudar o status:\n\n" + (e instanceof Error ? e.message : String(e))
+      );
+    }
     setDetalhe(atualizado);
   };
 

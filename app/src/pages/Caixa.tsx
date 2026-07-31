@@ -72,7 +72,15 @@ export const Caixa: React.FC = () => {
 
   const abrirCaixa = async (valor: number) => {
     const s: SessaoCaixa = { id: uid(), abertoEm: nowISO(), valorAbertura: valor };
-    await saveSessao(s);
+    try {
+      await saveSessao(s);
+    } catch (e) {
+      // Caixa que não abriu de verdade faz todo lançamento do dia ficar sem
+      // sessão, e o fechamento não bate com nada.
+      return aviso.erro(
+        "Não foi possível abrir o caixa:\n\n" + (e instanceof Error ? e.message : String(e))
+      );
+    }
     setAbrindo(false);
   };
 

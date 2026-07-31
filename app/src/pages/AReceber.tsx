@@ -68,7 +68,13 @@ export const AReceber: React.FC = () => {
     if (!novo) return;
     if (!novo.clienteId) return aviso.alerta("Selecione o cliente.");
     if (novo.valor <= 0) return aviso.alerta("Informe o valor.");
-    await saveFiado(novo);
+    try {
+      await saveFiado(novo);
+    } catch (e) {
+      return aviso.erro(
+        "Não foi possível lançar a dívida:\n\n" + (e instanceof Error ? e.message : String(e))
+      );
+    }
     setNovo(null);
   };
 

@@ -182,6 +182,34 @@ inflado é invisível: ninguém procura por ele**.
 Vale para venda, devolução e entrada de mercadoria. A entrada nasceu ao
 contrário e foi corrigida na revisão.
 
+### Estoque negativo é informação, não erro
+
+Quatro telas desciam estoque com `Math.max(0, ...)`. O zero parece
+proteção e é o contrário: vender 3 de um item que o sistema acha que tem 1
+deixava o saldo em 0 em vez de -2, e as duas unidades que saíram sem nunca
+ter entrado sumiam do mapa. Nada para procurar, nada para a contagem achar
+— e o detector de estoque negativo da conferência nunca disparava numa
+venda, que é justamente onde o problema nasce. O PDV ainda avisava "a
+venda passa, mas o saldo fica negativo", mentindo.
+
+Estoque sobe e desce só por `lib/estoque.ts`. Negativo é o sistema
+dizendo que falta lançar uma entrada; quem conserta é a contagem.
+
+### Gravação sem tratamento de erro é a pior classe de bug (de novo)
+
+A regra já estava escrita e mesmo assim OS, status da OS, abertura de
+caixa, lançamento de fiado e conta a pagar gravavam sem `try/catch`. A
+janela fechava como se tivesse dado certo.
+
+O mesmo vale para a ordem: "dinheiro primeiro" foi quebrada cinco vezes
+pelo mesmo motivo — a ordem natural de escrever é "faz a coisa e depois
+anota", que é a errada.
+
+**Regra escrita não segura nada.** As duas viraram teste que lê o código
+do disco: `dinheiro-primeiro.test.ts` e `sem-emoji.test.ts`. Quando
+descobrir uma regra dessas quebrada pela terceira vez, o conserto não é
+consertar — é escrever o teste que reprova.
+
 ### Serviço não tem estoque
 
 `Produto.servico` existe porque o atendente digitava 99999999999 na
@@ -213,6 +241,11 @@ qual é. Ver `traduzErro` em `lib/auth.ts`.
 
 Em alguns aparelhos chegam como `?` e sujam o recado. Vale para WhatsApp,
 Telegram e recibo.
+
+A cobrança de fiado saiu com três emojis por meses. `sem-emoji.test.ts`
+varre `src` e `api`; emoji que fica só na tela é permitido marcando a
+linha com `// emoji-na-tela`, porque a marca é a diferença entre decisão
+e descuido.
 
 ### Segredo não passa por conversa
 
