@@ -65,11 +65,16 @@ export const Inventario: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
     setGravando(true);
     try {
-      for (const p of ajustes) await saveProduto(p);
-
-      // A perda entra como DESPESA, não como compra de estoque: a mercadoria
-      // não vai voltar. Contar como compra esconderia o buraco dentro de um
-      // número que o dono já espera ver grande.
+      /*
+       * Dinheiro primeiro, sempre. Estava ao contrário: baixava o estoque e
+       * só então lançava a perda. Falhando no meio, a mercadoria some do
+       * estoque e o prejuízo não entra em lugar nenhum — o mês fecha com
+       * lucro maior do que foi, e lucro inflado ninguém procura.
+       *
+       * A perda entra como DESPESA, não como compra de estoque: a mercadoria
+       * não vai voltar. Contar como compra esconderia o buraco dentro de um
+       * número que o dono já espera ver grande.
+       */
       if (resumo.faltando > 0) {
         const mov: MovimentoCaixa = {
           id: uid(),
@@ -84,6 +89,8 @@ export const Inventario: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         };
         await saveMovimento(mov);
       }
+
+      for (const p of ajustes) await saveProduto(p);
 
       aviso.sucesso(
         `${ajustes.length} produto(s) ajustado(s).` +

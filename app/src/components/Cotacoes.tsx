@@ -215,6 +215,33 @@ export const Cotacoes: React.FC<{
 
     setProcessando(true);
     try {
+      /*
+       * Dinheiro primeiro, sempre. Estava ao contrário: dava entrada no
+       * estoque e só então tirava do caixa. Falhando no meio sobrava
+       * mercadoria que ninguém pagou — e estoque que apareceu sozinho não
+       * salta aos olhos de ninguém, enquanto saída sem entrada salta na
+       * primeira conferência.
+       *
+       * Amarra à sessão de caixa aberta: sem isto o dinheiro sai do caixa
+       * mas não aparece no fechamento do dia, e a conta nunca bate.
+       */
+      const sessaoAberta = sessoes.find((s) => !s.fechadoEm);
+      await saveMovimento({
+        id: uid(),
+        tipo: "saida",
+        valor: total,
+        descricao: `Compra de peças — ${nomeForn(c.fornecedorId)}`,
+        categoria: "Compra de peça",
+        formaPagamento: "pix",
+        sessaoId: sessaoAberta?.id,
+        // Reposição de estoque: sai do caixa, mas não é despesa do resultado
+        compraEstoque: true,
+        // Sem custoRelacionado aqui: ele existe para marcar o custo embutido
+        // numa ENTRADA. Numa saída, o lucro já desconta pelo próprio valor —
+        // preencher os dois faria a compra ser descontada duas vezes.
+        data: nowISO(),
+      });
+
       const chave = (nome: string) => txt(nome).trim().toLowerCase();
 
       /**
@@ -254,25 +281,6 @@ export const Cotacoes: React.FC<{
           comprado: true,
         });
       }
-
-      // Amarra à sessão de caixa aberta: sem isto o dinheiro sai do caixa
-      // mas não aparece no fechamento do dia, e a conta nunca bate.
-      const sessaoAberta = sessoes.find((s) => !s.fechadoEm);
-      await saveMovimento({
-        id: uid(),
-        tipo: "saida",
-        valor: total,
-        descricao: `Compra de peças — ${nomeForn(c.fornecedorId)}`,
-        categoria: "Compra de peça",
-        formaPagamento: "pix",
-        sessaoId: sessaoAberta?.id,
-        // Reposição de estoque: sai do caixa, mas não é despesa do resultado
-        compraEstoque: true,
-        // Sem custoRelacionado aqui: ele existe para marcar o custo embutido
-        // numa ENTRADA. Numa saída, o lucro já desconta pelo próprio valor —
-        // preencher os dois faria a compra ser descontada duas vezes.
-        data: nowISO(),
-      });
 
       await saveCotacao({ ...c, status: "comprada", compradoEm: nowISO() });
       setComprando(null);
