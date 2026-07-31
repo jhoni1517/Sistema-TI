@@ -20,7 +20,7 @@ import { Modal, Field, SectionTitle, EmptyState, InputNumero } from "../componen
 import { sangriaSugerida } from "../lib/desempenho";
 import { uid, nowISO, brl, formatDate, formatDateTime, txt } from "../lib/format";
 import { printHTML } from "../lib/print";
-import { reciboFechamento, reciboVenda } from "../lib/recibo";
+import { reciboFechamento, reciboVenda, reciboMovimento } from "../lib/recibo";
 import {
   resumoCaixa,
   movimentosDaSessao,
@@ -239,11 +239,29 @@ export const Caixa: React.FC = () => {
                     <div className="flex justify-end gap-1">
                       {/* Recibo só de venda: despesa e sangria são conta da
                           loja, não têm o que entregar para cliente nenhum. */}
-                      {m.tipo === "entrada" && (
+                      {m.tipo === "entrada" ? (
                         <button
                           className="btn-ghost !p-1.5 text-brand-600"
                           title="Imprimir recibo para o cliente"
                           onClick={() => imprimirVenda(m)}
+                        >
+                          <Receipt size={14} />
+                        </button>
+                      ) : (
+                        /* Sangria e saída também precisam de papel: com mais
+                           de uma pessoa no balcão, o único registro sendo a
+                           linha do sistema é o bastante para a conversa virar
+                           "eu não tirei nada". Duas assinaturas. */
+                        <button
+                          className="btn-ghost !p-1.5 text-slate-500"
+                          title="Comprovante de sangria / saída"
+                          onClick={() =>
+                            printHTML(
+                              reciboMovimento(m, config),
+                              "Comprovante",
+                              config.papelImpressao || "a4"
+                            )
+                          }
                         >
                           <Receipt size={14} />
                         </button>

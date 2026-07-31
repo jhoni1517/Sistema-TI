@@ -119,6 +119,7 @@ export const PDV: React.FC = () => {
    */
   const finalizarRef = useRef<() => void>(undefined);
   const limparRef = useRef<() => void>(undefined);
+  const consultaRef = useRef<() => void>(undefined);
 
   /**
    * Atalhos de balcão.
@@ -140,6 +141,9 @@ export const PDV: React.FC = () => {
       } else if (e.key === "F4") {
         e.preventDefault();
         limparRef.current?.();
+      } else if (e.key === "F3") {
+        e.preventDefault();
+        consultaRef.current?.();
       } else if (e.key === "Escape") {
         setTermo("");
         focarBusca();
@@ -291,6 +295,28 @@ export const PDV: React.FC = () => {
     focarBusca();
   };
 
+  /**
+   * Consulta de preço, sem lançar no carrinho.
+   *
+   * "Quanto é esse aqui?" no meio de outra venda obrigava a lançar o item,
+   * ler o preço e tirar de novo — com risco real de esquecer de tirar e o
+   * cliente pagar por algo que nem viu.
+   */
+  const consultarPreco = () => {
+    const t = termo.trim();
+    if (!t) return aviso.info("Passe o produto no leitor ou digite o nome, e aperte F3.");
+    const p = buscarProduto(produtos, t) || sugestoes[0];
+    if (!p) return aviso.alerta(`Nada encontrado para "${t}".`);
+    const promo = promocaoValendo(p);
+    aviso.info(
+      `${p.nome}\n\n${brl(precoEfetivo(p))}${p.porPeso ? " por quilo" : ""}` +
+        (promo ? `\nPromoção — de ${brl(p.preco)}` : "") +
+        (p.servico ? "" : `\n${p.quantidade}${p.porPeso ? " kg" : " un"} em estoque`)
+    );
+    setTermo("");
+    focarBusca();
+  };
+
   const limpar = () => {
     setItens([]);
     setDesconto(0);
@@ -389,6 +415,7 @@ export const PDV: React.FC = () => {
 
   finalizarRef.current = finalizar;
   limparRef.current = limpar;
+  consultaRef.current = consultarPreco;
 
   const imprimir = (v: Venda) => {
     printHTML(
@@ -404,7 +431,7 @@ export const PDV: React.FC = () => {
         title="Frente de caixa"
         subtitle={
           sessao
-            ? "Leia o código de barras ou digite o nome — F2 fecha a venda, F4 limpa"
+            ? "Leia o código ou digite o nome — F2 fecha, F3 consulta preço, F4 limpa"
             : "Caixa fechado — abra o caixa para a venda entrar no fechamento do dia"
         }
         action={

@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Wrench,
@@ -9,15 +9,25 @@ import {
   TrendingUp,
   Users,
   ArrowRight,
+  ShieldAlert,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { brl, isToday, codigoOS, formatDate, txt } from "../lib/format";
 import { receitaBruta, totalOS, lucroLiquido } from "../lib/calc";
 import { OS_STATUS_META, type OSStatus } from "../lib/types";
+import { conferirTudo, dinheiroEmRisco } from "../lib/integridade";
+import { Conferencia } from "../components/Conferencia";
 
 export const Dashboard: React.FC = () => {
-  const { ordens, clientes, produtos, movimentos, config } = useApp();
+  const { ordens, clientes, produtos, movimentos, vendas, fiados, sessoes, config } = useApp();
   const navigate = useNavigate();
+  const [conferindo, setConferindo] = useState(false);
+
+  const achados = useMemo(
+    () => conferirTudo({ ordens, vendas, movimentos, produtos, fiados, clientes, sessoes }),
+    [ordens, vendas, movimentos, produtos, fiados, clientes, sessoes]
+  );
+  const emRisco = dinheiroEmRisco(achados);
 
   const stats = useMemo(() => {
     const abertas = ordens.filter((o) => !["entregue", "cancelada"].includes(o.status));
@@ -76,6 +86,36 @@ export const Dashboard: React.FC = () => {
           </p>
         </button>
       </div>
+
+      {/* Conferência: o sistema apontando o próprio buraco.
+          Nada disso dá erro na hora — tudo aparece no fechamento do mês,
+          quando ninguém lembra mais o que aconteceu. */}
+      {achados.length > 0 && (
+        <button
+          onClick={() => setConferindo(true)}
+          className={`card mb-6 flex w-full flex-wrap items-center gap-3 text-left ${
+            emRisco > 0 ? "ring-2 ring-red-300" : "ring-1 ring-amber-200"
+          }`}
+        >
+          <ShieldAlert
+            size={22}
+            className={emRisco > 0 ? "text-red-500" : "text-amber-500"}
+          />
+          <span className="min-w-0 flex-1">
+            <span className="block font-bold text-slate-800">
+              {achados.length} ponto(s) para conferir no sistema
+            </span>
+            <span className="block text-sm text-slate-500">
+              {emRisco > 0
+                ? `${brl(emRisco)} entraram ou saíram sem registro certo.`
+                : "Estoque, dívidas e caixa com algo fora do lugar."}
+            </span>
+          </span>
+          <ArrowRight size={16} className="text-slate-400" />
+        </button>
+      )}
+
+      {conferindo && <Conferencia onClose={() => setConferindo(false)} />}
 
       {/* OS recentes */}
       <div className="card">

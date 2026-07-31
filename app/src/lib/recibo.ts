@@ -445,3 +445,54 @@ export function folhaDeEtiquetas(etiquetas: Etiqueta[], config: Config): string 
   </style>
   <div class="etqs">${celulas}</div>`;
 }
+
+/**
+ * Comprovante de sangria ou suprimento.
+ *
+ * Dinheiro que sai da gaveta para o cofre, ou que entra como troco, andava
+ * sem papel nenhum — e o único registro era a linha no sistema. Numa loja
+ * com mais de uma pessoa no balcão, isso é o suficiente para a conversa
+ * virar "eu não tirei nada".
+ *
+ * Duas assinaturas de propósito: quem entregou e quem recebeu.
+ */
+export function reciboMovimento(mov: MovimentoCaixa, config: Config): string {
+  const saida = mov.tipo === "sangria" || mov.tipo === "saida";
+  const titulo =
+    mov.tipo === "sangria"
+      ? "Comprovante de Sangria"
+      : saida
+        ? "Comprovante de Saída"
+        : "Comprovante de Suprimento";
+
+  return `
+  ${cab(config)}
+  <h2 class="center" style="margin-bottom:6px">${titulo}</h2>
+  <p class="center muted" style="margin-bottom:14px">${formatDateTime(mov.data)}</p>
+
+  <div class="box">
+    <div class="label">Descrição</div>
+    <div class="val"><b>${esc(mov.descricao) || "-"}</b></div>
+    ${mov.categoria ? `<div class="label">Categoria</div><div class="val">${esc(mov.categoria)}</div>` : ""}
+  </div>
+
+  <div class="tot">
+    <div class="line"><span>Forma</span><span style="text-transform:capitalize">${esc(
+      mov.formaPagamento
+    )}</span></div>
+    <div class="line grand"><span>Valor</span><span>${brl(Number(mov.valor) || 0)}</span></div>
+  </div>
+
+  <p style="margin-top:14px;font-size:12px">
+    ${
+      saida
+        ? `Retirado do caixa a importância de <b>${brl(Number(mov.valor) || 0)}</b> referente ao descrito acima.`
+        : `Acrescentado ao caixa a importância de <b>${brl(Number(mov.valor) || 0)}</b> referente ao descrito acima.`
+    }
+  </p>
+
+  <div class="sign">
+    <div>${saida ? "Quem retirou" : "Quem entregou"}</div>
+    <div>${saida ? "Quem recebeu" : "Quem guardou"}</div>
+  </div>`;
+}

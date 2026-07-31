@@ -14,9 +14,10 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { TrendingUp, DollarSign, Percent, Wrench, Users, Package } from "lucide-react";
+import { TrendingUp, DollarSign, Percent, Wrench, Users, Package , FileText } from "lucide-react";
 import { useApp } from "../store/AppStore";
-import { SectionTitle } from "../components/ui";
+import { SectionTitle, Field } from "../components/ui";
+import { csvDoPeriodo, nomeDoArquivo, limitesDoMes } from "../lib/contabil";
 import {
   comparativoRecente,
   ticketMedio,
@@ -117,6 +118,25 @@ export const Relatorios: React.FC = () => {
     return Object.entries(map).map(([name, value]) => ({ name, value }));
   }, [movimentos]);
 
+  const [mesContador, setMesContador] = useState(() => new Date().toISOString().slice(0, 7));
+
+  const exportarContador = () => {
+    const { de, ate } = limitesDoMes(mesContador);
+    if (!de) return;
+    const blob = new Blob(
+      // BOM na frente: sem ele o Excel abre "Peça" como "PeÃ§a", e o contador
+      // devolve o arquivo achando que veio corrompido.
+      ["\ufeff" + csvDoPeriodo(movimentos, de, ate)],
+      { type: "text/csv;charset=utf-8" }
+    );
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nomeDoArquivo(de, ate);
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const semana = useMemo(() => comparativoRecente(movimentos, 7), [movimentos]);
   const ticket = useMemo(() => ticketMedio(vendas), [vendas]);
   const pico = useMemo(() => horariosDePico(vendas), [vendas]);
@@ -139,6 +159,28 @@ export const Relatorios: React.FC = () => {
           </select>
         }
       />
+
+      {/* Arquivo do contador. Hoje a resposta é mandar print e ele
+          redigitar — cada redigitação é uma chance de erro, e "esse número
+          está diferente do que você me mandou" custa uma tarde dos dois. */}
+      <div className="card mb-6 flex flex-wrap items-end gap-3">
+        <Field label="Mês para o contador" className="max-w-[180px]">
+          <input
+            type="month"
+            className="input"
+            value={mesContador}
+            onChange={(e) => setMesContador(e.target.value)}
+          />
+        </Field>
+        <button className="btn-secondary" onClick={exportarContador}>
+          <FileText size={18} /> Baixar livro-caixa (CSV)
+        </button>
+        <p className="min-w-[220px] flex-1 text-xs text-slate-500">
+          Abre em qualquer planilha. Entrada e saída em colunas separadas, com os
+          totais dentro do arquivo — sem eles, a soma do contador pode dar diferente
+          da tela e ninguém sabe qual está certa.
+        </p>
+      </div>
 
       {/* Comparativo, ticket e pico: as perguntas que o dono faz de cabeça
           e erra — "vendi mais que semana passada?", "que horas enche?" */}
