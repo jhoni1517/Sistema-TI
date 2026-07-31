@@ -49,6 +49,43 @@ export function aposRetorno(produto: Produto, quantidade: number): number {
 }
 
 /**
+ * Uma gravação por produto, com o saldo final depois de TODAS as linhas.
+ *
+ * O laço ingênuo — `for (item) { acha o produto; grava }` — lê sempre a
+ * lista de produtos da tela, que só é atualizada depois que a função
+ * inteira termina. Com o MESMO produto em duas linhas, a segunda volta
+ * calcula em cima do saldo velho e sobrescreve a primeira: vende duas
+ * fontes, desce uma.
+ *
+ * Acontece mais do que parece. No balcão a peça entra duas vezes quando o
+ * atendente digita o nome numa linha e escolhe da lista na outra; na OS,
+ * quando a mesma peça aparece numa opção e como item fixo.
+ */
+export function saldosApos(
+  itens: { produtoId?: string; quantidade?: number }[],
+  produtos: Produto[],
+  direcao: "baixa" | "retorno" = "baixa"
+): { produto: Produto; quantidade: number }[] {
+  const somaPorProduto = new Map<string, number>();
+  for (const i of itens) {
+    if (!i.produtoId) continue;
+    somaPorProduto.set(i.produtoId, (somaPorProduto.get(i.produtoId) || 0) + n(i.quantidade));
+  }
+
+  const saidas: { produto: Produto; quantidade: number }[] = [];
+  for (const [id, total] of somaPorProduto) {
+    const produto = produtos.find((x) => x.id === id);
+    if (!produto || produto.servico) continue;
+    saidas.push({
+      produto,
+      quantidade:
+        direcao === "baixa" ? aposBaixa(produto, total) : aposRetorno(produto, total),
+    });
+  }
+  return saidas;
+}
+
+/**
  * O que vai ficar negativo se esta venda fechar agora.
  *
  * O aviso na hora de adicionar o item se perde: o balcão adiciona dez

@@ -17,7 +17,7 @@ import { aviso } from "../components/Aviso";
 import { useApp } from "../store/AppStore";
 import { SectionTitle, EmptyState, InputNumero } from "../components/ui";
 import { uid, nowISO, brl, txt } from "../lib/format";
-import { aposBaixa, faltaNoEstoque, avisoDeFalta } from "../lib/estoque";
+import { saldosApos, faltaNoEstoque, avisoDeFalta } from "../lib/estoque";
 import { printHTML } from "../lib/print";
 import { reciboPDV } from "../lib/recibo";
 import { sessaoAberta as achaSessaoAberta } from "../lib/caixa";
@@ -399,14 +399,11 @@ export const PDV: React.FC = () => {
       }
       await saveVenda({ ...venda, movimentoId });
 
-      for (const item of itens) {
-        if (!item.produtoId) continue;
-        const p = produtos.find((x) => x.id === item.produtoId);
-        if (!p || p.servico) continue;
-        await saveProduto({
-          ...p,
-          quantidade: aposBaixa(p, item.quantidade),
-        });
+      // Uma gravação por produto, com o saldo final. Descontar linha a
+      // linha lia sempre o saldo velho da tela: o mesmo produto em duas
+      // linhas descia uma vez só.
+      for (const { produto, quantidade } of saldosApos(itens, produtos)) {
+        await saveProduto({ ...produto, quantidade });
       }
 
       setUltima({ ...venda, movimentoId });

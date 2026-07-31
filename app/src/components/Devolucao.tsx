@@ -3,7 +3,7 @@ import { Undo2, Search, AlertTriangle } from "lucide-react";
 import { aviso } from "./Aviso";
 import { Modal, Field, InputNumero } from "./ui";
 import { useApp } from "../store/AppStore";
-import { aposRetorno } from "../lib/estoque";
+import { saldosApos } from "../lib/estoque";
 import { uid, nowISO, brl, formatDateTime } from "../lib/format";
 import { sessaoAberta as achaSessaoAberta } from "../lib/caixa";
 import {
@@ -115,16 +115,14 @@ export const Devolucao: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       // repor, e isso é normal: ele nunca saiu do estoque.
       const semVolta: string[] = [];
       for (const item of resumo.itens) {
-        const prod = produtos.find((p) => p.id === item.produtoId);
-        if (!prod) {
-          if (item.descricao) semVolta.push(item.descricao);
-          continue;
+        if (!produtos.some((p) => p.id === item.produtoId) && item.descricao) {
+          semVolta.push(item.descricao);
         }
-        if (prod.servico) continue;
-        await saveProduto({
-          ...prod,
-          quantidade: aposRetorno(prod, item.quantidade),
-        });
+      }
+      // Uma gravação por produto, com o saldo final: devolver duas linhas do
+      // mesmo item somava uma só, porque a segunda lia o saldo velho.
+      for (const { produto, quantidade } of saldosApos(resumo.itens, produtos, "retorno")) {
+        await saveProduto({ ...produto, quantidade });
       }
 
       if (semVolta.length > 0) {

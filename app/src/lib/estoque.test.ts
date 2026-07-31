@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { aposBaixa, aposRetorno, faltaNoEstoque, avisoDeFalta } from "./estoque";
+import { aposBaixa, aposRetorno, saldosApos, faltaNoEstoque, avisoDeFalta } from "./estoque";
 import type { Produto } from "./types";
 
 const prod = (p: Partial<Produto>): Produto =>
@@ -113,5 +113,68 @@ describe("o texto do aviso", () => {
   it("sem emoji: em alguns aparelhos chega como interrogação", () => {
     const t = avisoDeFalta([{ produto: prod({}), saida: 3, sobra: -2 }]);
     expect(t).not.toMatch(/\p{Extended_Pictographic}/u);
+  });
+});
+
+describe("uma gravação por produto, com o saldo final", () => {
+  const estoque = [
+    prod({ id: "p1", nome: "Fonte 500W", quantidade: 5 }),
+    prod({ id: "p2", nome: "SSD", quantidade: 2 }),
+    prod({ id: "s1", nome: "Instalação", servico: true, quantidade: 0 }),
+  ];
+
+  it("o MESMO produto em duas linhas desce as duas vezes", () => {
+    // Este era o bug: o laço lia o saldo da tela a cada volta, e a segunda
+    // gravação sobrescrevia a primeira. Vendia duas fontes, descia uma.
+    const r = saldosApos(
+      [
+        { produtoId: "p1", quantidade: 2 },
+        { produtoId: "p1", quantidade: 1 },
+      ],
+      estoque
+    );
+    expect(r).toHaveLength(1);
+    expect(r[0].quantidade).toBe(2);
+  });
+
+  it("produtos diferentes viram gravações diferentes", () => {
+    const r = saldosApos(
+      [
+        { produtoId: "p1", quantidade: 1 },
+        { produtoId: "p2", quantidade: 1 },
+      ],
+      estoque
+    );
+    expect(r.map((x) => [x.produto.id, x.quantidade])).toEqual([
+      ["p1", 4],
+      ["p2", 1],
+    ]);
+  });
+
+  it("item avulso e serviço não geram gravação", () => {
+    expect(
+      saldosApos([{ quantidade: 9 }, { produtoId: "s1", quantidade: 9 }], estoque)
+    ).toEqual([]);
+  });
+
+  it("produto que não existe mais não trava a venda", () => {
+    expect(saldosApos([{ produtoId: "sumiu", quantidade: 1 }], estoque)).toEqual([]);
+  });
+
+  it("na devolução, duas linhas do mesmo item somam as duas", () => {
+    const r = saldosApos(
+      [
+        { produtoId: "p2", quantidade: 1 },
+        { produtoId: "p2", quantidade: 3 },
+      ],
+      estoque,
+      "retorno"
+    );
+    expect(r[0].quantidade).toBe(6);
+  });
+
+  it("continua deixando negativo: o zero apagava a prova", () => {
+    const r = saldosApos([{ produtoId: "p2", quantidade: 5 }], estoque);
+    expect(r[0].quantidade).toBe(-3);
   });
 });

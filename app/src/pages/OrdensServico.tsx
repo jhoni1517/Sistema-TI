@@ -67,7 +67,7 @@ import {
   type Config,
 } from "../lib/types";
 import { travaAtendimento, classificacaoDe, travaFiado } from "../lib/clientes";
-import { aposBaixa } from "../lib/estoque";
+import { saldosApos } from "../lib/estoque";
 import { aoApagarOrdem, textoDaConfirmacao } from "../lib/exclusao";
 import {
   garantiaDaOS,
@@ -236,6 +236,10 @@ export const OrdensServico: React.FC = () => {
 
     // Só a alternativa escolhida sai da prateleira. Baixar as duas fontes
     // deixaria uma delas sumida do estoque sem nunca ter sido vendida.
+    // Primeiro resolve cada peça no estoque, depois grava. Descontar dentro
+    // do laço lia sempre o saldo velho da tela: a mesma peça em duas linhas
+    // (uma digitada, outra escolhida da lista) descia uma vez só.
+    const aBaixar: { produtoId: string; quantidade: number }[] = [];
     for (const p of pecasEfetivas(o)) {
       const nome = txt(p.descricao).trim().toLowerCase();
       const prod =
@@ -246,12 +250,10 @@ export const OrdensServico: React.FC = () => {
         if (nome) semVinculo.push(txt(p.descricao));
         continue;
       }
-      // Serviço não tem estoque para descontar
-      if (prod.servico) continue;
-      await saveProduto({
-        ...prod,
-        quantidade: aposBaixa(prod, p.quantidade),
-      });
+      aBaixar.push({ produtoId: prod.id, quantidade: Number(p.quantidade) || 0 });
+    }
+    for (const { produto, quantidade } of saldosApos(aBaixar, produtos)) {
+      await saveProduto({ ...produto, quantidade });
     }
 
     if (semVinculo.length > 0) {
