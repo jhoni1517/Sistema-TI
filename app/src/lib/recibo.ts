@@ -21,8 +21,21 @@ const esc = (v?: string | number | null): string =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
+/**
+ * Cabeçalho do documento impresso.
+ *
+ * A logo tem altura fixa em milímetros: definir em pixel dá tamanhos
+ * diferentes em cada impressora, e uma logo ocupando meia folha no papel
+ * térmico da bobina estraga o recibo inteiro.
+ */
 const cab = (config: Config) => `
   <div class="head">
+    ${
+      config.logoUrl
+        ? `<img src="${esc(config.logoUrl)}" alt=""
+             style="max-height:18mm;max-width:60mm;object-fit:contain;margin-bottom:4px" />`
+        : ""
+    }
     <h1>${esc(config.nomeLoja) || "Assistência Técnica"}</h1>
     ${config.enderecoLoja ? `<p>${esc(config.enderecoLoja)}</p>` : ""}
     <p>${[config.telefoneLoja, config.cnpj].filter(Boolean).map(esc).join(" · ")}</p>

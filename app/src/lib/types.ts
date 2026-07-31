@@ -194,6 +194,13 @@ export interface Produto {
   /** Código de barras — é por ele que o leitor do balcão acha o produto */
   codigoBarras?: string;
   /**
+   * Endereço da foto do produto no depósito de imagens.
+   *
+   * Só o endereço: o arquivo em si engordaria a linha, e "produtos" é lido
+   * inteiro em toda carga. Ver lib/imagens.ts.
+   */
+  imagemUrl?: string;
+  /**
    * Vendido por quilo. O campo "preco" passa a ser o preço do QUILO, e a
    * quantidade vendida é fracionária (0,315 kg). Mercearia e açougue.
    */
@@ -554,6 +561,11 @@ export interface Evento {
 
 export interface Config {
   nomeLoja: string;
+  /**
+   * Logo da loja, no cabeçalho do recibo impresso e da página do cliente.
+   * Só o endereço da imagem. Ver lib/imagens.ts.
+   */
+  logoUrl?: string;
   /**
    * Ramo de atividade da loja. Decide o vocabulário das telas e quais
    * módulos aparecem. Ausente = assistência técnica, que é como o sistema

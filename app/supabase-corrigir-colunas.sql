@@ -49,6 +49,9 @@ alter table produtos add column if not exists validade text;
 -- Código curto do produto na balança do balcão: é por ele que a frente de
 -- caixa reconhece a etiqueta impressa e já lança o peso.
 alter table produtos add column if not exists "codigoBalanca" text;
+-- Foto do produto. Só o endereço: o arquivo mora no depósito de imagens,
+-- porque "produtos" é lido inteiro em toda carga.
+alter table produtos add column if not exists "imagemUrl" text;
 
 -- ---------- Clientes ----------
 alter table clientes add column if not exists "tipoPessoa" text default 'fisica';

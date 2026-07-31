@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { aviso } from "../components/Aviso";
+import { ImagemUpload } from "../components/ImagemUpload";
 import { Store, KeyRound, Cloud, Download, Upload, Save, Database, Palette, Sun, Moon, Monitor, Percent, FileText, ShieldCheck } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { RAMO_META, temRecurso } from "../lib/ramos";
@@ -137,6 +138,20 @@ export const Config: React.FC = () => {
           <Field label="Endereço" className="sm:col-span-2">
             <input className="input" value={form.enderecoLoja} onChange={(e) => setForm({ ...form, enderecoLoja: e.target.value })} />
           </Field>
+
+          {/* A logo entra no recibo impresso e na página que o cliente abre.
+              É o que faz o papel parecer da loja e não de um sistema. */}
+          <div className="sm:col-span-2">
+            <ImagemUpload
+              label="Logo da loja"
+              url={form.logoUrl}
+              onChange={(logoUrl) => setForm({ ...form, logoUrl })}
+              pasta="logo"
+              lado={400}
+              formato="faixa"
+              dica="Aparece no recibo impresso e na página de acompanhamento do cliente. A imagem é enviada na hora — não precisa clicar em Salvar para ela subir."
+            />
+          </div>
 
           {/* O ramo é o que a loja CONTRATOU, não uma preferência: quem
               comprou mercearia podia se virar pizzaria sozinho e usar o que

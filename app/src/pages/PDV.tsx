@@ -310,8 +310,18 @@ export const PDV: React.FC = () => {
                   <button
                     key={p.id}
                     onClick={() => addProduto(p)}
-                    className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left hover:bg-slate-50"
+                    className="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left hover:bg-slate-50"
                   >
+                    {/* Com o balcão cheio, reconhecer pela foto é mais rápido
+                        do que ler o nome de dez itens parecidos. */}
+                    {p.imagemUrl && (
+                      <img
+                        src={p.imagemUrl}
+                        alt=""
+                        loading="lazy"
+                        className="h-8 w-8 shrink-0 rounded border border-slate-200 object-cover"
+                      />
+                    )}
                     <span className="min-w-0 flex-1 truncate">
                       <span className="text-sm font-medium text-slate-700">{p.nome}</span>
                       <span className="ml-2 text-xs text-slate-400">

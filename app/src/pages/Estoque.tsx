@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { aviso } from "../components/Aviso";
+import { ImagemUpload } from "../components/ImagemUpload";
 import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck, FileQuestion, Wrench, CalendarX } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
@@ -207,23 +208,37 @@ export const Estoque: React.FC = () => {
                 return (
                   <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="px-4 py-3">
-                      <p className="flex flex-wrap items-center gap-1.5 font-semibold text-slate-800">
-                        {p.nome}
-                        {(() => {
-                          const v = situacaoValidade(p);
-                          return v === "vencido" || v === "vence_perto" ? (
-                            <span className={`badge ${VALIDADE_META[v].cor}`}>
-                              {VALIDADE_META[v].label}
-                            </span>
-                          ) : null;
-                        })()}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        {nomeCat(p)}
-                        {p.sku ? ` · ${p.sku}` : ""}
-                        {p.porPeso ? " · por kg" : ""}
-                        {p.validade ? ` · vence ${formatDate(p.validade)}` : ""}
-                      </p>
+                      <div className="flex items-center gap-3">
+                        {/* Miniatura só quando existe: um quadro cinza vazio
+                            em cada linha só faz a lista ficar mais alta. */}
+                        {p.imagemUrl && (
+                          <img
+                            src={p.imagemUrl}
+                            alt=""
+                            loading="lazy"
+                            className="h-10 w-10 shrink-0 rounded-lg border border-slate-200 object-cover"
+                          />
+                        )}
+                        <div className="min-w-0">
+                          <p className="flex flex-wrap items-center gap-1.5 font-semibold text-slate-800">
+                            {p.nome}
+                            {(() => {
+                              const v = situacaoValidade(p);
+                              return v === "vencido" || v === "vence_perto" ? (
+                                <span className={`badge ${VALIDADE_META[v].cor}`}>
+                                  {VALIDADE_META[v].label}
+                                </span>
+                              ) : null;
+                            })()}
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            {nomeCat(p)}
+                            {p.sku ? ` · ${p.sku}` : ""}
+                            {p.porPeso ? " · por kg" : ""}
+                            {p.validade ? ` · vence ${formatDate(p.validade)}` : ""}
+                          </p>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-center">
                       {p.servico ? (
@@ -304,6 +319,19 @@ export const Estoque: React.FC = () => {
             <Field label="Código / SKU">
               <input className="input" value={editando.sku} onChange={(e) => setEditando({ ...editando, sku: e.target.value })} />
             </Field>
+
+            {/* Foto do produto: no balcão cheio, achar pela imagem é mais
+                rápido do que ler o nome de dez itens parecidos. */}
+            <div className="sm:col-span-2">
+              <ImagemUpload
+                label="Foto do produto"
+                url={editando.imagemUrl}
+                onChange={(imagemUrl) => setEditando({ ...editando, imagemUrl })}
+                pasta="produtos"
+                lado={600}
+                dica="Aparece na lista do estoque e na frente de caixa. Enviada na hora."
+              />
+            </div>
 
             {/* Recursos do ramo: só aparecem para quem realmente usa */}
             {(temRecurso(ramo, "peso") || temRecurso(ramo, "validade")) && (

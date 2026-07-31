@@ -137,6 +137,17 @@ orçamento. Ver `lib/orcamento.ts` e `supabase-migracao-opcoes-os.sql`.
 Antes de cobrar, o sistema pergunta se a escolha não foi confirmada: cobrar
 pela sugestão achando que é decisão do cliente só aparece no fechamento.
 
+### Imagem não mora no banco
+
+`produtos` é lido inteiro em toda carga. Cem produtos com foto em base64
+viram dezenas de MB a cada F5, no 4G do balcão. No banco fica só o endereço;
+o arquivo vai para o Storage, encolhido para 800px e JPEG **antes** de subir
+— a foto sai do celular com 4000px e 5 MB.
+
+O caminho é `<lojaId>/pasta/arquivo.jpg` e a política do Storage só deixa
+escrever na pasta da própria loja, com assinatura em dia. Caminho montado na
+tela não protege nada. Ver `lib/imagens.ts` e `supabase-migracao-imagens.sql`.
+
 ### Serviço não tem estoque
 
 `Produto.servico` existe porque o atendente digitava 99999999999 na
