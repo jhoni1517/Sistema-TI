@@ -129,8 +129,18 @@ export default async function handler(req, res) {
       novos.push({ loja_id: l.id, tipo, referencia });
     }
 
+    // Sem mensalidade nova a avisar, os OUTROS avisos ainda precisam sair.
+    // Antes o return curto aqui matava contas, agenda e fiado no mesmo dia:
+    // bastava nenhuma loja estar vencendo para o aviso do aluguel sumir.
     if (novos.length === 0) {
-      return res.status(200).json({ ok: true, enviados: 0, mensagem: "nada novo hoje" });
+      return res.status(200).json({
+        ok: true,
+        enviados: 0,
+        mensagem: "nenhuma mensalidade nova",
+        contas: await avisarContas(),
+        agenda: await avisarAgenda(),
+        fiado: await avisarFiado(),
+      });
     }
 
     // Monta o resumo
@@ -163,12 +173,14 @@ export default async function handler(req, res) {
 
     const contas = await avisarContas();
     const agenda = await avisarAgenda();
+    const fiado = await avisarFiado();
 
     return res.status(200).json({
       ok: true,
       enviados: enviou ? novos.length : 0,
       contas,
       agenda,
+      fiado,
       telegram: enviou ? "enviado" : "não configurado ou falhou",
     });
   } catch (e) {
@@ -363,4 +375,80 @@ async function aniversariosProximos(hoje) {
     else if (dias === 1) saida.push(`• ${c.nome} faz aniversário amanhã`);
   }
   return saida;
+}
+
+
+/**
+ * Fiado vencido, uma vez por semana.
+ *
+ * A tela "Quem chamar hoje" só alcança quem abre o sistema, e fiado vencido é
+ * exatamente o que se esquece: o valor não some da tela, mas ninguém abre a
+ * tela. Aqui chega no celular.
+ *
+ * Semanal, não diário, de propósito. Cobrança de bairro que aparece todo dia
+ * vira ruído e a pessoa para de ler o aviso inteiro — inclusive o de
+ * mensalidade, que é o que paga o sistema.
+ */
+async function avisarFiado() {
+  // Segunda-feira. Em outro dia nem consulta o banco.
+  if (new Date().getUTCDay() !== 1) return "fora do dia (só segunda)";
+
+  let fiados;
+  try {
+    fiados = await sb(
+      'fiados?select=id,"clienteId",descricao,valor,pagamentos,quitado,vencimento' +
+        "&quitado=is.false&vencimento=not.is.null"
+    );
+  } catch {
+    return "tabela de fiados ainda não existe";
+  }
+
+  const hoje = new Date().toISOString().slice(0, 10);
+  const atrasados = [];
+
+  for (const f of fiados || []) {
+    const venc = String(f.vencimento || "").slice(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(venc) || venc >= hoje) continue;
+    const pago = (f.pagamentos || []).reduce((s, p) => s + (Number(p.valor) || 0), 0);
+    const saldo = (Number(f.valor) || 0) - pago;
+    if (saldo <= 0) continue;
+    atrasados.push({
+      clienteId: f.clienteId,
+      descricao: f.descricao || "fiado",
+      saldo,
+      dias: Math.round(
+        (Date.parse(hoje + "T00:00:00Z") - Date.parse(venc + "T00:00:00Z")) / 86400000
+      ),
+    });
+  }
+
+  if (atrasados.length === 0) return "nenhum fiado vencido";
+
+  // Nomes num pedido só: uma consulta por devedor deixaria o cron lento e
+  // caro sem nenhum ganho.
+  let nomes = {};
+  try {
+    const ids = [...new Set(atrasados.map((a) => a.clienteId).filter(Boolean))];
+    if (ids.length > 0) {
+      const linhas = await sb(`clientes?select=id,nome&id=in.(${ids.join(",")})`);
+      for (const c of linhas || []) nomes[c.id] = c.nome;
+    }
+  } catch {
+    /* sem os nomes o aviso ainda serve: o valor é o que importa */
+  }
+
+  atrasados.sort((a, b) => b.dias - a.dias);
+  const total = atrasados.reduce((s, a) => s + a.saldo, 0);
+  const linhas = atrasados
+    .slice(0, 15)
+    .map(
+      (a) =>
+        `• ${nomes[a.clienteId] || "sem cliente"} — ${dinheiro(a.saldo)} (${a.dias}d)`
+    );
+  if (atrasados.length > 15) linhas.push(`• e mais ${atrasados.length - 15}`);
+
+  const enviou = await enviarTelegram(
+    `*Fiado vencido*\n${linhas.join("\n")}\n\nTotal: *${dinheiro(total)}*`
+  );
+  return enviou ? `${atrasados.length} avisado(s)` : "telegram não configurado";
 }

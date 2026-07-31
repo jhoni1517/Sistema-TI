@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from "react";
 import { aviso } from "../components/Aviso";
-import { Plus, Search, Pencil, Trash2, Users, Phone, MessageCircle, Wrench, User, Building2, ShieldAlert } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Users, Phone, MessageCircle, Wrench, User, Building2, ShieldAlert, Cake } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { uid, nowISO, whatsappLink, formatDate, brl, txt, mascaraDocumento, soDigitos, documentoValido } from "../lib/format";
 import { avaliarCliente, classificacaoDe, travaFiado } from "../lib/clientes";
+import { Relacionamento } from "../components/Relacionamento";
 import { CLASSIFICACAO_META, type Classificacao, type Cliente } from "../lib/types";
 
 const vazio = (): Cliente => ({
@@ -23,6 +24,7 @@ export const Clientes: React.FC = () => {
   const { clientes, ordens, fiados, saveCliente, removeCliente } = useApp();
   const [busca, setBusca] = useState("");
   const [editando, setEditando] = useState<Cliente | null>(null);
+  const [relacionamento, setRelacionamento] = useState(false);
   const [filtroClasse, setFiltroClasse] = useState<Classificacao | "todos">("todos");
 
   const juridica = editando?.tipoPessoa === "juridica";
@@ -94,11 +96,18 @@ export const Clientes: React.FC = () => {
         title="Clientes"
         subtitle={`${clientes.length} cadastrado(s)`}
         action={
-          <button className="btn-primary" onClick={() => setEditando(vazio())}>
-            <Plus size={18} /> Novo cliente
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button className="btn-secondary" onClick={() => setRelacionamento(true)}>
+              <Cake size={18} /> Quem chamar hoje
+            </button>
+            <button className="btn-primary" onClick={() => setEditando(vazio())}>
+              <Plus size={18} /> Novo cliente
+            </button>
+          </div>
         }
       />
+
+      {relacionamento && <Relacionamento onClose={() => setRelacionamento(false)} />}
 
       <div className="mb-4 flex flex-wrap gap-2">
         {(["todos", "normal", "atencao", "bloqueado"] as const).map((f) => (

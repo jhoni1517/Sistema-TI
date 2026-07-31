@@ -91,6 +91,45 @@ export const PDV: React.FC = () => {
     focarBusca();
   }, []);
 
+  /**
+   * O atalho precisa sempre chamar a versão ATUAL da função.
+   *
+   * Prender a função de fechar venda no efeito uma vez só congelaria o
+   * carrinho daquele instante: F2 fecharia a venda anterior, com os itens e
+   * o valor antigos.
+   */
+  const finalizarRef = useRef<() => void>(undefined);
+  const limparRef = useRef<() => void>(undefined);
+
+  /**
+   * Atalhos de balcão.
+   *
+   * Com fila, tirar a mão do teclado para achar o botão de pagar custa mais
+   * do que parece — e o leitor de código de barras já mantém o foco no campo
+   * de busca o tempo todo. F2 fecha a venda, F4 limpa o carrinho, Esc apaga
+   * o que está digitado sem mexer no carrinho.
+   *
+   * Não usa Ctrl+letra de propósito: quase toda combinação dessas já é do
+   * navegador, e o que o operador ganharia num atalho perderia numa aba
+   * fechada sem querer no meio da venda.
+   */
+  useEffect(() => {
+    const atalho = (e: KeyboardEvent) => {
+      if (e.key === "F2") {
+        e.preventDefault();
+        finalizarRef.current?.();
+      } else if (e.key === "F4") {
+        e.preventDefault();
+        limparRef.current?.();
+      } else if (e.key === "Escape") {
+        setTermo("");
+        focarBusca();
+      }
+    };
+    window.addEventListener("keydown", atalho);
+    return () => window.removeEventListener("keydown", atalho);
+  }, []);
+
   const total = totalVenda({ itens, desconto });
   const bruto = subtotalVenda(itens);
   const troco = trocoDe(total, recebido);
@@ -254,6 +293,9 @@ export const PDV: React.FC = () => {
     }
   };
 
+  finalizarRef.current = finalizar;
+  limparRef.current = limpar;
+
   const imprimir = (v: Venda) => {
     printHTML(
       reciboPDV(v, config, clientes.find((c) => c.id === v.clienteId)),
@@ -267,7 +309,7 @@ export const PDV: React.FC = () => {
         title="Frente de caixa"
         subtitle={
           sessao
-            ? "Leia o código de barras ou digite o nome do produto"
+            ? "Leia o código de barras ou digite o nome — F2 fecha a venda, F4 limpa"
             : "Caixa fechado — abra o caixa para a venda entrar no fechamento do dia"
         }
         action={

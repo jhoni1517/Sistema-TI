@@ -148,6 +148,28 @@ O caminho é `<lojaId>/pasta/arquivo.jpg` e a política do Storage só deixa
 escrever na pasta da própria loja, com assinatura em dia. Caminho montado na
 tela não protege nada. Ver `lib/imagens.ts` e `supabase-migracao-imagens.sql`.
 
+### O que a vitrine pública mostra é decidido no banco
+
+O catálogo e o rastreio abrem sem login. Filtrar campo na tela não esconde
+nada de quem abre o painel do navegador: o corte é feito na função SQL, que
+é a única porta — as políticas de leitura das tabelas continuam exigindo
+login.
+
+Do catálogo saem nome, foto, preço e "tem ou não tem". Nunca custo, margem,
+fornecedor nem quantidade exata: concorrente também abre o link.
+
+O catálogo nasce desligado em toda loja (`lojas.catalogo_ativo`). Ninguém
+publica preço sem escolher publicar.
+
+### Regra de preço é uma só, e ela vive em dois lugares
+
+`precoEfetivo` (promoção com prazo) manda no PDV, na etiqueta da balança, na
+etiqueta de prateleira e no catálogo. A mesma conta está em SQL, porque a
+página pública calcula sozinha.
+
+Tela que lê `produto.preco` direto faz a gôndola dizer um valor e o caixa
+cobrar outro — e quem aparece como mentiroso é a loja, não o sistema.
+
 ### Serviço não tem estoque
 
 `Produto.servico` existe porque o atendente digitava 99999999999 na

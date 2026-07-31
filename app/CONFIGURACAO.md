@@ -123,7 +123,8 @@ https://supabase.com/dashboard/project/nviagibefxqtognowqwe/sql/new:
 10. `supabase-migracao-ramo-loja.sql`
 11. `supabase-migracao-opcoes-os.sql`
 12. `supabase-migracao-imagens.sql`
-13. `supabase-corrigir-colunas.sql`
+13. `supabase-migracao-catalogo.sql`
+14. `supabase-corrigir-colunas.sql`
 
 O de número 11 é o que faz a página do cliente entender mais de um orçamento
 na mesma OS ("fonte de 500W mais SSD" contra "só a fonte de 200W"). Sem ele,
@@ -137,6 +138,17 @@ O de número 12 cria o depósito de imagens (logo da loja e foto de produto) e
 as regras de quem pode escrever nele. Não precisa mexer no painel de Storage
 na mão. As imagens ficam abertas para quem tiver o endereço — elas aparecem
 no recibo impresso e na página que o cliente abre sem login.
+
+O de número 13 cria o catálogo público. Ele nasce DESLIGADO em toda loja:
+ninguém publica preço sem escolher publicar. Para ligar o de uma loja:
+
+```sql
+update lojas set catalogo_ativo = true,
+       catalogo_recado = 'Entrega no bairro. Chame no WhatsApp.'
+ where nome = 'NOME DA LOJA';
+```
+
+O link fica em Configurações → Dados da loja → Catálogo público.
 
 O último é seguro rodar quantas vezes quiser e é o primeiro lugar a olhar
 quando aparecer `Could not find the 'xxx' column of 'yyy' in the schema
