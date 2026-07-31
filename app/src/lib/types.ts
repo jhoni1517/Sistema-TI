@@ -459,6 +459,12 @@ export interface Venda {
   formaPagamento: FormaPagamento;
   /** Dinheiro entregue pelo cliente, para calcular o troco */
   valorRecebido?: number;
+  /**
+   * Venda dividida em mais de uma forma ("50 no cartão e o resto em
+   * dinheiro"). Quando existe, `formaPagamento` guarda a de MAIOR valor, só
+   * para as telas de uma linha só. Ver lib/pagamento.ts.
+   */
+  pagamentos?: { forma: FormaPagamento; valor: number; recebido?: number }[];
   clienteId?: ID;
   /** Lançamento correspondente no caixa */
   movimentoId?: ID;

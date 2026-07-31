@@ -84,6 +84,10 @@ alter table fiados add column if not exists "osId" text;
 -- Devoluções da venda. Ficam na própria venda para que "quanto ainda pode
 -- voltar" seja uma conta e não um palpite do atendente.
 alter table vendas add column if not exists devolucoes jsonb default '[]'::jsonb;
+-- Venda dividida em mais de uma forma de pagamento. Sem isto o atendente
+-- lançava tudo como dinheiro e o fechamento acusava sobra no cartão e falta
+-- na gaveta todo dia, sem ninguém achar a origem.
+alter table vendas add column if not exists pagamentos jsonb default '[]'::jsonb;
 
 -- ---------- Sessões de caixa ----------
 alter table sessoes add column if not exists observacoes text;

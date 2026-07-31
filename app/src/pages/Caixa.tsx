@@ -96,19 +96,24 @@ export const Caixa: React.FC = () => {
   };
 
   const imprimirResumo = () => {
-    printHTML(reciboFechamento(sessaoAberta, movsSessao, config), "Fechamento de caixa");
+    printHTML(
+      reciboFechamento(sessaoAberta, movsSessao, config),
+      "Fechamento de caixa",
+      config.papelImpressao || "a4"
+    );
   };
 
   /** Recibo da compra, para o cliente levar. Nada de despesa nem sangria. */
   const imprimirVenda = (m: MovimentoCaixa) => {
     const cli = clientes.find((c) => c.id === m.clienteId);
-    printHTML(reciboVenda(m, config, cli), "Recibo de venda");
+    printHTML(reciboVenda(m, config, cli), "Recibo de venda", config.papelImpressao || "a4");
   };
 
   const imprimirFechamentoAntigo = (s: SessaoCaixa) => {
     printHTML(
       reciboFechamento(s, movimentosDaSessao(s, movimentos), config),
-      "Fechamento de caixa"
+      "Fechamento de caixa",
+      config.papelImpressao || "a4"
     );
   };
 

@@ -6,6 +6,7 @@ import { opcaoDaPeca, opcaoAtual, subtotalPeca } from "./orcamento";
 import { resumoCaixa, conferencia, CONFERENCIA_META } from "./caixa";
 import { subtotalItem, subtotalVenda, totalVenda, trocoDe } from "./pdv";
 import { barrasEAN13, precoDaEtiqueta, type Etiqueta } from "./etiqueta";
+import { trocoDoPagamento } from "./pagamento";
 
 /**
  * Escapa texto antes de entrar no HTML do recibo.
@@ -286,14 +287,35 @@ export function reciboPDV(
     ${desconto > 0 ? `<div class="line"><span>Subtotal</span><span>${brl(bruto)}</span></div>` : ""}
     ${desconto > 0 ? `<div class="line"><span>Desconto</span><span>- ${brl(desconto)}</span></div>` : ""}
     <div class="line grand"><span>Total</span><span>${brl(total)}</span></div>
-    <div class="line"><span>Pagamento</span><span style="text-transform:capitalize">${esc(
-      v.formaPagamento
-    )}</span></div>
     ${
-      v.formaPagamento === "dinheiro" && recebido > 0
-        ? `<div class="line"><span>Recebido</span><span>${brl(recebido)}</span></div>
-           <div class="line"><span>Troco</span><span>${brl(trocoDe(total, recebido))}</span></div>`
-        : ""
+      // Venda dividida mostra CADA forma. Um cupom dizendo só "crédito" numa
+      // venda de 200 com 10 em espécie não bate com o que o cliente pagou —
+      // e é o cupom que ele leva para conferir.
+      (v.pagamentos || []).length > 1
+        ? (v.pagamentos || [])
+            .map(
+              (pg) =>
+                `<div class="line"><span style="text-transform:capitalize">${esc(
+                  pg.forma
+                )}</span><span>${brl(Number(pg.valor) || 0)}</span></div>`
+            )
+            .join("")
+        : `<div class="line"><span>Pagamento</span><span style="text-transform:capitalize">${esc(
+            v.formaPagamento
+          )}</span></div>`
+    }
+    ${
+      (v.pagamentos || []).length > 1
+        ? (() => {
+            const t = trocoDoPagamento(total, v.pagamentos || []);
+            return t > 0
+              ? `<div class="line"><span>Troco</span><span>${brl(t)}</span></div>`
+              : "";
+          })()
+        : v.formaPagamento === "dinheiro" && recebido > 0
+          ? `<div class="line"><span>Recebido</span><span>${brl(recebido)}</span></div>
+             <div class="line"><span>Troco</span><span>${brl(trocoDe(total, recebido))}</span></div>`
+          : ""
     }
   </div>
 

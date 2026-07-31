@@ -35,21 +35,21 @@ export const faltaNoPagamento = (total: number, parcelas: Parcela[]): number =>
 /**
  * Troco.
  *
+ * O troco é a diferença entre o que o cliente ENTREGOU em espécie e o que
+ * ele de fato pagou em espécie. Ele não depende do total da venda, porque a
+ * soma das formas sempre fecha com o total — o excesso vive em `recebido`,
+ * nunca em `valor`.
+ *
  * Só sai de dinheiro. Passar R$ 100 no cartão numa compra de R$ 80 não gera
  * R$ 20 de troco — gera estorno, e devolver isso da gaveta é prejuízo puro
  * que só aparece na conferência.
  */
-export function trocoDoPagamento(total: number, parcelas: Parcela[]): number {
+export function trocoDoPagamento(_total: number, parcelas: Parcela[]): number {
   const emDinheiro = parcelas.filter((p) => p.forma === "dinheiro");
   if (emDinheiro.length === 0) return 0;
-
-  // O que o cliente entregou em espécie, e o que as OUTRAS formas cobriram.
   const entregue = emDinheiro.reduce((s, p) => s + n(p.recebido ?? p.valor), 0);
-  const outras = parcelas
-    .filter((p) => p.forma !== "dinheiro")
-    .reduce((s, p) => s + n(p.valor), 0);
-
-  return centavos(Math.max(0, entregue + outras - n(total)));
+  const lancado = emDinheiro.reduce((s, p) => s + n(p.valor), 0);
+  return centavos(Math.max(0, entregue - lancado));
 }
 
 /**
@@ -69,13 +69,26 @@ export function problemaNoPagamento(total: number, parcelas: Parcela[]): string 
   const falta = faltaNoPagamento(total, validas);
   if (falta > 0) return `Faltam ${falta.toFixed(2)} para fechar a venda.`;
 
-  // Pagar a mais só é permitido em dinheiro, porque só de dinheiro sai troco.
-  const semDinheiro = validas.every((p) => p.forma !== "dinheiro");
+  /*
+   * A soma das formas precisa fechar EXATO com o total.
+   *
+   * Este é o furo que a revisão pegou: numa venda de 100 com 60 no cartão, o
+   * atendente digitava 50 em dinheiro e o sistema aceitava — lançando 110 no
+   * caixa por uma venda de 100. A sobra aparecia na conferência da gaveta
+   * dias depois, sem origem.
+   *
+   * Dinheiro a mais na mão do cliente é `recebido`, não `valor`: é de lá que
+   * o troco sai, e é o `valor` que vira lançamento no caixa.
+   */
   const pago = totalPago(validas);
-  if (semDinheiro && pago > n(total)) {
+  if (pago > n(total)) {
+    const sobra = centavos(pago - n(total));
     return (
       `As formas somam ${pago.toFixed(2)} numa venda de ${n(total).toFixed(2)}. ` +
-      "Sem dinheiro em espécie não há troco a dar — ajuste os valores."
+      `Tire ${sobra.toFixed(2)} de alguma delas` +
+      (validas.some((p) => p.forma === "dinheiro")
+        ? " — se o cliente entregou a mais em espécie, ponha o valor entregue no campo Recebido."
+        : ".")
     );
   }
 

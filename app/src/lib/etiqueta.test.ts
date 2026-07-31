@@ -138,3 +138,64 @@ describe("desenho das barras", () => {
     expect(barrasEAN13(codigoInterno(1), 50)).toContain('height="50"');
   });
 });
+
+/**
+ * Trava das tabelas do EAN-13.
+ *
+ * Os testes acima só olham a estrutura: um dígito trocado dentro das tabelas
+ * de codificação passaria por eles e produziria uma etiqueta que o leitor
+ * simplesmente não lê — descoberto depois de colar cem delas na prateleira.
+ *
+ * Aqui o desenho de um código conhecido é comparado bit a bit com o que a
+ * norma manda. O código 5901234123457 é o exemplo padrão do EAN-13.
+ */
+describe("as tabelas do EAN-13 estão certas", () => {
+  /** Reconstrói a sequência de barras a partir dos retângulos do SVG */
+  const bitsDe = (svg: string, largura: number): string => {
+    const marcados = new Set([...svg.matchAll(/x="(\d+)"/g)].map((m) => Number(m[1])));
+    return Array.from({ length: largura }, (_, i) => (marcados.has(i) ? "1" : "0")).join("");
+  };
+
+  it("desenha 5901234123457 exatamente como a norma manda", () => {
+    // Primeiro dígito 5 -> paridade ABBAAB na metade esquerda.
+    const esperado =
+      "101" +
+      "0001011" + // 9 tabela A
+      "0100111" + // 0 tabela B
+      "0110011" + // 1 tabela B
+      "0010011" + // 2 tabela A
+      "0111101" + // 3 tabela A
+      "0011101" + // 4 tabela B
+      "01010" +
+      "1100110" + // 1 direita
+      "1101100" + // 2
+      "1000010" + // 3
+      "1011100" + // 4
+      "1001110" + // 5
+      "1000100" + // 7
+      "101";
+
+    expect(esperado).toHaveLength(95);
+    expect(bitsDe(barrasEAN13("5901234123457"), 95)).toBe(esperado);
+  });
+
+  it("o dígito verificador do exemplo padrão fecha", () => {
+    expect(ean13Valido("5901234123457")).toBe(true);
+  });
+
+  it("guardas de início, meio e fim nas posições exatas", () => {
+    // Fora do lugar, o leitor não acha onde o código começa.
+    const bits = bitsDe(barrasEAN13(codigoInterno(7)), 95);
+    expect(bits.slice(0, 3)).toBe("101");
+    expect(bits.slice(45, 50)).toBe("01010");
+    expect(bits.slice(92)).toBe("101");
+  });
+
+  it("a metade esquerda sempre começa com zero e a direita com um", () => {
+    // É essa diferença que deixa o leitor descobrir se o código passou de
+    // trás para frente.
+    const bits = bitsDe(barrasEAN13(codigoInterno(123)), 95);
+    for (let i = 0; i < 6; i++) expect(bits[3 + i * 7]).toBe("0");
+    for (let i = 0; i < 6; i++) expect(bits[50 + i * 7]).toBe("1");
+  });
+});

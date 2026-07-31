@@ -1035,7 +1035,11 @@ const OSDetalhe: React.FC<{
   // o link leva a loja: a consulta pública só devolve dados desta loja
   const trackingUrl = `${window.location.origin}${window.location.pathname}#/rastreio/${codigoOS(os.numero)}?loja=${obterLoja() || ""}`;
   const imprimir = () => {
-    printHTML(reciboOS(os, cliente, config, { incluirCliente }), codigoOS(os.numero));
+    printHTML(
+      reciboOS(os, cliente, config, { incluirCliente }),
+      codigoOS(os.numero),
+      config.papelImpressao || "a4"
+    );
   };
   const linkRastreio = () => {
     const url = trackingUrl;

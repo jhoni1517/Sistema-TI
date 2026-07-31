@@ -85,10 +85,9 @@ export const Etiquetas: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
   const imprimir = () => {
     if (escolhidos.length === 0) return aviso.alerta("Escolha ao menos um produto.");
-    printHTML(
-      folhaDeEtiquetas(etiquetasDe(escolhidos, quantidades), config),
-      "Etiquetas"
-    );
+    // Sempre A4: a folha de etiquetas é uma grade de três colunas, e forçar
+    // isso na bobina de 48mm cortaria duas delas.
+    printHTML(folhaDeEtiquetas(etiquetasDe(escolhidos, quantidades), config), "Etiquetas", "a4");
   };
 
   return (

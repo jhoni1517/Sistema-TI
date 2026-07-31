@@ -38,9 +38,11 @@ export const EntradaNota: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [gravando, setGravando] = useState(false);
 
   const sessao = useMemo(() => achaSessaoAberta(sessoes), [sessoes]);
-  const entrada = { itens, frete, desconto };
+  // useMemo aqui: "entrada" é recriado a cada render, então o cache nunca
+  // valia e as dependências declaradas mentiam sobre o que ele observa.
+  const entrada = useMemo(() => ({ itens, frete, desconto }), [itens, frete, desconto]);
   const problema = problemaNaEntrada(entrada, produtos);
-  const avisos = useMemo(() => avisosDeMargem(entrada, produtos), [itens, frete, desconto, produtos]);
+  const avisos = useMemo(() => avisosDeMargem(entrada, produtos), [entrada, produtos]);
 
   const sugestoes = useMemo(() => {
     const t = txt(busca).trim().toLowerCase();

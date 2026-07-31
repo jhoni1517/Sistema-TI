@@ -41,6 +41,14 @@ import {
   VALIDADE_META,
 } from "../lib/pdv";
 import { precoEfetivo, promocaoValendo } from "../lib/promocao";
+import {
+  trocoDoPagamento,
+  faltaNoPagamento,
+  problemaNoPagamento,
+  consolidar,
+  formaPrincipal,
+  type Parcela,
+} from "../lib/pagamento";
 import { Devolucao } from "../components/Devolucao";
 import type {
   FormaPagamento,
@@ -76,6 +84,16 @@ export const PDV: React.FC = () => {
   const [desconto, setDesconto] = useState(0);
   const [forma, setForma] = useState<FormaPagamento>("dinheiro");
   const [recebido, setRecebido] = useState<number | undefined>(undefined);
+  /**
+   * Venda dividida ("50 no cartão e o resto em dinheiro").
+   *
+   * Vazio = uma forma só, que é a esmagadora maioria e não pode ficar mais
+   * lenta por causa da exceção. Quando alguém divide, cada forma vira um
+   * lançamento próprio no caixa — senão o fechamento acusa sobra no cartão e
+   * falta na gaveta, todo dia, sem origem rastreável.
+   */
+  const [parcelas, setParcelas] = useState<Parcela[]>([]);
+  const dividido = parcelas.length > 0;
   const [clienteId, setClienteId] = useState("");
   const [gravando, setGravando] = useState(false);
   const [ultima, setUltima] = useState<Venda | null>(null);
@@ -133,8 +151,8 @@ export const PDV: React.FC = () => {
 
   const total = totalVenda({ itens, desconto });
   const bruto = subtotalVenda(itens);
-  const troco = trocoDe(total, recebido);
-  const falta = faltaPara(total, recebido);
+  const troco = dividido ? trocoDoPagamento(total, parcelas) : trocoDe(total, recebido);
+  const falta = dividido ? faltaNoPagamento(total, parcelas) : faltaPara(total, recebido);
   const sugestoes = useMemo(() => sugerirProdutos(produtos, termo), [produtos, termo]);
 
   const proximoNumero = useMemo(
@@ -277,6 +295,7 @@ export const PDV: React.FC = () => {
     setItens([]);
     setDesconto(0);
     setRecebido(undefined);
+    setParcelas([]);
     setClienteId("");
     setTermo("");
     focarBusca();
@@ -287,7 +306,10 @@ export const PDV: React.FC = () => {
     if (itens.some((i) => (Number(i.precoUnit) || 0) <= 0)) {
       return aviso.alerta("Tem item sem preço. Informe o valor antes de fechar.");
     }
-    if (forma === "dinheiro" && falta > 0 && recebido !== undefined) {
+    if (dividido) {
+      const erro = problemaNoPagamento(total, parcelas);
+      if (erro) return aviso.alerta(erro);
+    } else if (forma === "dinheiro" && falta > 0 && recebido !== undefined) {
       return aviso.alerta(`Faltam ${brl(falta)} para fechar a venda.`);
     }
     if (gravando) return; // clique duplo no balcão acontece o tempo todo
@@ -298,8 +320,9 @@ export const PDV: React.FC = () => {
       numero: proximoNumero,
       itens,
       desconto,
-      formaPagamento: forma,
+      formaPagamento: dividido ? formaPrincipal(parcelas) : forma,
       valorRecebido: forma === "dinheiro" ? recebido : undefined,
+      pagamentos: dividido ? consolidar(parcelas) : undefined,
       clienteId: clienteId || undefined,
       sessaoId: sessao?.id,
       criadoEm: nowISO(),
@@ -309,20 +332,36 @@ export const PDV: React.FC = () => {
       // A ordem importa: dinheiro primeiro. Se algo falhar depois, sobra
       // lançamento sem baixa — que se conserta olhando o estoque. O
       // contrário some com a venda e ninguém percebe.
-      const movimento: MovimentoCaixa = {
-        id: uid(),
-        tipo: "entrada",
-        categoria: "Venda",
-        descricao: `Venda ${venda.numero} (${itens.length} item(ns))`,
-        valor: total,
-        formaPagamento: forma,
-        clienteId: clienteId || undefined,
-        custoRelacionado: custoVenda(itens),
-        data: nowISO(),
-        sessaoId: sessao?.id,
-      };
-      await saveMovimento(movimento);
-      await saveVenda({ ...venda, movimentoId: movimento.id });
+      // Um lançamento POR FORMA. O fechamento do caixa separa o dinheiro da
+      // gaveta do que caiu na maquininha; um lançamento só, com a forma
+      // "principal", jogaria os R$ 10 em espécie dentro do cartão.
+      const formas = dividido
+        ? consolidar(parcelas)
+        : [{ forma, valor: total, recebido }];
+      const custo = custoVenda(itens);
+      let movimentoId = "";
+      for (const [i, f] of formas.entries()) {
+        const movimento: MovimentoCaixa = {
+          id: uid(),
+          tipo: "entrada",
+          categoria: "Venda",
+          descricao:
+            `Venda ${venda.numero} (${itens.length} item(ns))` +
+            (formas.length > 1 ? ` - ${f.forma}` : ""),
+          valor: f.valor,
+          formaPagamento: f.forma,
+          clienteId: clienteId || undefined,
+          // O custo vai INTEIRO no primeiro lançamento. Dividir o CMV entre
+          // as formas de pagamento não significa nada e só dificultaria
+          // conferir de onde saiu cada número.
+          custoRelacionado: i === 0 ? custo : 0,
+          data: nowISO(),
+          sessaoId: sessao?.id,
+        };
+        await saveMovimento(movimento);
+        if (i === 0) movimentoId = movimento.id;
+      }
+      await saveVenda({ ...venda, movimentoId });
 
       for (const item of itens) {
         if (!item.produtoId) continue;
@@ -334,12 +373,10 @@ export const PDV: React.FC = () => {
         });
       }
 
-      setUltima({ ...venda, movimentoId: movimento.id });
+      setUltima({ ...venda, movimentoId });
       limpar();
       aviso.sucesso(
-        forma === "dinheiro" && troco > 0
-          ? `Venda registrada. Troco: ${brl(troco)}`
-          : "Venda registrada."
+        troco > 0 ? `Venda registrada. Troco: ${brl(troco)}` : "Venda registrada."
       );
     } catch (e) {
       aviso.erro(
@@ -623,39 +660,173 @@ export const PDV: React.FC = () => {
           <p className="text-xs uppercase tracking-wide text-slate-400">Total</p>
           <p className="mb-4 text-4xl font-bold text-slate-800">{brl(total)}</p>
 
-          <div className="mb-3 grid grid-cols-2 gap-2">
-            {FORMAS.map((f) => (
+          {!dividido ? (
+            <>
+              <div className="mb-3 grid grid-cols-2 gap-2">
+                {FORMAS.map((f) => (
+                  <button
+                    key={f.k}
+                    onClick={() => setForma(f.k)}
+                    className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${
+                      forma === f.k
+                        ? "border-brand-500 bg-brand-50 text-brand-700"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    {f.nome}
+                  </button>
+                ))}
+              </div>
+
+              {/* Troco só no dinheiro: no cartão não existe troco */}
+              {forma === "dinheiro" && (
+                <div className="mb-3">
+                  <label className="label">Valor recebido</label>
+                  <InputNumero
+                    className="input"
+                    placeholder={brl(total)}
+                    value={recebido}
+                    onChange={setRecebido}
+                  />
+                  {recebido !== undefined && (
+                    <p
+                      className={`mt-1 text-lg font-bold ${
+                        falta > 0 ? "text-red-600" : "text-emerald-600"
+                      }`}
+                    >
+                      {falta > 0 ? `Falta ${brl(falta)}` : `Troco ${brl(troco)}`}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Dividir é exceção: fica atrás de um clique para não deixar
+                  a venda normal mais lenta por causa dela. */}
               <button
-                key={f.k}
-                onClick={() => setForma(f.k)}
-                className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${
-                  forma === f.k
-                    ? "border-brand-500 bg-brand-50 text-brand-700"
-                    : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                className="mb-3 text-xs text-brand-600 underline"
+                onClick={() =>
+                  setParcelas([
+                    { forma, valor: total },
+                    { forma: forma === "dinheiro" ? "pix" : "dinheiro", valor: 0 },
+                  ])
+                }
+              >
+                Dividir em mais de uma forma
+              </button>
+            </>
+          ) : (
+            <div className="mb-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="label !mb-0">Formas de pagamento</label>
+                <button
+                  className="text-xs text-slate-500 underline"
+                  onClick={() => setParcelas([])}
+                >
+                  Voltar para uma forma
+                </button>
+              </div>
+
+              {parcelas.map((pc, i) => (
+                <div key={i} className="flex flex-wrap items-center gap-2">
+                  <select
+                    className="input !w-auto !py-1.5 flex-1 text-sm"
+                    value={pc.forma}
+                    onChange={(e) =>
+                      setParcelas((v) =>
+                        v.map((x, n) =>
+                          n === i ? { ...x, forma: e.target.value as FormaPagamento } : x
+                        )
+                      )
+                    }
+                  >
+                    {FORMAS.map((f) => (
+                      <option key={f.k} value={f.k}>
+                        {f.nome}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="w-28">
+                    <InputNumero
+                      className="input !py-1.5 text-sm"
+                      value={pc.valor}
+                      onChange={(v) =>
+                        setParcelas((x) =>
+                          x.map((y, n) => (n === i ? { ...y, valor: v ?? 0 } : y))
+                        )
+                      }
+                    />
+                  </div>
+                  {parcelas.length > 2 && (
+                    <button
+                      className="text-slate-400 hover:text-red-500"
+                      onClick={() => setParcelas((v) => v.filter((_, n) => n !== i))}
+                    >
+                      <X size={15} />
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  className="btn-secondary !py-1 text-xs"
+                  onClick={() => setParcelas((v) => [...v, { forma: "dinheiro", valor: falta }])}
+                >
+                  <Plus size={13} /> Outra forma
+                </button>
+                {falta > 0 && (
+                  <button
+                    className="btn-secondary !py-1 text-xs"
+                    onClick={() =>
+                      setParcelas((v) =>
+                        v.map((x, n) =>
+                          n === v.length - 1 ? { ...x, valor: (Number(x.valor) || 0) + falta } : x
+                        )
+                      )
+                    }
+                  >
+                    Completar {brl(falta)} na última
+                  </button>
+                )}
+              </div>
+
+              {/* Recebido em espécie: é o único lugar de onde sai troco */}
+              {parcelas.some((x) => x.forma === "dinheiro") && (
+                <div>
+                  <label className="label">Recebido em dinheiro</label>
+                  <InputNumero
+                    className="input !py-1.5 text-sm"
+                    placeholder={brl(
+                      parcelas
+                        .filter((x) => x.forma === "dinheiro")
+                        .reduce((s, x) => s + (Number(x.valor) || 0), 0)
+                    )}
+                    value={parcelas.find((x) => x.forma === "dinheiro")?.recebido}
+                    onChange={(v) =>
+                      setParcelas((lista) => {
+                        const i = lista.findIndex((x) => x.forma === "dinheiro");
+                        return lista.map((x, n) => (n === i ? { ...x, recebido: v } : x));
+                      })
+                    }
+                  />
+                </div>
+              )}
+
+              <p
+                className={`text-lg font-bold ${
+                  falta > 0 ? "text-red-600" : troco > 0 ? "text-emerald-600" : "text-slate-600"
                 }`}
               >
-                {f.nome}
-              </button>
-            ))}
-          </div>
+                {falta > 0
+                  ? `Falta ${brl(falta)}`
+                  : troco > 0
+                    ? `Troco ${brl(troco)}`
+                    : "Pagamento fechado"}
+              </p>
 
-          {/* Troco só no dinheiro: no cartão não existe troco */}
-          {forma === "dinheiro" && (
-            <div className="mb-3">
-              <label className="label">Valor recebido</label>
-              <InputNumero
-                className="input"
-                placeholder={brl(total)}
-                value={recebido}
-                onChange={setRecebido}
-              />
-              {recebido !== undefined && (
-                <p
-                  className={`mt-1 text-lg font-bold ${
-                    falta > 0 ? "text-red-600" : "text-emerald-600"
-                  }`}
-                >
-                  {falta > 0 ? `Falta ${brl(falta)}` : `Troco ${brl(troco)}`}
+              {problemaNoPagamento(total, parcelas) && falta === 0 && (
+                <p className="rounded-lg bg-amber-50 p-2 text-xs text-amber-800">
+                  {problemaNoPagamento(total, parcelas)}
                 </p>
               )}
             </div>

@@ -67,7 +67,26 @@ describe("troco só sai de dinheiro", () => {
     // Passar 100 no cartão numa compra de 80 gera estorno, não troco.
     // Devolver isso da gaveta é prejuízo puro que só aparece na conferência.
     expect(trocoDoPagamento(80, [p("credito", 100)])).toBe(0);
-    expect(problemaNoPagamento(80, [p("credito", 100)])).toContain("não há troco");
+    expect(problemaNoPagamento(80, [p("credito", 100)])).toContain("Tire 20.00");
+  });
+
+  it("BUG DA REVISÃO: as formas não podem somar mais que a venda", () => {
+    // Venda de 100 com 60 no cartão: o atendente digitava 50 em dinheiro e o
+    // sistema aceitava, lançando 110 no caixa. A sobra aparecia na
+    // conferência da gaveta dias depois, sem origem.
+    const parcelas = [p("credito", 60), p("dinheiro", 50)];
+    expect(totalPago(parcelas)).toBe(110);
+    expect(problemaNoPagamento(100, parcelas)).toContain("Tire 10.00");
+    expect(problemaNoPagamento(100, parcelas)).toContain("Recebido");
+  });
+
+  it("o jeito certo de receber a mais em espécie é pelo Recebido", () => {
+    // 60 no cartão, 40 em dinheiro, cliente entrega 50: troco de 10, e o
+    // caixa recebe exatamente 100.
+    const parcelas = [p("credito", 60), p("dinheiro", 40, 50)];
+    expect(problemaNoPagamento(100, parcelas)).toBe("");
+    expect(totalPago(parcelas)).toBe(100);
+    expect(trocoDoPagamento(100, parcelas)).toBe(10);
   });
 
   it("valor exato não gera troco", () => {
