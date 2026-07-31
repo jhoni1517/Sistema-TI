@@ -54,7 +54,7 @@ export const Dashboard: React.FC = () => {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">Olá! 👋</h1>
+        <h1 className="text-2xl font-bold text-slate-800">Olá! 👋</h1> {/* emoji-na-tela: saudação do painel, nunca sai daqui */}
         <p className="text-sm text-slate-500">Resumo de hoje · {config.nomeLoja}</p>
       </div>
 
