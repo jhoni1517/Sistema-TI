@@ -229,7 +229,7 @@ describe("o cron e a tela concordam sobre o que está vencido", () => {
   );
 
   it("api/cobranca.js ainda tem a rotina de fiado vencido", () => {
-    expect(fonte).toContain("async function avisarFiado()");
+    expect(fonte).toContain("async function avisarFiado(chats)");
   });
 
   it("as duas contas de saldo e atraso batem", () => {
@@ -296,7 +296,7 @@ describe("o cron e a tela concordam sobre o que está vencido", () => {
     const i = fonte.indexOf("nenhuma mensalidade nova");
     expect(i).toBeGreaterThan(0);
     const bloco = fonte.slice(i - 400, i + 300);
-    expect(bloco).toContain("avisarContas()");
-    expect(bloco).toContain("avisarFiado()");
+    expect(bloco).toContain("avisarContas(chats)");
+    expect(bloco).toContain("avisarFiado(chats)");
   });
 });

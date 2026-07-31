@@ -626,6 +626,16 @@ export interface Config {
    */
   limiteGaveta?: number;
   /**
+   * Chat do Telegram DESTA loja, para onde vão os avisos diários de contas
+   * a pagar, agenda, aniversário e fiado vencido.
+   *
+   * Existe porque a rotina diária mandava tudo para um chat só, o do
+   * operador do sistema: nome e dívida de cliente de uma loja iam parar no
+   * celular de outra pessoa, e o dono que precisava do lembrete não recebia
+   * nada. Vazio = esta loja não recebe aviso nenhum, e nada dela sai.
+   */
+  telegramChatId?: string;
+  /**
    * Ramo de atividade da loja. Decide o vocabulário das telas e quais
    * módulos aparecem. Ausente = assistência técnica, que é como o sistema
    * nasceu — nenhuma loja existente pode acordar diferente de ontem.

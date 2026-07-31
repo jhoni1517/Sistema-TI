@@ -38,6 +38,20 @@ velha, senão o sistema fica fora do ar entre os dois passos.
 3. Reaponte o webhook:
    `https://api.telegram.org/bot<TOKEN_NOVO>/setWebhook?url=https://sistema-ti-caixa.vercel.app/api/telegram`
 
+**Dois destinos, e a diferença não é detalhe.** `TELEGRAM_CHAT_ID` é o SEU
+chat e recebe só a cobrança de mensalidade — nome da loja e quanto ela deve,
+que é da sua relação comercial com ela.
+
+Contas a pagar, agenda, aniversário de cliente, fiado vencido e lembrete de
+backup vão para o Telegram **de cada loja**, que o dono preenche em
+**Configurações → Avisos no Telegram (chat id)**. Ele descobre o número dele
+mandando `/start` para o robô.
+
+Loja sem chat preenchido não recebe nada, e nada dela sai. Era o contrário:
+tudo caía no seu chat, inclusive nome e dívida de cliente de outra loja.
+Isso é dado pessoal de terceiro, e o dono que precisava do lembrete não
+recebia nada.
+
 ---
 
 ## 2. Variáveis no Vercel
@@ -53,7 +67,7 @@ Variables**. Marque **Production**, **Preview** e **Development** em todas.
 | `SUPABASE_SERVICE_ROLE_KEY` | Chave de serviço | Aviso diário de mensalidade e de contas não dispara; "Liberar senha" não funciona |
 | `CRON_SECRET` | Senha do robô diário | `/api/cobranca` fica aberto para qualquer um chamar |
 | `TELEGRAM_TOKEN` | Robô do Telegram | Nenhuma notificação chega no celular |
-| `TELEGRAM_CHAT_ID` | Para quem mandar | O aviso não sabe o destino |
+| `TELEGRAM_CHAT_ID` | Seu chat, **só para a cobrança de mensalidade** | Você não recebe o resumo de quem está devendo |
 
 Depois de salvar, vá em **Deployments** e clique em **Redeploy** no item
 mais recente. Variável nova só entra em build novo — salvar sem publicar não

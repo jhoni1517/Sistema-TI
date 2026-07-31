@@ -2,10 +2,18 @@
 // Rotina diária de cobrança das mensalidades
 // Endpoint: /api/cobranca  (chamado pelo cron do Vercel)
 //
-// O que faz: olha o vencimento de todas as lojas e manda no seu Telegram
+// O que faz: olha o vencimento de todas as lojas e manda no SEU Telegram
 // um resumo do que precisa de ação — quem vence em breve, quem venceu e
 // quem já está travada. Sem isto, o aviso só existe para quem abre o
 // sistema, e quem sumiu por uma semana é pego de surpresa.
+//
+// DOIS DESTINOS, e a diferença não é detalhe:
+//   - Mensalidade vai para TELEGRAM_CHAT_ID, o seu. Nome da loja e quanto
+//     ela deve são da sua relação comercial com ela.
+//   - Contas, agenda, aniversários, fiado e backup vão para o Telegram DE
+//     CADA LOJA (Configurações > Avisos no Telegram). Nada de dentro de uma
+//     loja pode chegar no chat do operador do sistema: é dado pessoal de
+//     cliente de terceiro, e quem precisa do lembrete é o dono da loja.
 //
 // Cada aviso é gravado no banco para não repetir todo dia. O gatilho é a
 // combinação loja + tipo + data de vencimento: quando a loja renova, a
@@ -55,18 +63,68 @@ async function sb(caminho, opcoes = {}) {
   return r.status === 204 ? null : r.json();
 }
 
-async function enviarTelegram(texto) {
-  if (!TELEGRAM_TOKEN || !TELEGRAM_CHAT_ID) return false;
+async function enviarPara(chatId, texto) {
+  if (!TELEGRAM_TOKEN || !chatId) return false;
   const r = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
-      chat_id: TELEGRAM_CHAT_ID,
+      chat_id: chatId,
       text: texto,
       parse_mode: "Markdown",
     }),
   });
   return r.ok;
+}
+
+/**
+ * Aviso que é do OPERADOR do sistema, não da loja.
+ *
+ * Só a cobrança de mensalidade passa por aqui: nome da loja e quanto ela
+ * deve são da relação comercial dele com ela. Nada de dentro da loja —
+ * cliente, dívida, agenda — pode usar este caminho.
+ */
+async function enviarTelegram(texto) {
+  return enviarPara(TELEGRAM_CHAT_ID, texto);
+}
+
+/**
+ * O Telegram de cada loja, lido da configuração que ela mesma edita.
+ *
+ * O cron usa a chave de serviço e enxerga TODAS as lojas. Antes ele juntava
+ * o que achava e mandava tudo para um chat só, o do operador: nome e dívida
+ * de cliente de mercearia, agenda de assistência técnica, conta a pagar de
+ * pizzaria. Isso é dado pessoal de terceiro saindo da loja que o coletou
+ * para o celular de outra pessoa — e nem serve, porque quem precisa do
+ * lembrete é o dono da loja, não o dono do sistema.
+ *
+ * Loja sem chat configurado não recebe nada, e nada dela sai. Silêncio é o
+ * padrão certo: o contrário vaza por omissão.
+ */
+async function chatsDasLojas() {
+  const mapa = new Map();
+  try {
+    const linhas = await sb("configuracoes?select=id,dados");
+    for (const l of linhas || []) {
+      const chat = String(l?.dados?.telegramChatId || "").trim();
+      if (chat) mapa.set(String(l.id), chat);
+    }
+  } catch {
+    /* sem configuração nenhuma, ninguém recebe — que é o lado seguro */
+  }
+  return mapa;
+}
+
+/** Agrupa linhas por loja, ignorando o que não tem dono identificado */
+function porLoja(linhas, campo = "lojaId") {
+  const grupos = new Map();
+  for (const l of linhas || []) {
+    const id = String(l?.[campo] || "");
+    if (!id) continue;
+    if (!grupos.has(id)) grupos.set(id, []);
+    grupos.get(id).push(l);
+  }
+  return grupos;
 }
 
 // Sem emoji: em alguns aparelhos elas chegam como "?" e sujam o aviso
@@ -133,14 +191,15 @@ export default async function handler(req, res) {
     // Antes o return curto aqui matava contas, agenda e fiado no mesmo dia:
     // bastava nenhuma loja estar vencendo para o aviso do aluguel sumir.
     if (novos.length === 0) {
+      const chats = await chatsDasLojas();
       return res.status(200).json({
         ok: true,
         enviados: 0,
         mensagem: "nenhuma mensalidade nova",
-        contas: await avisarContas(),
-        agenda: await avisarAgenda(),
-        fiado: await avisarFiado(),
-        backup: await conferirBackup(),
+        contas: await avisarContas(chats),
+        agenda: await avisarAgenda(chats),
+        fiado: await avisarFiado(chats),
+        backup: await conferirBackup(chats),
       });
     }
 
@@ -172,10 +231,11 @@ export default async function handler(req, res) {
       });
     }
 
-    const contas = await avisarContas();
-    const agenda = await avisarAgenda();
-    const fiado = await avisarFiado();
-    const backup = await conferirBackup();
+    const chats = await chatsDasLojas();
+    const contas = await avisarContas(chats);
+    const agenda = await avisarAgenda(chats);
+    const fiado = await avisarFiado(chats);
+    const backup = await conferirBackup(chats);
 
     return res.status(200).json({
       ok: true,
@@ -192,13 +252,20 @@ export default async function handler(req, res) {
 }
 
 /**
- * Lembrete das contas a pagar de cada loja.
+ * Lembrete das contas a pagar, para o Telegram DE CADA LOJA.
  *
  * A notificação do navegador só alcança quem está com o sistema aberto.
  * Este aqui chega no celular mesmo com tudo fechado — é o que evita
  * esquecer o aluguel por não ter entrado no sistema naquele dia.
+ *
+ * Uma mensagem por loja, no chat dela. Antes ia tudo para o chat do
+ * operador do sistema: ele recebia o aluguel da pizzaria, a conta de luz da
+ * mercearia e o fornecedor da assistência, e nenhum dos três donos recebia
+ * nada.
  */
-async function avisarContas() {
+async function avisarContas(chats) {
+  if (chats.size === 0) return "nenhuma loja com Telegram configurado";
+
   // A tabela pode não existir ainda (migração não rodada): falhar aqui não
   // pode derrubar o aviso de mensalidade, que é independente.
   let contas;
@@ -221,51 +288,68 @@ async function avisarContas() {
     (jaAvisados || []).map((a) => `${a.conta_id}|${a.referencia}|${a.tipo}`)
   );
 
-  const atrasadas = [];
-  const hoje = [];
-  const proximas = [];
-  const novos = [];
+  let lojasAvisadas = 0;
+  let total = 0;
 
-  for (const c of contas || []) {
-    // Conta avulsa já quitada não volta a cobrar
-    if (c.recorrencia === "unica" && (c.pagamentos || []).length > 0) continue;
+  for (const [lojaId, doLoja] of porLoja(contas)) {
+    const chat = chats.get(lojaId);
+    // Loja sem chat não gera mensagem, e o que é dela não vai para lugar
+    // nenhum. Sem o `continue` o dado escaparia para o chat do operador.
+    if (!chat) continue;
 
-    const dias = diasAte(c.vencimento);
-    const limite = Number(c.lembreteDias ?? 3);
-    if (dias > limite) continue;
+    const atrasadas = [];
+    const hoje = [];
+    const proximas = [];
+    const novos = [];
 
-    const tipo = dias < 0 ? "atrasada" : dias === 0 ? "hoje" : "proxima";
-    const referencia = String(c.vencimento).slice(0, 10);
-    if (enviados.has(`${c.id}|${referencia}|${tipo}`)) continue;
+    for (const c of doLoja) {
+      // Conta avulsa já quitada não volta a cobrar
+      if (c.recorrencia === "unica" && (c.pagamentos || []).length > 0) continue;
 
-    const linha = `• ${c.descricao} — ${dinheiro(c.valor)}` +
-      (dias < 0 ? ` (${Math.abs(dias)}d em atraso)` : dias > 0 ? ` (em ${dias}d)` : "");
-    (dias < 0 ? atrasadas : dias === 0 ? hoje : proximas).push(linha);
+      const dias = diasAte(c.vencimento);
+      const limite = Number(c.lembreteDias ?? 3);
+      if (dias > limite) continue;
 
-    novos.push({ lojaId: c.lojaId, conta_id: c.id, referencia, tipo });
+      const tipo = dias < 0 ? "atrasada" : dias === 0 ? "hoje" : "proxima";
+      const referencia = String(c.vencimento).slice(0, 10);
+      if (enviados.has(`${c.id}|${referencia}|${tipo}`)) continue;
+
+      const linha =
+        `• ${c.descricao} — ${dinheiro(c.valor)}` +
+        (dias < 0 ? ` (${Math.abs(dias)}d em atraso)` : dias > 0 ? ` (em ${dias}d)` : "");
+      (dias < 0 ? atrasadas : dias === 0 ? hoje : proximas).push(linha);
+
+      novos.push({ lojaId: c.lojaId, conta_id: c.id, referencia, tipo });
+    }
+
+    if (novos.length === 0) continue;
+
+    const partes = ["*Contas a pagar*"];
+    if (atrasadas.length) partes.push(`EM ATRASO\n${atrasadas.join("\n")}`);
+    if (hoje.length) partes.push(`VENCEM HOJE\n${hoje.join("\n")}`);
+    if (proximas.length) partes.push(`CHEGANDO\n${proximas.join("\n")}`);
+
+    // Só marca como avisado se a mensagem realmente saiu — Telegram fora do
+    // ar faz o aviso voltar amanhã em vez de sumir para sempre.
+    if (!(await enviarPara(chat, partes.join("\n\n")))) continue;
+
+    await sb("avisos_contas", {
+      method: "POST",
+      headers: { Prefer: "resolution=ignore-duplicates" },
+      body: JSON.stringify(novos),
+    });
+
+    lojasAvisadas++;
+    total += novos.length;
   }
 
-  if (novos.length === 0) return "nada novo";
-
-  const partes = ["*Contas a pagar*"];
-  if (atrasadas.length) partes.push(`EM ATRASO\n${atrasadas.join("\n")}`);
-  if (hoje.length) partes.push(`VENCEM HOJE\n${hoje.join("\n")}`);
-  if (proximas.length) partes.push(`CHEGANDO\n${proximas.join("\n")}`);
-
-  const ok = await enviarTelegram(partes.join("\n\n"));
-  if (!ok) return "telegram não configurado";
-
-  await sb("avisos_contas", {
-    method: "POST",
-    headers: { Prefer: "resolution=ignore-duplicates" },
-    body: JSON.stringify(novos),
-  });
-
-  return `${novos.length} lembrete(s) enviado(s)`;
+  return lojasAvisadas === 0
+    ? "nada novo"
+    : `${total} lembrete(s) em ${lojasAvisadas} loja(s)`;
 }
 
 /**
- * Lembrete da agenda do dia.
+ * Lembrete da agenda do dia, no Telegram de cada loja.
  *
  * Só o que acontece HOJE e o que já entrou na antecedência pedida. Agenda
  * que manda a semana inteira todo dia vira ruído, e ruído a pessoa silencia.
@@ -274,48 +358,59 @@ async function avisarContas() {
  * novo amanhã se ainda não foi concluído, ao contrário da conta, que só
  * precisa ser cobrada uma vez por vencimento.
  */
-async function avisarAgenda() {
+async function avisarAgenda(chats) {
+  if (chats.size === 0) return "nenhuma loja com Telegram configurado";
+
   let eventos;
   try {
     eventos = await sb(
-      'eventos?select=id,titulo,tipo,data,hora,local,repetir,"avisarDiasAntes",concluido&concluido=is.false'
+      'eventos?select=id,titulo,tipo,data,hora,local,repetir,"avisarDiasAntes",concluido,"lojaId"&concluido=is.false'
     );
   } catch {
     return "tabela de eventos ainda não existe";
   }
 
   const hoje = new Date().toISOString().slice(0, 10);
-  const doDia = [];
-  const chegando = [];
-
-  for (const e of eventos || []) {
-    const data = proximaData(e, hoje);
-    if (!data) continue;
-    const dias = diasAte(data + "T00:00:00Z");
-    if (dias < 0) continue;
-    const antecedencia = Number(e.avisarDiasAntes ?? 0);
-    if (dias > antecedencia) continue;
-
-    const linha = `• ${e.hora ? e.hora + " " : ""}${e.titulo}` +
-      (e.local ? ` — ${e.local}` : "") +
-      (dias > 0 ? ` (em ${dias}d)` : "");
-    (dias === 0 ? doDia : chegando).push(linha);
-  }
-
   // Aniversários avisam na véspera: dá tempo de separar um brinde.
-  const parabens = await aniversariosProximos(hoje);
+  const parabensPorLoja = await aniversariosProximos(hoje, chats);
+  const eventosPorLoja = porLoja(eventos);
 
-  if (doDia.length === 0 && chegando.length === 0 && parabens.length === 0) {
-    return "nada na agenda";
+  let lojasAvisadas = 0;
+  let itens = 0;
+
+  for (const [lojaId, chat] of chats) {
+    const doDia = [];
+    const chegando = [];
+
+    for (const e of eventosPorLoja.get(lojaId) || []) {
+      const data = proximaData(e, hoje);
+      if (!data) continue;
+      const dias = diasAte(data + "T00:00:00Z");
+      if (dias < 0) continue;
+      const antecedencia = Number(e.avisarDiasAntes ?? 0);
+      if (dias > antecedencia) continue;
+
+      const linha =
+        `• ${e.hora ? e.hora + " " : ""}${e.titulo}` +
+        (e.local ? ` — ${e.local}` : "") +
+        (dias > 0 ? ` (em ${dias}d)` : "");
+      (dias === 0 ? doDia : chegando).push(linha);
+    }
+
+    const parabens = parabensPorLoja.get(lojaId) || [];
+    if (doDia.length === 0 && chegando.length === 0 && parabens.length === 0) continue;
+
+    const partes = ["*Agenda*"];
+    if (doDia.length) partes.push(`HOJE\n${doDia.join("\n")}`);
+    if (chegando.length) partes.push(`CHEGANDO\n${chegando.join("\n")}`);
+    if (parabens.length) partes.push(`ANIVERSÁRIOS\n${parabens.join("\n")}`);
+
+    if (!(await enviarPara(chat, partes.join("\n\n")))) continue;
+    lojasAvisadas++;
+    itens += doDia.length + chegando.length + parabens.length;
   }
 
-  const partes = ["*Agenda*"];
-  if (doDia.length) partes.push(`HOJE\n${doDia.join("\n")}`);
-  if (chegando.length) partes.push(`CHEGANDO\n${chegando.join("\n")}`);
-  if (parabens.length) partes.push(`ANIVERSÁRIOS\n${parabens.join("\n")}`);
-
-  const ok = await enviarTelegram(partes.join("\n\n"));
-  return ok ? `${doDia.length + chegando.length + parabens.length} item(ns)` : "telegram não configurado";
+  return lojasAvisadas === 0 ? "nada na agenda" : `${itens} item(ns) em ${lojasAvisadas} loja(s)`;
 }
 
 /** Próxima data do evento, respeitando a repetição. Espelha src/lib/agenda.ts */
@@ -353,69 +448,88 @@ function avancarData(data, repetir, diaOriginal) {
   return new Date(Date.UTC(ano, mes0, Math.min(dia, ultimo))).toISOString().slice(0, 10);
 }
 
-/** Clientes que fazem aniversário hoje ou amanhã */
-async function aniversariosProximos(hoje) {
+/**
+ * Clientes que fazem aniversário hoje ou amanhã, separados por loja.
+ *
+ * A consulta traz só as lojas que têm Telegram configurado. Nome de cliente
+ * é o dado mais sensível que passa por aqui — puxar o de quem não vai
+ * receber nada seria carregar risco sem nenhum uso.
+ */
+async function aniversariosProximos(hoje, chats) {
+  const saida = new Map();
+  const ids = [...chats.keys()];
+  if (ids.length === 0) return saida;
+
   let clientes;
   try {
-    clientes = await sb("clientes?select=nome,nascimento&nascimento=not.is.null");
+    clientes = await sb(
+      `clientes?select=nome,nascimento,"lojaId"&nascimento=not.is.null` +
+        `&lojaId=in.(${ids.join(",")})`
+    );
   } catch {
-    return [];
+    return saida;
   }
+
   const ano = Number(hoje.slice(0, 4));
-  const saida = [];
   for (const c of clientes || []) {
+    const lojaId = String(c.lojaId || "");
+    if (!chats.has(lojaId)) continue;
     const n = String(c.nascimento || "").slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(n)) continue;
     const mes0 = Number(n.slice(5, 7)) - 1;
     const ultimo = new Date(Date.UTC(ano, mes0 + 1, 0)).getUTCDate();
-    const data = new Date(
-      Date.UTC(ano, mes0, Math.min(Number(n.slice(8, 10)), ultimo))
-    )
+    const data = new Date(Date.UTC(ano, mes0, Math.min(Number(n.slice(8, 10)), ultimo)))
       .toISOString()
       .slice(0, 10);
     const dias = diasAte(data + "T00:00:00Z");
-    if (dias === 0) saida.push(`• ${c.nome} faz aniversário hoje`);
-    else if (dias === 1) saida.push(`• ${c.nome} faz aniversário amanhã`);
+    if (dias !== 0 && dias !== 1) continue;
+    if (!saida.has(lojaId)) saida.set(lojaId, []);
+    saida
+      .get(lojaId)
+      .push(`• ${c.nome} faz aniversário ${dias === 0 ? "hoje" : "amanhã"}`);
   }
   return saida;
 }
 
-
 /**
- * Fiado vencido, uma vez por semana.
+ * Fiado vencido, uma vez por semana, no Telegram da própria loja.
  *
  * A tela "Quem chamar hoje" só alcança quem abre o sistema, e fiado vencido é
  * exatamente o que se esquece: o valor não some da tela, mas ninguém abre a
  * tela. Aqui chega no celular.
  *
  * Semanal, não diário, de propósito. Cobrança de bairro que aparece todo dia
- * vira ruído e a pessoa para de ler o aviso inteiro — inclusive o de
- * mensalidade, que é o que paga o sistema.
+ * vira ruído e a pessoa para de ler o aviso inteiro.
  */
-async function avisarFiado() {
+async function avisarFiado(chats) {
   // Segunda-feira. Em outro dia nem consulta o banco.
   if (new Date().getUTCDay() !== 1) return "fora do dia (só segunda)";
+  if (chats.size === 0) return "nenhuma loja com Telegram configurado";
 
+  const ids = [...chats.keys()];
   let fiados;
   try {
     fiados = await sb(
-      'fiados?select=id,"clienteId",descricao,valor,pagamentos,quitado,vencimento' +
-        "&quitado=is.false&vencimento=not.is.null"
+      'fiados?select=id,"clienteId",descricao,valor,pagamentos,quitado,vencimento,"lojaId"' +
+        `&quitado=is.false&vencimento=not.is.null&lojaId=in.(${ids.join(",")})`
     );
   } catch {
     return "tabela de fiados ainda não existe";
   }
 
   const hoje = new Date().toISOString().slice(0, 10);
-  const atrasados = [];
+  const porLojaId = new Map();
 
   for (const f of fiados || []) {
+    const lojaId = String(f.lojaId || "");
+    if (!chats.has(lojaId)) continue;
     const venc = String(f.vencimento || "").slice(0, 10);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(venc) || venc >= hoje) continue;
     const pago = (f.pagamentos || []).reduce((s, p) => s + (Number(p.valor) || 0), 0);
     const saldo = (Number(f.valor) || 0) - pago;
     if (saldo <= 0) continue;
-    atrasados.push({
+    if (!porLojaId.has(lojaId)) porLojaId.set(lojaId, []);
+    porLojaId.get(lojaId).push({
       clienteId: f.clienteId,
       descricao: f.descricao || "fiado",
       saldo,
@@ -425,37 +539,49 @@ async function avisarFiado() {
     });
   }
 
-  if (atrasados.length === 0) return "nenhum fiado vencido";
+  if (porLojaId.size === 0) return "nenhum fiado vencido";
 
   // Nomes num pedido só: uma consulta por devedor deixaria o cron lento e
   // caro sem nenhum ganho.
-  let nomes = {};
+  const nomes = {};
   try {
-    const ids = [...new Set(atrasados.map((a) => a.clienteId).filter(Boolean))];
-    if (ids.length > 0) {
-      const linhas = await sb(`clientes?select=id,nome&id=in.(${ids.join(",")})`);
+    const devedores = [
+      ...new Set(
+        [...porLojaId.values()].flat().map((a) => a.clienteId).filter(Boolean)
+      ),
+    ];
+    if (devedores.length > 0) {
+      const linhas = await sb(`clientes?select=id,nome&id=in.(${devedores.join(",")})`);
       for (const c of linhas || []) nomes[c.id] = c.nome;
     }
   } catch {
     /* sem os nomes o aviso ainda serve: o valor é o que importa */
   }
 
-  atrasados.sort((a, b) => b.dias - a.dias);
-  const total = atrasados.reduce((s, a) => s + a.saldo, 0);
-  const linhas = atrasados
-    .slice(0, 15)
-    .map(
-      (a) =>
-        `• ${nomes[a.clienteId] || "sem cliente"} — ${dinheiro(a.saldo)} (${a.dias}d)`
+  let lojasAvisadas = 0;
+  let devedoresAvisados = 0;
+
+  for (const [lojaId, atrasados] of porLojaId) {
+    atrasados.sort((a, b) => b.dias - a.dias);
+    const total = atrasados.reduce((s, a) => s + a.saldo, 0);
+    const linhas = atrasados
+      .slice(0, 15)
+      .map((a) => `• ${nomes[a.clienteId] || "sem cliente"} — ${dinheiro(a.saldo)} (${a.dias}d)`);
+    if (atrasados.length > 15) linhas.push(`• e mais ${atrasados.length - 15}`);
+
+    const enviou = await enviarPara(
+      chats.get(lojaId),
+      `*Fiado vencido*\n${linhas.join("\n")}\n\nTotal: *${dinheiro(total)}*`
     );
-  if (atrasados.length > 15) linhas.push(`• e mais ${atrasados.length - 15}`);
+    if (!enviou) continue;
+    lojasAvisadas++;
+    devedoresAvisados += atrasados.length;
+  }
 
-  const enviou = await enviarTelegram(
-    `*Fiado vencido*\n${linhas.join("\n")}\n\nTotal: *${dinheiro(total)}*`
-  );
-  return enviou ? `${atrasados.length} avisado(s)` : "telegram não configurado";
+  return lojasAvisadas === 0
+    ? "telegram não configurado"
+    : `${devedoresAvisados} devedor(es) em ${lojasAvisadas} loja(s)`;
 }
-
 
 /**
  * Lembrete semanal de backup, com o tamanho da loja no recado.
@@ -469,19 +595,23 @@ async function avisarFiado() {
  * Domingo, e só quando há o que perder: lembrar loja vazia de fazer backup
  * é o jeito mais rápido de a pessoa parar de ler os avisos.
  */
-async function conferirBackup() {
+async function conferirBackup(chats) {
   if (new Date().getUTCDay() !== 0) return "fora do dia (só domingo)";
+  if (chats.size === 0) return "nenhuma loja com Telegram configurado";
 
-  const contar = async (tabela) => {
+  const contar = async (tabela, lojaId) => {
     try {
-      const r = await fetch(`${SUPABASE_URL}/rest/v1/${tabela}?select=id`, {
-        headers: {
-          apikey: SERVICE_KEY,
-          Authorization: `Bearer ${SERVICE_KEY}`,
-          Prefer: "count=exact",
-          Range: "0-0",
-        },
-      });
+      const r = await fetch(
+        `${SUPABASE_URL}/rest/v1/${tabela}?select=id&lojaId=eq.${lojaId}`,
+        {
+          headers: {
+            apikey: SERVICE_KEY,
+            Authorization: `Bearer ${SERVICE_KEY}`,
+            Prefer: "count=exact",
+            Range: "0-0",
+          },
+        }
+      );
       // O total vem no cabeçalho, sem trazer as linhas: contar puxando tudo
       // custaria caro e não serve para mais nada aqui.
       const faixa = r.headers.get("content-range") || "";
@@ -491,21 +621,29 @@ async function conferirBackup() {
     }
   };
 
-  const [clientes, ordens, produtos, movimentos] = await Promise.all([
-    contar("clientes"),
-    contar("ordens"),
-    contar("produtos"),
-    contar("movimentos"),
-  ]);
-  const total = clientes + ordens + produtos + movimentos;
-  if (total === 0) return "nada a proteger ainda";
+  let lojasAvisadas = 0;
+  for (const [lojaId, chat] of chats) {
+    const [clientes, ordens, produtos, movimentos] = await Promise.all([
+      contar("clientes", lojaId),
+      contar("ordens", lojaId),
+      contar("produtos", lojaId),
+      contar("movimentos", lojaId),
+    ]);
+    const total = clientes + ordens + produtos + movimentos;
+    if (total === 0) continue; // loja vazia não precisa de lembrete
 
-  const enviou = await enviarTelegram(
-    "*Backup semanal*\n" +
-      `Hoje o sistema guarda ${clientes} cliente(s), ${ordens} ordem(ns), ` +
-      `${produtos} produto(s) e ${movimentos} lançamento(s) de caixa.\n\n` +
-      "Abra Configurações e clique em Exportar. O arquivo fica no seu " +
-      "aparelho — ele tem dado de cliente e não deve circular por conversa."
-  );
-  return enviou ? `lembrete enviado (${total} registros)` : "telegram não configurado";
+    const enviou = await enviarPara(
+      chat,
+      "*Backup semanal*\n" +
+        `Hoje o sistema guarda ${clientes} cliente(s), ${ordens} ordem(ns), ` +
+        `${produtos} produto(s) e ${movimentos} lançamento(s) de caixa.\n\n` +
+        "Abra Configurações e clique em Exportar. O arquivo fica no seu " +
+        "aparelho — ele tem dado de cliente e não deve circular por conversa."
+    );
+    if (enviou) lojasAvisadas++;
+  }
+
+  return lojasAvisadas === 0
+    ? "nada a proteger ainda"
+    : `lembrete enviado para ${lojasAvisadas} loja(s)`;
 }

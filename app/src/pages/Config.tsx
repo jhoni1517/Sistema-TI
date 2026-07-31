@@ -168,6 +168,25 @@ export const Config: React.FC = () => {
             </p>
           </Field>
 
+          {/* Avisos no Telegram DESTA loja. A rotina diária mandava tudo
+              para um chat só, o do operador do sistema: nome e dívida de
+              cliente iam parar no celular de outra pessoa, e quem precisava
+              do lembrete não recebia nada. */}
+          <Field label="Avisos no Telegram (chat id)">
+            <input
+              className="input"
+              value={form.telegramChatId || ""}
+              onChange={(e) => setForm({ ...form, telegramChatId: e.target.value.trim() })}
+              placeholder="ex.: 123456789"
+              inputMode="numeric"
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              Contas a pagar, agenda, aniversários e fiado vencido chegam aqui todo
+              dia. Para descobrir o seu numero, abra o robo no Telegram e mande
+              /start — ele responde com o chat id. Vazio = esta loja nao recebe aviso.
+            </p>
+          </Field>
+
           {/* Papel da impressora. O recibo saía sempre em A4 e a bobina do
               balcão cortava a metade direita de tudo, inclusive do total. */}
           <Field label="Papel da impressora">
