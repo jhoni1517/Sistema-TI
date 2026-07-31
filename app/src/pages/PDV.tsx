@@ -8,6 +8,7 @@ import {
   Scale,
   Printer,
   Undo2,
+  PauseCircle,
   CheckCircle2,
   AlertTriangle,
   X,
@@ -216,6 +217,62 @@ export const PDV: React.FC = () => {
 
   const removerItem = (i: number) => setItens((prev) => prev.filter((_, idx) => idx !== i));
 
+  /**
+   * Vendas em espera.
+   *
+   * O cliente esqueceu a carteira no carro, ou volta para pegar mais uma
+   * coisa — e a fila para junto. Antes disso a saída era anotar no papel ou
+   * pedir para todo mundo esperar. Fica no aparelho porque é uma pausa de
+   * minutos, e sobrevive ao F5 porque o navegador do balcão trava.
+   */
+  const CHAVE_ESPERA = "sistema-ti:vendas-em-espera";
+
+  const lerEspera = (): { id: string; itens: ItemVenda[]; desconto: number; em: string }[] => {
+    try {
+      const v = JSON.parse(localStorage.getItem(CHAVE_ESPERA) || "[]");
+      return Array.isArray(v) ? v : [];
+    } catch {
+      return [];
+    }
+  };
+  const [espera, setEspera] = useState(lerEspera);
+  const gravarEspera = (lista: typeof espera) => {
+    setEspera(lista);
+    try {
+      localStorage.setItem(CHAVE_ESPERA, JSON.stringify(lista));
+    } catch {
+      /* aparelho sem armazenamento: a espera só não sobrevive ao F5 */
+    }
+  };
+
+  const segurarVenda = () => {
+    if (itens.length === 0) return aviso.alerta("Carrinho vazio.");
+    gravarEspera([...espera, { id: uid(), itens, desconto, em: nowISO() }]);
+    limpar();
+    aviso.sucesso("Venda guardada. Chame o próximo.");
+  };
+
+  const retomarVenda = (id: string) => {
+    const alvo = espera.find((e) => e.id === id);
+    if (!alvo) return;
+    // Carrinho aberto não pode ser sobrescrito em silêncio: são duas vendas
+    // diferentes, e a atual sumiria sem aviso.
+    if (itens.length > 0) {
+      if (!confirm("O carrinho atual será guardado para você retomar depois. Continuar?")) {
+        return;
+      }
+      gravarEspera([
+        ...espera.filter((e) => e.id !== id),
+        { id: uid(), itens, desconto, em: nowISO() },
+      ]);
+    } else {
+      gravarEspera(espera.filter((e) => e.id !== id));
+    }
+    setItens(alvo.itens);
+    setDesconto(alvo.desconto);
+    focarBusca();
+  };
+
   const limpar = () => {
     setItens([]);
     setDesconto(0);
@@ -299,7 +356,8 @@ export const PDV: React.FC = () => {
   const imprimir = (v: Venda) => {
     printHTML(
       reciboPDV(v, config, clientes.find((c) => c.id === v.clienteId)),
-      `Venda ${v.numero}`
+      `Venda ${v.numero}`,
+      config.papelImpressao || "a4"
     );
   };
 
@@ -319,6 +377,9 @@ export const PDV: React.FC = () => {
                 <Printer size={18} /> Cupom da venda {ultima.numero}
               </button>
             )}
+            <button className="btn-secondary" onClick={segurarVenda}>
+              <PauseCircle size={18} /> Guardar venda
+            </button>
             <button className="btn-secondary" onClick={() => setDevolvendo(true)}>
               <Undo2 size={18} /> Devolução
             </button>
@@ -327,6 +388,37 @@ export const PDV: React.FC = () => {
       />
 
       {devolvendo && <Devolucao onClose={() => setDevolvendo(false)} />}
+
+      {/* Vendas guardadas ficam à vista: guardada e esquecida é mercadoria
+          separada que nunca foi vendida. */}
+      {espera.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 p-3">
+          <span className="text-sm font-semibold text-brand-800">
+            {espera.length} venda(s) guardada(s):
+          </span>
+          {espera.map((e) => (
+            <span key={e.id} className="flex items-center gap-1">
+              <button
+                className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-brand-700 ring-1 ring-brand-200"
+                onClick={() => retomarVenda(e.id)}
+              >
+                {e.itens.length} item(ns) · {brl(totalVenda({ itens: e.itens, desconto: e.desconto }))}
+              </button>
+              <button
+                className="text-xs text-slate-400 hover:text-red-500"
+                title="Descartar esta venda guardada"
+                onClick={() => {
+                  if (confirm("Descartar esta venda guardada?")) {
+                    gravarEspera(espera.filter((x) => x.id !== e.id));
+                  }
+                }}
+              >
+                <X size={13} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
 
       {!sessao && (
         <p className="mb-4 flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">

@@ -4,7 +4,8 @@ import { Plus, Search, Pencil, Trash2, Users, Phone, MessageCircle, Wrench, User
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { uid, nowISO, whatsappLink, formatDate, brl, txt, mascaraDocumento, soDigitos, documentoValido } from "../lib/format";
-import { avaliarCliente, classificacaoDe, travaFiado } from "../lib/clientes";
+import { avaliarCliente, classificacaoDe, travaFiado, devendo } from "../lib/clientes";
+import { garantiasDoCliente } from "../lib/garantia";
 import { Relacionamento } from "../components/Relacionamento";
 import { CLASSIFICACAO_META, type Classificacao, type Cliente } from "../lib/types";
 
@@ -21,7 +22,44 @@ const vazio = (): Cliente => ({
 });
 
 export const Clientes: React.FC = () => {
-  const { clientes, ordens, fiados, saveCliente, removeCliente } = useApp();
+  const { clientes, ordens, fiados, vendas, saveCliente, removeCliente } = useApp();
+
+  /**
+   * O que este cliente já significou para a loja.
+   *
+   * Sem isso, decidir se vale abrir exceção para ele é palpite: quem atende
+   * lembra da última discussão, não dos dois anos de compra antes dela.
+   */
+  const historicoDoCliente = (id: string) => {
+    const minhas = vendas.filter((v) => v.clienteId === id);
+    const gasto = minhas.reduce(
+      (s, v) =>
+        s +
+        Math.max(
+          0,
+          (v.itens || []).reduce(
+            (t, i) => t + (Number(i.quantidade) || 0) * (Number(i.precoUnit) || 0),
+            0
+          ) - (Number(v.desconto) || 0)
+        ),
+      0
+    );
+    const minhasOS = ordens.filter((o) => o.clienteId === id);
+    const datas = [
+      ...minhas.map((v) => v.criadoEm),
+      ...minhasOS.map((o) => o.entregueEm || o.criadoEm),
+    ]
+      .filter(Boolean)
+      .sort();
+    return {
+      gasto,
+      compras: minhas.length,
+      ordens: minhasOS.length,
+      devendo: devendo(id, fiados),
+      garantias: garantiasDoCliente(ordens, id),
+      ultima: datas[datas.length - 1] || "",
+    };
+  };
   const [busca, setBusca] = useState("");
   const [editando, setEditando] = useState<Cliente | null>(null);
   const [relacionamento, setRelacionamento] = useState(false);
@@ -360,6 +398,51 @@ export const Clientes: React.FC = () => {
                 })()}
               </p>
             </Field>
+            {/* Histórico: quanto este cliente já deixou aqui, o que ele
+                comprou e o que ainda está na garantia. Sem isso, decidir se
+                vale abrir exceção para ele é palpite. */}
+            {clientes.some((c) => c.id === editando.id) && (
+              <div className="sm:col-span-2 rounded-xl bg-slate-50 p-3">
+                <p className="mb-2 text-sm font-semibold text-slate-700">
+                  Histórico deste cliente
+                </p>
+                {(() => {
+                  const hist = historicoDoCliente(editando.id);
+                  return (
+                    <>
+                      <div className="flex flex-wrap gap-4 text-sm">
+                        <span>
+                          Já gastou: <b>{brl(hist.gasto)}</b>
+                        </span>
+                        <span>
+                          Compras: <b>{hist.compras}</b>
+                        </span>
+                        <span>
+                          Ordens: <b>{hist.ordens}</b>
+                        </span>
+                        {hist.devendo > 0 && (
+                          <span className="text-red-600">
+                            Deve: <b>{brl(hist.devendo)}</b>
+                          </span>
+                        )}
+                      </div>
+                      {hist.garantias.length > 0 && (
+                        <p className="mt-2 text-xs text-emerald-700">
+                          {hist.garantias.length} serviço(s) ainda na garantia — o mais
+                          curto vence em {hist.garantias[0].garantia.diasRestantes} dia(s).
+                        </p>
+                      )}
+                      {hist.ultima && (
+                        <p className="mt-1 text-xs text-slate-500">
+                          Última vez aqui: {formatDate(hist.ultima)}
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            )}
+
             <Field label="Observações" className="sm:col-span-2">
               <textarea
                 className="input"

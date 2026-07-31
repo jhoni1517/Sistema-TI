@@ -157,6 +157,25 @@ export const Config: React.FC = () => {
             />
           </div>
 
+          {/* Papel da impressora. O recibo saía sempre em A4 e a bobina do
+              balcão cortava a metade direita de tudo, inclusive do total. */}
+          <Field label="Papel da impressora">
+            <select
+              className="input"
+              value={form.papelImpressao || "a4"}
+              onChange={(e) =>
+                setForm({ ...form, papelImpressao: e.target.value as "a4" | "58" | "80" })
+              }
+            >
+              <option value="a4">Folha comum (A4)</option>
+              <option value="80">Bobina térmica 80mm</option>
+              <option value="58">Bobina térmica 58mm</option>
+            </select>
+            <p className="mt-1 text-xs text-slate-400">
+              Na bobina o recibo sai em coluna única, sem tabela lado a lado.
+            </p>
+          </Field>
+
           {/* Catálogo público: a loja manda foto de produto no WhatsApp uma
               por uma, o dia inteiro. Aqui vira um link só. */}
           <div className="sm:col-span-2 rounded-xl border border-slate-200 p-3">

@@ -140,6 +140,7 @@ export default async function handler(req, res) {
         contas: await avisarContas(),
         agenda: await avisarAgenda(),
         fiado: await avisarFiado(),
+        backup: await conferirBackup(),
       });
     }
 
@@ -174,6 +175,7 @@ export default async function handler(req, res) {
     const contas = await avisarContas();
     const agenda = await avisarAgenda();
     const fiado = await avisarFiado();
+    const backup = await conferirBackup();
 
     return res.status(200).json({
       ok: true,
@@ -181,6 +183,7 @@ export default async function handler(req, res) {
       contas,
       agenda,
       fiado,
+      backup,
       telegram: enviou ? "enviado" : "não configurado ou falhou",
     });
   } catch (e) {
@@ -451,4 +454,58 @@ async function avisarFiado() {
     `*Fiado vencido*\n${linhas.join("\n")}\n\nTotal: *${dinheiro(total)}*`
   );
   return enviou ? `${atrasados.length} avisado(s)` : "telegram não configurado";
+}
+
+
+/**
+ * Lembrete semanal de backup, com o tamanho da loja no recado.
+ *
+ * O botão "Exportar" existe em Configurações desde o começo e ninguém clica:
+ * backup é a tarefa que só parece importante depois que já era tarde. O
+ * lembrete não faz o backup sozinho de propósito — o arquivo tem dado de
+ * cliente e mandá-lo por Telegram, sem criptografia e para um chat que fica
+ * aberto no celular, criaria um risco maior do que o que resolve.
+ *
+ * Domingo, e só quando há o que perder: lembrar loja vazia de fazer backup
+ * é o jeito mais rápido de a pessoa parar de ler os avisos.
+ */
+async function conferirBackup() {
+  if (new Date().getUTCDay() !== 0) return "fora do dia (só domingo)";
+
+  const contar = async (tabela) => {
+    try {
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/${tabela}?select=id`, {
+        headers: {
+          apikey: SERVICE_KEY,
+          Authorization: `Bearer ${SERVICE_KEY}`,
+          Prefer: "count=exact",
+          Range: "0-0",
+        },
+      });
+      // O total vem no cabeçalho, sem trazer as linhas: contar puxando tudo
+      // custaria caro e não serve para mais nada aqui.
+      const faixa = r.headers.get("content-range") || "";
+      return Number(faixa.split("/")[1]) || 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  const [clientes, ordens, produtos, movimentos] = await Promise.all([
+    contar("clientes"),
+    contar("ordens"),
+    contar("produtos"),
+    contar("movimentos"),
+  ]);
+  const total = clientes + ordens + produtos + movimentos;
+  if (total === 0) return "nada a proteger ainda";
+
+  const enviou = await enviarTelegram(
+    "*Backup semanal*\n" +
+      `Hoje o sistema guarda ${clientes} cliente(s), ${ordens} ordem(ns), ` +
+      `${produtos} produto(s) e ${movimentos} lançamento(s) de caixa.\n\n` +
+      "Abra Configurações e clique em Exportar. O arquivo fica no seu " +
+      "aparelho — ele tem dado de cliente e não deve circular por conversa."
+  );
+  return enviou ? `lembrete enviado (${total} registros)` : "telegram não configurado";
 }

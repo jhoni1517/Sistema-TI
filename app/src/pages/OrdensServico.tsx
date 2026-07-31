@@ -21,6 +21,7 @@ import {
   History,
   EyeOff,
   ShieldAlert,
+  ShieldCheck,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
@@ -66,6 +67,7 @@ import {
   type Config,
 } from "../lib/types";
 import { travaAtendimento, classificacaoDe, travaFiado } from "../lib/clientes";
+import { garantiaDaOS, GARANTIA_META, textoDaGarantia } from "../lib/garantia";
 
 const CHECKLIST_ITENS = [
   "Liga normalmente",
@@ -337,6 +339,21 @@ export const OrdensServico: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-xs font-bold text-slate-400">{codigoOS(o.numero)}</span>
                   <span className={`badge ${OS_STATUS_META[o.status].color}`}>{OS_STATUS_META[o.status].label}</span>
+                  {(() => {
+                    // "Esse conserto ainda está na garantia?" chega toda
+                    // semana. A resposta estava em duas telas mais uma conta
+                    // de cabeça — e errar custa dos dois lados.
+                    const g = garantiaDaOS(o);
+                    if (g.situacao !== "valida") return null;
+                    return (
+                      <span
+                        className={`badge ${GARANTIA_META.valida.cor}`}
+                        title={`Garantia até ${g.ate.split("-").reverse().join("/")}`}
+                      >
+                        <ShieldCheck size={11} /> Garantia {g.diasRestantes}d
+                      </span>
+                    );
+                  })()}
                   {semPagamento(o) && (
                     <button
                       className="badge bg-amber-100 text-amber-800 hover:bg-amber-200"
@@ -1156,6 +1173,32 @@ const OSDetalhe: React.FC<{
             </div>
           </div>
         )}
+
+        {/* Garantia: resposta pronta, com botão para colar no WhatsApp.
+            Negar garantia válida perde o cliente; honrar garantia vencida
+            paga peça que já foi paga uma vez. */}
+        {(() => {
+          const g = garantiaDaOS(os);
+          if (g.situacao === "sem_garantia") return null;
+          return (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-3 no-print">
+              <span className={`badge ${GARANTIA_META[g.situacao].cor}`}>
+                <ShieldCheck size={12} /> {GARANTIA_META[g.situacao].label}
+              </span>
+              <span className="min-w-0 flex-1 text-sm text-slate-600">
+                {textoDaGarantia(os)}
+              </span>
+              {cliente?.telefone && (
+                <button
+                  className="btn-secondary !py-1.5 text-xs"
+                  onClick={() => abrirWhatsapp(txt(cliente.telefone), textoDaGarantia(os))}
+                >
+                  <MessageCircle size={14} /> Responder
+                </button>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Fotos da entrada: saem na impressão junto com o termo de guarda,
             que é onde elas valem como prova do estado do aparelho. */}

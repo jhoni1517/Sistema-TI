@@ -1,5 +1,22 @@
 // Impressão limpa via iframe oculto — não depende da tela/tema do app.
-export function printHTML(inner: string, title = "Impressão"): void {
+/**
+ * Largura do papel.
+ *
+ * "a4" é a folha comum; "58" e "80" são as bobinas térmicas de balcão, em
+ * milímetros. O recibo saía sempre em A4 e, na bobina, a impressora cortava
+ * a metade direita de tudo — inclusive do total.
+ */
+export type Papel = "a4" | "58" | "80";
+
+const MEDIDAS: Record<Papel, { largura: string; margem: string; fonte: string }> = {
+  a4: { largura: "auto", margem: "12mm", fonte: "13px" },
+  // 58mm de bobina tem ~48mm imprimíveis; 80mm tem ~72mm. Usar a largura
+  // cheia joga o fim de cada linha para fora da área de impressão.
+  "58": { largura: "48mm", margem: "2mm", fonte: "10px" },
+  "80": { largura: "72mm", margem: "3mm", fonte: "11px" },
+};
+
+export function printHTML(inner: string, title = "Impressão", papel: Papel = "a4"): void {
   const iframe = document.createElement("iframe");
   iframe.setAttribute("aria-hidden", "true");
   Object.assign(iframe.style, {
@@ -17,9 +34,23 @@ export function printHTML(inner: string, title = "Impressão"): void {
   doc.open();
   doc.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${title}</title>
   <style>
-    @page { margin: 12mm; }
+    @page { margin: ${MEDIDAS[papel].margem}; size: ${papel === "a4" ? "auto" : MEDIDAS[papel].largura + " auto"}; }
     * { box-sizing: border-box; }
-    body { font-family: Arial, Helvetica, sans-serif; color: #111; font-size: 13px; line-height: 1.5; margin: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; color: #111; font-size: ${MEDIDAS[papel].fonte}; line-height: 1.4; margin: 0; ${papel === "a4" ? "" : `width:${MEDIDAS[papel].largura};`} }
+    ${
+      papel === "a4"
+        ? ""
+        : `/* Bobina: sem colunas lado a lado, que não cabem em 48mm.
+             O que era linha de duas colunas vira duas linhas. */
+           .row { display: block; }
+           .box { border: 0; padding: 0; margin-bottom: 6px; }
+           .tot { width: 100%; margin-left: 0; }
+           .sign { display: block; margin-top: 24px; }
+           .sign div { margin-top: 18px; }
+           .head h1 { font-size: 14px; }
+           table { font-size: ${MEDIDAS[papel].fonte}; }
+           th, td { padding: 2px 1px; }`
+    }
     h1,h2,h3 { margin: 0; }
     .center { text-align: center; }
     .right { text-align: right; }

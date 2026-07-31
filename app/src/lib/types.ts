@@ -608,6 +608,12 @@ export interface Config {
    */
   logoUrl?: string;
   /**
+   * Largura do papel da impressora: "a4", "58" ou "80" (bobina térmica).
+   * O recibo saía sempre em A4 e a bobina cortava a metade direita de tudo,
+   * inclusive do total.
+   */
+  papelImpressao?: "a4" | "58" | "80";
+  /**
    * Ramo de atividade da loja. Decide o vocabulário das telas e quais
    * módulos aparecem. Ausente = assistência técnica, que é como o sistema
    * nasceu — nenhuma loja existente pode acordar diferente de ontem.

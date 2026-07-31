@@ -2,7 +2,9 @@ import React, { useMemo, useState } from "react";
 import { aviso } from "../components/Aviso";
 import { ImagemUpload } from "../components/ImagemUpload";
 import { Etiquetas } from "../components/Etiquetas";
-import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck, FileQuestion, Wrench, CalendarX, Tag } from "lucide-react";
+import { EntradaNota } from "../components/EntradaNota";
+import { Inventario } from "../components/Inventario";
+import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck, FileQuestion, Wrench, CalendarX, Tag, ClipboardCheck } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { temRecurso } from "../lib/ramos";
@@ -41,6 +43,8 @@ export const Estoque: React.FC = () => {
   const [gerFornecedores, setGerFornecedores] = useState(false);
   const [verCotacoes, setVerCotacoes] = useState(false);
   const [etiquetas, setEtiquetas] = useState(false);
+  const [entrada, setEntrada] = useState(false);
+  const [inventario, setInventario] = useState(false);
 
   const classes = useMemo(
     () => categorias.filter((c) => !c.paiId).sort((a, b) => txt(a.nome).localeCompare(txt(b.nome))),
@@ -140,6 +144,12 @@ export const Estoque: React.FC = () => {
             <button className="btn-secondary" onClick={() => setGerFornecedores(true)}>
               <Truck size={18} /> Fornecedores
             </button>
+            <button className="btn-secondary" onClick={() => setEntrada(true)}>
+              <Truck size={18} /> Entrada
+            </button>
+            <button className="btn-secondary" onClick={() => setInventario(true)}>
+              <ClipboardCheck size={18} /> Contagem
+            </button>
             <button className="btn-secondary" onClick={() => setEtiquetas(true)}>
               <Tag size={18} /> Etiquetas
             </button>
@@ -154,6 +164,8 @@ export const Estoque: React.FC = () => {
       />
 
       {etiquetas && <Etiquetas onClose={() => setEtiquetas(false)} />}
+      {entrada && <EntradaNota onClose={() => setEntrada(false)} />}
+      {inventario && <Inventario onClose={() => setInventario(false)} />}
 
       {/* Vencimento: só para quem vende coisa que estraga */}
       {temRecurso(ramo, "validade") && vencendo.length > 0 && (
