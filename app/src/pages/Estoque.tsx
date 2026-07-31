@@ -6,6 +6,7 @@ import { EntradaNota } from "../components/EntradaNota";
 import { Inventario } from "../components/Inventario";
 import { Reposicao } from "../components/Reposicao";
 import { minimoSugerido } from "../lib/reposicao";
+import { aoApagarProduto, textoDaConfirmacao } from "../lib/exclusao";
 import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck, FileQuestion, Wrench, CalendarX, Tag, ClipboardCheck, ShoppingBasket } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
@@ -37,7 +38,7 @@ const vazio = (): Produto => ({
 });
 
 export const Estoque: React.FC = () => {
-  const { produtos, categorias, fornecedores, cotacoes, vendas, ramo, saveProduto, removeProduto, saveCategoria, removeCategoria, saveFornecedor, removeFornecedor } = useApp();
+  const { produtos, categorias, fornecedores, cotacoes, vendas, ordens, ramo, saveProduto, removeProduto, saveCategoria, removeCategoria, saveFornecedor, removeFornecedor } = useApp();
   const [busca, setBusca] = useState("");
   const [editando, setEditando] = useState<Produto | null>(null);
   const [soBaixo, setSoBaixo] = useState(false);
@@ -302,7 +303,14 @@ export const Estoque: React.FC = () => {
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1">
                         <button className="btn-ghost !p-2" onClick={() => setEditando(p)}><Pencil size={15} /></button>
-                        <button className="btn-ghost !p-2 text-red-500" onClick={() => { if (confirm(`Excluir ${p.nome}?`)) removeProduto(p.id); }}><Trash2 size={15} /></button>
+                        <button className="btn-ghost !p-2 text-red-500" onClick={() => {
+                          // Produto já vendido não se apaga: o cupom do
+                          // cliente cita o nome, e o relatório passaria a
+                          // mostrar venda de item que não existe.
+                          const r = aoApagarProduto(p, { vendas, ordens });
+                          if (!r.pode) return aviso.alerta(`${r.titulo}\n\n${r.saida}`);
+                          if (confirm(textoDaConfirmacao(r))) removeProduto(p.id);
+                        }}><Trash2 size={15} /></button>
                       </div>
                     </td>
                   </tr>

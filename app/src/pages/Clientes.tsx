@@ -6,6 +6,7 @@ import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../componen
 import { uid, nowISO, whatsappLink, formatDate, brl, txt, mascaraDocumento, soDigitos, documentoValido } from "../lib/format";
 import { avaliarCliente, classificacaoDe, travaFiado, devendo } from "../lib/clientes";
 import { garantiasDoCliente } from "../lib/garantia";
+import { aoApagarCliente, textoDaConfirmacao } from "../lib/exclusao";
 import { Relacionamento } from "../components/Relacionamento";
 import { CLASSIFICACAO_META, type Classificacao, type Cliente } from "../lib/types";
 
@@ -245,7 +246,16 @@ export const Clientes: React.FC = () => {
                 <button
                   className="btn-secondary !py-1.5 !px-2.5 text-red-600"
                   onClick={() => {
-                    if (confirm(`Excluir ${c.nome}?`)) removeCliente(c.id);
+                    {
+                        // "Excluir Fulano?" não é pergunta, é armadilha: quem
+                        // responde sim não sabe que ele deve R$ 340 e tem um
+                        // notebook na bancada.
+                        const r = aoApagarCliente(c, { fiados, ordens, vendas });
+                        if (!r.pode) {
+                          return aviso.alerta(`${r.titulo}\n\n${r.saida}`);
+                        }
+                        if (confirm(textoDaConfirmacao(r))) removeCliente(c.id);
+                      }
                   }}
                 >
                   <Trash2 size={14} />

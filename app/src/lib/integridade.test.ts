@@ -287,14 +287,34 @@ describe("OS esquecida na bancada", () => {
  * junto com os dados, não ao quadrado.
  */
 describe("a conferência não pode travar o painel", () => {
-  const gerar = (n: number): Dados => ({
+  /**
+   * Conta quantas vezes cada movimento é LIDO, em vez de cronometrar.
+   *
+   * A primeira versão deste teste media `performance.now()` e comparava a
+   * razão entre 1.000 e 2.000 registros. Falhava sozinha em máquina
+   * ocupada — 10ms contra 10ms é ruído, não medição — e teste que falha à
+   * toa é teste que a gente aprende a ignorar.
+   *
+   * O que causava o travamento era varrer a lista inteira de movimentos
+   * para cada venda. Então o que o teste fixa é isto, e nada mais: cada
+   * movimento é lido um punhado de vezes, não uma vez por venda.
+   */
+  const gerar = (n: number, leituras: { total: number }): Dados => ({
     ordens: Array.from({ length: n }, (_, i) =>
       os({ id: `o${i}`, numero: i, maoDeObra: 10 })
     ),
     vendas: Array.from({ length: n }, (_, i) => venda({ id: `v${i}`, numero: i })),
-    movimentos: Array.from({ length: n }, (_, i) =>
-      mov({ id: `m${i}`, descricao: `Venda ${i} (1 item(ns))`, osId: `o${i}` })
-    ),
+    movimentos: Array.from({ length: n }, (_, i) => {
+      const m = mov({ id: `m${i}`, osId: `o${i}` });
+      const descricao = `Venda ${i} (1 item(ns))`;
+      Object.defineProperty(m, "descricao", {
+        get() {
+          leituras.total++;
+          return descricao;
+        },
+      });
+      return m;
+    }),
     produtos: [],
     fiados: [],
     clientes: [],
@@ -304,21 +324,22 @@ describe("a conferência não pode travar o painel", () => {
   it("com tudo vinculado, nada é acusado — mesmo em volume", () => {
     // Se o casamento por número quebrar, este teste explode em 2.000 achados
     // falsos em vez de passar em silêncio.
-    expect(conferirTudo(gerar(1000), HOJE)).toEqual([]);
+    expect(conferirTudo(gerar(1000, { total: 0 }), HOJE)).toEqual([]);
   });
 
-  it("dobrar os dados não multiplica o trabalho por quatro", () => {
-    const medir = (n: number) => {
-      const d = gerar(n);
-      const t = performance.now();
-      conferirTudo(d, HOJE);
-      return performance.now() - t + 1; // +1 evita divisão por zero
+  it("dobrar os dados não multiplica as leituras por quatro", () => {
+    const ler = (n: number) => {
+      const leituras = { total: 0 };
+      conferirTudo(gerar(n, leituras), HOJE);
+      return leituras.total;
     };
-    // Aquece, para o primeiro custo de compilação não distorcer a razão.
-    medir(200);
-    const razao = medir(2000) / medir(1000);
-    // Linear ficaria perto de 2; quadrático passa de 4 com folga. A margem é
-    // generosa de propósito: o que se quer pegar é a volta do quadrático.
-    expect(razao).toBeLessThan(3.5);
+    const mil = ler(1000);
+    const doisMil = ler(2000);
+
+    // Linear: uma leitura por movimento, com alguma folga para o dia em que
+    // outra conferência precisar do mesmo campo.
+    expect(mil).toBeLessThanOrEqual(1000 * 3);
+    // Quadrático daria 4x aqui. Se voltar, este número explode.
+    expect(doisMil / mil).toBeLessThan(2.5);
   });
 });

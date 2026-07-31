@@ -67,6 +67,7 @@ import {
   type Config,
 } from "../lib/types";
 import { travaAtendimento, classificacaoDe, travaFiado } from "../lib/clientes";
+import { aoApagarOrdem, textoDaConfirmacao } from "../lib/exclusao";
 import {
   garantiaDaOS,
   GARANTIA_META,
@@ -493,7 +494,16 @@ export const OrdensServico: React.FC = () => {
             setDetalhe(null);
           }}
           onExcluir={async () => {
-            if (confirm(`Excluir a OS ${codigoOS(detalhe.numero)}?`)) {
+            // Com dinheiro lançado, apagar deixa a entrada do caixa apontando
+            // para uma OS que não existe — e o mês fecha com receita sem
+            // origem, que ninguém consegue explicar depois.
+            const r = aoApagarOrdem(detalhe, { movimentos, fiados });
+            if (!r.pode) {
+              return aviso.alerta(
+                `${r.titulo}\n\n${r.perdas.map((p) => `- ${p}`).join("\n")}\n\n${r.saida}`
+              );
+            }
+            if (confirm(textoDaConfirmacao(r))) {
               await removeOrdem(detalhe.id);
               setDetalhe(null);
             }
