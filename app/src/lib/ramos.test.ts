@@ -11,6 +11,7 @@ import {
   definirRamoAparelho,
   ramoLembrado,
   lembrarRamoDaConta,
+  ramoDoEmail,
 } from "./ramos";
 
 describe("ramos", () => {
@@ -274,5 +275,28 @@ describe("plano contratado", () => {
         `${r} entrega exatamente o mesmo que os outros`
       ).toBe(true);
     }
+  });
+});
+
+/**
+ * A consulta ao servidor.
+ *
+ * A memória do aparelho não resolve no aparelho novo — que é justamente onde
+ * a pessoa mais precisa de ajuda. Estes testes fixam o que a função NÃO pode
+ * fazer: consultar a cada tecla e derrubar o login quando a rede falha.
+ */
+describe("perguntar o ramo pelo e-mail", () => {
+  it("não consulta o que nem parece e-mail", async () => {
+    // Consultar a cada tecla digitada transformaria a tela de entrada num
+    // gerador de tráfego.
+    for (const t of ["", "a", "jo", "joao", "joao@", "joao.com"]) {
+      expect(await ramoDoEmail(t)).toBeNull();
+    }
+  });
+
+  it("falha de rede não derruba a tela de entrada", async () => {
+    // Atrapalhar o login por causa de um enfeite seria bem pior do que a
+    // tela deixar de adivinhar.
+    await expect(ramoDoEmail("dona@mercearia.com")).resolves.toBeNull();
   });
 });

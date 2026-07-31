@@ -258,3 +258,35 @@ export function lembrarRamoDaConta(email: string, ramo: Ramo): void {
     /* aparelho sem armazenamento: a tela só não vai adivinhar da próxima vez */
   }
 }
+
+/**
+ * Pergunta ao servidor qual é o ramo desta conta.
+ *
+ * A memória do aparelho (acima) só funciona onde a conta já entrou uma vez.
+ * No aparelho novo — que é justamente onde a pessoa mais precisa de ajuda —
+ * ela não sabe nada, e os quatro botões de tipo de loja voltam a aparecer
+ * sem fazer efeito nenhum para quem é cliente.
+ *
+ * O preço é conhecido e aceito: a função responde sem senha, então quem já
+ * sabe o e-mail exato de alguém descobre o ramo do negócio. Ela não devolve
+ * mais nada — nem se o e-mail existe, nem nome, nem loja.
+ *
+ * Nunca lança: falha de rede aqui só faz a tela deixar de adivinhar, e
+ * atrapalhar o login por causa de um enfeite seria bem pior.
+ */
+export async function ramoDoEmail(email: string): Promise<Ramo | null> {
+  const alvo = email.trim();
+  // Menos que isso não é e-mail, e consultar a cada tecla digitada
+  // transformaria a tela de entrada num gerador de tráfego.
+  if (alvo.length < 5 || !alvo.includes("@") || !alvo.includes(".")) return null;
+  try {
+    const { supabase, supabaseEnabled } = await import("./supabase");
+    if (!supabaseEnabled || !supabase) return null;
+    const { data, error } = await supabase.rpc("ramo_do_email", { p_email: alvo });
+    if (error) return null;
+    const v = Array.isArray(data) ? data[0] : data;
+    return typeof v === "string" && RAMOS.includes(v as Ramo) ? (v as Ramo) : null;
+  } catch {
+    return null;
+  }
+}

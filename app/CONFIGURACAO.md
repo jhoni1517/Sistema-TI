@@ -124,7 +124,8 @@ https://supabase.com/dashboard/project/nviagibefxqtognowqwe/sql/new:
 11. `supabase-migracao-opcoes-os.sql`
 12. `supabase-migracao-imagens.sql`
 13. `supabase-migracao-catalogo.sql`
-14. `supabase-corrigir-colunas.sql`
+14. `supabase-migracao-ramo-email.sql`
+15. `supabase-corrigir-colunas.sql`
 
 O de número 11 é o que faz a página do cliente entender mais de um orçamento
 na mesma OS ("fonte de 500W mais SSD" contra "só a fonte de 200W"). Sem ele,
@@ -149,6 +150,16 @@ update lojas set catalogo_ativo = true,
 ```
 
 O link fica em Configurações → Dados da loja → Catálogo público.
+
+O de número 14 faz a tela de entrada reconhecer o tipo de loja ao digitar o
+e-mail. Ele responde **sem senha**, então quem já sabe o endereço exato de
+alguém descobre o ramo do negócio dele — é uma troca consciente, porque sem
+ele o reconhecimento só funcionaria em aparelho onde a conta já entrou uma
+vez. Para desligar depois, sem quebrar nada:
+
+```sql
+revoke execute on function ramo_do_email(text) from anon;
+```
 
 O último é seguro rodar quantas vezes quiser e é o primeiro lugar a olhar
 quando aparecer `Could not find the 'xxx' column of 'yyy' in the schema

@@ -17,6 +17,7 @@ import {
   lerRamoAparelho,
   definirRamoAparelho,
   ramoLembrado,
+  ramoDoEmail,
   type Ramo,
 } from "../lib/ramos";
 
@@ -64,11 +65,40 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
    * Quem já entrou aqui não precisa dizer de novo que tem uma mercearia — e,
    * pior, os botões de tipo de loja nem valiam para ele: só o administrador
    * demonstrando o sistema muda de ramo. Clicar e nada acontecer parecia
-   * defeito. A resposta vem do login anterior, guardada no próprio aparelho;
-   * perguntar ao servidor contaria a qualquer um, sem senha, que aquele
-   * e-mail existe e que tipo de loja ele toca.
+   * defeito. Esta é a resposta instantânea, vinda do login anterior neste
+   * aparelho — sem rede e sem espera. Quando ela não sabe, a consulta ao
+   * servidor logo abaixo assume.
    */
-  const conhecida = modo === "entrar" ? ramoLembrado(email) : null;
+  const lembrado = modo === "entrar" ? ramoLembrado(email) : null;
+
+  /**
+   * Ramo que o servidor conhece para este e-mail.
+   *
+   * A memória do aparelho só resolve onde a conta já entrou uma vez — e o
+   * aparelho novo é justamente onde a pessoa mais precisa de ajuda. A
+   * consulta acontece com atraso, depois que a pessoa para de digitar:
+   * disparar a cada tecla transformaria a tela de entrada num gerador de
+   * tráfego, e ainda piscaria o nome do ramo enquanto o e-mail é escrito.
+   */
+  const [ramoDaConta, setRamoDaConta] = useState<Ramo | null>(null);
+
+  useEffect(() => {
+    if (modo !== "entrar" || lembrado) return setRamoDaConta(null);
+    let vivo = true;
+    const t = setTimeout(async () => {
+      const r = await ramoDoEmail(email);
+      // Só aplica se o campo ainda for o mesmo: quem digita rápido dispara
+      // duas consultas, e a lenta chegando por último mostraria o ramo de um
+      // e-mail que já não está mais na tela.
+      if (vivo) setRamoDaConta(r);
+    }, 600);
+    return () => {
+      vivo = false;
+      clearTimeout(t);
+    };
+  }, [email, modo, lembrado]);
+
+  const conhecida = lembrado ?? ramoDaConta;
   const ramoNaTela = conhecida ?? ramo;
   const mostraEscolha = !conhecida || verTipos;
 
@@ -194,7 +224,7 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
               {RAMO_META[conhecida].label}
             </p>
             <p className="mt-0.5 text-xs text-amber-100/70">
-              Reconhecemos esta conta neste aparelho.
+              Reconhecemos esta conta.
             </p>
             {!verTipos && (
               <button
