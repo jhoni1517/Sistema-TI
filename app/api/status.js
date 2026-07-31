@@ -59,7 +59,9 @@ export default async function handler(req, res) {
       supabaseUrl: !!SUPABASE_URL,
       supabaseKey: !!SUPABASE_KEY,
       telegramToken: !!process.env.TELEGRAM_TOKEN,
-      telegramChatId: process.env.TELEGRAM_CHAT_ID || "(sem restrição)",
+      // Só se está definido. Imprimir o número não ajuda a diagnosticar
+      // nada e transforma a página numa lista de para-onde-mandar.
+      telegramChatId: !!process.env.TELEGRAM_CHAT_ID,
       whatsappToken: !!process.env.WHATSAPP_TOKEN,
       whatsappPhoneId: process.env.WHATSAPP_PHONE_ID || null,
       whatsappVerifyToken: !!process.env.WHATSAPP_VERIFY_TOKEN,
@@ -73,7 +75,7 @@ export default async function handler(req, res) {
     banco: "não testado",
     telegram: "não testado",
     whatsapp: "não testado",
-    ultimosLancamentos: [],
+    ultimosLancamentos: 0,
   };
 
   // 1) Testa leitura/gravação no Supabase
@@ -91,7 +93,10 @@ export default async function handler(req, res) {
         out.banco =
           `ok — o banco respondeu. Vieram ${linhas.length} linha(s) com a chave pública` +
           (linhas.length === 0 ? "; vazio é o esperado, é o RLS barrando." : ".");
-        out.ultimosLancamentos = linhas;
+        // Só a contagem. O que prova que o RLS está barrando é o zero, não
+        // o conteúdo — e página de diagnóstico que imprime lançamento vira
+        // porta dos fundos no dia em que o RLS regride.
+        out.ultimosLancamentos = linhas.length;
       } else {
         out.banco = `ERRO ao ler (${r.status}): ${await r.text()}`;
       }

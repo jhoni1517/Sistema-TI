@@ -92,10 +92,12 @@ async function lojaDoRobo() {
 
 /** Sessão de caixa aberta, para o lançamento entrar no fechamento do dia */
 async function sessaoAbertaId(lojaId) {
+  // Sem loja, a busca traria a sessão aberta de QUALQUER loja e o
+  // lançamento entraria no fechamento de outra pessoa.
+  if (!lojaId) return null;
   try {
-    const filtroLoja = lojaId ? `&lojaId=eq.${lojaId}` : "";
     const r = await fetch(
-      `${SUPABASE_URL}/rest/v1/sessoes?select=id&fechadoEm=is.null${filtroLoja}&order=abertoEm.desc&limit=1`,
+      `${SUPABASE_URL}/rest/v1/sessoes?select=id&fechadoEm=is.null&lojaId=eq.${lojaId}&order=abertoEm.desc&limit=1`,
       { headers: headers() }
     );
     if (!r.ok) return null;
@@ -141,9 +143,21 @@ export async function registrarMovimento(mov, origem = "") {
 export async function resumoCaixa() {
   const hoje = new Date().toISOString().slice(0, 10);
   const lojaId = await lojaDoRobo();
-  const filtroLoja = lojaId ? `&lojaId=eq.${lojaId}` : "";
+  /*
+   * Sem loja, o filtro saía vazio e a chave de serviço somava o caixa de
+   * TODAS as lojas — o /saldo respondia no Telegram com o faturamento do
+   * dia dos clientes junto do próprio. O comentário logo acima já dizia que
+   * era isso que aconteceria; faltava o código concordar.
+   *
+   * Recusar é o certo: número errado com cara de certo é pior do que erro.
+   */
+  if (!lojaId) {
+    throw new Error(
+      "Não descobri de qual loja é este robô. Confira se existe um perfil com super_admin, ou defina LOJA_ID nas variáveis do Vercel."
+    );
+  }
   const r = await fetch(
-    `${SUPABASE_URL}/rest/v1/movimentos?select=tipo,valor,descricao,data&data=gte.${hoje}${filtroLoja}`,
+    `${SUPABASE_URL}/rest/v1/movimentos?select=tipo,valor,descricao,data&data=gte.${hoje}&lojaId=eq.${lojaId}`,
     { headers: headers() }
   );
   if (!r.ok) throw new Error(`Banco respondeu ${r.status}`);
