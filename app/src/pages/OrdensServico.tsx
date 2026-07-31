@@ -25,6 +25,7 @@ import {
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { PatternLock } from "../components/PatternLock";
+import { FotosAparelho } from "../components/FotosAparelho";
 import { printHTML } from "../lib/print";
 import { obterLoja } from "../lib/db";
 import { registrarAcessoSigilo } from "../lib/auth";
@@ -64,7 +65,7 @@ import {
   type FormaPagamento,
   type Config,
 } from "../lib/types";
-import { travaAtendimento, classificacaoDe } from "../lib/clientes";
+import { travaAtendimento, classificacaoDe, travaFiado } from "../lib/clientes";
 
 const CHECKLIST_ITENS = [
   "Liga normalmente",
@@ -498,6 +499,16 @@ export const OrdensServico: React.FC = () => {
           }}
           onFiado={async () => {
             if (escolhaPendente(detalhe)) return;
+            // O teto do fiado é decisão do dono, tomada uma vez. Aqui ela só
+            // é lembrada — quem está no balcão ainda pode autorizar, porque
+            // sistema que não deixa fazer nada é contornado por fora.
+            const teto = travaFiado(cliente(detalhe.clienteId), fiados, totalOS(detalhe));
+            if (
+              teto.estoura &&
+              !confirm(`${teto.motivo}\n\nLançar em A Receber mesmo assim?`)
+            ) {
+              return;
+            }
             try {
               await saveFiado({
                 id: uid(),
@@ -818,6 +829,14 @@ const OSForm: React.FC<{
           </div>
         </div>
 
+        <div>
+          <label className="label">Fotos do aparelho na entrada</label>
+          <FotosAparelho
+            fotos={os.fotos || []}
+            onChange={(fotos) => setOs({ ...os, fotos })}
+          />
+        </div>
+
         {/* Peças */}
         <fieldset className="rounded-xl border border-slate-200 p-4">
           <legend className="px-2 text-sm font-bold text-slate-600">Peças e produtos</legend>
@@ -1133,6 +1152,24 @@ const OSDetalhe: React.FC<{
                   </span>
                   <span className="ml-2 shrink-0 text-slate-400">{formatDateTime(h.criadoEm).slice(0, 10)}</span>
                 </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Fotos da entrada: saem na impressão junto com o termo de guarda,
+            que é onde elas valem como prova do estado do aparelho. */}
+        {(os.fotos || []).length > 0 && (
+          <div>
+            <p className="label">Estado na entrada</p>
+            <div className="flex flex-wrap gap-2">
+              {(os.fotos || []).map((url) => (
+                <img
+                  key={url}
+                  src={url}
+                  alt=""
+                  className="h-24 w-24 rounded-lg border border-slate-200 object-cover"
+                />
               ))}
             </div>
           </div>

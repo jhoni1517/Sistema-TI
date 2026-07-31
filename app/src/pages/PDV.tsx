@@ -7,6 +7,7 @@ import {
   Minus,
   Scale,
   Printer,
+  Undo2,
   CheckCircle2,
   AlertTriangle,
   X,
@@ -38,6 +39,8 @@ import {
   situacaoValidade,
   VALIDADE_META,
 } from "../lib/pdv";
+import { precoEfetivo, promocaoValendo } from "../lib/promocao";
+import { Devolucao } from "../components/Devolucao";
 import type {
   FormaPagamento,
   ItemVenda,
@@ -75,6 +78,7 @@ export const PDV: React.FC = () => {
   const [clienteId, setClienteId] = useState("");
   const [gravando, setGravando] = useState(false);
   const [ultima, setUltima] = useState<Venda | null>(null);
+  const [devolvendo, setDevolvendo] = useState(false);
 
   const buscaRef = useRef<HTMLInputElement>(null);
   const sessao = useMemo(() => achaSessaoAberta(sessoes), [sessoes]);
@@ -141,7 +145,9 @@ export const PDV: React.FC = () => {
           `Nenhum produto com o código de balança ${etiqueta.codigo}. Cadastre esse código em Estoque.`
         );
       }
-      const qtd = quantidadeDaEtiqueta(etiqueta, Number(p.preco) || 0);
+      // Preço efetivo: com promoção valendo, a etiqueta da balança
+      // precisa render o mesmo valor que a gôndola anuncia.
+      const qtd = quantidadeDaEtiqueta(etiqueta, precoEfetivo(p));
       if (qtd <= 0) {
         setTermo("");
         focarBusca();
@@ -265,13 +271,20 @@ export const PDV: React.FC = () => {
             : "Caixa fechado — abra o caixa para a venda entrar no fechamento do dia"
         }
         action={
-          ultima && (
-            <button className="btn-secondary" onClick={() => imprimir(ultima)}>
-              <Printer size={18} /> Cupom da venda {ultima.numero}
+          <div className="flex flex-wrap gap-2">
+            {ultima && (
+              <button className="btn-secondary" onClick={() => imprimir(ultima)}>
+                <Printer size={18} /> Cupom da venda {ultima.numero}
+              </button>
+            )}
+            <button className="btn-secondary" onClick={() => setDevolvendo(true)}>
+              <Undo2 size={18} /> Devolução
             </button>
-          )
+          </div>
         }
       />
+
+      {devolvendo && <Devolucao onClose={() => setDevolvendo(false)} />}
 
       {!sessao && (
         <p className="mb-4 flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
@@ -329,7 +342,20 @@ export const PDV: React.FC = () => {
                         {p.codigoBarras && ` · ${p.codigoBarras}`}
                       </span>
                     </span>
-                    <span className="shrink-0 font-semibold text-slate-800">{brl(p.preco)}</span>
+                    <span className="shrink-0 text-right">
+                      {promocaoValendo(p) ? (
+                        <>
+                          <span className="block text-xs text-slate-400 line-through">
+                            {brl(p.preco)}
+                          </span>
+                          <span className="block font-semibold text-emerald-600">
+                            {brl(precoEfetivo(p))}
+                          </span>
+                        </>
+                      ) : (
+                        <span className="font-semibold text-slate-800">{brl(p.preco)}</span>
+                      )}
+                    </span>
                   </button>
                 ))}
                 <button

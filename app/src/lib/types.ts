@@ -156,6 +156,14 @@ export interface OrdemServico {
   recusadoEm?: string;
   // Assinatura do cliente (imagem em data URL)
   assinaturaCliente?: string;
+  /**
+   * Fotos do aparelho na ENTRADA, com o endereço no depósito de imagens.
+   *
+   * O checklist diz "tela sem trincos"; a foto mostra o trinco que já estava
+   * lá. Sem ela, a discussão na retirada é a palavra do cliente contra a do
+   * técnico, e quem perde é sempre a loja.
+   */
+  fotos?: string[];
   // Quando ficou pronta (base para taxa de armazenamento)
   prontaEm?: string;
 }

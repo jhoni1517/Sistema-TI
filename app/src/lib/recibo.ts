@@ -5,6 +5,7 @@ import { totalPecas, totalOS } from "./calc";
 import { opcaoDaPeca, opcaoAtual, subtotalPeca } from "./orcamento";
 import { resumoCaixa, conferencia, CONFERENCIA_META } from "./caixa";
 import { subtotalItem, subtotalVenda, totalVenda, trocoDe } from "./pdv";
+import { barrasEAN13, precoDaEtiqueta, type Etiqueta } from "./etiqueta";
 
 /**
  * Escapa texto antes de entrar no HTML do recibo.
@@ -124,6 +125,25 @@ export function reciboOS(
   </div>
 
   ${os.tecnico ? `<div class="muted" style="margin-top:10px">Técnico responsável: ${esc(os.tecnico)}</div>` : ""}
+
+  ${
+    // As fotos da entrada saem no papel que o cliente assina: é ali que elas
+    // deixam de ser registro interno e passam a valer como prova do estado.
+    (os.fotos || []).length > 0
+      ? `<div class="box" style="margin-top:14px">
+          <div class="label">Estado do aparelho na entrada</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">
+            ${(os.fotos || [])
+              .slice(0, 6)
+              .map(
+                (u) =>
+                  `<img src="${esc(u)}" style="width:28mm;height:28mm;object-fit:cover;border:1px solid #ddd" />`
+              )
+              .join("")}
+          </div>
+        </div>`
+      : ""
+  }
 
   <div class="box" style="margin-top:14px">
     <div class="label">Termo de guarda e retirada</div>
@@ -350,4 +370,56 @@ export function reciboFechamento(
     <div>Conferido por</div>
     <div>${esc(config.nomeLoja) || "Responsável"}</div>
   </div>`;
+}
+
+/**
+ * Folha de etiquetas de gôndola.
+ *
+ * Três por linha em papel A4, que é o que cabe legível sem lupa e sem
+ * desperdiçar papel. O código de barras vai em SVG: etiqueta impressa em
+ * baixa resolução não é lida pelo leitor, e o vetor sai nítido até na jato
+ * de tinta velha do balcão.
+ *
+ * `page-break-inside: avoid` em cada etiqueta impede o pior resultado
+ * possível — a etiqueta cortada ao meio pela quebra de página, que só
+ * aparece depois de imprimir cem delas.
+ */
+export function folhaDeEtiquetas(etiquetas: Etiqueta[], config: Config): string {
+  const celulas = etiquetas
+    .map((e) => {
+      const barras = barrasEAN13(e.codigo, 30);
+      return `<div class="etq">
+        <div class="etq-loja">${esc(config.nomeLoja) || ""}</div>
+        <div class="etq-nome">${esc(e.nome)}</div>
+        ${
+          e.precoDe > 0
+            ? `<div class="etq-de">de ${brl(e.precoDe)}</div>`
+            : ""
+        }
+        <div class="etq-preco">${esc(precoDaEtiqueta(e))}</div>
+        ${
+          barras
+            ? `<div class="etq-barras">${barras}</div>
+               <div class="etq-cod">${esc(e.codigo)}</div>`
+            : `<div class="etq-cod">${esc(e.codigo) || "sem código"}</div>`
+        }
+      </div>`;
+    })
+    .join("");
+
+  return `
+  <style>
+    .etqs { display: flex; flex-wrap: wrap; gap: 4mm; }
+    .etq {
+      width: 60mm; padding: 3mm; border: 1px dashed #999; border-radius: 2mm;
+      text-align: center; page-break-inside: avoid;
+    }
+    .etq-loja { font-size: 8px; text-transform: uppercase; color: #777; letter-spacing: .05em; }
+    .etq-nome { font-size: 12px; font-weight: bold; margin: 1mm 0; min-height: 9mm; }
+    .etq-de { font-size: 10px; color: #777; text-decoration: line-through; }
+    .etq-preco { font-size: 22px; font-weight: bold; line-height: 1.1; }
+    .etq-barras { margin-top: 1.5mm; }
+    .etq-cod { font-size: 9px; letter-spacing: .12em; color: #333; }
+  </style>
+  <div class="etqs">${celulas}</div>`;
 }

@@ -2,9 +2,9 @@ import React, { useMemo, useState } from "react";
 import { aviso } from "../components/Aviso";
 import { Plus, Search, Pencil, Trash2, Users, Phone, MessageCircle, Wrench, User, Building2, ShieldAlert } from "lucide-react";
 import { useApp } from "../store/AppStore";
-import { Modal, Field, EmptyState, SectionTitle } from "../components/ui";
-import { uid, nowISO, whatsappLink, formatDate, txt, mascaraDocumento, soDigitos, documentoValido } from "../lib/format";
-import { avaliarCliente, classificacaoDe } from "../lib/clientes";
+import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
+import { uid, nowISO, whatsappLink, formatDate, brl, txt, mascaraDocumento, soDigitos, documentoValido } from "../lib/format";
+import { avaliarCliente, classificacaoDe, travaFiado } from "../lib/clientes";
 import { CLASSIFICACAO_META, type Classificacao, type Cliente } from "../lib/types";
 
 const vazio = (): Cliente => ({
@@ -333,6 +333,22 @@ export const Clientes: React.FC = () => {
               />
               <p className="mt-1 text-xs text-slate-400">
                 Aparece sozinho na Agenda todo ano. Se não souber o ano, use 1900.
+              </p>
+            </Field>
+            {/* Teto do fiado: decisão de dono, tomada uma vez com a cabeça
+                fria, em vez de decisão do atendente no balcão com fila. */}
+            <Field label="Limite de fiado (R$)">
+              <InputNumero
+                className="input"
+                value={editando.limiteFiado}
+                onChange={(v) => setEditando({ ...editando, limiteFiado: v })}
+              />
+              <p className="mt-1 text-xs text-slate-400">
+                {(() => {
+                  const t = travaFiado(editando, fiados);
+                  if (!t.temLimite) return `Vazio = sem teto. Deve hoje: ${brl(t.devendo)}.`;
+                  return `Deve hoje ${brl(t.devendo)} — ainda cabem ${brl(t.disponivel)}.`;
+                })()}
               </p>
             </Field>
             <Field label="Observações" className="sm:col-span-2">

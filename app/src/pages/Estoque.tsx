@@ -1,11 +1,17 @@
 import React, { useMemo, useState } from "react";
 import { aviso } from "../components/Aviso";
 import { ImagemUpload } from "../components/ImagemUpload";
-import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck, FileQuestion, Wrench, CalendarX } from "lucide-react";
+import { Etiquetas } from "../components/Etiquetas";
+import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck, FileQuestion, Wrench, CalendarX, Tag } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { temRecurso } from "../lib/ramos";
 import { situacaoValidade, produtosVencendo, VALIDADE_META } from "../lib/pdv";
+import {
+  promocaoValendo,
+  percentualDaPromocao,
+  problemaNaPromocao,
+} from "../lib/promocao";
 import { Cotacoes } from "../components/Cotacoes";
 import { uid, nowISO, brl, txt, formatDate } from "../lib/format";
 import type { Produto, Categoria, Fornecedor } from "../lib/types";
@@ -34,6 +40,7 @@ export const Estoque: React.FC = () => {
   const [gerCategorias, setGerCategorias] = useState(false);
   const [gerFornecedores, setGerFornecedores] = useState(false);
   const [verCotacoes, setVerCotacoes] = useState(false);
+  const [etiquetas, setEtiquetas] = useState(false);
 
   const classes = useMemo(
     () => categorias.filter((c) => !c.paiId).sort((a, b) => txt(a.nome).localeCompare(txt(b.nome))),
@@ -93,6 +100,14 @@ export const Estoque: React.FC = () => {
   const salvar = async () => {
     if (!editando) return;
     if (!editando.nome.trim()) return aviso.alerta("Informe o nome do produto.");
+    // Promoção mais cara que o preço normal só aparece quando o cliente
+    // reclama no balcão. Abaixo do custo passa com confirmação: queima de
+    // estoque vencendo às vezes vale a pena.
+    const aviProm = problemaNaPromocao(editando);
+    if (aviProm.startsWith("O preço promocional") || aviProm.startsWith("A promoção termina")) {
+      return aviso.alerta(aviProm);
+    }
+    if (aviProm && !confirm(`${aviProm}\n\nSalvar assim mesmo?`)) return;
     // grava os textos de categoria/fornecedor para exibição/compatibilidade
     const p = {
       ...editando,
@@ -125,6 +140,9 @@ export const Estoque: React.FC = () => {
             <button className="btn-secondary" onClick={() => setGerFornecedores(true)}>
               <Truck size={18} /> Fornecedores
             </button>
+            <button className="btn-secondary" onClick={() => setEtiquetas(true)}>
+              <Tag size={18} /> Etiquetas
+            </button>
             <button className="btn-secondary" onClick={() => setGerCategorias(true)}>
               <FolderTree size={18} /> Categorias
             </button>
@@ -134,6 +152,8 @@ export const Estoque: React.FC = () => {
           </div>
         }
       />
+
+      {etiquetas && <Etiquetas onClose={() => setEtiquetas(false)} />}
 
       {/* Vencimento: só para quem vende coisa que estraga */}
       {temRecurso(ramo, "validade") && vencendo.length > 0 && (
@@ -222,6 +242,11 @@ export const Estoque: React.FC = () => {
                         <div className="min-w-0">
                           <p className="flex flex-wrap items-center gap-1.5 font-semibold text-slate-800">
                             {p.nome}
+                            {promocaoValendo(p) && (
+                              <span className="badge bg-emerald-100 text-emerald-700">
+                                <Tag size={11} /> -{percentualDaPromocao(p)}%
+                              </span>
+                            )}
                             {(() => {
                               const v = situacaoValidade(p);
                               return v === "vencido" || v === "vence_perto" ? (
@@ -442,6 +467,49 @@ export const Estoque: React.FC = () => {
                 onChange={(v) => setEditando({ ...editando, preco: (v ?? 0) })}
               />
             </Field>
+
+            {/* Promoção com prazo. O preço cheio fica de pé e volta sozinho:
+                promover editando o preço na mão dava certo até a hora de
+                destrocar, que ninguém lembrava. */}
+            <div className="sm:col-span-2 rounded-xl border border-slate-200 p-3">
+              <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-slate-600">
+                <Tag size={15} /> Promoção (opcional)
+              </p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Field label={editando.porPeso ? "Preço promocional /kg" : "Preço promocional"}>
+                  <InputNumero
+                    className="input"
+                    value={editando.precoPromocional}
+                    onChange={(v) => setEditando({ ...editando, precoPromocional: v })}
+                  />
+                </Field>
+                <Field label="Começa em">
+                  <input
+                    type="date"
+                    className="input"
+                    value={editando.promocaoInicio || ""}
+                    onChange={(e) => setEditando({ ...editando, promocaoInicio: e.target.value })}
+                  />
+                </Field>
+                <Field label="Termina em">
+                  <input
+                    type="date"
+                    className="input"
+                    value={editando.promocaoFim || ""}
+                    onChange={(e) => setEditando({ ...editando, promocaoFim: e.target.value })}
+                  />
+                </Field>
+              </div>
+              {problemaNaPromocao(editando) && (
+                <p className="mt-2 text-xs text-amber-700">{problemaNaPromocao(editando)}</p>
+              )}
+              {promocaoValendo(editando) && (
+                <p className="mt-2 text-xs text-emerald-700">
+                  Valendo hoje: {percentualDaPromocao(editando)}% de desconto. Sem data de
+                  fim, vale até você tirar.
+                </p>
+              )}
+            </div>
             <Field label="Fornecedor" className="sm:col-span-2">
               <select
                 className="input"
