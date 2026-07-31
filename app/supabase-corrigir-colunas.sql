@@ -52,6 +52,12 @@ alter table produtos add column if not exists "codigoBalanca" text;
 -- Foto do produto. Só o endereço: o arquivo mora no depósito de imagens,
 -- porque "produtos" é lido inteiro em toda carga.
 alter table produtos add column if not exists "imagemUrl" text;
+-- Promoção com prazo. O preço cheio fica em "preco" e volta sozinho quando o
+-- prazo acaba: promover editando o preço na mão dava certo até a hora de
+-- destrocar, que ninguém lembrava.
+alter table produtos add column if not exists "precoPromocional" numeric;
+alter table produtos add column if not exists "promocaoInicio" text;
+alter table produtos add column if not exists "promocaoFim" text;
 
 -- ---------- Clientes ----------
 alter table clientes add column if not exists "tipoPessoa" text default 'fisica';
@@ -63,10 +69,18 @@ alter table clientes add column if not exists "motivoClassificacao" text;
 alter table clientes add column if not exists "classificadoEm" text;
 -- Aniversário: a Agenda monta o evento sozinha a partir daqui, todo ano.
 alter table clientes add column if not exists nascimento text;
+-- Teto do fiado. Vazio = sem teto. Decisão de dono, tomada uma vez, em vez
+-- de decisão do atendente no balcão com fila esperando.
+alter table clientes add column if not exists "limiteFiado" numeric;
 
 -- ---------- Fiado ----------
 alter table fiados add column if not exists vencimento text;
 alter table fiados add column if not exists "osId" text;
+
+-- ---------- Vendas (frente de caixa) ----------
+-- Devoluções da venda. Ficam na própria venda para que "quanto ainda pode
+-- voltar" seja uma conta e não um palpite do atendente.
+alter table vendas add column if not exists devolucoes jsonb default '[]'::jsonb;
 
 -- ---------- Sessões de caixa ----------
 alter table sessoes add column if not exists observacoes text;

@@ -85,6 +85,13 @@ export interface Cliente {
   classificadoEm?: string;
   /** Aniversário (AAAA-MM-DD). O ano pode ser qualquer um: só o dia importa. */
   nascimento?: string;
+  /**
+   * Teto do fiado deste cliente. Vazio = sem teto.
+   *
+   * "Fio pra você" é decisão de dono, tomada uma vez. Sem o teto no sistema,
+   * ela virava decisão do atendente, no balcão, sob pressão da fila.
+   */
+  limiteFiado?: number;
   criadoEm: string;
 }
 
@@ -207,6 +214,14 @@ export interface Produto {
   porPeso?: boolean;
   /** Vencimento do lote (AAAA-MM-DD). Vira alerta no estoque. */
   validade?: string;
+  /**
+   * Promoção com prazo. O preço cheio continua em `preco` e volta sozinho
+   * quando o prazo acaba — promover editando o preço na mão dava certo até
+   * a hora de destrocar, que ninguém lembrava. Ver lib/promocao.ts.
+   */
+  precoPromocional?: number;
+  promocaoInicio?: string;
+  promocaoFim?: string;
   /**
    * Código curto que este produto tem na balança do balcão.
    *
@@ -440,7 +455,25 @@ export interface Venda {
   /** Lançamento correspondente no caixa */
   movimentoId?: ID;
   sessaoId?: ID;
+  /**
+   * Devoluções já feitas desta venda. Ficam na própria venda para que
+   * "quanto ainda pode voltar" seja uma conta e não um palpite.
+   * Ver lib/devolucao.ts.
+   */
+  devolucoes?: DevolucaoVenda[];
   criadoEm: string;
+}
+
+/** Uma devolução: o que voltou, quanto saiu do caixa e por quê */
+export interface DevolucaoVenda {
+  id: ID;
+  data: string;
+  /** Quantidade devolvida por índice do item na venda */
+  itens: Record<number, number>;
+  valor: number;
+  motivo?: string;
+  /** Lançamento de saída no caixa */
+  movimentoId?: ID;
 }
 
 export interface SessaoCaixa {

@@ -2,86 +2,49 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Wrench, Users, Package, X, CornerDownLeft } from "lucide-react";
 import { useApp } from "../store/AppStore";
-import { brl, codigoOS } from "../lib/format";
-import { totalOS } from "../lib/calc";
-import { OS_STATUS_META } from "../lib/types";
+import { buscarTudo, type Resultado, type TipoResultado } from "../lib/busca";
 
-interface Item {
-  tipo: "os" | "cliente" | "produto";
-  titulo: string;
-  sub: string;
-  extra?: string;
-  rota: string;
-}
-
-/** Busca única em clientes, ordens e produtos. Abre com Ctrl+K ou pelo botão. */
+/**
+ * Busca única em clientes, ordens e produtos. Abre com Ctrl+K ou pelo botão.
+ *
+ * A regra de o QUE casa com o QUÊ mora em lib/busca.ts, com teste. Ela
+ * estava aqui dentro e por isso não cobria o jeito como se digita de
+ * verdade no balcão: "12" em vez de "OS00012", telefone com a máscara que
+ * veio colada do WhatsApp, nome sem acento.
+ */
 export const BuscaGlobal: React.FC<{ aberto: boolean; onClose: () => void }> = ({
   aberto,
   onClose,
 }) => {
   const { clientes, ordens, produtos } = useApp();
   const [q, setQ] = useState("");
+  const [escolhido, setEscolhido] = useState(0);
   const navigate = useNavigate();
 
+  // Reabrir limpo: a busca de dois minutos atrás não ajuda em nada agora.
   useEffect(() => {
-    if (aberto) setQ("");
+    if (aberto) {
+      setQ("");
+      setEscolhido(0);
+    }
   }, [aberto]);
 
-  const resultados = useMemo<Item[]>(() => {
-    const termo = q.trim().toLowerCase();
-    if (termo.length < 2) return [];
-    const out: Item[] = [];
+  useEffect(() => setEscolhido(0), [q]);
 
-    for (const o of ordens) {
-      const cli = clientes.find((c) => c.id === o.clienteId)?.nome || "";
-      const alvo = `${codigoOS(o.numero)} ${cli} ${o.marca} ${o.modelo} ${o.imeiSerial || ""} ${o.defeitoRelatado}`.toLowerCase();
-      if (alvo.includes(termo)) {
-        out.push({
-          tipo: "os",
-          titulo: `${codigoOS(o.numero)} · ${cli || "sem cliente"}`,
-          sub: `${o.marca} ${o.modelo} — ${OS_STATUS_META[o.status].label}`,
-          extra: brl(totalOS(o)),
-          rota: "/ordens",
-        });
-      }
-    }
-
-    for (const c of clientes) {
-      const alvo = `${c.nome} ${c.telefone} ${c.cpf || ""} ${c.email || ""}`.toLowerCase();
-      if (alvo.includes(termo)) {
-        out.push({
-          tipo: "cliente",
-          titulo: c.nome,
-          sub: c.telefone || "sem telefone",
-          rota: "/clientes",
-        });
-      }
-    }
-
-    for (const p of produtos) {
-      const alvo = `${p.nome} ${p.sku || ""} ${p.categoria || ""}`.toLowerCase();
-      if (alvo.includes(termo)) {
-        out.push({
-          tipo: "produto",
-          titulo: p.nome,
-          sub: `${p.quantidade} em estoque${p.categoria ? ` · ${p.categoria}` : ""}`,
-          extra: brl(p.preco),
-          rota: "/estoque",
-        });
-      }
-    }
-
-    return out.slice(0, 12);
-  }, [q, ordens, clientes, produtos]);
+  const resultados = useMemo<Resultado[]>(
+    () => buscarTudo(q, { clientes, ordens, produtos }),
+    [q, ordens, clientes, produtos]
+  );
 
   if (!aberto) return null;
 
-  const ir = (r: string) => {
-    navigate(r);
+  const abrir = (r: Resultado | undefined) => {
+    if (!r) return;
+    navigate(r.rota);
     onClose();
   };
 
-  const icone = (t: Item["tipo"]) =>
+  const icone = (t: TipoResultado) =>
     t === "os" ? <Wrench size={16} /> : t === "cliente" ? <Users size={16} /> : <Package size={16} />;
 
   return (
@@ -98,12 +61,25 @@ export const BuscaGlobal: React.FC<{ aberto: boolean; onClose: () => void }> = (
           <input
             autoFocus
             className="flex-1 bg-transparent py-4 text-sm text-slate-800 outline-none placeholder:text-slate-400"
-            placeholder="Buscar OS, cliente, aparelho, IMEI ou produto..."
+            placeholder="OS, cliente, telefone, IMEI, código de barras..."
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Escape") onClose();
-              if (e.key === "Enter" && resultados[0]) ir(resultados[0].rota);
+              if (e.key === "Escape") return onClose();
+              if (e.key === "Enter") {
+                e.preventDefault();
+                return abrir(resultados[escolhido]);
+              }
+              // Escolher pelo teclado: no balcão a mão já está no teclado, e
+              // ir para o mouse a cada busca custa mais do que parece.
+              if (e.key === "ArrowDown") {
+                e.preventDefault();
+                setEscolhido((i) => Math.min(i + 1, resultados.length - 1));
+              }
+              if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setEscolhido((i) => Math.max(i - 1, 0));
+              }
             }}
           />
           <button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100">
@@ -121,16 +97,21 @@ export const BuscaGlobal: React.FC<{ aberto: boolean; onClose: () => void }> = (
           ) : (
             resultados.map((r, i) => (
               <button
-                key={i}
-                onClick={() => ir(r.rota)}
-                className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50"
+                key={`${r.tipo}-${r.id}`}
+                onMouseEnter={() => setEscolhido(i)}
+                onClick={() => abrir(r)}
+                className={`flex w-full items-center gap-3 px-4 py-3 text-left ${
+                  i === escolhido ? "bg-brand-50" : "hover:bg-slate-50"
+                }`}
               >
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
                   {icone(r.tipo)}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-slate-800">{r.titulo}</span>
-                  <span className="block truncate text-xs text-slate-400">{r.sub}</span>
+                  <span className="block truncate text-sm font-semibold text-slate-800">
+                    {r.titulo}
+                  </span>
+                  <span className="block truncate text-xs text-slate-400">{r.detalhe}</span>
                 </span>
                 {r.extra && <span className="text-sm font-bold text-slate-600">{r.extra}</span>}
               </button>
@@ -140,7 +121,7 @@ export const BuscaGlobal: React.FC<{ aberto: boolean; onClose: () => void }> = (
 
         <div className="flex items-center justify-between border-t border-slate-200 px-4 py-2 text-[11px] text-slate-400">
           <span className="flex items-center gap-1">
-            <CornerDownLeft size={12} /> Enter abre o primeiro
+            <CornerDownLeft size={12} /> Enter abre · setas escolhem
           </span>
           <span>Ctrl + K para abrir a qualquer momento</span>
         </div>
