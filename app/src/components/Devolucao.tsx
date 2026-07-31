@@ -3,6 +3,7 @@ import { Undo2, Search, AlertTriangle } from "lucide-react";
 import { aviso } from "./Aviso";
 import { Modal, Field, InputNumero } from "./ui";
 import { useApp } from "../store/AppStore";
+import { aposRetorno } from "../lib/estoque";
 import { uid, nowISO, brl, formatDateTime } from "../lib/format";
 import { sessaoAberta as achaSessaoAberta } from "../lib/caixa";
 import {
@@ -122,7 +123,7 @@ export const Devolucao: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         if (prod.servico) continue;
         await saveProduto({
           ...prod,
-          quantidade: (Number(prod.quantidade) || 0) + (Number(item.quantidade) || 0),
+          quantidade: aposRetorno(prod, item.quantidade),
         });
       }
 

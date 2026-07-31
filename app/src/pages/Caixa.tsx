@@ -19,6 +19,7 @@ import { useApp } from "../store/AppStore";
 import { Modal, Field, SectionTitle, EmptyState, InputNumero } from "../components/ui";
 import { sangriaSugerida } from "../lib/desempenho";
 import { uid, nowISO, brl, formatDate, formatDateTime, txt } from "../lib/format";
+import { aposBaixa } from "../lib/estoque";
 import { printHTML } from "../lib/print";
 import { reciboFechamento, reciboVenda, reciboMovimento } from "../lib/recibo";
 import {
@@ -298,7 +299,7 @@ export const Caixa: React.FC = () => {
               if (prod && !prod.servico) {
                 await saveProduto({
                   ...prod,
-                  quantidade: Math.max(0, prod.quantidade - (extra.quantidade || 1)),
+                  quantidade: aposBaixa(prod, extra.quantidade || 1),
                 });
               }
             }

@@ -67,6 +67,7 @@ import {
   type Config,
 } from "../lib/types";
 import { travaAtendimento, classificacaoDe, travaFiado } from "../lib/clientes";
+import { aposBaixa } from "../lib/estoque";
 import { aoApagarOrdem, textoDaConfirmacao } from "../lib/exclusao";
 import {
   garantiaDaOS,
@@ -234,7 +235,7 @@ export const OrdensServico: React.FC = () => {
       if (prod.servico) continue;
       await saveProduto({
         ...prod,
-        quantidade: Math.max(0, (Number(prod.quantidade) || 0) - (Number(p.quantidade) || 0)),
+        quantidade: aposBaixa(prod, p.quantidade),
       });
     }
 

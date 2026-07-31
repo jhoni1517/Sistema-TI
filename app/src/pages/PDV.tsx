@@ -17,6 +17,7 @@ import { aviso } from "../components/Aviso";
 import { useApp } from "../store/AppStore";
 import { SectionTitle, EmptyState, InputNumero } from "../components/ui";
 import { uid, nowISO, brl, txt } from "../lib/format";
+import { aposBaixa, faltaNoEstoque, avisoDeFalta } from "../lib/estoque";
 import { printHTML } from "../lib/print";
 import { reciboPDV } from "../lib/recibo";
 import { sessaoAberta as achaSessaoAberta } from "../lib/caixa";
@@ -338,6 +339,15 @@ export const PDV: React.FC = () => {
     } else if (forma === "dinheiro" && falta > 0 && recebido !== undefined) {
       return aviso.alerta(`Faltam ${brl(falta)} para fechar a venda.`);
     }
+    // Última chance de ver o estoque estourando. O aviso na hora de
+    // adicionar se perde quando o balcão joga dez coisas no carrinho — e
+    // duas linhas do mesmo produto só estouram somadas, caso que nenhum
+    // aviso item a item pega. Não bloqueia: a mercadoria já está na mão.
+    const semEstoque = faltaNoEstoque(itens, produtos);
+    if (semEstoque.length > 0 && !confirm(avisoDeFalta(semEstoque) + "\n\nFechar a venda assim?")) {
+      return;
+    }
+
     if (gravando) return; // clique duplo no balcão acontece o tempo todo
     setGravando(true);
 
@@ -395,7 +405,7 @@ export const PDV: React.FC = () => {
         if (!p || p.servico) continue;
         await saveProduto({
           ...p,
-          quantidade: Math.max(0, (Number(p.quantidade) || 0) - (Number(item.quantidade) || 0)),
+          quantidade: aposBaixa(p, item.quantidade),
         });
       }
 
