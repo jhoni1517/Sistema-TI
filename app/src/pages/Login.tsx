@@ -16,6 +16,7 @@ import {
   RAMO_META,
   lerRamoAparelho,
   definirRamoAparelho,
+  ramoLembrado,
   type Ramo,
 } from "../lib/ramos";
 
@@ -48,12 +49,28 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
    * serviço sumiram da tela do dono numa tentativa de só dar uma olhada.
    */
   const [ramo, setRamo] = useState<Ramo | null>(() => lerRamoAparelho());
+  /** Mostra os quatro tipos mesmo quando o aparelho já conhece a conta */
+  const [verTipos, setVerTipos] = useState(false);
 
   const escolherRamo = (r: Ramo) => {
     const novo = ramo === r ? null : r;
     setRamo(novo);
     definirRamoAparelho(novo);
   };
+
+  /**
+   * O aparelho já conhece esta conta?
+   *
+   * Quem já entrou aqui não precisa dizer de novo que tem uma mercearia — e,
+   * pior, os botões de tipo de loja nem valiam para ele: só o administrador
+   * demonstrando o sistema muda de ramo. Clicar e nada acontecer parecia
+   * defeito. A resposta vem do login anterior, guardada no próprio aparelho;
+   * perguntar ao servidor contaria a qualquer um, sem senha, que aquele
+   * e-mail existe e que tipo de loja ele toca.
+   */
+  const conhecida = modo === "entrar" ? ramoLembrado(email) : null;
+  const ramoNaTela = conhecida ?? ramo;
+  const mostraEscolha = !conhecida || verTipos;
 
   const forca = forcaSenha(senha);
 
@@ -166,37 +183,62 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
           </div>
           <h1 className="text-2xl font-bold text-white">Sistema TI</h1>
           <p className="text-sm text-slate-400">
-            {ramo ? RAMO_META[ramo].descricao : "Caixa, estoque e atendimento"}
+            {ramoNaTela ? RAMO_META[ramoNaTela].descricao : "Caixa, estoque e atendimento"}
           </p>
         </div>
 
-        {/* Tipo de loja, antes de entrar. Não grava nada e vale só aqui. */}
-        <div className="mb-4">
-          <p className="mb-2 text-center text-xs uppercase tracking-wide text-slate-500">
-            Tipo de loja
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            {RAMOS.map((r) => (
+        {/* Conta que já entrou aqui: a tela se apresenta sozinha */}
+        {conhecida && (
+          <div className="mb-4 rounded-xl border border-amber-400/40 bg-amber-400/10 p-3 text-center">
+            <p className="text-sm font-semibold text-amber-200">
+              {RAMO_META[conhecida].label}
+            </p>
+            <p className="mt-0.5 text-xs text-amber-100/70">
+              Reconhecemos esta conta neste aparelho.
+            </p>
+            {!verTipos && (
               <button
-                key={r}
                 type="button"
-                onClick={() => escolherRamo(r)}
-                className={`rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition ${
-                  ramo === r
-                    ? "border-amber-400 bg-amber-400/15 text-amber-200"
-                    : "border-slate-700 text-slate-300 hover:border-slate-500 hover:bg-white/5"
-                }`}
+                onClick={() => setVerTipos(true)}
+                className="mt-1 text-xs text-slate-400 underline"
               >
-                {RAMO_META[r].label}
+                Ver outros tipos de loja
               </button>
-            ))}
+            )}
           </div>
-          <p className="mt-2 text-center text-xs text-slate-500">
-            {ramo
-              ? "Vale só neste aparelho. A configuração da sua loja não muda."
-              : "Opcional. Sem escolher, entra como a sua loja está configurada."}
-          </p>
-        </div>
+        )}
+
+        {/* Tipo de loja, antes de entrar. Não grava nada e vale só aqui. */}
+        {mostraEscolha && (
+          <div className="mb-4">
+            <p className="mb-2 text-center text-xs uppercase tracking-wide text-slate-500">
+              Tipo de loja
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {RAMOS.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => escolherRamo(r)}
+                  className={`rounded-xl border px-3 py-2.5 text-left text-sm font-semibold transition ${
+                    ramo === r
+                      ? "border-amber-400 bg-amber-400/15 text-amber-200"
+                      : "border-slate-700 text-slate-300 hover:border-slate-500 hover:bg-white/5"
+                  }`}
+                >
+                  {RAMO_META[r].label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-center text-xs text-slate-500">
+              {/* Deixa explícito que isto é vitrine, não plano: só o
+                  administrador vê outro ramo depois de entrar. Antes o botão
+                  dava a impressão de liberar o que a loja não comprou. */}
+              Só muda a aparência desta tela. O que a sua loja usa é o que foi
+              contratado.
+            </p>
+          </div>
+        )}
 
         <form onSubmit={enviar} className="rounded-2xl bg-white p-6 shadow-2xl">
           <h2 className="mb-4 text-lg font-bold text-slate-800">{titulo}</h2>

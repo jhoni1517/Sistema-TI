@@ -9,6 +9,8 @@ import {
   ramoEfetivo,
   lerRamoAparelho,
   definirRamoAparelho,
+  ramoLembrado,
+  lembrarRamoDaConta,
 } from "./ramos";
 
 describe("ramos", () => {
@@ -137,6 +139,69 @@ describe("ramo escolhido no aparelho", () => {
     memoria.set("sistema-ti:ramo-aparelho", "padaria");
     expect(lerRamoAparelho()).toBeNull();
     expect(ramoEfetivo("pizzaria")).toBe("pizzaria");
+  });
+});
+
+/**
+ * A tela de entrada mostrava quatro botões de tipo de loja para todo mundo,
+ * e para o cliente eles não faziam nada — só o administrador muda de ramo.
+ * Clicar e nada acontecer parecia defeito.
+ */
+describe("o aparelho lembra o ramo de quem já entrou", () => {
+  beforeEach(() => memoria.clear());
+
+  it("conta que nunca entrou aqui não é reconhecida", () => {
+    expect(ramoLembrado("novo@loja.com")).toBeNull();
+  });
+
+  it("depois de entrar uma vez, a tela já sabe o tipo de loja", () => {
+    lembrarRamoDaConta("dona@mercearia.com", "mercearia");
+    expect(ramoLembrado("dona@mercearia.com")).toBe("mercearia");
+  });
+
+  it("e-mail com espaço ou maiúscula é a mesma conta", () => {
+    // Quem digita no celular acerta o endereço e erra a caixa: reconhecer
+    // "Dona@Mercearia.com " como outra conta faria a tela esquecer à toa.
+    lembrarRamoDaConta("dona@mercearia.com", "mercearia");
+    expect(ramoLembrado("  Dona@Mercearia.COM ")).toBe("mercearia");
+  });
+
+  it("aparelho de balcão guarda mais de uma conta", () => {
+    lembrarRamoDaConta("a@x.com", "mercearia");
+    lembrarRamoDaConta("b@x.com", "pizzaria");
+    expect(ramoLembrado("a@x.com")).toBe("mercearia");
+    expect(ramoLembrado("b@x.com")).toBe("pizzaria");
+  });
+
+  it("mudança de plano sobrescreve o que estava guardado", () => {
+    lembrarRamoDaConta("a@x.com", "mercearia");
+    lembrarRamoDaConta("a@x.com", "bebidas");
+    expect(ramoLembrado("a@x.com")).toBe("bebidas");
+  });
+
+  it("guarda as últimas contas e esquece as antigas", () => {
+    for (const n of [1, 2, 3, 4, 5, 6]) lembrarRamoDaConta(`c${n}@x.com`, "mercearia");
+    expect(ramoLembrado("c6@x.com")).toBe("mercearia");
+    expect(ramoLembrado("c1@x.com")).toBeNull();
+  });
+
+  it("e-mail vazio não vira conta guardada", () => {
+    lembrarRamoDaConta("   ", "mercearia");
+    expect(ramoLembrado("")).toBeNull();
+  });
+
+  it("armazenamento estragado não impede ninguém de entrar", () => {
+    memoria.set("sistema-ti:ramo-por-conta", "isto não é json");
+    expect(() => ramoLembrado("a@x.com")).not.toThrow();
+    expect(ramoLembrado("a@x.com")).toBeNull();
+  });
+
+  it("ramo inventado no armazenamento é ignorado", () => {
+    memoria.set(
+      "sistema-ti:ramo-por-conta",
+      JSON.stringify([{ email: "a@x.com", ramo: "padaria" }])
+    );
+    expect(ramoLembrado("a@x.com")).toBeNull();
   });
 });
 

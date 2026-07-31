@@ -119,7 +119,7 @@ const AreaProtegida: React.FC = () => {
   const papel = sessao.perfil.papel;
 
   return (
-    <AppProvider souSuperAdmin={sessao.perfil.super_admin === true}>
+    <AppProvider souSuperAdmin={sessao.perfil.super_admin === true} email={sessao.email}>
       <Routes>
         <Route element={<Layout onLogout={logout} sessao={sessao} />}>
           <Route index element={<Dashboard />} />

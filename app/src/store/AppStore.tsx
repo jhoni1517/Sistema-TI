@@ -8,7 +8,13 @@ import React, {
 import { db } from "../lib/db";
 import { aviso } from "../components/Aviso";
 import { aplicarTema } from "../lib/themes";
-import { ramoDe, lerRamoAparelho, definirRamoAparelho, type Ramo } from "../lib/ramos";
+import {
+  ramoDe,
+  lerRamoAparelho,
+  definirRamoAparelho,
+  lembrarRamoDaConta,
+  type Ramo,
+} from "../lib/ramos";
 import type {
   Cliente,
   OrdemServico,
@@ -132,7 +138,9 @@ export const AppProvider: React.FC<{
   children: React.ReactNode;
   /** Só o administrador do sistema pode ver o sistema como outro ramo */
   souSuperAdmin?: boolean;
-}> = ({ children, souSuperAdmin }) => {
+  /** Para o aparelho lembrar o tipo de loja desta conta na próxima entrada */
+  email?: string;
+}> = ({ children, souSuperAdmin, email }) => {
   const [loading, setLoading] = useState(true);
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [ordens, setOrdens] = useState<OrdemServico[]>([]);
@@ -217,9 +225,22 @@ export const AppProvider: React.FC<{
     // O ramo contratado vem da loja, não da configuração: é o que foi
     // vendido, e a loja não muda sozinha.
     try {
-      setRamoLoja(await db.loja.ramo());
+      const contratado = await db.loja.ramo();
+      setRamoLoja(contratado);
+      // Guarda para a tela de entrada se apresentar sozinha na próxima vez.
+      // É o único jeito honesto de fazer isso: perguntar ao servidor antes do
+      // login contaria a qualquer um que aquele e-mail existe.
+      if (email) lembrarRamoDaConta(email, ramoDe(contratado));
     } catch (e) {
+      // Entra na mesma lista das outras falhas de carga. Sem isso, uma
+      // mercearia abria como assistência sem nada na tela explicando —
+      // o dono ficava procurando o PDV que o sistema tinha escondido.
       console.error("Falha ao carregar o ramo da loja:", e);
+      falhas.push(
+        "Tipo de loja: " +
+          (e instanceof Error ? e.message : String(e)) +
+          "\nEnquanto isso o sistema abre como assistência técnica."
+      );
     }
 
     // Configurações da loja vindas da nuvem (nome, senha, etc.) — mantém aparência local
@@ -241,7 +262,7 @@ export const AppProvider: React.FC<{
     }
 
     setLoading(false);
-  }, []);
+  }, [email]);
 
   useEffect(() => {
     reload();

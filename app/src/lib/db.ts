@@ -70,9 +70,18 @@ export const obterLoja = (): string | null => lojaAtual;
  * da nuvem ao sair, e o próximo login falhava como se a conta não
  * existisse.
  */
+/**
+ * Chaves que são do APARELHO, não da loja, e por isso sobrevivem ao logout.
+ *
+ * "ramo-por-conta" é a memória de qual tipo de loja cada conta usa nesta
+ * máquina. Apagar junto fazia a tela de entrada esquecer exatamente no
+ * momento em que ela precisa lembrar: no login seguinte.
+ */
+const CHAVES_DO_APARELHO = [PREFIX + "config", PREFIX + "ramo-por-conta"];
+
 export const limparCacheLocal = () => {
   for (const chave of Object.keys(localStorage)) {
-    if (chave.startsWith(PREFIX) && chave !== PREFIX + "config") {
+    if (chave.startsWith(PREFIX) && !CHAVES_DO_APARELHO.includes(chave)) {
       localStorage.removeItem(chave);
     }
   }
@@ -398,10 +407,32 @@ export const db = {
         .select("ramo")
         .eq("id", lojaAtual)
         .maybeSingle();
-      // Coluna ainda não criada não pode derrubar a carga: a loja continua
-      // funcionando como assistência até a migração rodar.
-      if (error) return null;
-      return (data?.ramo as string) || null;
+
+      if (error) {
+        // Coluna ainda não criada não derruba a carga: a loja continua
+        // funcionando como assistência até a migração rodar.
+        if (/column|does not exist|schema cache|42703|PGRST204/i.test(error.message)) {
+          return null;
+        }
+        // Qualquer outro erro PRECISA aparecer. Engolir aqui rebaixava uma
+        // mercearia a assistência em silêncio: o cliente abria o sistema
+        // errado e não havia nada na tela dizendo o porquê.
+        throw new Error(
+          `Não foi possível ler o tipo de loja contratado: ${error.message}`
+        );
+      }
+
+      // Linha não veio: ou a loja sumiu, ou a política de leitura barrou. Nos
+      // dois casos o sistema não sabe o que a loja comprou, e fingir que sabe
+      // é como o erro passa despercebido.
+      if (!data) {
+        throw new Error(
+          "A loja deste usuário não foi encontrada. Confira se o perfil aponta " +
+            "para uma loja existente (tabela perfis, coluna loja_id)."
+        );
+      }
+
+      return (data.ramo as string) || null;
     },
   },
 
