@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, SectionTitle, EmptyState, InputNumero } from "../components/ui";
+import { sangriaSugerida } from "../lib/desempenho";
 import { uid, nowISO, brl, formatDate, formatDateTime, txt } from "../lib/format";
 import { printHTML } from "../lib/print";
 import { reciboFechamento, reciboVenda } from "../lib/recibo";
@@ -139,6 +140,19 @@ export const Caixa: React.FC = () => {
         <div className="card bg-gradient-to-br from-brand-600 to-brand-800 text-white ring-brand-700">
           <p className="flex items-center gap-2 text-sm text-brand-100"><Wallet size={16} /> Saldo em caixa</p>
           <p className="mt-1 text-3xl font-bold">{brl(saldo)}</p>
+          {(() => {
+            // Loja de bairro guarda o dia inteiro em espécie sem pensar. O
+            // limite não é sobre desconfiar de ninguém: é sobre quanto se
+            // perde num assalto.
+            const s = sangriaSugerida(saldo, config.limiteGaveta || 0);
+            if (!s.passou) return null;
+            return (
+              <p className="mt-2 rounded-lg bg-amber-400/20 p-2 text-xs">
+                Passou {brl(s.excedente)} do limite da gaveta.
+                {s.sugestao > 0 && <> Sugestão: sangrar <b>{brl(s.sugestao)}</b>.</>}
+              </p>
+            );
+          })()}
           <p className="mt-1 text-xs text-brand-200">Abertura: {brl(abertura)}</p>
         </div>
         <Resumo label="Entradas" value={entradas} color="text-emerald-600" icon={<ArrowDownCircle size={18} className="text-emerald-600" />} />

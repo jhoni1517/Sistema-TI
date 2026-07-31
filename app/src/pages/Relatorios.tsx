@@ -18,6 +18,12 @@ import { TrendingUp, DollarSign, Percent, Wrench, Users, Package } from "lucide-
 import { useApp } from "../store/AppStore";
 import { SectionTitle } from "../components/ui";
 import {
+  comparativoRecente,
+  ticketMedio,
+  horariosDePico,
+  comissoes,
+} from "../lib/desempenho";
+import {
   giroDosProdutos,
   curvaABC,
   produtosParados,
@@ -111,6 +117,11 @@ export const Relatorios: React.FC = () => {
     return Object.entries(map).map(([name, value]) => ({ name, value }));
   }, [movimentos]);
 
+  const semana = useMemo(() => comparativoRecente(movimentos, 7), [movimentos]);
+  const ticket = useMemo(() => ticketMedio(vendas), [vendas]);
+  const pico = useMemo(() => horariosDePico(vendas), [vendas]);
+  const comissao = useMemo(() => comissoes(ordens, config), [ordens, config]);
+
   const giro = useMemo(() => giroDosProdutos(produtos, vendas), [produtos, vendas]);
   const abc = useMemo(() => curvaABC(giro), [giro]);
   const parados = useMemo(() => produtosParados(giro, produtos), [giro, produtos]);
@@ -128,6 +139,82 @@ export const Relatorios: React.FC = () => {
           </select>
         }
       />
+
+      {/* Comparativo, ticket e pico: as perguntas que o dono faz de cabeça
+          e erra — "vendi mais que semana passada?", "que horas enche?" */}
+      <div className="mb-6 grid gap-3 sm:grid-cols-3">
+        <div className="card">
+          <p className="label">Últimos 7 dias</p>
+          <p className="text-2xl font-bold text-slate-800">{brl(semana.atual)}</p>
+          <p
+            className={`text-xs font-semibold ${
+              semana.melhorou ? "text-emerald-600" : "text-red-600"
+            }`}
+          >
+            {semana.variacao > 0 ? "+" : ""}
+            {semana.variacao}% contra os 7 anteriores ({brl(semana.anterior)})
+          </p>
+          <p className="mt-1 text-xs text-slate-400">
+            Sete contra sete, e não este mês contra o passado: no dia 3 a conta
+            mensal seria três dias contra trinta.
+          </p>
+        </div>
+        <div className="card">
+          <p className="label">Ticket médio</p>
+          <p className="text-2xl font-bold text-slate-800">{brl(ticket)}</p>
+          <p className="mt-1 text-xs text-slate-400">
+            Só vendas de balcão. Fiado recebido e OS entram no caixa e não são
+            compra de balcão.
+          </p>
+        </div>
+        <div className="card">
+          <p className="label">Horários de pico</p>
+          {pico.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-400">Sem vendas registradas.</p>
+          ) : (
+            <div className="mt-1 space-y-0.5">
+              {pico.map((f) => (
+                <p key={f.hora} className="flex justify-between text-sm">
+                  <span className="text-slate-600">
+                    {String(f.hora).padStart(2, "0")}h — {f.vendas} venda(s)
+                  </span>
+                  <b className="text-slate-800">{brl(f.receita)}</b>
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Comissão: sobre o LUCRO, não sobre o faturamento. Sobre faturamento
+          premia quem usa peça cara, não quem conserta bem. */}
+      {comissao.length > 0 && (
+        <div className="card mb-6">
+          <h3 className="mb-1 flex items-center gap-2 font-bold text-slate-700">
+            <Percent size={17} /> Comissão por técnico
+          </h3>
+          <p className="mb-3 text-xs text-slate-500">
+            Sobre o lucro da ordem entregue, a {config.comissaoPadrao || 0}% (ajuste em
+            Configurações). Sobre faturamento, dois técnicos com o mesmo esforço
+            receberiam valores diferentes só porque um usou uma peça cara.
+          </p>
+          <div className="space-y-1">
+            {comissao.map((c) => (
+              <div key={c.tecnico} className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="min-w-0 flex-1 truncate font-medium text-slate-700">
+                  {c.tecnico}
+                </span>
+                <span className="text-xs text-slate-400">{c.ordens} ordem(ns)</span>
+                <span className="w-24 text-right text-slate-600">{brl(c.faturado)}</span>
+                <span className="w-24 text-right text-slate-600">lucro {brl(c.lucro)}</span>
+                <span className="w-24 text-right font-bold text-emerald-600">
+                  {brl(c.valor)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Curva ABC e o que está parado.
           A tela respondia "quanto entrou". Não respondia a pergunta que

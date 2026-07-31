@@ -4,7 +4,8 @@ import { ImagemUpload } from "../components/ImagemUpload";
 import { Etiquetas } from "../components/Etiquetas";
 import { EntradaNota } from "../components/EntradaNota";
 import { Inventario } from "../components/Inventario";
-import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck, FileQuestion, Wrench, CalendarX, Tag, ClipboardCheck } from "lucide-react";
+import { Reposicao } from "../components/Reposicao";
+import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck, FileQuestion, Wrench, CalendarX, Tag, ClipboardCheck, ShoppingBasket } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { temRecurso } from "../lib/ramos";
@@ -45,6 +46,7 @@ export const Estoque: React.FC = () => {
   const [etiquetas, setEtiquetas] = useState(false);
   const [entrada, setEntrada] = useState(false);
   const [inventario, setInventario] = useState(false);
+  const [reposicao, setReposicao] = useState(false);
 
   const classes = useMemo(
     () => categorias.filter((c) => !c.paiId).sort((a, b) => txt(a.nome).localeCompare(txt(b.nome))),
@@ -144,6 +146,9 @@ export const Estoque: React.FC = () => {
             <button className="btn-secondary" onClick={() => setGerFornecedores(true)}>
               <Truck size={18} /> Fornecedores
             </button>
+            <button className="btn-secondary" onClick={() => setReposicao(true)}>
+              <ShoppingBasket size={18} /> O que comprar
+            </button>
             <button className="btn-secondary" onClick={() => setEntrada(true)}>
               <Truck size={18} /> Entrada
             </button>
@@ -166,6 +171,7 @@ export const Estoque: React.FC = () => {
       {etiquetas && <Etiquetas onClose={() => setEtiquetas(false)} />}
       {entrada && <EntradaNota onClose={() => setEntrada(false)} />}
       {inventario && <Inventario onClose={() => setInventario(false)} />}
+      {reposicao && <Reposicao onClose={() => setReposicao(false)} />}
 
       {/* Vencimento: só para quem vende coisa que estraga */}
       {temRecurso(ramo, "validade") && vencendo.length > 0 && (

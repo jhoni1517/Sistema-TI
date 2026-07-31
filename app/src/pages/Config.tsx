@@ -157,6 +157,17 @@ export const Config: React.FC = () => {
             />
           </div>
 
+          <Field label="Limite de dinheiro na gaveta (R$)">
+            <InputNumero
+              className="input"
+              value={form.limiteGaveta}
+              onChange={(limiteGaveta) => setForm({ ...form, limiteGaveta })}
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              Passando disso, o Caixa sugere uma sangria. Vazio = sem aviso.
+            </p>
+          </Field>
+
           {/* Papel da impressora. O recibo saía sempre em A4 e a bobina do
               balcão cortava a metade direita de tudo, inclusive do total. */}
           <Field label="Papel da impressora">

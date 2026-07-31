@@ -620,6 +620,12 @@ export interface Config {
    */
   papelImpressao?: "a4" | "58" | "80";
   /**
+   * Quanto pode ficar em espécie na gaveta antes do sistema sugerir sangria.
+   * Vazio = sem aviso. Não é sobre desconfiar de ninguém: é sobre quanto se
+   * perde num assalto, e sobre a gaveta não virar o cofre da loja.
+   */
+  limiteGaveta?: number;
+  /**
    * Ramo de atividade da loja. Decide o vocabulário das telas e quais
    * módulos aparecem. Ausente = assistência técnica, que é como o sistema
    * nasceu — nenhuma loja existente pode acordar diferente de ontem.
