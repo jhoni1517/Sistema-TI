@@ -5,7 +5,8 @@ import React, {
   useState,
   useCallback,
 } from "react";
-import { db } from "../lib/db";
+import { db, sincronizarPendentes } from "../lib/db";
+import { tamanhoDaFila } from "../lib/fila";
 import { aviso } from "../components/Aviso";
 import { aplicarTema } from "../lib/themes";
 import {
@@ -50,6 +51,10 @@ const DEFAULT_CONFIG: Config = {
 interface AppState {
   loading: boolean;
   online: boolean;
+  /** Quantos registros estão presos esperando internet */
+  pendentes: number;
+  /** Tenta gravar agora o que está preso */
+  sincronizar: () => Promise<void>;
   clientes: Cliente[];
   ordens: OrdemServico[];
   produtos: Produto[];
@@ -267,6 +272,53 @@ export const AppProvider: React.FC<{
   useEffect(() => {
     reload();
   }, [reload]);
+
+  /**
+   * O que ficou preso enquanto a internet estava fora.
+   *
+   * Fica no estado para a tela poder mostrar — descarregar em silêncio seria
+   * repetir o erro que a fila veio consertar: o operador precisa saber que
+   * existe venda esperando, e precisa saber quando ela entrou.
+   */
+  const [pendentes, setPendentes] = useState(() => tamanhoDaFila());
+
+  const sincronizar = useCallback(async () => {
+    if (tamanhoDaFila() === 0) return;
+    const r = await sincronizarPendentes();
+    setPendentes(r.restantes);
+    if (r.gravados > 0) {
+      aviso.sucesso(
+        `${r.gravados} registro(s) que estavam esperando internet foram gravados.`
+      );
+      await reload();
+    }
+    // Recusado pelo banco não volta para a fila: ele sai de lá e vira aviso,
+    // senão seguraria os outros para sempre tentando o impossível.
+    if (r.recusados.length > 0) {
+      aviso.erro(
+        `${r.recusados.length} registro(s) NÃO foram aceitos pelo banco e saíram da fila:\n\n` +
+          r.recusados.map((p) => `${p.tabela}: ${p.ultimoErro}`).join("\n")
+      );
+    }
+  }, [reload]);
+
+  /**
+   * Tenta descarregar assim que a internet volta, e também ao abrir a aba.
+   *
+   * O evento "online" do navegador mente com frequência (rede de celular
+   * oscilando diz que voltou antes de voltar), por isso a tentativa também
+   * acontece ao focar a janela: é quando alguém está de fato olhando.
+   */
+  useEffect(() => {
+    sincronizar();
+    const aoVoltar = () => sincronizar();
+    window.addEventListener("online", aoVoltar);
+    window.addEventListener("focus", aoVoltar);
+    return () => {
+      window.removeEventListener("online", aoVoltar);
+      window.removeEventListener("focus", aoVoltar);
+    };
+  }, [sincronizar]);
 
   // Recarrega ao voltar para a aba/app (mostra lançamentos feitos pelo WhatsApp ou por outro aparelho)
   useEffect(() => {
@@ -525,6 +577,8 @@ export const AppProvider: React.FC<{
   const value: AppState = {
     loading,
     online: db.online,
+    pendentes,
+    sincronizar,
     clientes,
     ordens,
     produtos,

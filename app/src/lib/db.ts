@@ -26,6 +26,8 @@ import type {
  * não exige mudar nenhuma tela.
  */
 
+import { enfileirar, ehFalhaDeRede, descarregar } from "./fila";
+
 const PREFIX = "sistema-ti:";
 
 type TableName =
@@ -211,15 +213,30 @@ async function upsert<T extends WithId>(table: TableName, row: T): Promise<T> {
     }
     // carimba a loja do usuário — sem isso o banco rejeita a gravação
     const payload = await cifrarLinha(table, { ...row, lojaId: lojaAtual });
-    const { data, error } = await supabase
-      .from(table)
-      .upsert(payload)
-      .select()
-      .single();
-    if (error) throw traduzirErroGravacao(error);
-    // devolve para a tela já em texto claro, como ela espera
-    const [volta] = await decifrarLinhas(table, [data as T]);
-    return volta;
+    try {
+      const { data, error } = await supabase
+        .from(table)
+        .upsert(payload)
+        .select()
+        .single();
+      if (error) throw traduzirErroGravacao(error);
+      // devolve para a tela já em texto claro, como ela espera
+      const [volta] = await decifrarLinhas(table, [data as T]);
+      return volta;
+    } catch (e) {
+      // Internet caiu no meio da venda: o cliente já levou a mercadoria e o
+      // troco já saiu da gaveta. Guardar para gravar quando voltar é a
+      // diferença entre um susto e um furo de caixa que ninguém rastreia.
+      //
+      // Só falha de REDE entra na fila. Recusa do banco (coluna que falta,
+      // assinatura vencida, sem permissão) vai falhar de novo para sempre —
+      // enfileirar criaria fila infinita e o operador acharia que salvou.
+      if (ehFalhaDeRede(e)) {
+        enfileirar(table, payload as unknown as Record<string, unknown>);
+        return row;
+      }
+      throw e;
+    }
   }
   const rows = localBackend.list<T>(table);
   const idx = rows.findIndex((r) => r.id === row.id);
@@ -455,3 +472,18 @@ export const db = {
     },
   },
 };
+
+
+/**
+ * Tenta gravar o que ficou preso na fila enquanto a internet estava fora.
+ *
+ * Devolve o que aconteceu para a tela poder avisar — descarregar em silêncio
+ * seria repetir o erro que a fila veio consertar.
+ */
+export async function sincronizarPendentes() {
+  return descarregar(async (tabela, linha) => {
+    if (!supabaseEnabled || !supabase) throw new Error("Nuvem desligada");
+    const { error } = await supabase.from(tabela).upsert(linha);
+    if (error) throw traduzirErroGravacao(error);
+  });
+}
