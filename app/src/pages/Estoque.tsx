@@ -5,6 +5,7 @@ import { Etiquetas } from "../components/Etiquetas";
 import { EntradaNota } from "../components/EntradaNota";
 import { Inventario } from "../components/Inventario";
 import { Reposicao } from "../components/Reposicao";
+import { minimoSugerido } from "../lib/reposicao";
 import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck, FileQuestion, Wrench, CalendarX, Tag, ClipboardCheck, ShoppingBasket } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
@@ -36,7 +37,7 @@ const vazio = (): Produto => ({
 });
 
 export const Estoque: React.FC = () => {
-  const { produtos, categorias, fornecedores, cotacoes, ramo, saveProduto, removeProduto, saveCategoria, removeCategoria, saveFornecedor, removeFornecedor } = useApp();
+  const { produtos, categorias, fornecedores, cotacoes, vendas, ramo, saveProduto, removeProduto, saveCategoria, removeCategoria, saveFornecedor, removeFornecedor } = useApp();
   const [busca, setBusca] = useState("");
   const [editando, setEditando] = useState<Produto | null>(null);
   const [soBaixo, setSoBaixo] = useState(false);
@@ -462,6 +463,26 @@ export const Estoque: React.FC = () => {
                     onChange={(v) => setEditando({ ...editando, quantidade: (v ?? 0) })}
                   />
                 </Field>
+
+            {/* Estoque mínimo sugerido pelo consumo real. O número do
+                cadastro é um chute que ninguém revisita — este diz quanto ele
+                deveria ser para o produto não acabar antes da próxima compra. */}
+            {(() => {
+              const sugerido = minimoSugerido(editando, vendas);
+              if (sugerido <= 0 || sugerido === editando.estoqueMinimo) return null;
+              return (
+                <p className="sm:col-span-2 -mt-2 text-xs text-slate-500">
+                  Pelo consumo dos últimos 30 dias, o mínimo deveria ser{" "}
+                  <button
+                    className="font-bold text-brand-600 underline"
+                    onClick={() => setEditando({ ...editando, estoqueMinimo: sugerido })}
+                  >
+                    {sugerido}
+                  </button>{" "}
+                  para cobrir uma semana.
+                </p>
+              );
+            })()}
                 <Field label="Estoque mínimo (alerta)">
                   <InputNumero
                     className="input"

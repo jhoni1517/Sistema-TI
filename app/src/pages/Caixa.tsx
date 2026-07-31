@@ -144,7 +144,9 @@ export const Caixa: React.FC = () => {
             // Loja de bairro guarda o dia inteiro em espécie sem pensar. O
             // limite não é sobre desconfiar de ninguém: é sobre quanto se
             // perde num assalto.
-            const s = sangriaSugerida(saldo, config.limiteGaveta || 0);
+            // Espécie, não saldo: o saldo soma cartão e Pix, que nunca passam
+            // pela gaveta.
+            const s = sangriaSugerida(resumo.emEspecie, config.limiteGaveta || 0);
             if (!s.passou) return null;
             return (
               <p className="mt-2 rounded-lg bg-amber-400/20 p-2 text-xs">

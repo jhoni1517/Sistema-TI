@@ -17,6 +17,11 @@ export interface ResumoCaixa {
   sangrias: number;
   /** Quanto deveria haver na gaveta */
   saldo: number;
+  /**
+   * Só o que está em papel na gaveta: abertura + entradas em dinheiro, menos
+   * saídas e sangrias. O saldo soma cartão e Pix, que nunca passam por lá.
+   */
+  emEspecie: number;
   /** Quanto foi contado de fato (undefined = ninguém contou) */
   contado?: number;
   /**
@@ -57,6 +62,22 @@ export function resumoCaixa(
     porForma[f] = (porForma[f] || 0) + (Number(m.valor) || 0);
   }
 
+  /*
+   * Quanto está em ESPÉCIE na gaveta.
+   *
+   * Diferente do saldo: o saldo soma cartão e Pix, que nunca passam pela
+   * gaveta. Um dia com R$ 3.000 no cartão fazia o aviso de sangria disparar
+   * sem ter um centavo a mais em papel — e o aviso que dispara sem motivo é
+   * o aviso que a pessoa aprende a ignorar.
+   *
+   * Saída e sangria entram porque saem da gaveta de verdade. Saída paga no
+   * cartão da loja não deveria descontar daqui, mas ela é rara e descontar a
+   * mais só faz o aviso ser conservador — o erro seguro é para este lado.
+   */
+  const emEspecie = arredonda(
+    abertura + (porForma.dinheiro || 0) - saidas - sangrias
+  );
+
   const contado = typeof sessao?.valorContado === "number" ? sessao.valorContado : undefined;
 
   return {
@@ -65,6 +86,7 @@ export function resumoCaixa(
     saidas,
     sangrias,
     saldo,
+    emEspecie,
     contado,
     diferenca: contado === undefined ? undefined : arredonda(contado - saldo),
     quantidade: movimentos.length,

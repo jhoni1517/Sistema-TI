@@ -67,7 +67,12 @@ import {
   type Config,
 } from "../lib/types";
 import { travaAtendimento, classificacaoDe, travaFiado } from "../lib/clientes";
-import { garantiaDaOS, GARANTIA_META, textoDaGarantia } from "../lib/garantia";
+import {
+  garantiaDaOS,
+  GARANTIA_META,
+  textoDaGarantia,
+  garantiasVencendo,
+} from "../lib/garantia";
 
 const CHECKLIST_ITENS = [
   "Liga normalmente",
@@ -298,6 +303,35 @@ export const OrdensServico: React.FC = () => {
           </button>
         }
       />
+
+      {/* Garantia vencendo: "sua garantia vence semana que vem, quer que a
+          gente dê uma olhada?" custa uma mensagem e evita o retorno bravo no
+          dia 91. A função existia e não estava em tela nenhuma. */}
+      {(() => {
+        const vencendo = garantiasVencendo(ordens, 7);
+        if (vencendo.length === 0) return null;
+        return (
+          <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+            <p className="flex items-center gap-2 text-sm font-bold text-emerald-800">
+              <ShieldCheck size={16} /> {vencendo.length} garantia(s) vencendo nesta semana
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {vencendo.slice(0, 8).map(({ os: o, garantia }) => (
+                <button
+                  key={o.id}
+                  onClick={() => setDetalhe(o)}
+                  className="badge bg-emerald-100 text-emerald-800 hover:opacity-80"
+                >
+                  {codigoOS(o.numero)} · {nomeCliente(o.clienteId)} · {garantia.diasRestantes}d
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-emerald-700">
+              Chamar antes custa uma mensagem e evita o retorno bravo no dia 91.
+            </p>
+          </div>
+        );
+      })()}
 
       {/* Filtros */}
       <div className="mb-4 flex flex-wrap gap-2">

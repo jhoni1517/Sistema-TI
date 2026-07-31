@@ -170,6 +170,18 @@ página pública calcula sozinha.
 Tela que lê `produto.preco` direto faz a gôndola dizer um valor e o caixa
 cobrar outro — e quem aparece como mentiroso é a loja, não o sistema.
 
+### Dinheiro primeiro, sempre
+
+Toda gravação que mexe em caixa E em estoque grava o **movimento antes**.
+
+Falhando no meio, sobra lançamento de dinheiro sem a baixa correspondente —
+que salta aos olhos na conferência e se conserta olhando o estoque. Ao
+contrário, some a venda (ou aparece mercadoria que ninguém pagou), e **lucro
+inflado é invisível: ninguém procura por ele**.
+
+Vale para venda, devolução e entrada de mercadoria. A entrada nasceu ao
+contrário e foi corrigida na revisão.
+
 ### Serviço não tem estoque
 
 `Produto.servico` existe porque o atendente digitava 99999999999 na

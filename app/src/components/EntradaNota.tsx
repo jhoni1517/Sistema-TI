@@ -87,18 +87,19 @@ export const EntradaNota: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
     setGravando(true);
     try {
-      const rateado = custoRateado(entrada);
-      for (const i of itens) {
-        const p = produtos.find((x) => x.id === i.produtoId);
-        if (!p || Number(i.quantidade) <= 0) continue;
-        await saveProduto(
-          aplicarEntrada(p, i.quantidade, rateado[i.produtoId] ?? i.custoUnit)
-        );
-      }
-
-      // Compra de estoque NÃO é despesa do mês: é troca de dinheiro por
-      // mercadoria, e vira custo quando a peça sai. Contar como despesa e
-      // como custo mostrava prejuízo em venda lucrativa.
+      /*
+       * O DINHEIRO PRIMEIRO, como em toda gravação do sistema.
+       *
+       * Estava ao contrário: o estoque subia e a compra saía do caixa depois.
+       * Falhando no meio, a loja ficava com mercadoria que ninguém pagou — e
+       * lucro inflado é invisível, ninguém procura por ele. Uma saída de
+       * caixa sem mercadoria, ao contrário, salta aos olhos na conferência e
+       * se conserta olhando o estoque.
+       *
+       * Compra de estoque NÃO é despesa do mês: é troca de dinheiro por
+       * mercadoria, e vira custo quando a peça sai. Contar como despesa e
+       * como custo mostrava prejuízo em venda lucrativa.
+       */
       if (total > 0) {
         const mov: MovimentoCaixa = {
           id: uid(),
@@ -114,6 +115,15 @@ export const EntradaNota: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           data: nowISO(),
         };
         await saveMovimento(mov);
+      }
+
+      const rateado = custoRateado(entrada);
+      for (const i of itens) {
+        const p = produtos.find((x) => x.id === i.produtoId);
+        if (!p || Number(i.quantidade) <= 0) continue;
+        await saveProduto(
+          aplicarEntrada(p, i.quantidade, rateado[i.produtoId] ?? i.custoUnit)
+        );
       }
 
       aviso.sucesso(`Entrada lançada. ${itens.length} item(ns) no estoque.`);
