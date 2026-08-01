@@ -77,18 +77,62 @@ export function parseMensagem(textoOriginal) {
  * LOJA_ID nas variáveis do Vercel manda mais, se um dia for outra.
  */
 let lojaCache = null;
-async function lojaDoRobo() {
+export async function lojaDoRobo() {
   if (process.env.LOJA_ID) return process.env.LOJA_ID;
   if (lojaCache) return lojaCache;
-  const r = await fetch(
-    `${SUPABASE_URL}/rest/v1/perfis?select=loja_id&super_admin=is.true&limit=1`,
-    { headers: headers() }
-  );
-  if (!r.ok) return null;
-  const [p] = await r.json();
-  lojaCache = p?.loja_id || null;
-  return lojaCache;
+
+  try {
+    const r = await fetch(
+      `${SUPABASE_URL}/rest/v1/perfis?select=loja_id&super_admin=is.true&limit=1`,
+      { headers: headers() }
+    );
+    if (r.ok) {
+      const [p] = await r.json();
+      if (p?.loja_id) {
+        lojaCache = p.loja_id;
+        return lojaCache;
+      }
+    }
+  } catch {
+    /* cai no plano B abaixo */
+  }
+
+  /*
+   * Plano B: uma loja só no sistema inteiro.
+   *
+   * Instalação de loja única não tem por que ter perfil marcado como
+   * super_admin — e sem ele o robô parava de responder, dizendo para
+   * mexer numa tabela que a pessoa nunca viu. Com uma loja só não existe
+   * ambiguidade nenhuma sobre de quem é o caixa.
+   *
+   * Com DUAS ou mais, para de propósito: escolher uma no chute é como o
+   * /saldo respondia com o faturamento dos clientes junto do próprio.
+   */
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/lojas?select=id&limit=2`, {
+      headers: headers(),
+    });
+    if (!r.ok) return null;
+    const linhas = await r.json();
+    if (Array.isArray(linhas) && linhas.length === 1) {
+      lojaCache = linhas[0].id;
+      return lojaCache;
+    }
+  } catch {
+    /* sem resposta, o chamador recusa — que é o lado seguro */
+  }
+  return null;
 }
+
+/** O recado de quando o robô não sabe de qual loja ele é */
+export const SEM_LOJA =
+  "Não descobri de qual loja é este robô, então não vou responder com o " +
+  "caixa da loja errada.\n\n" +
+  "Três saídas, qualquer uma resolve:\n" +
+  "1. Defina LOJA_ID nas variáveis do Vercel com o id da sua loja.\n" +
+  "2. Marque o seu perfil como super_admin na tabela perfis.\n" +
+  "3. Confira se SUPABASE_SERVICE_ROLE_KEY está no Vercel — sem ela o robô " +
+  "usa a chave pública e não enxerga nada.";
 
 /** Sessão de caixa aberta, para o lançamento entrar no fechamento do dia */
 async function sessaoAbertaId(lojaId) {
@@ -113,11 +157,7 @@ export async function registrarMovimento(mov, origem = "") {
     throw new Error("Banco não configurado (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).");
   }
   const lojaId = await lojaDoRobo();
-  if (!lojaId) {
-    throw new Error(
-      "Não descobri de qual loja é este robô. Confira se existe um perfil com super_admin, ou defina LOJA_ID nas variáveis do Vercel."
-    );
-  }
+  if (!lojaId) throw new Error(SEM_LOJA);
   const sessaoId = await sessaoAbertaId(lojaId);
   const res = await fetch(`${SUPABASE_URL}/rest/v1/movimentos`, {
     method: "POST",
@@ -151,11 +191,7 @@ export async function resumoCaixa() {
    *
    * Recusar é o certo: número errado com cara de certo é pior do que erro.
    */
-  if (!lojaId) {
-    throw new Error(
-      "Não descobri de qual loja é este robô. Confira se existe um perfil com super_admin, ou defina LOJA_ID nas variáveis do Vercel."
-    );
-  }
+  if (!lojaId) throw new Error(SEM_LOJA);
   const r = await fetch(
     `${SUPABASE_URL}/rest/v1/movimentos?select=tipo,valor,descricao,data&data=gte.${hoje}&lojaId=eq.${lojaId}`,
     { headers: headers() }

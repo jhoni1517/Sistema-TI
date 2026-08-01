@@ -10,12 +10,29 @@
 
 import { parseMensagem, registrarMovimento, brl, AJUDA } from "./_caixa.js";
 
+/**
+ * Responde no WhatsApp, e DIZ quando não conseguiu.
+ *
+ * Mesmo problema que o robô do Telegram tinha: token faltando e `catch {}`
+ * vazio. A mensagem chegava, o lançamento entrava no caixa e nada era
+ * respondido — do lado de quem digitou, "o robô parou". E quem não recebe
+ * confirmação repete, então o mesmo gasto entrava duas ou três vezes.
+ *
+ * O registro da função é o único canal que sobra quando o canal de resposta
+ * é justamente o que está quebrado.
+ */
 async function responder(to, texto) {
   const token = process.env.WHATSAPP_TOKEN;
   const phoneId = process.env.WHATSAPP_PHONE_ID;
-  if (!token || !phoneId) return;
+  if (!token || !phoneId) {
+    console.error(
+      "WhatsApp: nada foi respondido porque falta WHATSAPP_TOKEN ou " +
+        "WHATSAPP_PHONE_ID no Vercel. O lançamento pode ter sido gravado."
+    );
+    return false;
+  }
   try {
-    await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
+    const r = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -24,8 +41,14 @@ async function responder(to, texto) {
         text: { body: texto },
       }),
     });
-  } catch {
-    /* ignora falha de envio */
+    if (!r.ok) {
+      console.error(`WhatsApp recusou a resposta (${r.status}): ${await r.text()}`);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("WhatsApp: falha de rede ao responder:", e?.message || e);
+    return false;
   }
 }
 

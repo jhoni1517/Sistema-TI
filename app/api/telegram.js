@@ -18,16 +18,43 @@ import {
 
 const TOKEN = process.env.TELEGRAM_TOKEN;
 
+/**
+ * Responde no chat, e DIZ quando não conseguiu.
+ *
+ * A versão anterior tinha `if (!TOKEN) return;` e um `catch {}` vazio. Com o
+ * TELEGRAM_TOKEN faltando ou errado no Vercel, o robô continuava recebendo a
+ * mensagem (o webhook é da Telegram para cá, não precisa do token), gravava o
+ * lançamento no caixa normalmente e simplesmente não respondia nada.
+ *
+ * Do lado de quem digitou, isso é "o robô parou". Do lado do sistema, era
+ * sucesso silencioso — e o lançamento entrava duas, três vezes, porque quem
+ * não recebe confirmação repete.
+ *
+ * Agora a falha vai para o registro da função, que é o único canal que sobra
+ * quando o canal de resposta é justamente o que está quebrado.
+ */
 async function responder(chatId, texto) {
-  if (!TOKEN) return;
+  if (!TOKEN) {
+    console.error(
+      "Telegram: nada foi respondido porque falta TELEGRAM_TOKEN no Vercel. " +
+        "O lançamento pode ter sido gravado mesmo assim."
+    );
+    return false;
+  }
   try {
-    await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
+    const r = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ chat_id: chatId, text: texto }),
     });
-  } catch {
-    /* ignora falha de envio */
+    if (!r.ok) {
+      console.error(`Telegram recusou a resposta (${r.status}): ${await r.text()}`);
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error("Telegram: falha de rede ao responder:", e?.message || e);
+    return false;
   }
 }
 
@@ -36,9 +63,44 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     const base = `https://${req.headers.host}`;
     res.setHeader("content-type", "text/plain; charset=utf-8");
+
+    /*
+     * Testa o token DE VERDADE, chamando a Telegram.
+     *
+     * Antes esta página só dizia se a variável existia. Token errado ou
+     * revogado passava por "sim" — e o sintoma no balcão era o robô gravar
+     * o lançamento e não responder nada, sem nenhum lugar onde olhar.
+     */
+    let situacao = "NÃO — falta TELEGRAM_TOKEN no Vercel";
+    let webhook = "não dá para conferir sem o token";
+    if (TOKEN) {
+      try {
+        const eu = await fetch(`https://api.telegram.org/bot${TOKEN}/getMe`);
+        const corpo = await eu.json();
+        situacao = corpo?.ok
+          ? `sim, e VALIDO (bot @${corpo.result?.username})`
+          : `sim, mas RECUSADO pela Telegram: ${corpo?.description || eu.status}. ` +
+            "O token foi trocado ou revogado — pegue o atual no BotFather.";
+      } catch (e) {
+        situacao = "sim, mas não consegui falar com a Telegram: " + (e?.message || e);
+      }
+      try {
+        const w = await fetch(`https://api.telegram.org/bot${TOKEN}/getWebhookInfo`);
+        const corpo = await w.json();
+        const r = corpo?.result;
+        webhook = r?.url
+          ? `recebendo em ${r.url}` +
+            (r.last_error_message ? ` | ultimo erro: ${r.last_error_message}` : "")
+          : "NAO ligado — abra o link de setWebhook abaixo";
+      } catch {
+        webhook = "não consegui conferir";
+      }
+    }
+
     return res.status(200).send(
       "Robô do Telegram do Sistema TI\n\n" +
-        `Token configurado: ${TOKEN ? "sim" : "NÃO — falta TELEGRAM_TOKEN no Vercel"}\n` +
+        `Token: ${situacao}\n` +
+        `Webhook: ${webhook}\n` +
         `Restrito ao chat: ${process.env.TELEGRAM_CHAT_ID || "não (qualquer pessoa que achar o bot pode lançar)"}\n\n` +
         "Para ligar o robô, abra este endereço uma vez no navegador\n" +
         "(troque SEU_TOKEN pelo token do BotFather):\n\n" +
