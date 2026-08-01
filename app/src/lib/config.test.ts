@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { paraNuvem, precisaGravarNaNuvem, SO_NO_APARELHO } from "./config";
+import { paraNuvem, precisaGravarNaNuvem, problemaNoChatId, SO_NO_APARELHO } from "./config";
 import type { Config } from "./types";
 
 /**
@@ -91,5 +91,33 @@ describe("quando vale a pena gravar na nuvem", () => {
 
   it("salvar sem mudar nada não grava", () => {
     expect(precisaGravarNaNuvem(base, { ...base })).toBe(false);
+  });
+});
+
+describe("o campo do chat id recusa o token do robô", () => {
+  it("token colado no lugar do chat id é recusado, dizendo onde ele mora", () => {
+    // Aconteceu de verdade. Os dois valores saem da mesma tela do BotFather,
+    // e o token é o que está na mão na hora de configurar.
+    const r = problemaNoChatId("8197980608:AAEbEIVx9fg93luP-nrdFLSNG8STnWexemplo");
+    expect(r).toContain("TOKEN");
+    expect(r).toContain("Vercel");
+  });
+
+  it("chat id de conversa passa", () => {
+    expect(problemaNoChatId("123456789")).toBe("");
+  });
+
+  it("chat id de grupo passa: eles são negativos", () => {
+    expect(problemaNoChatId("-100123456789")).toBe("");
+  });
+
+  it("vazio passa: a loja pode não querer aviso nenhum", () => {
+    expect(problemaNoChatId("")).toBe("");
+    expect(problemaNoChatId("   ")).toBe("");
+  });
+
+  it("qualquer outra coisa explica o que é o chat id", () => {
+    expect(problemaNoChatId("@meubot")).toContain("só números");
+    expect(problemaNoChatId("123")).toContain("só números");
   });
 });

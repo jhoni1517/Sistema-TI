@@ -53,3 +53,43 @@ export function paraNuvem(c: Config): Record<string, unknown> {
 export function precisaGravarNaNuvem(antes: Config, depois: Config): boolean {
   return JSON.stringify(paraNuvem(antes)) !== JSON.stringify(paraNuvem(depois));
 }
+
+/**
+ * O campo do Telegram recebeu o TOKEN do robô em vez do chat id.
+ *
+ * Aconteceu de verdade, e o estrago é sério: o token dá controle total do
+ * robô, e este campo sobe para o banco, entra no backup e sai no export —
+ * que circulam por WhatsApp e e-mail. Um segredo colado aqui está queimado
+ * no minuto seguinte.
+ *
+ * A culpa não é de quem colou. Os dois valores vêm da mesma tela do
+ * BotFather, com nomes parecidos, e o token é o que está na mão na hora de
+ * configurar. Cabe ao campo saber a diferença.
+ *
+ * Token tem a forma `123456789:AAH-letras-e-numeros`. Chat id é só dígitos,
+ * com um sinal de menos na frente quando é grupo.
+ */
+export function problemaNoChatId(valor: string): string {
+  const v = (valor || "").trim();
+  if (!v) return "";
+
+  if (/^\d+:[\w-]{20,}$/.test(v)) {
+    return (
+      "Isto é o TOKEN do robô, não o chat id. O token nunca pode ser colado " +
+      "aqui: este campo vai para o banco e sai no backup, que circula por " +
+      "conversa.\n\n" +
+      "O token mora só nas variáveis do Vercel (TELEGRAM_TOKEN).\n\n" +
+      "O chat id é só o número que o robô responde quando você manda /start."
+    );
+  }
+
+  // Grupo tem id negativo, conversa direta é positivo. Nada além de dígitos.
+  if (!/^-?\d{5,}$/.test(v)) {
+    return (
+      "O chat id é só números — algo como 123456789, ou -100123456789 se for " +
+      "um grupo. Mande /start para o robô no Telegram e ele responde com o seu."
+    );
+  }
+
+  return "";
+}

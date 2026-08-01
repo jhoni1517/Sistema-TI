@@ -10,6 +10,7 @@ import { Equipe } from "../components/Equipe";
 import { MinhaConta } from "../components/MinhaConta";
 import { carregarSessao, type Sessao } from "../lib/auth";
 import { db, importarTudo, obterLoja, type DumpLoja } from "../lib/db";
+import { problemaNoChatId } from "../lib/config";
 import type { Config as ConfigType } from "../lib/types";
 
 export const Config: React.FC = () => {
@@ -56,6 +57,10 @@ export const Config: React.FC = () => {
   };
 
   const salvar = () => {
+    // Recusa antes de gravar. Só avisar não bastaria: o campo já sobe para o
+    // banco, e um token que chegou lá já saiu no backup.
+    const erroChat = problemaNoChatId(form.telegramChatId || "");
+    if (erroChat) return aviso.erro(erroChat);
     saveConfig(form);
     setSalvo(true);
     setTimeout(() => setSalvo(false), 2500);
@@ -208,6 +213,14 @@ export const Config: React.FC = () => {
               placeholder="ex.: 123456789"
               inputMode="numeric"
             />
+            {/* O token do robô já foi colado aqui uma vez. Este campo vai
+                para o banco e sai no backup, que circula por conversa —
+                segredo colado aqui está queimado no minuto seguinte. */}
+            {problemaNoChatId(form.telegramChatId || "") && (
+              <p className="mt-1 whitespace-pre-line rounded-lg bg-rose-50 p-2 text-xs text-rose-700">
+                {problemaNoChatId(form.telegramChatId || "")}
+              </p>
+            )}
             <p className="mt-1 text-xs text-slate-400">
               Contas a pagar, agenda, aniversários e fiado vencido chegam aqui todo
               dia. Para descobrir o seu numero, abra o robo no Telegram e mande
