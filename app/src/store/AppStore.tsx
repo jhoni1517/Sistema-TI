@@ -168,6 +168,19 @@ export const AppProvider: React.FC<{
   const [ramoLoja, setRamoLoja] = useState<string | null>(null);
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [config, setConfig] = useState<Config>(loadConfig());
+  /*
+   * A configuração da nuvem já chegou?
+   *
+   * Enquanto não chegou, `config` é só o que este aparelho tinha guardado —
+   * e num aparelho novo isso é o PADRÃO. Gravar nesse estado sobe "Minha
+   * Assistência TI" e campos em branco por cima do que a loja tinha,
+   * apagando para TODOS os aparelhos de uma vez.
+   *
+   * Aconteceu de verdade: o celular abriu com o formulário em branco, o
+   * dono clicou em Salvar e perdeu nome, telefone, CNPJ, endereço, logo e
+   * chat do Telegram.
+   */
+  const [configCarregada, setConfigCarregada] = useState(false);
 
   // Aplica o tema (cor + claro/escuro) e reage à mudança do sistema no modo "auto"
   useEffect(() => {
@@ -253,8 +266,18 @@ export const AppProvider: React.FC<{
     try {
       const cloudCfg = await db.config.get();
       if (cloudCfg) setConfig((prev) => ({ ...prev, ...cloudCfg }));
+      // Só a partir daqui gravar é seguro. Sem nuvem ligada também libera:
+      // aí não existe nada para sobrescrever.
+      setConfigCarregada(true);
     } catch (e) {
+      // NÃO libera a gravação. Falhou a leitura, o que está na tela pode ser
+      // o padrão — e subir o padrão apaga a configuração da loja inteira.
       console.error("Falha ao carregar a configuração da loja:", e);
+      falhas.push(
+        "Configurações da loja: " +
+          (e instanceof Error ? e.message : String(e)) +
+          "\nSalvar está bloqueado até a leitura funcionar, para não apagar o que está gravado."
+      );
     }
 
     if (falhas.length > 0) {
@@ -575,6 +598,16 @@ export const AppProvider: React.FC<{
   const saveConfig = async (c: Config) => {
     localStorage.setItem("sistema-ti:config", JSON.stringify(c));
     setConfig(c);
+    if (!configCarregada) {
+      // Não é só deixar de subir: é AVISAR. Gravar em silêncio só no
+      // aparelho faria a pessoa achar que salvou.
+      aviso.erro(
+        "As configurações da loja ainda não terminaram de carregar da nuvem.\n\n" +
+          "Foram salvas neste aparelho, mas NÃO subiram — subir agora apagaria " +
+          "o que está gravado. Atualize a página e salve de novo."
+      );
+      return;
+    }
     // Só aparência mudou: não vale uma gravação na nuvem a cada clique na
     // paleta de cores, que é o que a pré-visualização ao vivo faria.
     if (!precisaGravarNaNuvem(config, c)) return;

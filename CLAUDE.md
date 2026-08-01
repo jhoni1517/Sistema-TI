@@ -225,6 +225,30 @@ que já segurou uma tela de login velha na frente dele.
 Trocou arquivo estático sem hash (ícone, manifest)? Suba a versão do cache
 em `public/sw.js`.
 
+### Formulário que não acompanha a nuvem apaga a loja inteira
+
+O pior bug desta base até hoje, e o único que apagou dado de verdade.
+
+`useState(config)` no formulário de Configurações só vale na PRIMEIRA
+renderização. A configuração da loja chega da nuvem um instante depois, e a
+tela continuava mostrando o padrão: "Minha Assistência TI", telefone em
+branco, sem logo, sem chat do Telegram.
+
+Isso sozinho seria só confuso. O grave é o passo seguinte: clicar em Salvar
+subia esse formulário em branco por cima do que estava gravado, apagando
+para TODOS os aparelhos de uma vez. O celular abriu vazio, o dono salvou, e
+o computador perdeu junto.
+
+Duas travas, e as duas são necessárias:
+
+1. O formulário acompanha a nuvem enquanto ninguém mexeu num campo. Depois
+   que mexeu, para — recarregar por cima de quem está digitando é o outro
+   jeito de perder o que a pessoa escreveu.
+2. `saveConfig` RECUSA antes de a leitura da nuvem terminar, e diz por quê.
+   Falha de leitura não libera: o que está na tela pode ser o padrão.
+
+Vale para qualquer tela que edite algo que veio da nuvem.
+
 ### Lista do que sobe para a nuvem envelhece; lista do que fica, não
 
 `saveConfig` gravava na nuvem uma lista de campos escrita à mão. Oito
