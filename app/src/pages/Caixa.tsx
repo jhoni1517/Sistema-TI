@@ -29,6 +29,8 @@ import {
   sessaoAberta as achaSessaoAberta,
   conferencia,
   CONFERENCIA_META,
+  filtrarMovimentos,
+  agruparPorDia,
 } from "../lib/caixa";
 import type { MovimentoCaixa, TipoMovimento, FormaPagamento, SessaoCaixa, Produto, Cliente } from "../lib/types";
 
@@ -48,6 +50,8 @@ export const Caixa: React.FC = () => {
   const [abrindo, setAbrindo] = useState(false);
   const [fechando, setFechando] = useState(false);
   const [aba, setAba] = useState<"movimentos" | "fechamentos">("movimentos");
+  const [busca, setBusca] = useState("");
+  const [filtroTipo, setFiltroTipo] = useState<TipoMovimento | "">("");
   const [verSessao, setVerSessao] = useState<SessaoCaixa | null>(null);
 
   const sessaoAberta = useMemo(() => achaSessaoAberta(sessoes), [sessoes]);
@@ -65,9 +69,26 @@ export const Caixa: React.FC = () => {
 
   const fechadas = useMemo(() => sessoesFechadas(sessoes), [sessoes]);
 
+  /*
+   * A lista corrida de 100 linhas não respondia a pergunta que se faz
+   * olhando o caixa: "quanto entrou ontem?". Agora ela é filtrável e vem
+   * agrupada por dia, com o subtotal de cada um.
+   *
+   * O corte em 300 é depois do filtro, de propósito: cortar antes fazia a
+   * busca não achar o que estava na posição 101.
+   */
   const listaMovs = useMemo(
-    () => [...movimentos].sort((a, b) => txt(b.data).localeCompare(txt(a.data))).slice(0, 100),
-    [movimentos]
+    () =>
+      agruparPorDia(
+        filtrarMovimentos(movimentos, { termo: busca, tipo: filtroTipo })
+          .sort((a, b) => txt(b.data).localeCompare(txt(a.data)))
+          .slice(0, 300)
+      ),
+    [movimentos, busca, filtroTipo]
+  );
+  const quantosNaLista = useMemo(
+    () => listaMovs.reduce((n, d) => n + d.movimentos.length, 0),
+    [listaMovs]
   );
 
   const abrirCaixa = async (valor: number) => {
@@ -119,6 +140,48 @@ export const Caixa: React.FC = () => {
     printHTML(reciboVenda(m, config, cli), "Recibo de venda", config.papelImpressao || "a4");
   };
 
+  /**
+   * Apagar uma movimentação.
+   *
+   * "Excluir movimentação?" não é pergunta, é armadilha: não diz o valor,
+   * não diz o que era, e não avisa que apagar a entrada de uma venda deixa
+   * a venda existindo sem dinheiro nenhum — que é justamente o que a
+   * conferência acusa depois como "venda sem caixa".
+   */
+  const apagarMovimento = async (m: MovimentoCaixa) => {
+    const daVenda = /^Venda \d+/.test(txt(m.descricao));
+    const daOS = !!m.osId;
+    const aviso1 =
+      daVenda || daOS
+        ? "\n\nATENÇÃO: este lançamento é de " +
+          (daVenda ? "uma venda do PDV" : "uma ordem de serviço") +
+          ". Apagando, a " +
+          (daVenda ? "venda" : "OS") +
+          " continua existindo sem dinheiro nenhum, e a conferência vai acusar isso."
+        : "";
+
+    if (
+      !confirm(
+        `Apagar ${m.tipo === "entrada" ? "a entrada" : m.tipo === "sangria" ? "a sangria" : "a saída"} de ${brl(m.valor)}?\n\n` +
+          `${txt(m.descricao)}\n${txt(m.categoria)} · ${formatDateTime(m.data)}` +
+          aviso1 +
+          "\n\nIsto não pode ser desfeito."
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await removeMovimento(m.id);
+      aviso.sucesso("Movimentação apagada.");
+    } catch (e) {
+      // A janela fechava como se tivesse apagado, e o valor continuava lá.
+      aviso.erro(
+        "Não foi possível apagar:\n\n" + (e instanceof Error ? e.message : String(e))
+      );
+    }
+  };
+
   const imprimirFechamentoAntigo = (s: SessaoCaixa) => {
     printHTML(
       reciboFechamento(s, movimentosDaSessao(s, movimentos), config),
@@ -164,12 +227,41 @@ export const Caixa: React.FC = () => {
               </p>
             );
           })()}
-          <p className="mt-1 text-xs text-brand-200">Abertura: {brl(abertura)}</p>
+          {/* Na gaveta, não o saldo: é este número que a mão confere no
+              fechamento. O saldo soma cartão e Pix, que nunca passaram por
+              ali — e conferir contra ele faz a gaveta nunca bater. */}
+          <div className="mt-2 flex items-center justify-between border-t border-white/20 pt-2 text-xs text-brand-100">
+            <span>Abertura {brl(abertura)}</span>
+            <span className="font-semibold text-white">
+              Na gaveta {brl(resumo.emEspecie)}
+            </span>
+          </div>
         </div>
         <Resumo label="Entradas" value={entradas} color="text-emerald-600" icon={<ArrowDownCircle size={18} className="text-emerald-600" />} />
         <Resumo label="Saídas" value={saidas} color="text-red-600" icon={<ArrowUpCircle size={18} className="text-red-600" />} />
         <Resumo label="Sangrias" value={sangrias} color="text-amber-600" icon={<Scissors size={18} className="text-amber-600" />} />
       </div>
+
+      {/* Entradas por forma de pagamento.
+          Era o número que só existia no fechamento impresso, e é o primeiro
+          que alguém procura: quanto foi na maquininha, quanto foi no Pix,
+          quanto tem que estar em papel. */}
+      {Object.keys(resumo.porForma).length > 0 && (
+        <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {(["dinheiro", "pix", "debito", "credito", "outro"] as const)
+            .filter((f) => resumo.porForma[f])
+            .map((f) => (
+              <div key={f} className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
+                <p className="text-xs capitalize text-slate-400">
+                  {f === "debito" ? "Débito" : f === "credito" ? "Crédito" : f}
+                </p>
+                <p className="mt-0.5 text-lg font-bold text-slate-800">
+                  {brl(resumo.porForma[f])}
+                </p>
+              </div>
+            ))}
+        </div>
+      )}
 
       {/* Ações */}
       <div className="mb-6 flex flex-wrap gap-3">
@@ -207,83 +299,140 @@ export const Caixa: React.FC = () => {
         />
       ) : (
       <>
-      {listaMovs.length === 0 ? (
-        <EmptyState icon={<Wallet size={48} />} title="Nenhuma movimentação" hint="Registre entradas e saídas do caixa." />
+      {/* Busca e filtro. Sem isto, achar "aquela saída de uns cinquenta de
+          terça" era rolar com o dedo até cansar — e no celular, que é onde o
+          dono lê, isso é desistir. */}
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            className="input w-full !pl-9"
+            placeholder="Procurar por descrição, categoria ou forma..."
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+          />
+        </div>
+        <div className="flex gap-1.5 overflow-x-auto">
+          {([
+            { k: "", nome: "Tudo" },
+            { k: "entrada", nome: "Entradas" },
+            { k: "saida", nome: "Saídas" },
+            { k: "sangria", nome: "Sangrias" },
+          ] as const).map((f) => (
+            <button
+              key={f.k}
+              onClick={() => setFiltroTipo(f.k)}
+              className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
+                filtroTipo === f.k
+                  ? "bg-slate-800 text-white"
+                  : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              {f.nome}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {quantosNaLista === 0 ? (
+        <EmptyState
+          icon={<Wallet size={48} />}
+          title={busca || filtroTipo ? "Nada encontrado" : "Nenhuma movimentação"}
+          hint={
+            busca || filtroTipo
+              ? "Tente outra palavra, ou toque em Tudo para ver a lista inteira."
+              : "Registre entradas e saídas do caixa."
+          }
+        />
       ) : (
-        <div className="overflow-x-auto rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
-          <table className="w-full text-sm">
-            <thead className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
-              <tr>
-                <th className="px-4 py-3">Descrição</th>
-                <th className="px-4 py-3">Forma</th>
-                <th className="px-4 py-3">Data</th>
-                <th className="px-4 py-3 text-right">Valor</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {listaMovs.map((m) => (
-                <tr key={m.id} className="border-b border-slate-100 hover:bg-slate-50">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
+        <div className="space-y-4">
+          {listaMovs.map((d) => (
+            <div key={d.dia}>
+              {/* O subtotal do dia responde "quanto entrou ontem" sem
+                  ninguém somar nada na cabeça. */}
+              <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-3 px-1">
+                <p className="text-sm font-semibold text-slate-700">{formatDate(d.dia)}</p>
+                <p className="text-xs text-slate-500">
+                  <span className="text-emerald-600">+{brl(d.entradas)}</span>
+                  {d.saidas > 0 && <span className="text-red-500"> −{brl(d.saidas)}</span>}
+                  <span className="ml-2 font-bold text-slate-700">= {brl(d.resultado)}</span>
+                </p>
+              </div>
+
+              <div className="divide-y divide-slate-100 overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-slate-200">
+                {d.movimentos.map((m) => (
+                  /* Linha, não célula de tabela: cinco colunas num celular
+                     viram rolagem lateral, e o dono lê no celular. */
+                  <div key={m.id} className="flex items-center gap-3 p-3 hover:bg-slate-50">
+                    <span className="shrink-0">
                       {m.tipo === "entrada" ? (
-                        <ArrowDownCircle size={16} className="text-emerald-500" />
+                        <ArrowDownCircle size={20} className="text-emerald-500" />
                       ) : m.tipo === "sangria" ? (
-                        <Scissors size={16} className="text-amber-500" />
+                        <Scissors size={20} className="text-amber-500" />
                       ) : (
-                        <ArrowUpCircle size={16} className="text-red-500" />
+                        <ArrowUpCircle size={20} className="text-red-500" />
                       )}
-                      <div>
-                        <p className="font-medium text-slate-800">{m.descricao}</p>
-                        <p className="text-xs text-slate-400">{m.categoria}</p>
-                      </div>
+                    </span>
+
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-slate-800">{m.descricao}</p>
+                      <p className="truncate text-xs text-slate-400">
+                        {m.categoria}
+                        <span className="mx-1">·</span>
+                        <span className="capitalize">{m.formaPagamento}</span>
+                        <span className="mx-1">·</span>
+                        {formatDateTime(m.data).slice(-5)}
+                      </p>
                     </div>
-                  </td>
-                  <td className="px-4 py-3 capitalize text-slate-500">{m.formaPagamento}</td>
-                  <td className="px-4 py-3 text-slate-500">{formatDateTime(m.data)}</td>
-                  <td className={`px-4 py-3 text-right font-bold ${m.tipo === "entrada" ? "text-emerald-600" : "text-red-600"}`}>
-                    {m.tipo === "entrada" ? "+" : "-"} {brl(m.valor)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex justify-end gap-1">
+
+                    <p
+                      className={`shrink-0 text-right font-bold tabular-nums ${
+                        m.tipo === "entrada" ? "text-emerald-600" : "text-red-600"
+                      }`}
+                    >
+                      {m.tipo === "entrada" ? "+" : "−"} {brl(m.valor)}
+                    </p>
+
+                    <div className="flex shrink-0 gap-0.5">
                       {/* Recibo só de venda: despesa e sangria são conta da
-                          loja, não têm o que entregar para cliente nenhum. */}
-                      {m.tipo === "entrada" ? (
-                        <button
-                          className="btn-ghost !p-1.5 text-brand-600"
-                          title="Imprimir recibo para o cliente"
-                          onClick={() => imprimirVenda(m)}
-                        >
-                          <Receipt size={14} />
-                        </button>
-                      ) : (
-                        /* Sangria e saída também precisam de papel: com mais
-                           de uma pessoa no balcão, o único registro sendo a
-                           linha do sistema é o bastante para a conversa virar
-                           "eu não tirei nada". Duas assinaturas. */
-                        <button
-                          className="btn-ghost !p-1.5 text-slate-500"
-                          title="Comprovante de sangria / saída"
-                          onClick={() =>
-                            printHTML(
-                              reciboMovimento(m, config),
-                              "Comprovante",
-                              config.papelImpressao || "a4"
-                            )
-                          }
-                        >
-                          <Receipt size={14} />
-                        </button>
-                      )}
-                      <button className="btn-ghost !p-1.5 text-red-400" title="Excluir" onClick={() => { if (confirm("Excluir movimentação?")) removeMovimento(m.id); }}>
-                        <Trash2 size={14} />
+                          loja, não têm o que entregar para cliente nenhum.
+                          Mas sangria e saída também ganham papel — com mais
+                          de uma pessoa no balcão, a linha do sistema sozinha
+                          é o bastante para virar "eu não tirei nada". */}
+                      <button
+                        className={`btn-ghost !p-1.5 ${
+                          m.tipo === "entrada" ? "text-brand-600" : "text-slate-400"
+                        }`}
+                        title={
+                          m.tipo === "entrada"
+                            ? "Imprimir recibo para o cliente"
+                            : "Comprovante de sangria / saída"
+                        }
+                        onClick={() =>
+                          m.tipo === "entrada"
+                            ? imprimirVenda(m)
+                            : printHTML(
+                                reciboMovimento(m, config),
+                                "Comprovante",
+                                config.papelImpressao || "a4"
+                              )
+                        }
+                      >
+                        <Receipt size={15} />
+                      </button>
+                      <button
+                        className="btn-ghost !p-1.5 text-red-400"
+                        title="Excluir"
+                        onClick={() => apagarMovimento(m)}
+                      >
+                        <Trash2 size={15} />
                       </button>
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       )}
       </>
