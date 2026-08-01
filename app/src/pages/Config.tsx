@@ -9,8 +9,9 @@ import { ACCENTS, ACCENT_KEYS } from "../lib/themes";
 import { Equipe } from "../components/Equipe";
 import { MinhaConta } from "../components/MinhaConta";
 import { carregarSessao, type Sessao } from "../lib/auth";
-import { db, importarTudo, obterLoja, type DumpLoja } from "../lib/db";
+import { importarTudo, type DumpLoja } from "../lib/db";
 import { problemaNoChatId } from "../lib/config";
+import { CatalogoPublico, TituloCatalogo } from "../components/CatalogoPublico";
 import type { Config as ConfigType } from "../lib/types";
 
 export const Config: React.FC = () => {
@@ -19,42 +20,10 @@ export const Config: React.FC = () => {
   const [salvo, setSalvo] = useState(false);
   const [importando, setImportando] = useState(false);
   const [sessao, setSessao] = useState<Sessao | null>(null);
-  const loja = obterLoja();
-  const linkCatalogo = loja
-    ? `${window.location.origin}${window.location.pathname}#/catalogo/${loja}`
-    : "";
-
-  const [catalogoAtivo, setCatalogoAtivo] = useState(false);
-  const [salvandoCatalogo, setSalvandoCatalogo] = useState(false);
 
   React.useEffect(() => {
     carregarSessao().then(setSessao);
-    // Falha aqui não pode derrubar a tela de configurações inteira: sem a
-    // resposta, o interruptor fica desligado, que é o lado seguro de errar.
-    db.loja.catalogoAtivo().then(setCatalogoAtivo).catch(() => setCatalogoAtivo(false));
   }, []);
-
-  const alternarCatalogo = async (ativo: boolean) => {
-    setSalvandoCatalogo(true);
-    try {
-      await db.loja.definirCatalogo(ativo);
-      setCatalogoAtivo(ativo);
-      aviso.sucesso(
-        ativo
-          ? "Catálogo no ar. Qualquer pessoa com o link vê nome, foto e preço."
-          : "Catálogo desligado. O link para de abrir."
-      );
-    } catch (e) {
-      // Erro engolido aqui faria o interruptor voltar sozinho sem explicação,
-      // e a loja acharia que publicou quando não publicou.
-      aviso.erro(
-        "Não foi possível mudar o catálogo:\n\n" +
-          (e instanceof Error ? e.message : String(e))
-      );
-    } finally {
-      setSalvandoCatalogo(false);
-    }
-  };
 
   const salvar = () => {
     // Recusa antes de gravar. Só avisar não bastaria: o campo já sobe para o
@@ -247,65 +216,14 @@ export const Config: React.FC = () => {
             </p>
           </Field>
 
-          {/* Catálogo público: a loja manda foto de produto no WhatsApp uma
-              por uma, o dia inteiro. Aqui vira um link só. */}
+          {/* O catálogo mora no Estoque, junto dos produtos que ele publica.
+              Aqui ficava enterrado no meio do formulário e ninguém achava. */}
           <div className="sm:col-span-2 rounded-xl border border-slate-200 p-3">
-            <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-slate-600">
-              <Store size={15} /> Catálogo público
-            </p>
-            <p className="mb-2 text-xs text-slate-500">
-              Uma página com foto e preço dos seus produtos, para mandar no WhatsApp.
-              Mostra nome, foto, preço e se está disponível — nunca custo, margem,
-              fornecedor nem a quantidade exata.
-            </p>
-            {/* O interruptor mora aqui, e não no SQL. Ligar a vitrine é
-                decisão de quem é dono do preço; deixar isso no painel do
-                banco entregava a decisão a quem NÃO é dono da loja e
-                transformava um interruptor em chamado de suporte. */}
-            <label className="mb-3 flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="h-4 w-4"
-                checked={catalogoAtivo}
-                disabled={salvandoCatalogo}
-                onChange={(e) => alternarCatalogo(e.target.checked)}
-              />
-              <span className={catalogoAtivo ? "font-semibold text-emerald-700" : "text-slate-600"}>
-                {catalogoAtivo ? "No ar: qualquer um com o link vê" : "Desligado"}
-              </span>
-            </label>
-            {loja ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <input
-                  readOnly
-                  className="input flex-1 !py-1.5 text-xs"
-                  value={linkCatalogo}
-                  onFocus={(e) => e.currentTarget.select()}
-                />
-                <button
-                  className="btn-secondary !py-1.5 text-xs"
-                  onClick={() => {
-                    navigator.clipboard?.writeText(linkCatalogo);
-                    aviso.sucesso("Link copiado.");
-                  }}
-                >
-                  Copiar
-                </button>
-                <a
-                  className="btn-secondary !py-1.5 text-xs"
-                  href={linkCatalogo}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Abrir
-                </a>
-              </div>
-            ) : (
-              <p className="text-xs text-amber-700">Entre de novo para gerar o link.</p>
-            )}
+            <TituloCatalogo />
+            <CatalogoPublico nomeLoja={form.nomeLoja} />
             <p className="mt-2 text-xs text-slate-400">
-              Nasce desligado: ninguém publica preço sem escolher publicar. Enquanto
-              estiver assim, quem abrir o link vê "este catálogo não está disponível".
+              Este mesmo botão fica em <b>Estoque &rarr; Catálogo</b>, que é onde
+              ele é mais fácil de achar.
             </p>
           </div>
 

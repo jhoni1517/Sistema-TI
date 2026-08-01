@@ -7,9 +7,10 @@ import { Inventario } from "../components/Inventario";
 import { Reposicao } from "../components/Reposicao";
 import { minimoSugerido } from "../lib/reposicao";
 import { aoApagarProduto, textoDaConfirmacao } from "../lib/exclusao";
-import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck, FileQuestion, Wrench, CalendarX, Tag, ClipboardCheck, ShoppingBasket } from "lucide-react";
+import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck, FileQuestion, Wrench, CalendarX, Tag, ClipboardCheck, ShoppingBasket, Store } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
+import { CatalogoPublico } from "../components/CatalogoPublico";
 import { temRecurso } from "../lib/ramos";
 import { situacaoValidade, produtosVencendo, VALIDADE_META } from "../lib/pdv";
 import {
@@ -38,10 +39,11 @@ const vazio = (): Produto => ({
 });
 
 export const Estoque: React.FC = () => {
-  const { produtos, categorias, fornecedores, cotacoes, vendas, ordens, ramo, saveProduto, removeProduto, saveCategoria, removeCategoria, saveFornecedor, removeFornecedor } = useApp();
+  const { produtos, categorias, fornecedores, cotacoes, vendas, ordens, ramo, config, saveProduto, removeProduto, saveCategoria, removeCategoria, saveFornecedor, removeFornecedor } = useApp();
   const [busca, setBusca] = useState("");
   const [editando, setEditando] = useState<Produto | null>(null);
   const [soBaixo, setSoBaixo] = useState(false);
+  const [catalogo, setCatalogo] = useState(false);
   const [gerCategorias, setGerCategorias] = useState(false);
   const [gerFornecedores, setGerFornecedores] = useState(false);
   const [verCotacoes, setVerCotacoes] = useState(false);
@@ -159,6 +161,13 @@ export const Estoque: React.FC = () => {
             </button>
             <button className="btn-secondary" onClick={() => setEtiquetas(true)}>
               <Tag size={18} /> Etiquetas
+            </button>
+            {/* O catálogo é a lista de produtos publicada. É aqui, olhando os
+                produtos, que alguém pensa "queria mandar isso para o
+                cliente" — e não no meio do formulário de Configurações,
+                onde ele estava e ninguém achava. */}
+            <button className="btn-secondary" onClick={() => setCatalogo(true)}>
+              <Store size={18} /> Catálogo
             </button>
             <button className="btn-secondary" onClick={() => setGerCategorias(true)}>
               <FolderTree size={18} /> Categorias
@@ -577,6 +586,12 @@ export const Estoque: React.FC = () => {
       </Modal>
 
       {/* Modal categorias */}
+      {catalogo && (
+        <Modal open title="Catálogo público" onClose={() => setCatalogo(false)}>
+          <CatalogoPublico nomeLoja={config.nomeLoja} />
+        </Modal>
+      )}
+
       {gerCategorias && (
         <CategoriasManager
           classes={classes}
