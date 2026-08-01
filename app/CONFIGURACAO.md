@@ -155,15 +155,19 @@ na mão. As imagens ficam abertas para quem tiver o endereço — elas aparecem
 no recibo impresso e na página que o cliente abre sem login.
 
 O de número 13 cria o catálogo público. Ele nasce DESLIGADO em toda loja:
-ninguém publica preço sem escolher publicar. Para ligar o de uma loja:
+ninguém publica preço sem escolher publicar.
+
+Quem liga é **o dono da loja**, em Configurações → Catálogo público, no
+próprio sistema. Deixar isso só no SQL entregava a decisão a quem não é dono
+do preço e transformava um interruptor em chamado de suporte.
+
+Pelo banco, se precisar (o recado do topo da página ainda só se muda aqui):
 
 ```sql
 update lojas set catalogo_ativo = true,
        catalogo_recado = 'Entrega no bairro. Chame no WhatsApp.'
  where nome = 'NOME DA LOJA';
 ```
-
-O link fica em Configurações → Dados da loja → Catálogo público.
 
 O de número 14 faz a tela de entrada reconhecer o tipo de loja ao digitar o
 e-mail. Ele responde **sem senha**, então quem já sabe o endereço exato de

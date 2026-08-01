@@ -225,6 +225,23 @@ que já segurou uma tela de login velha na frente dele.
 Trocou arquivo estático sem hash (ícone, manifest)? Suba a versão do cache
 em `public/sw.js`.
 
+### Lista do que sobe para a nuvem envelhece; lista do que fica, não
+
+`saveConfig` gravava na nuvem uma lista de campos escrita à mão. Oito
+configurações criadas depois daquele dia ficaram de fora sem ninguém
+perceber: logo, papel da impressora, limite da gaveta, chat do Telegram,
+ramo, formato da balança, link de avaliação e limpar senha na entrega.
+Salvavam no aparelho, a tela dizia "salvo", e na máquina seguinte estava
+tudo em branco. O robô diário respondia "nenhuma loja com Telegram
+configurado" para uma loja que tinha preenchido o campo.
+
+Sobe TUDO menos o que está em `SO_NO_APARELHO` (aparência e credencial).
+Esquecer uma exceção deixa um campo a mais na nuvem; esquecer na lista
+antiga perdia o campo. Entre dois erros, escolhe-se o que dói menos —
+e `config.test.ts` lê a interface do disco e cobra campo por campo.
+
+O erro também caía num `.catch(() => {})`, a mesma regra de sempre.
+
 ### Limpar o localStorage no logout apaga as credenciais da nuvem
 
 `limparCacheLocal` preserva `supabaseUrl`, `supabaseKey`, `tema` e

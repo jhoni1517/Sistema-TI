@@ -7,6 +7,7 @@ import React, {
 } from "react";
 import { db, sincronizarPendentes } from "../lib/db";
 import { tamanhoDaFila } from "../lib/fila";
+import { paraNuvem, precisaGravarNaNuvem } from "../lib/config";
 import { aviso } from "../components/Aviso";
 import { aplicarTema } from "../lib/themes";
 import {
@@ -118,7 +119,7 @@ interface AppState {
   removeCotacao: (id: string) => Promise<void>;
   savePreco: (p: PrecoFornecedor) => Promise<void>;
   removeFornecedor: (id: string) => Promise<void>;
-  saveConfig: (c: Config) => void;
+  saveConfig: (c: Config) => Promise<void>;
 }
 
 const Ctx = createContext<AppState | null>(null);
@@ -556,22 +557,37 @@ export const AppProvider: React.FC<{
     setMetas((prev) => prev.filter((x) => x.id !== id));
   };
 
-  const saveConfig = (c: Config) => {
+  /**
+   * Grava a configuração no aparelho E na nuvem.
+   *
+   * Duas coisas estavam erradas aqui, e as duas são as que este repositório
+   * mais briga para não repetir:
+   *
+   * 1. A lista do que subia era escrita à mão, e toda configuração criada
+   *    depois dela ficou de fora — logo, papel da impressora, limite da
+   *    gaveta, chat do Telegram. Salvava no aparelho, dizia "salvo", e na
+   *    máquina seguinte estava em branco. Agora sobe tudo menos a aparência
+   *    e as credenciais (ver lib/config.ts).
+   * 2. O erro caía num `.catch(() => {})`. Assinatura vencida ou coluna
+   *    faltando deixavam o dono trocar o nome da loja, ver "salvo", e nada
+   *    ir para a nuvem.
+   */
+  const saveConfig = async (c: Config) => {
     localStorage.setItem("sistema-ti:config", JSON.stringify(c));
     setConfig(c);
-    // sincroniza os dados da loja na nuvem (nome, senha, comissão) — aparência fica local
-    db.config
-      .save({
-        nomeLoja: c.nomeLoja,
-        telefoneLoja: c.telefoneLoja,
-        enderecoLoja: c.enderecoLoja,
-        cnpj: c.cnpj,
-        senhaAcesso: c.senhaAcesso,
-        comissaoPadrao: c.comissaoPadrao,
-        taxaArmazenamentoDia: c.taxaArmazenamentoDia,
-        diasAbandono: c.diasAbandono,
-      })
-      .catch(() => {});
+    // Só aparência mudou: não vale uma gravação na nuvem a cada clique na
+    // paleta de cores, que é o que a pré-visualização ao vivo faria.
+    if (!precisaGravarNaNuvem(config, c)) return;
+    try {
+      await db.config.save(paraNuvem(c));
+    } catch (e) {
+      aviso.erro(
+        "As configurações foram salvas neste aparelho, mas NÃO subiram para a " +
+          "nuvem:\n\n" +
+          (e instanceof Error ? e.message : String(e)) +
+          "\n\nEm outro aparelho elas ainda estão como antes."
+      );
+    }
   };
 
   const value: AppState = {
