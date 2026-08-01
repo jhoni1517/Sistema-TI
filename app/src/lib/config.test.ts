@@ -170,3 +170,36 @@ describe("o formulário em branco não pode apagar a loja", () => {
     expect(r.telegramChatId).toBe("123456789");
   });
 });
+
+describe("o primeiro Salvar da sessão sempre sobe", () => {
+  /**
+   * O conserto ficava impossível de aplicar.
+   *
+   * Pular a gravação "quando nada mudou" comparava o formulário com o que o
+   * APARELHO tinha na tela. O computador tinha logo, limite da gaveta e chat
+   * do Telegram guardados só nele; a nuvem não tinha nenhum dos três. Os dois
+   * pareciam iguais, e clicar em Salvar era descartado — justamente o clique
+   * que ia empurrar os campos que faltavam. O celular continuava abrindo sem
+   * eles, e não havia nada que o dono pudesse fazer na tela.
+   *
+   * A comparação tem que ser contra o que este aparelho JÁ MANDOU para a
+   * nuvem. Antes de mandar qualquer coisa, não há com o que comparar: manda.
+   */
+  const fonte = readFileSync(resolve(__dirname, "..", "store", "AppStore.tsx"), "utf8");
+
+  it("saveConfig compara com o último enviado, não com o que está na tela", () => {
+    expect(fonte).toContain("ultimoEnviado.current && !precisaGravarNaNuvem(");
+    // Comparar com `config` é o bug: é o estado da tela, que tem campos que a
+    // nuvem nunca recebeu.
+    expect(fonte).not.toContain("!precisaGravarNaNuvem(config,");
+  });
+
+  it("o que subiu é anotado só depois de a gravação dar certo", () => {
+    // Anotar antes faria uma falha de rede marcar como enviado o que nunca
+    // saiu, e o campo ficaria preso fora da nuvem para sempre.
+    const i = fonte.indexOf("await db.config.save(carga)");
+    const j = fonte.indexOf("ultimoEnviado.current = c");
+    expect(i).toBeGreaterThan(0);
+    expect(j).toBeGreaterThan(i);
+  });
+});
