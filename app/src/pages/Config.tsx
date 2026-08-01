@@ -9,7 +9,7 @@ import { ACCENTS, ACCENT_KEYS } from "../lib/themes";
 import { Equipe } from "../components/Equipe";
 import { MinhaConta } from "../components/MinhaConta";
 import { carregarSessao, type Sessao } from "../lib/auth";
-import { importarTudo, obterLoja, type DumpLoja } from "../lib/db";
+import { db, importarTudo, obterLoja, type DumpLoja } from "../lib/db";
 import type { Config as ConfigType } from "../lib/types";
 
 export const Config: React.FC = () => {
@@ -23,9 +23,37 @@ export const Config: React.FC = () => {
     ? `${window.location.origin}${window.location.pathname}#/catalogo/${loja}`
     : "";
 
+  const [catalogoAtivo, setCatalogoAtivo] = useState(false);
+  const [salvandoCatalogo, setSalvandoCatalogo] = useState(false);
+
   React.useEffect(() => {
     carregarSessao().then(setSessao);
+    // Falha aqui não pode derrubar a tela de configurações inteira: sem a
+    // resposta, o interruptor fica desligado, que é o lado seguro de errar.
+    db.loja.catalogoAtivo().then(setCatalogoAtivo).catch(() => setCatalogoAtivo(false));
   }, []);
+
+  const alternarCatalogo = async (ativo: boolean) => {
+    setSalvandoCatalogo(true);
+    try {
+      await db.loja.definirCatalogo(ativo);
+      setCatalogoAtivo(ativo);
+      aviso.sucesso(
+        ativo
+          ? "Catálogo no ar. Qualquer pessoa com o link vê nome, foto e preço."
+          : "Catálogo desligado. O link para de abrir."
+      );
+    } catch (e) {
+      // Erro engolido aqui faria o interruptor voltar sozinho sem explicação,
+      // e a loja acharia que publicou quando não publicou.
+      aviso.erro(
+        "Não foi possível mudar o catálogo:\n\n" +
+          (e instanceof Error ? e.message : String(e))
+      );
+    } finally {
+      setSalvandoCatalogo(false);
+    }
+  };
 
   const salvar = () => {
     saveConfig(form);
@@ -217,6 +245,22 @@ export const Config: React.FC = () => {
               Mostra nome, foto, preço e se está disponível — nunca custo, margem,
               fornecedor nem a quantidade exata.
             </p>
+            {/* O interruptor mora aqui, e não no SQL. Ligar a vitrine é
+                decisão de quem é dono do preço; deixar isso no painel do
+                banco entregava a decisão a quem NÃO é dono da loja e
+                transformava um interruptor em chamado de suporte. */}
+            <label className="mb-3 flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="h-4 w-4"
+                checked={catalogoAtivo}
+                disabled={salvandoCatalogo}
+                onChange={(e) => alternarCatalogo(e.target.checked)}
+              />
+              <span className={catalogoAtivo ? "font-semibold text-emerald-700" : "text-slate-600"}>
+                {catalogoAtivo ? "No ar: qualquer um com o link vê" : "Desligado"}
+              </span>
+            </label>
             {loja ? (
               <div className="flex flex-wrap items-center gap-2">
                 <input
@@ -247,9 +291,8 @@ export const Config: React.FC = () => {
               <p className="text-xs text-amber-700">Entre de novo para gerar o link.</p>
             )}
             <p className="mt-2 text-xs text-slate-400">
-              A página só abre depois que você ligar o catálogo desta loja no banco
-              (<code>catalogo_ativo</code>). Desligado por padrão: ninguém publica preço
-              sem escolher publicar.
+              Nasce desligado: ninguém publica preço sem escolher publicar. Enquanto
+              estiver assim, quem abrir o link vê "este catálogo não está disponível".
             </p>
           </div>
 

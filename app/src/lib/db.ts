@@ -451,6 +451,64 @@ export const db = {
 
       return (data.ramo as string) || null;
     },
+
+    /**
+     * O catálogo público está ligado nesta loja?
+     *
+     * Nasce desligado: ninguém publica preço sem escolher publicar. Coluna
+     * ainda não criada devolve `false` — a loja continua funcionando, só sem
+     * a vitrine, que é o lado seguro de errar.
+     */
+    async catalogoAtivo(): Promise<boolean> {
+      if (!supabaseEnabled || !supabase || !lojaAtual) return false;
+      const { data, error } = await supabase
+        .from("lojas")
+        .select("catalogo_ativo")
+        .eq("id", lojaAtual)
+        .maybeSingle();
+      if (error) {
+        if (/column|does not exist|schema cache|42703|PGRST204/i.test(error.message)) {
+          return false;
+        }
+        throw new Error(`Não foi possível ler o catálogo da loja: ${error.message}`);
+      }
+      return data?.catalogo_ativo === true;
+    },
+
+    /**
+     * Liga ou desliga a vitrine pública.
+     *
+     * Quem decide é o dono da loja, não o operador do sistema. Antes só dava
+     * para ligar rodando SQL no painel do banco — o que na prática deixava a
+     * decisão com quem NÃO é dono do preço, e transformava um interruptor em
+     * chamado de suporte.
+     *
+     * A política do banco continua mandando: só o dono da própria loja passa.
+     */
+    async definirCatalogo(ativo: boolean): Promise<void> {
+      if (!supabaseEnabled || !supabase || !lojaAtual) {
+        throw new Error("Sem conexão com a nuvem.");
+      }
+      const { data, error } = await supabase
+        .from("lojas")
+        .update({ catalogo_ativo: ativo })
+        .eq("id", lojaAtual)
+        .select("id");
+      if (error) throw traduzirErroGravacao(error);
+      /*
+       * Zero linhas alteradas NÃO é erro para o Postgres: a política de
+       * escrita simplesmente não encontra a linha e a chamada volta bem
+       * sucedida com nada dentro. Sem esta checagem, um funcionário clicava
+       * no interruptor, via "catálogo no ar" e nada tinha mudado — a pior
+       * classe de falha, porque a loja acha que publicou.
+       */
+      if (!data || data.length === 0) {
+        throw new Error(
+          "O banco não deixou mudar o catálogo desta loja. Só o dono da loja " +
+            "pode ligar ou desligar a vitrine — entre com a conta dele."
+        );
+      }
+    },
   },
 
   config: {
