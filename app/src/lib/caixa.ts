@@ -1,6 +1,6 @@
 import { isToday, txt } from "./format";
 import { receitaBruta, totalDespesas, totalSangrias } from "./calc";
-import type { MovimentoCaixa, SessaoCaixa } from "./types";
+import type { MovimentoCaixa, SessaoCaixa, TipoMovimento } from "./types";
 
 /**
  * Sessões de caixa: o que entrou, o que saiu e se bate com a gaveta.
@@ -134,3 +134,82 @@ export const CONFERENCIA_META: Record<
   sobra: { label: "Sobrou", cor: "bg-amber-100 text-amber-700" },
   falta: { label: "Faltou", cor: "bg-red-100 text-red-700" },
 };
+
+/**
+ * Filtra a lista de movimentações do jeito que se procura no balcão.
+ *
+ * A tela mostrava as últimas 100 numa lista corrida, sem busca. Achar
+ * "aquela saída de uns cinquenta reais de terça" era rolar com o dedo até
+ * cansar — e no celular, que é onde o dono lê, isso é desistir.
+ */
+export interface FiltroMovimento {
+  /** Casa com descrição, categoria ou forma de pagamento */
+  termo?: string;
+  /** Vazio = todos */
+  tipo?: TipoMovimento | "";
+  /** Só um dia (AAAA-MM-DD). Vazio = todos */
+  dia?: string;
+}
+
+export function filtrarMovimentos(
+  movimentos: MovimentoCaixa[],
+  filtro: FiltroMovimento = {}
+): MovimentoCaixa[] {
+  const termo = txt(filtro.termo).trim().toLowerCase();
+  const tipo = filtro.tipo || "";
+  const dia = txt(filtro.dia).slice(0, 10);
+
+  return movimentos.filter((m) => {
+    if (tipo && m.tipo !== tipo) return false;
+    if (dia && txt(m.data).slice(0, 10) !== dia) return false;
+    if (!termo) return true;
+    // Categoria e forma entram na busca porque é assim que a pessoa lembra:
+    // "aquela do cartão", "as de energia".
+    const alvo = `${txt(m.descricao)} ${txt(m.categoria)} ${txt(m.formaPagamento)}`.toLowerCase();
+    return alvo.includes(termo);
+  });
+}
+
+export interface DiaDeCaixa {
+  /** AAAA-MM-DD */
+  dia: string;
+  movimentos: MovimentoCaixa[];
+  entradas: number;
+  saidas: number;
+  /** Entradas menos tudo que saiu. É o que o dia rendeu de fato. */
+  resultado: number;
+}
+
+/**
+ * Agrupa por dia, do mais recente para o mais antigo, com o subtotal.
+ *
+ * Uma lista corrida de cem linhas não responde a única pergunta que se faz
+ * olhando o caixa: "quanto entrou ontem?". O subtotal por dia responde sem
+ * ninguém somar nada na cabeça.
+ */
+export function agruparPorDia(movimentos: MovimentoCaixa[]): DiaDeCaixa[] {
+  const porDia = new Map<string, MovimentoCaixa[]>();
+  for (const m of movimentos) {
+    const dia = txt(m.data).slice(0, 10);
+    if (!dia) continue; // sem data não dá para agrupar, e inventar um dia é pior
+    if (!porDia.has(dia)) porDia.set(dia, []);
+    porDia.get(dia)!.push(m);
+  }
+
+  return [...porDia.entries()]
+    .sort((a, b) => b[0].localeCompare(a[0]))
+    .map(([dia, movs]) => {
+      const entradas = receitaBruta(movs);
+      const saidas = totalDespesas(movs);
+      const sangrias = totalSangrias(movs);
+      return {
+        dia,
+        // Dentro do dia, o mais recente primeiro: é o que acabou de acontecer
+        // que a pessoa está conferindo.
+        movimentos: [...movs].sort((a, b) => txt(b.data).localeCompare(txt(a.data))),
+        entradas,
+        saidas,
+        resultado: arredonda(entradas - saidas - sangrias),
+      };
+    });
+}

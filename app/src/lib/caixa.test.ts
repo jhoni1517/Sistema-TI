@@ -5,6 +5,8 @@ import {
   sessoesFechadas,
   sessaoAberta,
   conferencia,
+  filtrarMovimentos,
+  agruparPorDia,
 } from "./caixa";
 import type { MovimentoCaixa, SessaoCaixa } from "./types";
 
@@ -172,5 +174,113 @@ describe("dinheiro em espécie na gaveta", () => {
   it("dia só de cartão deixa na gaveta apenas o troco de abertura", () => {
     const movs = [mov({ tipo: "entrada", valor: 900, formaPagamento: "pix" })];
     expect(resumoCaixa(sessao({ valorAbertura: 100 }), movs).emEspecie).toBe(100);
+  });
+});
+
+describe("procurar no caixa", () => {
+  const m = (p: Partial<MovimentoCaixa>): MovimentoCaixa =>
+    ({
+      id: "m",
+      tipo: "entrada",
+      categoria: "Venda",
+      descricao: "",
+      valor: 10,
+      formaPagamento: "dinheiro",
+      data: "2026-08-01T10:00:00.000Z",
+      ...p,
+    }) as MovimentoCaixa;
+
+  const lista = [
+    m({ id: "1", descricao: "Venda 12", valor: 100, data: "2026-08-01T10:00:00.000Z" }),
+    m({ id: "2", tipo: "saida", categoria: "Energia", descricao: "Conta de luz", valor: 230, data: "2026-08-01T14:00:00.000Z" }),
+    m({ id: "3", tipo: "sangria", categoria: "Sangria", descricao: "Banco", valor: 50, data: "2026-07-31T18:00:00.000Z" }),
+    m({ id: "4", descricao: "Venda 13", valor: 60, formaPagamento: "pix", data: "2026-07-31T09:00:00.000Z" }),
+  ];
+
+  it("sem filtro, devolve tudo", () => {
+    expect(filtrarMovimentos(lista)).toHaveLength(4);
+  });
+
+  it("acha pela descrição", () => {
+    expect(filtrarMovimentos(lista, { termo: "luz" }).map((x) => x.id)).toEqual(["2"]);
+  });
+
+  it("acha pela CATEGORIA: é assim que a pessoa lembra", () => {
+    // "as de energia" — ninguém lembra o texto exato que digitou.
+    expect(filtrarMovimentos(lista, { termo: "energia" }).map((x) => x.id)).toEqual(["2"]);
+  });
+
+  it("acha pela forma de pagamento: 'aquela do pix'", () => {
+    expect(filtrarMovimentos(lista, { termo: "pix" }).map((x) => x.id)).toEqual(["4"]);
+  });
+
+  it("não diferencia maiúscula", () => {
+    expect(filtrarMovimentos(lista, { termo: "CONTA DE LUZ" })).toHaveLength(1);
+  });
+
+  it("filtra por tipo", () => {
+    expect(filtrarMovimentos(lista, { tipo: "sangria" }).map((x) => x.id)).toEqual(["3"]);
+    expect(filtrarMovimentos(lista, { tipo: "entrada" })).toHaveLength(2);
+  });
+
+  it("tipo e termo somam", () => {
+    expect(filtrarMovimentos(lista, { tipo: "entrada", termo: "venda" })).toHaveLength(2);
+    expect(filtrarMovimentos(lista, { tipo: "saida", termo: "venda" })).toHaveLength(0);
+  });
+
+  it("filtra por dia", () => {
+    expect(filtrarMovimentos(lista, { dia: "2026-07-31" }).map((x) => x.id)).toEqual(["3", "4"]);
+  });
+});
+
+describe("o caixa agrupado por dia", () => {
+  const m = (p: Partial<MovimentoCaixa>): MovimentoCaixa =>
+    ({
+      id: "m",
+      tipo: "entrada",
+      categoria: "Venda",
+      descricao: "",
+      valor: 10,
+      formaPagamento: "dinheiro",
+      data: "2026-08-01T10:00:00.000Z",
+      ...p,
+    }) as MovimentoCaixa;
+
+  it("junta por dia, do mais recente para o mais antigo", () => {
+    const dias = agruparPorDia([
+      m({ id: "1", data: "2026-07-30T10:00:00.000Z" }),
+      m({ id: "2", data: "2026-08-01T10:00:00.000Z" }),
+    ]);
+    expect(dias.map((d) => d.dia)).toEqual(["2026-08-01", "2026-07-30"]);
+  });
+
+  it("o subtotal do dia responde 'quanto entrou ontem' sem somar na cabeça", () => {
+    const dias = agruparPorDia([
+      m({ id: "1", valor: 100 }),
+      m({ id: "2", tipo: "saida", valor: 30, categoria: "Despesa" }),
+      m({ id: "3", tipo: "sangria", valor: 20 }),
+    ]);
+    expect(dias).toHaveLength(1);
+    expect(dias[0].entradas).toBe(100);
+    expect(dias[0].saidas).toBe(30);
+    expect(dias[0].resultado).toBe(50);
+  });
+
+  it("dentro do dia, o mais recente vem primeiro", () => {
+    const dias = agruparPorDia([
+      m({ id: "cedo", data: "2026-08-01T08:00:00.000Z" }),
+      m({ id: "tarde", data: "2026-08-01T19:00:00.000Z" }),
+    ]);
+    expect(dias[0].movimentos.map((x) => x.id)).toEqual(["tarde", "cedo"]);
+  });
+
+  it("movimento sem data não inventa um dia", () => {
+    // Agrupar num dia chutado colocaria dinheiro na conta do dia errado.
+    expect(agruparPorDia([m({ id: "1", data: "" })])).toEqual([]);
+  });
+
+  it("centavos não viram dízima no subtotal", () => {
+    const dias = agruparPorDia([m({ id: "1", valor: 0.1 }), m({ id: "2", valor: 0.2 })]);
+    expect(dias[0].resultado).toBe(0.3);
   });
 });
