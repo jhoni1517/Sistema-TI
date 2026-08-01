@@ -20,6 +20,35 @@ export const Config: React.FC = () => {
   const [salvo, setSalvo] = useState(false);
   const [importando, setImportando] = useState(false);
   const [sessao, setSessao] = useState<Sessao | null>(null);
+  /** A pessoa já mexeu em algum campo? Enquanto não, o formulário segue a nuvem. */
+  const [mexeu, setMexeu] = useState(false);
+
+  /*
+   * O formulário nasce com o que o APARELHO tinha e nunca era atualizado.
+   *
+   * `useState(config)` só vale na primeira renderização. A configuração da
+   * loja chega da nuvem um instante depois, e o formulário continuava
+   * mostrando o padrão — "Minha Assistência TI", telefone em branco, sem
+   * logo, sem chat do Telegram.
+   *
+   * Isso já seria ruim. O grave é o passo seguinte: clicar em Salvar subia
+   * esse formulário em branco por cima do que a loja tinha, apagando para
+   * TODOS os aparelhos. Foi exatamente o que aconteceu — o celular abriu
+   * vazio, o dono salvou, e o computador perdeu tudo junto.
+   *
+   * Enquanto ninguém mexeu num campo, o formulário acompanha a nuvem. Depois
+   * que mexeu, para de acompanhar: recarregar por cima de quem está digitando
+   * é o outro jeito de perder o que a pessoa acabou de escrever.
+   */
+  React.useEffect(() => {
+    if (!mexeu) setForm(config);
+  }, [config, mexeu]);
+
+  /** Toda alteração de campo passa por aqui, para o formulário parar de seguir a nuvem */
+  const mudar = (patch: Partial<ConfigType>) => {
+    setMexeu(true);
+    setForm((f) => ({ ...f, ...patch }));
+  };
 
   React.useEffect(() => {
     carregarSessao().then(setSessao);
@@ -31,6 +60,7 @@ export const Config: React.FC = () => {
     const erroChat = problemaNoChatId(form.telegramChatId || "");
     if (erroChat) return aviso.erro(erroChat);
     saveConfig(form);
+    setMexeu(false);
     setSalvo(true);
     setTimeout(() => setSalvo(false), 2500);
   };
@@ -133,16 +163,16 @@ export const Config: React.FC = () => {
         <h3 className="mb-4 flex items-center gap-2 font-bold text-slate-700"><Store size={18} /> Dados da loja</h3>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Nome da loja" className="sm:col-span-2">
-            <input className="input" value={form.nomeLoja} onChange={(e) => setForm({ ...form, nomeLoja: e.target.value })} />
+            <input className="input" value={form.nomeLoja} onChange={(e) => mudar({ nomeLoja: e.target.value })} />
           </Field>
           <Field label="Telefone">
-            <input className="input" value={form.telefoneLoja} onChange={(e) => setForm({ ...form, telefoneLoja: e.target.value })} />
+            <input className="input" value={form.telefoneLoja} onChange={(e) => mudar({ telefoneLoja: e.target.value })} />
           </Field>
           <Field label="CNPJ / CPF">
-            <input className="input" value={form.cnpj} onChange={(e) => setForm({ ...form, cnpj: e.target.value })} />
+            <input className="input" value={form.cnpj} onChange={(e) => mudar({ cnpj: e.target.value })} />
           </Field>
           <Field label="Endereço" className="sm:col-span-2">
-            <input className="input" value={form.enderecoLoja} onChange={(e) => setForm({ ...form, enderecoLoja: e.target.value })} />
+            <input className="input" value={form.enderecoLoja} onChange={(e) => mudar({ enderecoLoja: e.target.value })} />
           </Field>
 
           {/* A logo entra no recibo impresso e na página que o cliente abre.
@@ -151,7 +181,15 @@ export const Config: React.FC = () => {
             <ImagemUpload
               label="Logo da loja"
               url={form.logoUrl}
-              onChange={(logoUrl) => setForm({ ...form, logoUrl })}
+              /* Grava na hora, porque a dica logo abaixo promete isso. Só
+                 mexer no formulário deixava o endereço da imagem esperando
+                 um Salvar que ninguém dá — o arquivo subia para o depósito e
+                 o sistema esquecia onde ele estava. */
+              onChange={(logoUrl) => {
+                const novo = { ...config, ...form, logoUrl };
+                setForm(novo);
+                saveConfig(novo);
+              }}
               pasta="logo"
               lado={400}
               formato="faixa"
@@ -163,7 +201,7 @@ export const Config: React.FC = () => {
             <InputNumero
               className="input"
               value={form.limiteGaveta}
-              onChange={(limiteGaveta) => setForm({ ...form, limiteGaveta })}
+              onChange={(limiteGaveta) => mudar({ limiteGaveta })}
             />
             <p className="mt-1 text-xs text-slate-400">
               Passando disso, o Caixa sugere uma sangria. Vazio = sem aviso.
@@ -178,7 +216,7 @@ export const Config: React.FC = () => {
             <input
               className="input"
               value={form.telegramChatId || ""}
-              onChange={(e) => setForm({ ...form, telegramChatId: e.target.value.trim() })}
+              onChange={(e) => mudar({ telegramChatId: e.target.value.trim() })}
               placeholder="ex.: 123456789"
               inputMode="numeric"
             />
@@ -204,7 +242,7 @@ export const Config: React.FC = () => {
               className="input"
               value={form.papelImpressao || "a4"}
               onChange={(e) =>
-                setForm({ ...form, papelImpressao: e.target.value as "a4" | "58" | "80" })
+                mudar({ papelImpressao: e.target.value as "a4" | "58" | "80" })
               }
             >
               <option value="a4">Folha comum (A4)</option>
@@ -264,7 +302,7 @@ export const Config: React.FC = () => {
         <p className="mb-4 text-sm text-slate-500">Aparece no rodapé do recibo da OS. Após o prazo, o aparelho pode ser vendido para custear o serviço ou descartado, conforme a lei.</p>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Prazo para retirada (dias)">
-            <InputNumero value={form.diasAbandono ?? 90} onChange={(v) => setForm({ ...form, diasAbandono: v })} />
+            <InputNumero value={form.diasAbandono ?? 90} onChange={(v) => mudar({ diasAbandono: v })} />
           </Field>
           {temRecurso(ramoContratado, "peso") && (
             <Field label="A balança grava o quê na etiqueta?" className="sm:col-span-2">
@@ -276,7 +314,7 @@ export const Config: React.FC = () => {
                   <button
                     key={f.k}
                     type="button"
-                    onClick={() => setForm({ ...form, formatoBalanca: f.k })}
+                    onClick={() => mudar({ formatoBalanca: f.k })}
                     className={`rounded-lg border px-3 py-2 text-sm font-semibold transition ${
                       (form.formatoBalanca || "peso") === f.k
                         ? "border-brand-500 bg-brand-50 text-brand-700"
@@ -300,7 +338,7 @@ export const Config: React.FC = () => {
               className="input"
               placeholder="https://g.page/r/.../review"
               value={form.linkAvaliacao || ""}
-              onChange={(e) => setForm({ ...form, linkAvaliacao: e.target.value })}
+              onChange={(e) => mudar({ linkAvaliacao: e.target.value })}
             />
             <p className="mt-1 text-xs text-slate-400">
               Entra na mensagem de WhatsApp e no recibo, mas só quando a OS é
@@ -310,7 +348,7 @@ export const Config: React.FC = () => {
             </p>
           </Field>
           <Field label="Taxa de armazenamento por dia (R$)">
-            <InputNumero value={form.taxaArmazenamentoDia ?? 0} onChange={(v) => setForm({ ...form, taxaArmazenamentoDia: v })} />
+            <InputNumero value={form.taxaArmazenamentoDia ?? 0} onChange={(v) => mudar({ taxaArmazenamentoDia: v })} />
           </Field>
         </div>
       </div>
@@ -332,7 +370,7 @@ export const Config: React.FC = () => {
         <h3 className="mb-4 flex items-center gap-2 font-bold text-slate-700"><KeyRound size={18} /> Operação</h3>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Comissão padrão do técnico (%)">
-            <InputNumero value={form.comissaoPadrao ?? 0} onChange={(v) => setForm({ ...form, comissaoPadrao: v })} />
+            <InputNumero value={form.comissaoPadrao ?? 0} onChange={(v) => mudar({ comissaoPadrao: v })} />
           </Field>
         </div>
         <p className="mt-3 text-xs text-slate-500">
@@ -356,7 +394,7 @@ export const Config: React.FC = () => {
             type="checkbox"
             className="mt-0.5 h-4 w-4"
             checked={form.limparSenhaNaEntrega !== false}
-            onChange={(e) => setForm({ ...form, limparSenhaNaEntrega: e.target.checked })}
+            onChange={(e) => mudar({ limparSenhaNaEntrega: e.target.checked })}
           />
           <span className="text-sm">
             <b className="text-slate-700">Apagar a senha do aparelho na entrega</b>
@@ -431,10 +469,10 @@ export const Config: React.FC = () => {
         </p>
         <div className="grid gap-4">
           <Field label="Supabase URL">
-            <input className="input" placeholder="https://xxxx.supabase.co" value={form.supabaseUrl || ""} onChange={(e) => setForm({ ...form, supabaseUrl: e.target.value })} />
+            <input className="input" placeholder="https://xxxx.supabase.co" value={form.supabaseUrl || ""} onChange={(e) => mudar({ supabaseUrl: e.target.value })} />
           </Field>
           <Field label="Supabase anon key">
-            <input className="input" placeholder="eyJhbGciOi..." value={form.supabaseKey || ""} onChange={(e) => setForm({ ...form, supabaseKey: e.target.value })} />
+            <input className="input" placeholder="eyJhbGciOi..." value={form.supabaseKey || ""} onChange={(e) => mudar({ supabaseKey: e.target.value })} />
           </Field>
         </div>
         <p className="mt-2 text-xs text-amber-600">Após salvar, recarregue a página para ativar a nuvem.</p>

@@ -121,3 +121,52 @@ describe("o campo do chat id recusa o token do robô", () => {
     expect(problemaNoChatId("123")).toContain("só números");
   });
 });
+
+describe("o formulário em branco não pode apagar a loja", () => {
+  /**
+   * O bug mais caro desta sessão, e o único que apagou dado de verdade.
+   *
+   * O formulário de Configurações nascia com o que o APARELHO tinha e nunca
+   * era atualizado — `useState(config)` só vale na primeira renderização. A
+   * configuração da loja chega da nuvem um instante depois, e a tela
+   * continuava mostrando o padrão: "Minha Assistência TI", telefone em
+   * branco, sem logo, sem chat do Telegram.
+   *
+   * Isso já seria ruim. O grave é o passo seguinte: clicar em Salvar subia
+   * esse formulário em branco por cima do que estava gravado, apagando para
+   * TODOS os aparelhos de uma vez. Foi o que aconteceu — o celular abriu
+   * vazio, o dono salvou, e o computador perdeu tudo junto.
+   *
+   * Duas travas vieram daí, e este teste guarda a segunda: nada sobe antes
+   * da leitura da nuvem terminar.
+   */
+  const PADRAO: Config = { ...base, nomeLoja: "Minha Assistência TI" };
+  const REAL: Config = {
+    ...base,
+    nomeLoja: "Nova Geração Informática",
+    telefoneLoja: "4132830643",
+    cnpj: "52679376000178",
+    enderecoLoja: "Rua Castro, 855",
+    telegramChatId: "123456789",
+  };
+
+  it("o padrão e o que a loja tem são diferentes: gravar um por cima do outro apaga", () => {
+    expect(precisaGravarNaNuvem(REAL, PADRAO)).toBe(true);
+  });
+
+  it("o que sobe carrega TODOS os campos, então subir em branco apaga todos", () => {
+    // É por isso que a trava é obrigatória: não existe gravação parcial que
+    // salve a situação depois que o formulário está vazio.
+    const emBranco = paraNuvem(PADRAO);
+    expect(emBranco.telefoneLoja).toBe("");
+    expect(emBranco.cnpj).toBe("");
+    expect(emBranco.telegramChatId).toBeUndefined();
+  });
+
+  it("com a nuvem lida, os campos da loja continuam inteiros", () => {
+    const r = paraNuvem(REAL);
+    expect(r.nomeLoja).toBe("Nova Geração Informática");
+    expect(r.telefoneLoja).toBe("4132830643");
+    expect(r.telegramChatId).toBe("123456789");
+  });
+});
