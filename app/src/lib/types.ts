@@ -85,6 +85,13 @@ export interface Cliente {
   classificadoEm?: string;
   /** Aniversário (AAAA-MM-DD). O ano pode ser qualquer um: só o dia importa. */
   nascimento?: string;
+  /**
+   * Teto do fiado deste cliente. Vazio = sem teto.
+   *
+   * "Fio pra você" é decisão de dono, tomada uma vez. Sem o teto no sistema,
+   * ela virava decisão do atendente, no balcão, sob pressão da fila.
+   */
+  limiteFiado?: number;
   criadoEm: string;
 }
 
@@ -94,6 +101,11 @@ export interface PecaOS {
   quantidade: number;
   custoUnit: number; // custo para a loja
   precoUnit: number; // preço cobrado do cliente
+  /**
+   * A qual orçamento a peça pertence ("Opção 1", "Completo"). Vazio = entra
+   * em qualquer um. Ver lib/orcamento.ts.
+   */
+  opcao?: string;
 }
 
 export interface HistoricoOS {
@@ -123,6 +135,11 @@ export interface OrdemServico {
   checklist: Record<string, boolean>;
   // Financeiro
   pecas: PecaOS[];
+  /**
+   * Qual dos orçamentos o cliente escolheu. Vazio = ninguém decidiu ainda, e
+   * vale o primeiro, que é a sugestão da loja. Ver lib/orcamento.ts.
+   */
+  opcaoEscolhida?: string;
   maoDeObra: number;
   desconto: number;
   // Fluxo
@@ -139,6 +156,14 @@ export interface OrdemServico {
   recusadoEm?: string;
   // Assinatura do cliente (imagem em data URL)
   assinaturaCliente?: string;
+  /**
+   * Fotos do aparelho na ENTRADA, com o endereço no depósito de imagens.
+   *
+   * O checklist diz "tela sem trincos"; a foto mostra o trinco que já estava
+   * lá. Sem ela, a discussão na retirada é a palavra do cliente contra a do
+   * técnico, e quem perde é sempre a loja.
+   */
+  fotos?: string[];
   // Quando ficou pronta (base para taxa de armazenamento)
   prontaEm?: string;
 }
@@ -184,12 +209,27 @@ export interface Produto {
   /** Código de barras — é por ele que o leitor do balcão acha o produto */
   codigoBarras?: string;
   /**
+   * Endereço da foto do produto no depósito de imagens.
+   *
+   * Só o endereço: o arquivo em si engordaria a linha, e "produtos" é lido
+   * inteiro em toda carga. Ver lib/imagens.ts.
+   */
+  imagemUrl?: string;
+  /**
    * Vendido por quilo. O campo "preco" passa a ser o preço do QUILO, e a
    * quantidade vendida é fracionária (0,315 kg). Mercearia e açougue.
    */
   porPeso?: boolean;
   /** Vencimento do lote (AAAA-MM-DD). Vira alerta no estoque. */
   validade?: string;
+  /**
+   * Promoção com prazo. O preço cheio continua em `preco` e volta sozinho
+   * quando o prazo acaba — promover editando o preço na mão dava certo até
+   * a hora de destrocar, que ninguém lembrava. Ver lib/promocao.ts.
+   */
+  precoPromocional?: number;
+  promocaoInicio?: string;
+  promocaoFim?: string;
   /**
    * Código curto que este produto tem na balança do balcão.
    *
@@ -419,11 +459,35 @@ export interface Venda {
   formaPagamento: FormaPagamento;
   /** Dinheiro entregue pelo cliente, para calcular o troco */
   valorRecebido?: number;
+  /**
+   * Venda dividida em mais de uma forma ("50 no cartão e o resto em
+   * dinheiro"). Quando existe, `formaPagamento` guarda a de MAIOR valor, só
+   * para as telas de uma linha só. Ver lib/pagamento.ts.
+   */
+  pagamentos?: { forma: FormaPagamento; valor: number; recebido?: number }[];
   clienteId?: ID;
   /** Lançamento correspondente no caixa */
   movimentoId?: ID;
   sessaoId?: ID;
+  /**
+   * Devoluções já feitas desta venda. Ficam na própria venda para que
+   * "quanto ainda pode voltar" seja uma conta e não um palpite.
+   * Ver lib/devolucao.ts.
+   */
+  devolucoes?: DevolucaoVenda[];
   criadoEm: string;
+}
+
+/** Uma devolução: o que voltou, quanto saiu do caixa e por quê */
+export interface DevolucaoVenda {
+  id: ID;
+  data: string;
+  /** Quantidade devolvida por índice do item na venda */
+  itens: Record<number, number>;
+  valor: number;
+  motivo?: string;
+  /** Lançamento de saída no caixa */
+  movimentoId?: ID;
 }
 
 export interface SessaoCaixa {
@@ -544,6 +608,33 @@ export interface Evento {
 
 export interface Config {
   nomeLoja: string;
+  /**
+   * Logo da loja, no cabeçalho do recibo impresso e da página do cliente.
+   * Só o endereço da imagem. Ver lib/imagens.ts.
+   */
+  logoUrl?: string;
+  /**
+   * Largura do papel da impressora: "a4", "58" ou "80" (bobina térmica).
+   * O recibo saía sempre em A4 e a bobina cortava a metade direita de tudo,
+   * inclusive do total.
+   */
+  papelImpressao?: "a4" | "58" | "80";
+  /**
+   * Quanto pode ficar em espécie na gaveta antes do sistema sugerir sangria.
+   * Vazio = sem aviso. Não é sobre desconfiar de ninguém: é sobre quanto se
+   * perde num assalto, e sobre a gaveta não virar o cofre da loja.
+   */
+  limiteGaveta?: number;
+  /**
+   * Chat do Telegram DESTA loja, para onde vão os avisos diários de contas
+   * a pagar, agenda, aniversário e fiado vencido.
+   *
+   * Existe porque a rotina diária mandava tudo para um chat só, o do
+   * operador do sistema: nome e dívida de cliente de uma loja iam parar no
+   * celular de outra pessoa, e o dono que precisava do lembrete não recebia
+   * nada. Vazio = esta loja não recebe aviso nenhum, e nada dela sai.
+   */
+  telegramChatId?: string;
   /**
    * Ramo de atividade da loja. Decide o vocabulário das telas e quais
    * módulos aparecem. Ausente = assistência técnica, que é como o sistema

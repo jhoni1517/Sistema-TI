@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { avaliarCliente, travaAtendimento, classificacaoDe } from "./clientes";
+import {
+  avaliarCliente,
+  travaAtendimento,
+  classificacaoDe,
+  devendo,
+  travaFiado,
+} from "./clientes";
 import type { Cliente, Fiado, OrdemServico } from "./types";
 
 /**
@@ -138,5 +144,88 @@ describe("trava no atendimento", () => {
   it("cadastro antigo, sem o campo, é tratado como normal", () => {
     expect(classificacaoDe(cli())).toBe("normal");
     expect(classificacaoDe(null)).toBe("normal");
+  });
+});
+
+/**
+ * Limite de fiado.
+ *
+ * "Fio pra você" é decisão de dono, tomada uma vez com a cabeça fria. Sem o
+ * teto no sistema ela virava decisão do atendente, no balcão, com fila
+ * esperando — e o dono só descobria no fim do mês.
+ */
+describe("limite de fiado", () => {
+  const cli = (p: Partial<Cliente>): Cliente =>
+    ({ id: "c1", nome: "João", telefone: "", criadoEm: "2026-01-01", ...p }) as Cliente;
+
+  const fiado = (f: Partial<Fiado>): Fiado =>
+    ({
+      id: "f1",
+      clienteId: "c1",
+      descricao: "",
+      valor: 100,
+      pagamentos: [],
+      quitado: false,
+      criadoEm: "2026-01-01",
+      ...f,
+    }) as Fiado;
+
+  it("soma tudo que o cliente deve, não só o último lançamento", () => {
+    // Quem atende olhava o último fiado e achava "ele deve pouco".
+    const fiados = [
+      fiado({ id: "a", valor: 100 }),
+      fiado({ id: "b", valor: 80 }),
+      fiado({ id: "c", valor: 500, quitado: true }),
+    ];
+    expect(devendo("c1", fiados)).toBe(180);
+  });
+
+  it("pagamento parcial abate do que ele deve", () => {
+    const fiados = [
+      fiado({ valor: 100, pagamentos: [{ data: "2026-02-01", valor: 40, formaPagamento: "dinheiro" }] }),
+    ];
+    expect(devendo("c1", fiados)).toBe(60);
+  });
+
+  it("dívida de outro cliente não entra na conta", () => {
+    expect(devendo("c1", [fiado({ clienteId: "c2", valor: 900 })])).toBe(0);
+  });
+
+  it("cliente sem teto nunca é barrado", () => {
+    const t = travaFiado(cli({}), [fiado({ valor: 5000 })], 1000);
+    expect(t.estoura).toBe(false);
+    expect(t.temLimite).toBe(false);
+    expect(t.disponivel).toBe(Infinity);
+  });
+
+  it("dentro do teto passa e mostra quanto ainda cabe", () => {
+    const t = travaFiado(cli({ limiteFiado: 300 }), [fiado({ valor: 100 })], 50);
+    expect(t.estoura).toBe(false);
+    expect(t.devendo).toBe(100);
+    expect(t.disponivel).toBe(200);
+  });
+
+  it("estourar o teto explica a conta inteira", () => {
+    const t = travaFiado(cli({ limiteFiado: 200 }), [fiado({ valor: 180 })], 50);
+    expect(t.estoura).toBe(true);
+    expect(t.motivo).toContain("180.00");
+    expect(t.motivo).toContain("200.00");
+    expect(t.motivo).toContain("230.00");
+  });
+
+  it("bater exatamente no teto ainda passa", () => {
+    expect(travaFiado(cli({ limiteFiado: 200 }), [fiado({ valor: 150 })], 50).estoura).toBe(
+      false
+    );
+  });
+
+  it("quem já estourou não fia nem mais um real", () => {
+    const t = travaFiado(cli({ limiteFiado: 100 }), [fiado({ valor: 150 })], 1);
+    expect(t.estoura).toBe(true);
+    expect(t.disponivel).toBe(0);
+  });
+
+  it("sem cliente escolhido não trava nada", () => {
+    expect(travaFiado(undefined, [], 100).estoura).toBe(false);
   });
 });

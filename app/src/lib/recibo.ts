@@ -2,8 +2,11 @@ import type { OrdemServico, Config, MovimentoCaixa, SessaoCaixa, Venda } from ".
 import { OS_STATUS_META } from "./types";
 import { brl, formatDate, formatDateTime, codigoOS, txt } from "./format";
 import { totalPecas, totalOS } from "./calc";
+import { opcaoDaPeca, opcaoAtual, subtotalPeca } from "./orcamento";
 import { resumoCaixa, conferencia, CONFERENCIA_META } from "./caixa";
 import { subtotalItem, subtotalVenda, totalVenda, trocoDe } from "./pdv";
+import { barrasEAN13, precoDaEtiqueta, type Etiqueta } from "./etiqueta";
+import { trocoDoPagamento } from "./pagamento";
 
 /**
  * Escapa texto antes de entrar no HTML do recibo.
@@ -20,8 +23,21 @@ const esc = (v?: string | number | null): string =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
+/**
+ * Cabeçalho do documento impresso.
+ *
+ * A logo tem altura fixa em milímetros: definir em pixel dá tamanhos
+ * diferentes em cada impressora, e uma logo ocupando meia folha no papel
+ * térmico da bobina estraga o recibo inteiro.
+ */
 const cab = (config: Config) => `
   <div class="head">
+    ${
+      config.logoUrl
+        ? `<img src="${esc(config.logoUrl)}" alt=""
+             style="max-height:18mm;max-width:60mm;object-fit:contain;margin-bottom:4px" />`
+        : ""
+    }
     <h1>${esc(config.nomeLoja) || "Assistência Técnica"}</h1>
     ${config.enderecoLoja ? `<p>${esc(config.enderecoLoja)}</p>` : ""}
     <p>${[config.telefoneLoja, config.cnpj].filter(Boolean).map(esc).join(" · ")}</p>
@@ -42,16 +58,22 @@ export function reciboOS(
       ? ` Após esse prazo, será cobrada taxa de armazenamento/guarda de ${brl(taxa)} por dia.`
       : "") +
     ` Decorrido o prazo legal sem retirada, o aparelho poderá ser vendido para custear o serviço/armazenamento ou descartado, nos termos da legislação vigente. O cliente declara ciência destas condições.`;
+  // Opção recusada sai riscada em vez de sumir: o cliente assina um
+  // documento que mostra as opções que teve e a que ele escolheu.
+  const escolhida = opcaoAtual(os);
   const pecas = os.pecas || [];
   const itens = pecas
-    .map(
-      (p) => `<tr>
-        <td>${esc(p.descricao) || "-"}</td>
+    .map((p) => {
+      const nome = opcaoDaPeca(p);
+      const recusada = !!nome && nome !== escolhida;
+      const marca = nome ? ` <span class="muted">(${esc(nome)})</span>` : "";
+      return `<tr${recusada ? ' style="color:#999;text-decoration:line-through"' : ""}>
+        <td>${esc(p.descricao) || "-"}${marca}</td>
         <td class="center">${esc(p.quantidade)}</td>
         <td class="right">${brl(Number(p.precoUnit) || 0)}</td>
-        <td class="right">${brl((Number(p.precoUnit) || 0) * (Number(p.quantidade) || 0))}</td>
-      </tr>`
-    )
+        <td class="right">${brl(subtotalPeca(p))}</td>
+      </tr>`;
+    })
     .join("");
 
   return `
@@ -104,6 +126,25 @@ export function reciboOS(
   </div>
 
   ${os.tecnico ? `<div class="muted" style="margin-top:10px">Técnico responsável: ${esc(os.tecnico)}</div>` : ""}
+
+  ${
+    // As fotos da entrada saem no papel que o cliente assina: é ali que elas
+    // deixam de ser registro interno e passam a valer como prova do estado.
+    (os.fotos || []).length > 0
+      ? `<div class="box" style="margin-top:14px">
+          <div class="label">Estado do aparelho na entrada</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px">
+            ${(os.fotos || [])
+              .slice(0, 6)
+              .map(
+                (u) =>
+                  `<img src="${esc(u)}" style="width:28mm;height:28mm;object-fit:cover;border:1px solid #ddd" />`
+              )
+              .join("")}
+          </div>
+        </div>`
+      : ""
+  }
 
   <div class="box" style="margin-top:14px">
     <div class="label">Termo de guarda e retirada</div>
@@ -246,14 +287,35 @@ export function reciboPDV(
     ${desconto > 0 ? `<div class="line"><span>Subtotal</span><span>${brl(bruto)}</span></div>` : ""}
     ${desconto > 0 ? `<div class="line"><span>Desconto</span><span>- ${brl(desconto)}</span></div>` : ""}
     <div class="line grand"><span>Total</span><span>${brl(total)}</span></div>
-    <div class="line"><span>Pagamento</span><span style="text-transform:capitalize">${esc(
-      v.formaPagamento
-    )}</span></div>
     ${
-      v.formaPagamento === "dinheiro" && recebido > 0
-        ? `<div class="line"><span>Recebido</span><span>${brl(recebido)}</span></div>
-           <div class="line"><span>Troco</span><span>${brl(trocoDe(total, recebido))}</span></div>`
-        : ""
+      // Venda dividida mostra CADA forma. Um cupom dizendo só "crédito" numa
+      // venda de 200 com 10 em espécie não bate com o que o cliente pagou —
+      // e é o cupom que ele leva para conferir.
+      (v.pagamentos || []).length > 1
+        ? (v.pagamentos || [])
+            .map(
+              (pg) =>
+                `<div class="line"><span style="text-transform:capitalize">${esc(
+                  pg.forma
+                )}</span><span>${brl(Number(pg.valor) || 0)}</span></div>`
+            )
+            .join("")
+        : `<div class="line"><span>Pagamento</span><span style="text-transform:capitalize">${esc(
+            v.formaPagamento
+          )}</span></div>`
+    }
+    ${
+      (v.pagamentos || []).length > 1
+        ? (() => {
+            const t = trocoDoPagamento(total, v.pagamentos || []);
+            return t > 0
+              ? `<div class="line"><span>Troco</span><span>${brl(t)}</span></div>`
+              : "";
+          })()
+        : v.formaPagamento === "dinheiro" && recebido > 0
+          ? `<div class="line"><span>Recebido</span><span>${brl(recebido)}</span></div>
+             <div class="line"><span>Troco</span><span>${brl(trocoDe(total, recebido))}</span></div>`
+          : ""
     }
   </div>
 
@@ -329,5 +391,108 @@ export function reciboFechamento(
   <div class="sign">
     <div>Conferido por</div>
     <div>${esc(config.nomeLoja) || "Responsável"}</div>
+  </div>`;
+}
+
+/**
+ * Folha de etiquetas de gôndola.
+ *
+ * Três por linha em papel A4, que é o que cabe legível sem lupa e sem
+ * desperdiçar papel. O código de barras vai em SVG: etiqueta impressa em
+ * baixa resolução não é lida pelo leitor, e o vetor sai nítido até na jato
+ * de tinta velha do balcão.
+ *
+ * `page-break-inside: avoid` em cada etiqueta impede o pior resultado
+ * possível — a etiqueta cortada ao meio pela quebra de página, que só
+ * aparece depois de imprimir cem delas.
+ */
+export function folhaDeEtiquetas(etiquetas: Etiqueta[], config: Config): string {
+  const celulas = etiquetas
+    .map((e) => {
+      const barras = barrasEAN13(e.codigo, 30);
+      return `<div class="etq">
+        <div class="etq-loja">${esc(config.nomeLoja) || ""}</div>
+        <div class="etq-nome">${esc(e.nome)}</div>
+        ${
+          e.precoDe > 0
+            ? `<div class="etq-de">de ${brl(e.precoDe)}</div>`
+            : ""
+        }
+        <div class="etq-preco">${esc(precoDaEtiqueta(e))}</div>
+        ${
+          barras
+            ? `<div class="etq-barras">${barras}</div>
+               <div class="etq-cod">${esc(e.codigo)}</div>`
+            : `<div class="etq-cod">${esc(e.codigo) || "sem código"}</div>`
+        }
+      </div>`;
+    })
+    .join("");
+
+  return `
+  <style>
+    .etqs { display: flex; flex-wrap: wrap; gap: 4mm; }
+    .etq {
+      width: 60mm; padding: 3mm; border: 1px dashed #999; border-radius: 2mm;
+      text-align: center; page-break-inside: avoid;
+    }
+    .etq-loja { font-size: 8px; text-transform: uppercase; color: #777; letter-spacing: .05em; }
+    .etq-nome { font-size: 12px; font-weight: bold; margin: 1mm 0; min-height: 9mm; }
+    .etq-de { font-size: 10px; color: #777; text-decoration: line-through; }
+    .etq-preco { font-size: 22px; font-weight: bold; line-height: 1.1; }
+    .etq-barras { margin-top: 1.5mm; }
+    .etq-cod { font-size: 9px; letter-spacing: .12em; color: #333; }
+  </style>
+  <div class="etqs">${celulas}</div>`;
+}
+
+/**
+ * Comprovante de sangria ou suprimento.
+ *
+ * Dinheiro que sai da gaveta para o cofre, ou que entra como troco, andava
+ * sem papel nenhum — e o único registro era a linha no sistema. Numa loja
+ * com mais de uma pessoa no balcão, isso é o suficiente para a conversa
+ * virar "eu não tirei nada".
+ *
+ * Duas assinaturas de propósito: quem entregou e quem recebeu.
+ */
+export function reciboMovimento(mov: MovimentoCaixa, config: Config): string {
+  const saida = mov.tipo === "sangria" || mov.tipo === "saida";
+  const titulo =
+    mov.tipo === "sangria"
+      ? "Comprovante de Sangria"
+      : saida
+        ? "Comprovante de Saída"
+        : "Comprovante de Suprimento";
+
+  return `
+  ${cab(config)}
+  <h2 class="center" style="margin-bottom:6px">${titulo}</h2>
+  <p class="center muted" style="margin-bottom:14px">${formatDateTime(mov.data)}</p>
+
+  <div class="box">
+    <div class="label">Descrição</div>
+    <div class="val"><b>${esc(mov.descricao) || "-"}</b></div>
+    ${mov.categoria ? `<div class="label">Categoria</div><div class="val">${esc(mov.categoria)}</div>` : ""}
+  </div>
+
+  <div class="tot">
+    <div class="line"><span>Forma</span><span style="text-transform:capitalize">${esc(
+      mov.formaPagamento
+    )}</span></div>
+    <div class="line grand"><span>Valor</span><span>${brl(Number(mov.valor) || 0)}</span></div>
+  </div>
+
+  <p style="margin-top:14px;font-size:12px">
+    ${
+      saida
+        ? `Retirado do caixa a importância de <b>${brl(Number(mov.valor) || 0)}</b> referente ao descrito acima.`
+        : `Acrescentado ao caixa a importância de <b>${brl(Number(mov.valor) || 0)}</b> referente ao descrito acima.`
+    }
+  </p>
+
+  <div class="sign">
+    <div>${saida ? "Quem retirou" : "Quem entregou"}</div>
+    <div>${saida ? "Quem recebeu" : "Quem guardou"}</div>
   </div>`;
 }

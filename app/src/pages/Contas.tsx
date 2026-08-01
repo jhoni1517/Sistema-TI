@@ -242,8 +242,14 @@ export const Contas: React.FC = () => {
     if (!(valorPg > 0)) return aviso.alerta("Informe o valor pago.");
     try {
       const atualizada = pagarConta(pagando, { valor: valorPg, formaPagamento: formaPg });
-      await saveConta(atualizada);
 
+      /*
+       * Dinheiro primeiro, sempre. Estava ao contrário: dava a conta como
+       * paga e só então lançava a saída. Falhando no meio, a conta some da
+       * lista — recorrente ainda pula para o mês seguinte — e a despesa
+       * nunca entra. O mês fecha com lucro maior do que foi, e ninguém
+       * procura por lucro inflado.
+       */
       const sessaoAberta = sessoes.find((s) => !s.fechadoEm);
       await saveMovimento({
         id: uid(),
@@ -257,6 +263,8 @@ export const Contas: React.FC = () => {
         data: nowISO(),
       });
 
+      await saveConta(atualizada);
+
       setPagando(null);
       aviso.sucesso(
         pagando.recorrencia === "unica"
@@ -269,12 +277,25 @@ export const Contas: React.FC = () => {
   };
 
   const alternarAtivo = async (c: ContaPagar) => {
-    await saveConta({ ...c, ativo: !c.ativo });
+    try {
+      await saveConta({ ...c, ativo: !c.ativo });
+    } catch (e) {
+      // Conta que continua ativa na calada segue cobrando alerta todo dia.
+      aviso.erro(
+        "Não foi possível mudar a conta:\n\n" + (e instanceof Error ? e.message : String(e))
+      );
+    }
   };
 
   const apagar = async (c: ContaPagar) => {
     if (!confirm(`Excluir a conta "${c.descricao}"? O histórico de pagamentos vai junto.`)) return;
-    await removeConta(c.id);
+    try {
+      await removeConta(c.id);
+    } catch (e) {
+      aviso.erro(
+        "Não foi possível excluir a conta:\n\n" + (e instanceof Error ? e.message : String(e))
+      );
+    }
   };
 
   const salvarMeta = async () => {

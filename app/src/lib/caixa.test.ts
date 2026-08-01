@@ -137,3 +137,40 @@ describe("listas de sessões", () => {
     expect(sessaoAberta([a, b])).toBeNull();
   });
 });
+
+/**
+ * O limite da gaveta é sobre PAPEL.
+ *
+ * O aviso de sangria olhava o saldo, que soma cartão e Pix. Um dia com
+ * R$ 3.000 na maquininha disparava o aviso sem ter um centavo a mais na
+ * gaveta — e aviso que dispara sem motivo é aviso que a pessoa ignora.
+ */
+describe("dinheiro em espécie na gaveta", () => {
+  it("cartão e Pix não entram", () => {
+    const movs = [
+      mov({ id: "a", tipo: "entrada", valor: 3000, formaPagamento: "credito" }),
+      mov({ id: "b", tipo: "entrada", valor: 100, formaPagamento: "dinheiro" }),
+    ];
+    const r = resumoCaixa(sessao({ valorAbertura: 50 }), movs);
+    expect(r.saldo).toBe(3150);
+    expect(r.emEspecie).toBe(150);
+  });
+
+  it("a abertura conta: o troco começa o dia na gaveta", () => {
+    expect(resumoCaixa(sessao({ valorAbertura: 200 }), []).emEspecie).toBe(200);
+  });
+
+  it("saída e sangria saem da gaveta", () => {
+    const movs = [
+      mov({ id: "a", tipo: "entrada", valor: 500, formaPagamento: "dinheiro" }),
+      mov({ id: "b", tipo: "saida", valor: 80 }),
+      mov({ id: "c", tipo: "sangria", valor: 300 }),
+    ];
+    expect(resumoCaixa(sessao({ valorAbertura: 100 }), movs).emEspecie).toBe(220);
+  });
+
+  it("dia só de cartão deixa na gaveta apenas o troco de abertura", () => {
+    const movs = [mov({ tipo: "entrada", valor: 900, formaPagamento: "pix" })];
+    expect(resumoCaixa(sessao({ valorAbertura: 100 }), movs).emEspecie).toBe(100);
+  });
+});

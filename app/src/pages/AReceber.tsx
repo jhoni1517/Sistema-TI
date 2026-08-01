@@ -13,6 +13,7 @@ import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { uid, nowISO, brl, formatDate, abrirWhatsapp, txt } from "../lib/format";
 import { saldoFiado, pagoFiado } from "../lib/calc";
+import { sessaoAberta as achaSessaoAberta } from "../lib/caixa";
 import type { Fiado, FormaPagamento } from "../lib/types";
 
 export const AReceber: React.FC = () => {
@@ -20,6 +21,7 @@ export const AReceber: React.FC = () => {
     fiados,
     clientes,
     config,
+    sessoes,
     saveFiado,
     removeFiado,
     saveMovimento,
@@ -66,30 +68,70 @@ export const AReceber: React.FC = () => {
     if (!novo) return;
     if (!novo.clienteId) return aviso.alerta("Selecione o cliente.");
     if (novo.valor <= 0) return aviso.alerta("Informe o valor.");
-    await saveFiado(novo);
+    try {
+      await saveFiado(novo);
+    } catch (e) {
+      return aviso.erro(
+        "Não foi possível lançar a dívida:\n\n" + (e instanceof Error ? e.message : String(e))
+      );
+    }
     setNovo(null);
   };
+
+  const [recebendo, setRecebendo] = useState(false);
 
   const registrarPagamento = async (f: Fiado, valor: number, forma: FormaPagamento) => {
     const saldo = saldoFiado(f);
     const valorReal = Math.min(valor, saldo);
-    const atualizado: Fiado = {
-      ...f,
-      pagamentos: [...f.pagamentos, { data: nowISO(), valor: valorReal, formaPagamento: forma }],
-    };
-    atualizado.quitado = saldoFiado(atualizado) <= 0;
-    await saveFiado(atualizado);
-    // entrada no caixa
-    await saveMovimento({
-      id: uid(),
-      tipo: "entrada",
-      categoria: "Fiado",
-      descricao: `Recebimento fiado - ${nomeCliente(f.clienteId)}`,
-      valor: valorReal,
-      formaPagamento: forma,
-      data: nowISO(),
-    });
-    setReceber(null);
+    if (valorReal <= 0) return aviso.alerta("Informe o valor recebido.");
+    if (recebendo) return; // clique duplo no balcão acontece o tempo todo
+    setRecebendo(true);
+
+    try {
+      /*
+       * Dinheiro primeiro, sempre.
+       *
+       * Estava ao contrário: dava baixa na dívida e SÓ ENTÃO lançava o
+       * caixa. Falhando no meio, a dívida sumia e o dinheiro nunca entrava
+       * — a loja perdia o registro do valor e o direito de cobrar de uma
+       * vez. Na ordem certa sobra uma entrada sem baixa, que aparece na
+       * conferência e se conserta olhando o A Receber.
+       */
+      await saveMovimento({
+        id: uid(),
+        tipo: "entrada",
+        categoria: "Fiado",
+        descricao: `Recebimento fiado - ${nomeCliente(f.clienteId)}`,
+        valor: valorReal,
+        formaPagamento: forma,
+        data: nowISO(),
+        // Sem a sessão, dinheiro de fiado recebido no balcão não entrava no
+        // fechamento: a gaveta acusava sobra todo dia, sem origem.
+        sessaoId: achaSessaoAberta(sessoes)?.id,
+      });
+
+      const atualizado: Fiado = {
+        ...f,
+        pagamentos: [...f.pagamentos, { data: nowISO(), valor: valorReal, formaPagamento: forma }],
+      };
+      atualizado.quitado = saldoFiado(atualizado) <= 0;
+      await saveFiado(atualizado);
+
+      setReceber(null);
+      aviso.sucesso(
+        atualizado.quitado
+          ? `${brl(valorReal)} recebidos. Dívida quitada.`
+          : `${brl(valorReal)} recebidos. Restam ${brl(saldoFiado(atualizado))}.`
+      );
+    } catch (e) {
+      // Erro engolido aqui é dívida que some sem dinheiro entrar.
+      aviso.erro(
+        "Não foi possível registrar o recebimento:\n\n" +
+          (e instanceof Error ? e.message : String(e))
+      );
+    } finally {
+      setRecebendo(false);
+    }
   };
 
   const cobrar = (f: Fiado) => {
@@ -98,9 +140,10 @@ export const AReceber: React.FC = () => {
     const msg =
       `*${config.nomeLoja}*\n\n` +
       `Olá ${nomeCliente(f.clienteId)}! Passando para lembrar do seu débito:\n\n` +
-      `📋 ${f.descricao}\n` +
-      `💰 Saldo devedor: *${brl(saldoFiado(f))}*\n` +
-      (f.vencimento ? `📅 Vencimento: ${formatDate(f.vencimento)}\n` : "") +
+      // Sem emoji: em alguns aparelhos chega como "?" e suja o recado.
+      `${f.descricao}\n` +
+      `Saldo devedor: *${brl(saldoFiado(f))}*\n` +
+      (f.vencimento ? `Vencimento: ${formatDate(f.vencimento)}\n` : "") +
       `\nQualquer coisa é só chamar. Obrigado!`;
     abrirWhatsapp(tel, msg);
   };

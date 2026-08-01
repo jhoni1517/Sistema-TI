@@ -1,16 +1,59 @@
 import type { OrdemServico, MovimentoCaixa, Fiado } from "./types";
+import {
+  pecasEfetivas,
+  subtotalPeca,
+  custoDaPeca,
+  nomesDasOpcoes,
+  escolhaConfirmada,
+  comOpcao,
+} from "./orcamento";
 
 /** Número seguro: a nuvem devolve nulo em coluna vazia */
 const n = (v?: number | null): number => (Number(v) || 0);
 
+/**
+ * Só as peças do orçamento escolhido contam.
+ *
+ * Quando a OS oferece caminhos diferentes — fonte de 500W mais SSD, ou só a
+ * fonte de 200W — somar todos cobrava do cliente um conserto que ele não vai
+ * levar. Ver lib/orcamento.ts.
+ */
 export const totalPecas = (o: OrdemServico): number =>
-  (o.pecas || []).reduce((s, p) => s + n(p.precoUnit) * n(p.quantidade), 0);
+  pecasEfetivas(o).reduce((s, p) => s + subtotalPeca(p), 0);
 
 export const custoPecas = (o: OrdemServico): number =>
-  (o.pecas || []).reduce((s, p) => s + n(p.custoUnit) * n(p.quantidade), 0);
+  pecasEfetivas(o).reduce((s, p) => s + custoDaPeca(p), 0);
 
 export const totalOS = (o: OrdemServico): number =>
   totalPecas(o) + n(o.maoDeObra) - n(o.desconto);
+
+/** Quanto sai o serviço inteiro com este orçamento */
+export const totalComOpcao = (o: OrdemServico, nome: string): number =>
+  totalOS(comOpcao(o, nome));
+
+/** Custo da loja com este orçamento — é o que decide se a opção dá lucro */
+export const custoComOpcao = (o: OrdemServico, nome: string): number =>
+  custoPecas(comOpcao(o, nome));
+
+/**
+ * Do mais barato ao mais caro entre os orçamentos oferecidos.
+ *
+ * Serve para dizer "o serviço sai de X a Y" enquanto o cliente não responde.
+ * `definido` conta se a escolha já foi confirmada — sem isso a loja cobrava
+ * pela sugestão achando que era decisão do cliente.
+ */
+export const faixaOS = (
+  o: OrdemServico
+): { minimo: number; maximo: number; definido: boolean } => {
+  const nomes = nomesDasOpcoes(o);
+  const definido = escolhaConfirmada(o);
+  if (nomes.length < 2) {
+    const t = totalOS(o);
+    return { minimo: t, maximo: t, definido };
+  }
+  const totais = nomes.map((nome) => totalComOpcao(o, nome));
+  return { minimo: Math.min(...totais), maximo: Math.max(...totais), definido };
+};
 
 export const lucroOS = (o: OrdemServico): number =>
   totalOS(o) - custoPecas(o);

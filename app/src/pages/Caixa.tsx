@@ -17,9 +17,11 @@ import {
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, SectionTitle, EmptyState, InputNumero } from "../components/ui";
+import { sangriaSugerida } from "../lib/desempenho";
 import { uid, nowISO, brl, formatDate, formatDateTime, txt } from "../lib/format";
+import { aposBaixa } from "../lib/estoque";
 import { printHTML } from "../lib/print";
-import { reciboFechamento, reciboVenda } from "../lib/recibo";
+import { reciboFechamento, reciboVenda, reciboMovimento } from "../lib/recibo";
 import {
   resumoCaixa,
   movimentosDaSessao,
@@ -70,7 +72,15 @@ export const Caixa: React.FC = () => {
 
   const abrirCaixa = async (valor: number) => {
     const s: SessaoCaixa = { id: uid(), abertoEm: nowISO(), valorAbertura: valor };
-    await saveSessao(s);
+    try {
+      await saveSessao(s);
+    } catch (e) {
+      // Caixa que não abriu de verdade faz todo lançamento do dia ficar sem
+      // sessão, e o fechamento não bate com nada.
+      return aviso.erro(
+        "Não foi possível abrir o caixa:\n\n" + (e instanceof Error ? e.message : String(e))
+      );
+    }
     setAbrindo(false);
   };
 
@@ -96,19 +106,24 @@ export const Caixa: React.FC = () => {
   };
 
   const imprimirResumo = () => {
-    printHTML(reciboFechamento(sessaoAberta, movsSessao, config), "Fechamento de caixa");
+    printHTML(
+      reciboFechamento(sessaoAberta, movsSessao, config),
+      "Fechamento de caixa",
+      config.papelImpressao || "a4"
+    );
   };
 
   /** Recibo da compra, para o cliente levar. Nada de despesa nem sangria. */
   const imprimirVenda = (m: MovimentoCaixa) => {
     const cli = clientes.find((c) => c.id === m.clienteId);
-    printHTML(reciboVenda(m, config, cli), "Recibo de venda");
+    printHTML(reciboVenda(m, config, cli), "Recibo de venda", config.papelImpressao || "a4");
   };
 
   const imprimirFechamentoAntigo = (s: SessaoCaixa) => {
     printHTML(
       reciboFechamento(s, movimentosDaSessao(s, movimentos), config),
-      "Fechamento de caixa"
+      "Fechamento de caixa",
+      config.papelImpressao || "a4"
     );
   };
 
@@ -134,6 +149,21 @@ export const Caixa: React.FC = () => {
         <div className="card bg-gradient-to-br from-brand-600 to-brand-800 text-white ring-brand-700">
           <p className="flex items-center gap-2 text-sm text-brand-100"><Wallet size={16} /> Saldo em caixa</p>
           <p className="mt-1 text-3xl font-bold">{brl(saldo)}</p>
+          {(() => {
+            // Loja de bairro guarda o dia inteiro em espécie sem pensar. O
+            // limite não é sobre desconfiar de ninguém: é sobre quanto se
+            // perde num assalto.
+            // Espécie, não saldo: o saldo soma cartão e Pix, que nunca passam
+            // pela gaveta.
+            const s = sangriaSugerida(resumo.emEspecie, config.limiteGaveta || 0);
+            if (!s.passou) return null;
+            return (
+              <p className="mt-2 rounded-lg bg-amber-400/20 p-2 text-xs">
+                Passou {brl(s.excedente)} do limite da gaveta.
+                {s.sugestao > 0 && <> Sugestão: sangrar <b>{brl(s.sugestao)}</b>.</>}
+              </p>
+            );
+          })()}
           <p className="mt-1 text-xs text-brand-200">Abertura: {brl(abertura)}</p>
         </div>
         <Resumo label="Entradas" value={entradas} color="text-emerald-600" icon={<ArrowDownCircle size={18} className="text-emerald-600" />} />
@@ -218,11 +248,29 @@ export const Caixa: React.FC = () => {
                     <div className="flex justify-end gap-1">
                       {/* Recibo só de venda: despesa e sangria são conta da
                           loja, não têm o que entregar para cliente nenhum. */}
-                      {m.tipo === "entrada" && (
+                      {m.tipo === "entrada" ? (
                         <button
                           className="btn-ghost !p-1.5 text-brand-600"
                           title="Imprimir recibo para o cliente"
                           onClick={() => imprimirVenda(m)}
+                        >
+                          <Receipt size={14} />
+                        </button>
+                      ) : (
+                        /* Sangria e saída também precisam de papel: com mais
+                           de uma pessoa no balcão, o único registro sendo a
+                           linha do sistema é o bastante para a conversa virar
+                           "eu não tirei nada". Duas assinaturas. */
+                        <button
+                          className="btn-ghost !p-1.5 text-slate-500"
+                          title="Comprovante de sangria / saída"
+                          onClick={() =>
+                            printHTML(
+                              reciboMovimento(m, config),
+                              "Comprovante",
+                              config.papelImpressao || "a4"
+                            )
+                          }
                         >
                           <Receipt size={14} />
                         </button>
@@ -259,7 +307,7 @@ export const Caixa: React.FC = () => {
               if (prod && !prod.servico) {
                 await saveProduto({
                   ...prod,
-                  quantidade: Math.max(0, prod.quantidade - (extra.quantidade || 1)),
+                  quantidade: aposBaixa(prod, extra.quantidade || 1),
                 });
               }
             }

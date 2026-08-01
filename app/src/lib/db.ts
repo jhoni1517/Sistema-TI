@@ -26,6 +26,8 @@ import type {
  * não exige mudar nenhuma tela.
  */
 
+import { enfileirar, ehFalhaDeRede, descarregar } from "./fila";
+
 const PREFIX = "sistema-ti:";
 
 type TableName =
@@ -70,9 +72,18 @@ export const obterLoja = (): string | null => lojaAtual;
  * da nuvem ao sair, e o próximo login falhava como se a conta não
  * existisse.
  */
+/**
+ * Chaves que são do APARELHO, não da loja, e por isso sobrevivem ao logout.
+ *
+ * "ramo-por-conta" é a memória de qual tipo de loja cada conta usa nesta
+ * máquina. Apagar junto fazia a tela de entrada esquecer exatamente no
+ * momento em que ela precisa lembrar: no login seguinte.
+ */
+const CHAVES_DO_APARELHO = [PREFIX + "config", PREFIX + "ramo-por-conta"];
+
 export const limparCacheLocal = () => {
   for (const chave of Object.keys(localStorage)) {
-    if (chave.startsWith(PREFIX) && chave !== PREFIX + "config") {
+    if (chave.startsWith(PREFIX) && !CHAVES_DO_APARELHO.includes(chave)) {
       localStorage.removeItem(chave);
     }
   }
@@ -202,15 +213,30 @@ async function upsert<T extends WithId>(table: TableName, row: T): Promise<T> {
     }
     // carimba a loja do usuário — sem isso o banco rejeita a gravação
     const payload = await cifrarLinha(table, { ...row, lojaId: lojaAtual });
-    const { data, error } = await supabase
-      .from(table)
-      .upsert(payload)
-      .select()
-      .single();
-    if (error) throw traduzirErroGravacao(error);
-    // devolve para a tela já em texto claro, como ela espera
-    const [volta] = await decifrarLinhas(table, [data as T]);
-    return volta;
+    try {
+      const { data, error } = await supabase
+        .from(table)
+        .upsert(payload)
+        .select()
+        .single();
+      if (error) throw traduzirErroGravacao(error);
+      // devolve para a tela já em texto claro, como ela espera
+      const [volta] = await decifrarLinhas(table, [data as T]);
+      return volta;
+    } catch (e) {
+      // Internet caiu no meio da venda: o cliente já levou a mercadoria e o
+      // troco já saiu da gaveta. Guardar para gravar quando voltar é a
+      // diferença entre um susto e um furo de caixa que ninguém rastreia.
+      //
+      // Só falha de REDE entra na fila. Recusa do banco (coluna que falta,
+      // assinatura vencida, sem permissão) vai falhar de novo para sempre —
+      // enfileirar criaria fila infinita e o operador acharia que salvou.
+      if (ehFalhaDeRede(e)) {
+        enfileirar(table, payload as unknown as Record<string, unknown>);
+        return row;
+      }
+      throw e;
+    }
   }
   const rows = localBackend.list<T>(table);
   const idx = rows.findIndex((r) => r.id === row.id);
@@ -398,10 +424,32 @@ export const db = {
         .select("ramo")
         .eq("id", lojaAtual)
         .maybeSingle();
-      // Coluna ainda não criada não pode derrubar a carga: a loja continua
-      // funcionando como assistência até a migração rodar.
-      if (error) return null;
-      return (data?.ramo as string) || null;
+
+      if (error) {
+        // Coluna ainda não criada não derruba a carga: a loja continua
+        // funcionando como assistência até a migração rodar.
+        if (/column|does not exist|schema cache|42703|PGRST204/i.test(error.message)) {
+          return null;
+        }
+        // Qualquer outro erro PRECISA aparecer. Engolir aqui rebaixava uma
+        // mercearia a assistência em silêncio: o cliente abria o sistema
+        // errado e não havia nada na tela dizendo o porquê.
+        throw new Error(
+          `Não foi possível ler o tipo de loja contratado: ${error.message}`
+        );
+      }
+
+      // Linha não veio: ou a loja sumiu, ou a política de leitura barrou. Nos
+      // dois casos o sistema não sabe o que a loja comprou, e fingir que sabe
+      // é como o erro passa despercebido.
+      if (!data) {
+        throw new Error(
+          "A loja deste usuário não foi encontrada. Confira se o perfil aponta " +
+            "para uma loja existente (tabela perfis, coluna loja_id)."
+        );
+      }
+
+      return (data.ramo as string) || null;
     },
   },
 
@@ -424,3 +472,18 @@ export const db = {
     },
   },
 };
+
+
+/**
+ * Tenta gravar o que ficou preso na fila enquanto a internet estava fora.
+ *
+ * Devolve o que aconteceu para a tela poder avisar — descarregar em silêncio
+ * seria repetir o erro que a fila veio consertar.
+ */
+export async function sincronizarPendentes() {
+  return descarregar(async (tabela, linha) => {
+    if (!supabaseEnabled || !supabase) throw new Error("Nuvem desligada");
+    const { error } = await supabase.from(tabela).upsert(linha);
+    if (error) throw traduzirErroGravacao(error);
+  });
+}

@@ -117,6 +117,99 @@ Repor peça é troca de dinheiro por mercadoria; vira custo quando a peça é
 vendida (CMV). Contar como despesa **e** como custo mostrava lucro negativo
 numa venda lucrativa. Ver `ehCompraEstoque` em `lib/calc.ts`.
 
+### Orçamentos alternativos nunca somam
+
+"Fonte de 500W mais SSD" ou "só a fonte de 200W" é uma escolha, não uma lista
+de compras. Tudo na mesma lista fazia o sistema somar tudo: o cliente recebia
+um orçamento cobrando as duas fontes, e a loja parecia empurrar o dobro.
+
+A unidade de escolha é o **orçamento inteiro**, não a peça — cada caminho
+costuma ter mais de uma peça. Peça com `opcao` vazia entra em qualquer
+cenário; peça com `opcao` preenchida pertence àquele orçamento;
+`OrdemServico.opcaoEscolhida` guarda a decisão, e sem decisão vale o
+primeiro, que é a sugestão da loja (total zerado seria menor que qualquer
+cenário real).
+
+A mesma conta existe em SQL — a página pública do cliente calcula o total
+sozinha, e duas regras diferentes mostrariam dois valores para o mesmo
+orçamento. Ver `lib/orcamento.ts` e `supabase-migracao-opcoes-os.sql`.
+
+Antes de cobrar, o sistema pergunta se a escolha não foi confirmada: cobrar
+pela sugestão achando que é decisão do cliente só aparece no fechamento.
+
+### Imagem não mora no banco
+
+`produtos` é lido inteiro em toda carga. Cem produtos com foto em base64
+viram dezenas de MB a cada F5, no 4G do balcão. No banco fica só o endereço;
+o arquivo vai para o Storage, encolhido para 800px e JPEG **antes** de subir
+— a foto sai do celular com 4000px e 5 MB.
+
+O caminho é `<lojaId>/pasta/arquivo.jpg` e a política do Storage só deixa
+escrever na pasta da própria loja, com assinatura em dia. Caminho montado na
+tela não protege nada. Ver `lib/imagens.ts` e `supabase-migracao-imagens.sql`.
+
+### O que a vitrine pública mostra é decidido no banco
+
+O catálogo e o rastreio abrem sem login. Filtrar campo na tela não esconde
+nada de quem abre o painel do navegador: o corte é feito na função SQL, que
+é a única porta — as políticas de leitura das tabelas continuam exigindo
+login.
+
+Do catálogo saem nome, foto, preço e "tem ou não tem". Nunca custo, margem,
+fornecedor nem quantidade exata: concorrente também abre o link.
+
+O catálogo nasce desligado em toda loja (`lojas.catalogo_ativo`). Ninguém
+publica preço sem escolher publicar.
+
+### Regra de preço é uma só, e ela vive em dois lugares
+
+`precoEfetivo` (promoção com prazo) manda no PDV, na etiqueta da balança, na
+etiqueta de prateleira e no catálogo. A mesma conta está em SQL, porque a
+página pública calcula sozinha.
+
+Tela que lê `produto.preco` direto faz a gôndola dizer um valor e o caixa
+cobrar outro — e quem aparece como mentiroso é a loja, não o sistema.
+
+### Dinheiro primeiro, sempre
+
+Toda gravação que mexe em caixa E em estoque grava o **movimento antes**.
+
+Falhando no meio, sobra lançamento de dinheiro sem a baixa correspondente —
+que salta aos olhos na conferência e se conserta olhando o estoque. Ao
+contrário, some a venda (ou aparece mercadoria que ninguém pagou), e **lucro
+inflado é invisível: ninguém procura por ele**.
+
+Vale para venda, devolução e entrada de mercadoria. A entrada nasceu ao
+contrário e foi corrigida na revisão.
+
+### Estoque negativo é informação, não erro
+
+Quatro telas desciam estoque com `Math.max(0, ...)`. O zero parece
+proteção e é o contrário: vender 3 de um item que o sistema acha que tem 1
+deixava o saldo em 0 em vez de -2, e as duas unidades que saíram sem nunca
+ter entrado sumiam do mapa. Nada para procurar, nada para a contagem achar
+— e o detector de estoque negativo da conferência nunca disparava numa
+venda, que é justamente onde o problema nasce. O PDV ainda avisava "a
+venda passa, mas o saldo fica negativo", mentindo.
+
+Estoque sobe e desce só por `lib/estoque.ts`. Negativo é o sistema
+dizendo que falta lançar uma entrada; quem conserta é a contagem.
+
+### Gravação sem tratamento de erro é a pior classe de bug (de novo)
+
+A regra já estava escrita e mesmo assim OS, status da OS, abertura de
+caixa, lançamento de fiado e conta a pagar gravavam sem `try/catch`. A
+janela fechava como se tivesse dado certo.
+
+O mesmo vale para a ordem: "dinheiro primeiro" foi quebrada cinco vezes
+pelo mesmo motivo — a ordem natural de escrever é "faz a coisa e depois
+anota", que é a errada.
+
+**Regra escrita não segura nada.** As duas viraram teste que lê o código
+do disco: `dinheiro-primeiro.test.ts` e `sem-emoji.test.ts`. Quando
+descobrir uma regra dessas quebrada pela terceira vez, o conserto não é
+consertar — é escrever o teste que reprova.
+
 ### Serviço não tem estoque
 
 `Produto.servico` existe porque o atendente digitava 99999999999 na
@@ -148,6 +241,11 @@ qual é. Ver `traduzErro` em `lib/auth.ts`.
 
 Em alguns aparelhos chegam como `?` e sujam o recado. Vale para WhatsApp,
 Telegram e recibo.
+
+A cobrança de fiado saiu com três emojis por meses. `sem-emoji.test.ts`
+varre `src` e `api`; emoji que fica só na tela é permitido marcando a
+linha com `// emoji-na-tela`, porque a marca é a diferença entre decisão
+e descuido.
 
 ### Segredo não passa por conversa
 

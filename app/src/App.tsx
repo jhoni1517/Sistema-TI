@@ -17,6 +17,7 @@ import { PDV } from "./pages/PDV";
 import { Relatorios } from "./pages/Relatorios";
 import { Config } from "./pages/Config";
 import { Rastreio } from "./pages/Rastreio";
+import { Catalogo } from "./pages/Catalogo";
 import { SemPerfil } from "./pages/SemPerfil";
 import { Lojas } from "./pages/Lojas";
 import { Assinatura } from "./pages/Assinatura";
@@ -119,7 +120,7 @@ const AreaProtegida: React.FC = () => {
   const papel = sessao.perfil.papel;
 
   return (
-    <AppProvider souSuperAdmin={sessao.perfil.super_admin === true}>
+    <AppProvider souSuperAdmin={sessao.perfil.super_admin === true} email={sessao.email}>
       <Routes>
         <Route element={<Layout onLogout={logout} sessao={sessao} />}>
           <Route index element={<Dashboard />} />
@@ -150,6 +151,10 @@ const App: React.FC = () => (
       {/* Acompanhamento público — não exige login e não expõe dados sensíveis */}
       <Route path="/rastreio" element={<Rastreio />} />
       <Route path="/rastreio/:codigo" element={<Rastreio />} />
+      {/* Vitrine pública: sem login, e o que ela mostra é decidido no banco.
+          Filtrar só na tela não esconde nada de quem abre o painel do
+          navegador. */}
+      <Route path="/catalogo/:loja" element={<Catalogo />} />
       <Route path="/*" element={<AreaProtegida />} />
     </Routes>
   </HashRouter>

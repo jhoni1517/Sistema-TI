@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { aviso } from "../components/Aviso";
+import { ImagemUpload } from "../components/ImagemUpload";
 import { Store, KeyRound, Cloud, Download, Upload, Save, Database, Palette, Sun, Moon, Monitor, Percent, FileText, ShieldCheck } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { RAMO_META, temRecurso } from "../lib/ramos";
@@ -8,7 +9,7 @@ import { ACCENTS, ACCENT_KEYS } from "../lib/themes";
 import { Equipe } from "../components/Equipe";
 import { MinhaConta } from "../components/MinhaConta";
 import { carregarSessao, type Sessao } from "../lib/auth";
-import { importarTudo, type DumpLoja } from "../lib/db";
+import { importarTudo, obterLoja, type DumpLoja } from "../lib/db";
 import type { Config as ConfigType } from "../lib/types";
 
 export const Config: React.FC = () => {
@@ -17,6 +18,10 @@ export const Config: React.FC = () => {
   const [salvo, setSalvo] = useState(false);
   const [importando, setImportando] = useState(false);
   const [sessao, setSessao] = useState<Sessao | null>(null);
+  const loja = obterLoja();
+  const linkCatalogo = loja
+    ? `${window.location.origin}${window.location.pathname}#/catalogo/${loja}`
+    : "";
 
   React.useEffect(() => {
     carregarSessao().then(setSessao);
@@ -137,6 +142,116 @@ export const Config: React.FC = () => {
           <Field label="Endereço" className="sm:col-span-2">
             <input className="input" value={form.enderecoLoja} onChange={(e) => setForm({ ...form, enderecoLoja: e.target.value })} />
           </Field>
+
+          {/* A logo entra no recibo impresso e na página que o cliente abre.
+              É o que faz o papel parecer da loja e não de um sistema. */}
+          <div className="sm:col-span-2">
+            <ImagemUpload
+              label="Logo da loja"
+              url={form.logoUrl}
+              onChange={(logoUrl) => setForm({ ...form, logoUrl })}
+              pasta="logo"
+              lado={400}
+              formato="faixa"
+              dica="Aparece no recibo impresso e na página de acompanhamento do cliente. A imagem é enviada na hora — não precisa clicar em Salvar para ela subir."
+            />
+          </div>
+
+          <Field label="Limite de dinheiro na gaveta (R$)">
+            <InputNumero
+              className="input"
+              value={form.limiteGaveta}
+              onChange={(limiteGaveta) => setForm({ ...form, limiteGaveta })}
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              Passando disso, o Caixa sugere uma sangria. Vazio = sem aviso.
+            </p>
+          </Field>
+
+          {/* Avisos no Telegram DESTA loja. A rotina diária mandava tudo
+              para um chat só, o do operador do sistema: nome e dívida de
+              cliente iam parar no celular de outra pessoa, e quem precisava
+              do lembrete não recebia nada. */}
+          <Field label="Avisos no Telegram (chat id)">
+            <input
+              className="input"
+              value={form.telegramChatId || ""}
+              onChange={(e) => setForm({ ...form, telegramChatId: e.target.value.trim() })}
+              placeholder="ex.: 123456789"
+              inputMode="numeric"
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              Contas a pagar, agenda, aniversários e fiado vencido chegam aqui todo
+              dia. Para descobrir o seu numero, abra o robo no Telegram e mande
+              /start — ele responde com o chat id. Vazio = esta loja nao recebe aviso.
+            </p>
+          </Field>
+
+          {/* Papel da impressora. O recibo saía sempre em A4 e a bobina do
+              balcão cortava a metade direita de tudo, inclusive do total. */}
+          <Field label="Papel da impressora">
+            <select
+              className="input"
+              value={form.papelImpressao || "a4"}
+              onChange={(e) =>
+                setForm({ ...form, papelImpressao: e.target.value as "a4" | "58" | "80" })
+              }
+            >
+              <option value="a4">Folha comum (A4)</option>
+              <option value="80">Bobina térmica 80mm</option>
+              <option value="58">Bobina térmica 58mm</option>
+            </select>
+            <p className="mt-1 text-xs text-slate-400">
+              Na bobina o recibo sai em coluna única, sem tabela lado a lado.
+            </p>
+          </Field>
+
+          {/* Catálogo público: a loja manda foto de produto no WhatsApp uma
+              por uma, o dia inteiro. Aqui vira um link só. */}
+          <div className="sm:col-span-2 rounded-xl border border-slate-200 p-3">
+            <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-slate-600">
+              <Store size={15} /> Catálogo público
+            </p>
+            <p className="mb-2 text-xs text-slate-500">
+              Uma página com foto e preço dos seus produtos, para mandar no WhatsApp.
+              Mostra nome, foto, preço e se está disponível — nunca custo, margem,
+              fornecedor nem a quantidade exata.
+            </p>
+            {loja ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  readOnly
+                  className="input flex-1 !py-1.5 text-xs"
+                  value={linkCatalogo}
+                  onFocus={(e) => e.currentTarget.select()}
+                />
+                <button
+                  className="btn-secondary !py-1.5 text-xs"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(linkCatalogo);
+                    aviso.sucesso("Link copiado.");
+                  }}
+                >
+                  Copiar
+                </button>
+                <a
+                  className="btn-secondary !py-1.5 text-xs"
+                  href={linkCatalogo}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Abrir
+                </a>
+              </div>
+            ) : (
+              <p className="text-xs text-amber-700">Entre de novo para gerar o link.</p>
+            )}
+            <p className="mt-2 text-xs text-slate-400">
+              A página só abre depois que você ligar o catálogo desta loja no banco
+              (<code>catalogo_ativo</code>). Desligado por padrão: ninguém publica preço
+              sem escolher publicar.
+            </p>
+          </div>
 
           {/* O ramo é o que a loja CONTRATOU, não uma preferência: quem
               comprou mercearia podia se virar pizzaria sozinho e usar o que

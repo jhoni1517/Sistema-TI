@@ -191,3 +191,102 @@ export function definirRamoAparelho(r: Ramo | null): void {
  */
 export const ramoEfetivo = (ramoDaLoja?: string | null): Ramo =>
   lerRamoAparelho() ?? ramoDe(ramoDaLoja);
+
+/* ------------------------------------------------------------------ */
+/* O aparelho lembra o ramo de quem já entrou nele                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Tipo de loja de cada conta que já entrou NESTE aparelho.
+ *
+ * A tela de entrada mostrava quatro botões de tipo de loja para todo mundo,
+ * inclusive para quem já é cliente e não escolhe nada — os botões só valem
+ * para o administrador demonstrando o sistema. Quem tem mercearia clicava em
+ * "Mercearia" e nada acontecia, o que parecia defeito.
+ *
+ * Agora, ao digitar o e-mail, a tela já se apresenta como a loja daquela
+ * conta. O dado vem do próprio aparelho, do login anterior: perguntar ao
+ * servidor "que tipo de loja é este e-mail?" contaria a qualquer um, sem
+ * senha, que o endereço existe e que ramo ele toca.
+ *
+ * Guarda só as últimas contas, e sobrevive ao logout de propósito — apagar
+ * junto com o resto do cache faria a tela esquecer no exato momento em que
+ * ela mais precisa lembrar. Não é dado da loja: é a memória do aparelho.
+ */
+const CHAVE_CONTAS = "sistema-ti:ramo-por-conta";
+const MAX_CONTAS = 5;
+
+interface ContaLembrada {
+  email: string;
+  ramo: Ramo;
+}
+
+const chaveEmail = (email: string): string => email.trim().toLowerCase();
+
+const lerContas = (): ContaLembrada[] => {
+  try {
+    const bruto = JSON.parse(localStorage.getItem(CHAVE_CONTAS) || "[]");
+    if (!Array.isArray(bruto)) return [];
+    return bruto.filter(
+      (c): c is ContaLembrada =>
+        !!c && typeof c.email === "string" && RAMOS.includes(c.ramo)
+    );
+  } catch {
+    // Armazenamento estragado não pode impedir alguém de entrar.
+    return [];
+  }
+};
+
+/** O que o aparelho lembra sobre esta conta. Nulo = nunca entrou aqui. */
+export function ramoLembrado(email: string): Ramo | null {
+  const alvo = chaveEmail(email);
+  if (!alvo) return null;
+  return lerContas().find((c) => c.email === alvo)?.ramo ?? null;
+}
+
+/** Guarda o ramo desta conta para a próxima vez que ela abrir o sistema */
+export function lembrarRamoDaConta(email: string, ramo: Ramo): void {
+  const alvo = chaveEmail(email);
+  if (!alvo) return;
+  try {
+    const resto = lerContas().filter((c) => c.email !== alvo);
+    localStorage.setItem(
+      CHAVE_CONTAS,
+      JSON.stringify([{ email: alvo, ramo }, ...resto].slice(0, MAX_CONTAS))
+    );
+  } catch {
+    /* aparelho sem armazenamento: a tela só não vai adivinhar da próxima vez */
+  }
+}
+
+/**
+ * Pergunta ao servidor qual é o ramo desta conta.
+ *
+ * A memória do aparelho (acima) só funciona onde a conta já entrou uma vez.
+ * No aparelho novo — que é justamente onde a pessoa mais precisa de ajuda —
+ * ela não sabe nada, e os quatro botões de tipo de loja voltam a aparecer
+ * sem fazer efeito nenhum para quem é cliente.
+ *
+ * O preço é conhecido e aceito: a função responde sem senha, então quem já
+ * sabe o e-mail exato de alguém descobre o ramo do negócio. Ela não devolve
+ * mais nada — nem se o e-mail existe, nem nome, nem loja.
+ *
+ * Nunca lança: falha de rede aqui só faz a tela deixar de adivinhar, e
+ * atrapalhar o login por causa de um enfeite seria bem pior.
+ */
+export async function ramoDoEmail(email: string): Promise<Ramo | null> {
+  const alvo = email.trim();
+  // Menos que isso não é e-mail, e consultar a cada tecla digitada
+  // transformaria a tela de entrada num gerador de tráfego.
+  if (alvo.length < 5 || !alvo.includes("@") || !alvo.includes(".")) return null;
+  try {
+    const { supabase, supabaseEnabled } = await import("./supabase");
+    if (!supabaseEnabled || !supabase) return null;
+    const { data, error } = await supabase.rpc("ramo_do_email", { p_email: alvo });
+    if (error) return null;
+    const v = Array.isArray(data) ? data[0] : data;
+    return typeof v === "string" && RAMOS.includes(v as Ramo) ? (v as Ramo) : null;
+  } catch {
+    return null;
+  }
+}

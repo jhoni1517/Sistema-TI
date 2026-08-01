@@ -158,3 +158,68 @@ export function travaAtendimento(cliente?: Cliente | null): {
   }
   return { bloqueia: false, avisa: false, titulo: "", motivo: "" };
 }
+
+/* ------------------------------------------------------------------ */
+/* Limite de fiado                                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Quanto este cliente já deve, somando tudo que não está quitado.
+ *
+ * O fiado ficava espalhado em vários lançamentos e ninguém somava na hora de
+ * fiar mais um. Quem atende vê "ele deve pouco" olhando o último, não o
+ * total.
+ */
+export const devendo = (clienteId: string, fiados: Fiado[]): number =>
+  fiados
+    .filter((f) => f.clienteId === clienteId && !f.quitado)
+    .reduce((s, f) => s + saldoFiado(f), 0);
+
+export interface TravaFiado {
+  /** Passa do teto? */
+  estoura: boolean;
+  /** Tem teto definido para este cliente? */
+  temLimite: boolean;
+  devendo: number;
+  limite: number;
+  /** Quanto ainda cabe. Sem teto, é Infinity. */
+  disponivel: number;
+  /** Explicação pronta para a tela. Vazio quando está tudo certo. */
+  motivo: string;
+}
+
+/**
+ * Cabe mais este valor no fiado deste cliente?
+ *
+ * "Fio pra você" é decisão de dono, tomada uma vez, com a cabeça fria. Sem o
+ * teto no sistema ela virava decisão do atendente, no balcão, com fila
+ * esperando — e o dono só descobria no fim do mês.
+ *
+ * Não é bloqueio absoluto de propósito: a tela pergunta e deixa o dono
+ * autorizar. Sistema que não deixa fazer nada acaba sendo contornado por
+ * fora, e aí o fiado volta a não existir no sistema.
+ */
+export function travaFiado(
+  cliente: Cliente | undefined | null,
+  fiados: Fiado[],
+  valorNovo = 0
+): TravaFiado {
+  const limite = Number(cliente?.limiteFiado) || 0;
+  const atual = cliente ? devendo(cliente.id, fiados) : 0;
+  const temLimite = limite > 0;
+  const disponivel = temLimite ? Math.max(0, limite - atual) : Infinity;
+  const total = atual + (Number(valorNovo) || 0);
+  const estoura = temLimite && total > limite;
+
+  return {
+    estoura,
+    temLimite,
+    devendo: atual,
+    limite,
+    disponivel,
+    motivo: estoura
+      ? `${txt(cliente?.nome) || "Este cliente"} já deve ${atual.toFixed(2)} e o limite é ` +
+        `${limite.toFixed(2)}. Com este lançamento chega a ${total.toFixed(2)}.`
+      : "",
+  };
+}

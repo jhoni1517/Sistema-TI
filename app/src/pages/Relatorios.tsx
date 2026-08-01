@@ -14,9 +14,22 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { TrendingUp, DollarSign, Percent, Wrench, Users, Package } from "lucide-react";
+import { TrendingUp, DollarSign, Percent, Wrench, Users, Package , FileText } from "lucide-react";
 import { useApp } from "../store/AppStore";
-import { SectionTitle } from "../components/ui";
+import { SectionTitle, Field } from "../components/ui";
+import { csvDoPeriodo, nomeDoArquivo, limitesDoMes } from "../lib/contabil";
+import {
+  comparativoRecente,
+  ticketMedio,
+  horariosDePico,
+  comissoes,
+} from "../lib/desempenho";
+import {
+  giroDosProdutos,
+  curvaABC,
+  produtosParados,
+  capitalParado,
+} from "../lib/giro";
 import { brl, monthKey } from "../lib/format";
 import { receitaBruta, despesasOperacionais, comprasEstoque, custoProdutos, lucroLiquido, totalOS } from "../lib/calc";
 import { accentHex, isDark } from "../lib/themes";
@@ -25,7 +38,7 @@ import { OS_STATUS_META, type OSStatus } from "../lib/types";
 const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
 export const Relatorios: React.FC = () => {
-  const { movimentos, ordens, config } = useApp();
+  const { movimentos, ordens, produtos, vendas, config } = useApp();
   const [meses, setMeses] = useState(6);
 
   const acc = accentHex(config.corDestaque);
@@ -105,6 +118,34 @@ export const Relatorios: React.FC = () => {
     return Object.entries(map).map(([name, value]) => ({ name, value }));
   }, [movimentos]);
 
+  const [mesContador, setMesContador] = useState(() => new Date().toISOString().slice(0, 7));
+
+  const exportarContador = () => {
+    const { de, ate } = limitesDoMes(mesContador);
+    if (!de) return;
+    const blob = new Blob(
+      // BOM na frente: sem ele o Excel abre "Peça" como "PeÃ§a", e o contador
+      // devolve o arquivo achando que veio corrompido.
+      ["\ufeff" + csvDoPeriodo(movimentos, de, ate)],
+      { type: "text/csv;charset=utf-8" }
+    );
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nomeDoArquivo(de, ate);
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const semana = useMemo(() => comparativoRecente(movimentos, 7), [movimentos]);
+  const ticket = useMemo(() => ticketMedio(vendas), [vendas]);
+  const pico = useMemo(() => horariosDePico(vendas), [vendas]);
+  const comissao = useMemo(() => comissoes(ordens, config), [ordens, config]);
+
+  const giro = useMemo(() => giroDosProdutos(produtos, vendas), [produtos, vendas]);
+  const abc = useMemo(() => curvaABC(giro), [giro]);
+  const parados = useMemo(() => produtosParados(giro, produtos), [giro, produtos]);
+
   return (
     <div>
       <SectionTitle
@@ -118,6 +159,184 @@ export const Relatorios: React.FC = () => {
           </select>
         }
       />
+
+      {/* Arquivo do contador. Hoje a resposta é mandar print e ele
+          redigitar — cada redigitação é uma chance de erro, e "esse número
+          está diferente do que você me mandou" custa uma tarde dos dois. */}
+      <div className="card mb-6 flex flex-wrap items-end gap-3">
+        <Field label="Mês para o contador" className="max-w-[180px]">
+          <input
+            type="month"
+            className="input"
+            value={mesContador}
+            onChange={(e) => setMesContador(e.target.value)}
+          />
+        </Field>
+        <button className="btn-secondary" onClick={exportarContador}>
+          <FileText size={18} /> Baixar livro-caixa (CSV)
+        </button>
+        <p className="min-w-[220px] flex-1 text-xs text-slate-500">
+          Abre em qualquer planilha. Entrada e saída em colunas separadas, com os
+          totais dentro do arquivo — sem eles, a soma do contador pode dar diferente
+          da tela e ninguém sabe qual está certa.
+        </p>
+      </div>
+
+      {/* Comparativo, ticket e pico: as perguntas que o dono faz de cabeça
+          e erra — "vendi mais que semana passada?", "que horas enche?" */}
+      <div className="mb-6 grid gap-3 sm:grid-cols-3">
+        <div className="card">
+          <p className="label">Últimos 7 dias</p>
+          <p className="text-2xl font-bold text-slate-800">{brl(semana.atual)}</p>
+          <p
+            className={`text-xs font-semibold ${
+              semana.melhorou ? "text-emerald-600" : "text-red-600"
+            }`}
+          >
+            {semana.variacao > 0 ? "+" : ""}
+            {semana.variacao}% contra os 7 anteriores ({brl(semana.anterior)})
+          </p>
+          <p className="mt-1 text-xs text-slate-400">
+            Sete contra sete, e não este mês contra o passado: no dia 3 a conta
+            mensal seria três dias contra trinta.
+          </p>
+        </div>
+        <div className="card">
+          <p className="label">Ticket médio</p>
+          <p className="text-2xl font-bold text-slate-800">{brl(ticket)}</p>
+          <p className="mt-1 text-xs text-slate-400">
+            Só vendas de balcão. Fiado recebido e OS entram no caixa e não são
+            compra de balcão.
+          </p>
+        </div>
+        <div className="card">
+          <p className="label">Horários de pico</p>
+          {pico.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-400">Sem vendas registradas.</p>
+          ) : (
+            <div className="mt-1 space-y-0.5">
+              {pico.map((f) => (
+                <p key={f.hora} className="flex justify-between text-sm">
+                  <span className="text-slate-600">
+                    {String(f.hora).padStart(2, "0")}h — {f.vendas} venda(s)
+                  </span>
+                  <b className="text-slate-800">{brl(f.receita)}</b>
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Comissão: sobre o LUCRO, não sobre o faturamento. Sobre faturamento
+          premia quem usa peça cara, não quem conserta bem. */}
+      {comissao.length > 0 && (
+        <div className="card mb-6">
+          <h3 className="mb-1 flex items-center gap-2 font-bold text-slate-700">
+            <Percent size={17} /> Comissão por técnico
+          </h3>
+          <p className="mb-3 text-xs text-slate-500">
+            Sobre o lucro da ordem entregue, a {config.comissaoPadrao || 0}% (ajuste em
+            Configurações). Sobre faturamento, dois técnicos com o mesmo esforço
+            receberiam valores diferentes só porque um usou uma peça cara.
+          </p>
+          <div className="space-y-1">
+            {comissao.map((c) => (
+              <div key={c.tecnico} className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="min-w-0 flex-1 truncate font-medium text-slate-700">
+                  {c.tecnico}
+                </span>
+                <span className="text-xs text-slate-400">{c.ordens} ordem(ns)</span>
+                <span className="w-24 text-right text-slate-600">{brl(c.faturado)}</span>
+                <span className="w-24 text-right text-slate-600">lucro {brl(c.lucro)}</span>
+                <span className="w-24 text-right font-bold text-emerald-600">
+                  {brl(c.valor)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Curva ABC e o que está parado.
+          A tela respondia "quanto entrou". Não respondia a pergunta que
+          decide o dinheiro do mês: o que eu paro de comprar? */}
+      <div className="mb-6 grid gap-4 lg:grid-cols-2">
+        <div className="card">
+          <h3 className="mb-1 flex items-center gap-2 font-bold text-slate-700">
+            <TrendingUp size={17} /> O que carrega o faturamento
+          </h3>
+          <p className="mb-3 text-xs text-slate-500">
+            Classe A são os itens que somam 80% do que a loja vende. Faltar um deles é
+            perder venda; faltar um C não muda o mês.
+          </p>
+          {abc.length === 0 ? (
+            <p className="py-6 text-center text-sm text-slate-400">
+              Sem vendas registradas ainda.
+            </p>
+          ) : (
+            <div className="space-y-1">
+              {abc.slice(0, 10).map((i) => (
+                <div key={i.produtoId} className="flex items-center gap-2 text-sm">
+                  <span
+                    className={`badge shrink-0 ${
+                      i.classe === "A"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : i.classe === "B"
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {i.classe}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-slate-700">{i.nome}</span>
+                  <span className="shrink-0 text-xs text-slate-400">
+                    {(i.fatia * 100).toFixed(0)}%
+                  </span>
+                  <span className="w-20 shrink-0 text-right font-semibold text-slate-800">
+                    {brl(i.receita)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="card">
+          <h3 className="mb-1 flex items-center gap-2 font-bold text-slate-700">
+            <Package size={17} /> Dinheiro parado na prateleira
+          </h3>
+          <p className="mb-3 text-xs text-slate-500">
+            Com estoque e sem sair há mais de 60 dias, a custo. É onde a promoção com
+            prazo entra antes de o produto vencer ou virar prejuízo puro.
+          </p>
+          {parados.length === 0 ? (
+            <p className="py-6 text-center text-sm text-slate-400">
+              Nada parado há mais de 60 dias.
+            </p>
+          ) : (
+            <>
+              <p className="mb-2 text-sm">
+                <b className="text-lg text-red-600">{brl(capitalParado(parados))}</b>{" "}
+                <span className="text-slate-500">em {parados.length} item(ns)</span>
+              </p>
+              <div className="space-y-1">
+                {parados.slice(0, 10).map((g) => (
+                  <div key={g.produtoId} className="flex items-center gap-2 text-sm">
+                    <span className="min-w-0 flex-1 truncate text-slate-700">{g.nome}</span>
+                    <span className="shrink-0 text-xs text-slate-400">
+                      {g.ultimaVenda ? `${g.diasParado} dias` : "nunca vendeu"}
+                    </span>
+                    <span className="w-20 shrink-0 text-right font-semibold text-slate-800">
+                      {brl(g.valorEmEstoque)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
 
       {/* KPIs */}
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

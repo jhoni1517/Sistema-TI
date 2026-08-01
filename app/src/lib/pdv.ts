@@ -1,5 +1,6 @@
 import { txt } from "./format";
 import { soData, hojeISO, diasAteVencer } from "./contas";
+import { precoEfetivo } from "./promocao";
 import type { ItemVenda, Produto, Venda } from "./types";
 
 /**
@@ -64,13 +65,20 @@ export const faltaPara = (total: number, recebido?: number): number => {
   return centavos(Math.max(0, total - recebido));
 };
 
-/** Item de carrinho a partir de um produto do estoque */
-export function itemDoProduto(p: Produto, quantidade = 1): ItemVenda {
+/**
+ * Item de carrinho a partir de um produto do estoque.
+ *
+ * O preço vem de precoEfetivo, nunca de `produto.preco` direto: é aqui que a
+ * promoção com prazo entra no caixa. Uma tela lendo o preço cheio faria a
+ * etiqueta da gôndola dizer um valor e o caixa cobrar outro — e quem aparece
+ * como mentiroso é a loja, não o sistema.
+ */
+export function itemDoProduto(p: Produto, quantidade = 1, hoje = hojeISO()): ItemVenda {
   return {
     produtoId: p.id,
     descricao: txt(p.nome),
     quantidade,
-    precoUnit: Number(p.preco) || 0,
+    precoUnit: precoEfetivo(p, hoje),
     custoUnit: Number(p.custo) || 0,
     porPeso: p.porPeso === true,
   };

@@ -38,6 +38,20 @@ velha, senão o sistema fica fora do ar entre os dois passos.
 3. Reaponte o webhook:
    `https://api.telegram.org/bot<TOKEN_NOVO>/setWebhook?url=https://sistema-ti-caixa.vercel.app/api/telegram`
 
+**Dois destinos, e a diferença não é detalhe.** `TELEGRAM_CHAT_ID` é o SEU
+chat e recebe só a cobrança de mensalidade — nome da loja e quanto ela deve,
+que é da sua relação comercial com ela.
+
+Contas a pagar, agenda, aniversário de cliente, fiado vencido e lembrete de
+backup vão para o Telegram **de cada loja**, que o dono preenche em
+**Configurações → Avisos no Telegram (chat id)**. Ele descobre o número dele
+mandando `/start` para o robô.
+
+Loja sem chat preenchido não recebe nada, e nada dela sai. Era o contrário:
+tudo caía no seu chat, inclusive nome e dívida de cliente de outra loja.
+Isso é dado pessoal de terceiro, e o dono que precisava do lembrete não
+recebia nada.
+
 ---
 
 ## 2. Variáveis no Vercel
@@ -53,7 +67,7 @@ Variables**. Marque **Production**, **Preview** e **Development** em todas.
 | `SUPABASE_SERVICE_ROLE_KEY` | Chave de serviço | Aviso diário de mensalidade e de contas não dispara; "Liberar senha" não funciona |
 | `CRON_SECRET` | Senha do robô diário | `/api/cobranca` fica aberto para qualquer um chamar |
 | `TELEGRAM_TOKEN` | Robô do Telegram | Nenhuma notificação chega no celular |
-| `TELEGRAM_CHAT_ID` | Para quem mandar | O aviso não sabe o destino |
+| `TELEGRAM_CHAT_ID` | Seu chat, **só para a cobrança de mensalidade** | Você não recebe o resumo de quem está devendo |
 
 Depois de salvar, vá em **Deployments** e clique em **Redeploy** no item
 mais recente. Variável nova só entra em build novo — salvar sem publicar não
@@ -121,7 +135,45 @@ https://supabase.com/dashboard/project/nviagibefxqtognowqwe/sql/new:
 8. `supabase-migracao-agenda.sql`
 9. `supabase-migracao-pdv.sql`
 10. `supabase-migracao-ramo-loja.sql`
-11. `supabase-corrigir-colunas.sql`
+11. `supabase-migracao-opcoes-os.sql`
+12. `supabase-migracao-imagens.sql`
+13. `supabase-migracao-catalogo.sql`
+14. `supabase-migracao-ramo-email.sql`
+15. `supabase-corrigir-colunas.sql`
+
+O de número 11 é o que faz a página do cliente entender mais de um orçamento
+na mesma OS ("fonte de 500W mais SSD" contra "só a fonte de 200W"). Sem ele,
+a página soma tudo e mostra um valor maior do que o da tela da loja. Ele
+também guarda as funções
+`consultar_os` e `responder_orcamento`, que saíram do
+`supabase-migracao-seguranca.sql` justamente para não voltarem à versão
+antiga quando aquele arquivo for rodado de novo.
+
+O de número 12 cria o depósito de imagens (logo da loja e foto de produto) e
+as regras de quem pode escrever nele. Não precisa mexer no painel de Storage
+na mão. As imagens ficam abertas para quem tiver o endereço — elas aparecem
+no recibo impresso e na página que o cliente abre sem login.
+
+O de número 13 cria o catálogo público. Ele nasce DESLIGADO em toda loja:
+ninguém publica preço sem escolher publicar. Para ligar o de uma loja:
+
+```sql
+update lojas set catalogo_ativo = true,
+       catalogo_recado = 'Entrega no bairro. Chame no WhatsApp.'
+ where nome = 'NOME DA LOJA';
+```
+
+O link fica em Configurações → Dados da loja → Catálogo público.
+
+O de número 14 faz a tela de entrada reconhecer o tipo de loja ao digitar o
+e-mail. Ele responde **sem senha**, então quem já sabe o endereço exato de
+alguém descobre o ramo do negócio dele — é uma troca consciente, porque sem
+ele o reconhecimento só funcionaria em aparelho onde a conta já entrou uma
+vez. Para desligar depois, sem quebrar nada:
+
+```sql
+revoke execute on function ramo_do_email(text) from anon;
+```
 
 O último é seguro rodar quantas vezes quiser e é o primeiro lugar a olhar
 quando aparecer `Could not find the 'xxx' column of 'yyy' in the schema

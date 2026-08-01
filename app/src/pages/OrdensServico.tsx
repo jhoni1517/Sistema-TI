@@ -21,17 +21,41 @@ import {
   History,
   EyeOff,
   ShieldAlert,
+  ShieldCheck,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { PatternLock } from "../components/PatternLock";
+import { FotosAparelho } from "../components/FotosAparelho";
 import { printHTML } from "../lib/print";
 import { obterLoja } from "../lib/db";
 import { registrarAcessoSigilo } from "../lib/auth";
 import { reciboOS } from "../lib/recibo";
 import { mensagemCliente } from "../lib/mensagens";
 import { uid, nowISO, brl, abrirWhatsapp, formatDateTime, codigoOS, txt } from "../lib/format";
-import { totalOS, totalPecas, custoPecas, lucroOS, diasEmPosse, taxaArmazenamento } from "../lib/calc";
+import {
+  totalOS,
+  totalPecas,
+  custoPecas,
+  lucroOS,
+  diasEmPosse,
+  taxaArmazenamento,
+  faixaOS,
+  totalComOpcao,
+  custoComOpcao,
+} from "../lib/calc";
+import {
+  opcaoDaPeca,
+  nomesDasOpcoes,
+  opcaoAtual,
+  escolhaConfirmada,
+  comOpcao,
+  proximoNomeDeOpcao,
+  renomearOpcao,
+  removerOpcao,
+  juntarEmUmOrcamento,
+  pecasEfetivas,
+} from "../lib/orcamento";
 import {
   OS_STATUS_META,
   CLASSIFICACAO_META,
@@ -42,7 +66,15 @@ import {
   type FormaPagamento,
   type Config,
 } from "../lib/types";
-import { travaAtendimento, classificacaoDe } from "../lib/clientes";
+import { travaAtendimento, classificacaoDe, travaFiado } from "../lib/clientes";
+import { saldosApos } from "../lib/estoque";
+import { aoApagarOrdem, textoDaConfirmacao } from "../lib/exclusao";
+import {
+  garantiaDaOS,
+  GARANTIA_META,
+  textoDaGarantia,
+  garantiasVencendo,
+} from "../lib/garantia";
 
 const CHECKLIST_ITENS = [
   "Liga normalmente",
@@ -137,7 +169,16 @@ export const OrdensServico: React.FC = () => {
       if (!ok) return;
     }
 
-    await saveOrdem({ ...editando, atualizadoEm: nowISO() });
+    try {
+      await saveOrdem({ ...editando, atualizadoEm: nowISO() });
+    } catch (e) {
+      // Sem isto a janela fechava como se tivesse gravado. Coluna faltando
+      // ou assinatura vencida derrubam a gravação em silêncio, e a OS que o
+      // cliente acabou de abrir simplesmente não existe.
+      return aviso.erro(
+        "Não foi possível salvar a OS:\n\n" + (e instanceof Error ? e.message : String(e))
+      );
+    }
     if (nova && trava.avisa) {
       aviso.alerta(`${trava.titulo}. Motivo: ${trava.motivo}`);
     }
@@ -172,7 +213,13 @@ export const OrdensServico: React.FC = () => {
       atualizadoEm: nowISO(),
       historico: [...o.historico, { data: nowISO(), status }],
     };
-    await saveOrdem(atualizado);
+    try {
+      await saveOrdem(atualizado);
+    } catch (e) {
+      return aviso.erro(
+        "Não foi possível mudar o status:\n\n" + (e instanceof Error ? e.message : String(e))
+      );
+    }
     setDetalhe(atualizado);
   };
 
@@ -187,7 +234,13 @@ export const OrdensServico: React.FC = () => {
   const baixarEstoqueEEntregar = async (o: OrdemServico) => {
     const semVinculo: string[] = [];
 
-    for (const p of o.pecas || []) {
+    // Só a alternativa escolhida sai da prateleira. Baixar as duas fontes
+    // deixaria uma delas sumida do estoque sem nunca ter sido vendida.
+    // Primeiro resolve cada peça no estoque, depois grava. Descontar dentro
+    // do laço lia sempre o saldo velho da tela: a mesma peça em duas linhas
+    // (uma digitada, outra escolhida da lista) descia uma vez só.
+    const aBaixar: { produtoId: string; quantidade: number }[] = [];
+    for (const p of pecasEfetivas(o)) {
       const nome = txt(p.descricao).trim().toLowerCase();
       const prod =
         (p.produtoId && produtos.find((x) => x.id === p.produtoId)) ||
@@ -197,12 +250,10 @@ export const OrdensServico: React.FC = () => {
         if (nome) semVinculo.push(txt(p.descricao));
         continue;
       }
-      // Serviço não tem estoque para descontar
-      if (prod.servico) continue;
-      await saveProduto({
-        ...prod,
-        quantidade: Math.max(0, (Number(prod.quantidade) || 0) - (Number(p.quantidade) || 0)),
-      });
+      aBaixar.push({ produtoId: prod.id, quantidade: Number(p.quantidade) || 0 });
+    }
+    for (const { produto, quantidade } of saldosApos(aBaixar, produtos)) {
+      await saveProduto({ ...produto, quantidade });
     }
 
     if (semVinculo.length > 0) {
@@ -233,6 +284,20 @@ export const OrdensServico: React.FC = () => {
     !movimentos.some((m) => m.osId === o.id) &&
     !fiados.some((f) => f.osId === o.id);
 
+  /**
+   * Cobrar sem saber qual orçamento o cliente aceitou é cobrar pela sugestão
+   * da loja. Pergunta em vez de assumir: quem está no balcão sabe a resposta,
+   * e o erro só apareceria no fechamento do mês.
+   */
+  const escolhaPendente = (o: OrdemServico): boolean => {
+    if (escolhaConfirmada(o)) return false;
+    return !confirm(
+      `O cliente não registrou qual opção quer.\n\n` +
+        `Cobrar pela opção "${opcaoAtual(o)}" (${brl(totalOS(o))})?\n\n` +
+        "Cancelar para editar a OS e marcar a opção certa."
+    );
+  };
+
   const avisarCliente = (o: OrdemServico) => {
     const c = cliente(o.clienteId);
     if (!txt(c?.telefone)) return aviso.alerta("Cliente sem telefone cadastrado.");
@@ -257,6 +322,35 @@ export const OrdensServico: React.FC = () => {
           </button>
         }
       />
+
+      {/* Garantia vencendo: "sua garantia vence semana que vem, quer que a
+          gente dê uma olhada?" custa uma mensagem e evita o retorno bravo no
+          dia 91. A função existia e não estava em tela nenhuma. */}
+      {(() => {
+        const vencendo = garantiasVencendo(ordens, 7);
+        if (vencendo.length === 0) return null;
+        return (
+          <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+            <p className="flex items-center gap-2 text-sm font-bold text-emerald-800">
+              <ShieldCheck size={16} /> {vencendo.length} garantia(s) vencendo nesta semana
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {vencendo.slice(0, 8).map(({ os: o, garantia }) => (
+                <button
+                  key={o.id}
+                  onClick={() => setDetalhe(o)}
+                  className="badge bg-emerald-100 text-emerald-800 hover:opacity-80"
+                >
+                  {codigoOS(o.numero)} · {nomeCliente(o.clienteId)} · {garantia.diasRestantes}d
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-xs text-emerald-700">
+              Chamar antes custa uma mensagem e evita o retorno bravo no dia 91.
+            </p>
+          </div>
+        );
+      })()}
 
       {/* Filtros */}
       <div className="mb-4 flex flex-wrap gap-2">
@@ -298,6 +392,21 @@ export const OrdensServico: React.FC = () => {
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-xs font-bold text-slate-400">{codigoOS(o.numero)}</span>
                   <span className={`badge ${OS_STATUS_META[o.status].color}`}>{OS_STATUS_META[o.status].label}</span>
+                  {(() => {
+                    // "Esse conserto ainda está na garantia?" chega toda
+                    // semana. A resposta estava em duas telas mais uma conta
+                    // de cabeça — e errar custa dos dois lados.
+                    const g = garantiaDaOS(o);
+                    if (g.situacao !== "valida") return null;
+                    return (
+                      <span
+                        className={`badge ${GARANTIA_META.valida.cor}`}
+                        title={`Garantia até ${g.ate.split("-").reverse().join("/")}`}
+                      >
+                        <ShieldCheck size={11} /> Garantia {g.diasRestantes}d
+                      </span>
+                    );
+                  })()}
                   {semPagamento(o) && (
                     <button
                       className="badge bg-amber-100 text-amber-800 hover:bg-amber-200"
@@ -403,12 +512,22 @@ export const OrdensServico: React.FC = () => {
             setDetalhe(null);
           }}
           onExcluir={async () => {
-            if (confirm(`Excluir a OS ${codigoOS(detalhe.numero)}?`)) {
+            // Com dinheiro lançado, apagar deixa a entrada do caixa apontando
+            // para uma OS que não existe — e o mês fecha com receita sem
+            // origem, que ninguém consegue explicar depois.
+            const r = aoApagarOrdem(detalhe, { movimentos, fiados });
+            if (!r.pode) {
+              return aviso.alerta(
+                `${r.titulo}\n\n${r.perdas.map((p) => `- ${p}`).join("\n")}\n\n${r.saida}`
+              );
+            }
+            if (confirm(textoDaConfirmacao(r))) {
               await removeOrdem(detalhe.id);
               setDetalhe(null);
             }
           }}
           onReceber={async (forma) => {
+            if (escolhaPendente(detalhe)) return;
             const valor = totalOS(detalhe);
             if (!(valor > 0)) {
               return aviso.alerta(
@@ -458,6 +577,17 @@ export const OrdensServico: React.FC = () => {
             }
           }}
           onFiado={async () => {
+            if (escolhaPendente(detalhe)) return;
+            // O teto do fiado é decisão do dono, tomada uma vez. Aqui ela só
+            // é lembrada — quem está no balcão ainda pode autorizar, porque
+            // sistema que não deixa fazer nada é contornado por fora.
+            const teto = travaFiado(cliente(detalhe.clienteId), fiados, totalOS(detalhe));
+            if (
+              teto.estoura &&
+              !confirm(`${teto.motivo}\n\nLançar em A Receber mesmo assim?`)
+            ) {
+              return;
+            }
             try {
               await saveFiado({
                 id: uid(),
@@ -500,10 +630,14 @@ const OSForm: React.FC<{
   onClose: () => void;
 }> = ({ os, setOs, clientes, produtos, onSave, onClose }) => {
   const trava = travaAtendimento(clientes.find((c) => c.id === os.clienteId));
-  const addPeca = () =>
+
+  const addPeca = (opcao?: string) =>
     setOs({
       ...os,
-      pecas: [...os.pecas, { descricao: "", quantidade: 1, custoUnit: 0, precoUnit: 0 }],
+      pecas: [
+        ...os.pecas,
+        { descricao: "", quantidade: 1, custoUnit: 0, precoUnit: 0, opcao },
+      ],
     });
   const setPeca = (i: number, p: PecaOS) => {
     const n = [...os.pecas];
@@ -511,6 +645,62 @@ const OSForm: React.FC<{
     setOs({ ...os, pecas: n });
   };
   const delPeca = (i: number) => setOs({ ...os, pecas: os.pecas.filter((_, x) => x !== i) });
+
+  const nomes = nomesDasOpcoes(os);
+  /**
+   * Um orçamento ou vários — a decisão que o atendente toma ANTES de digitar.
+   *
+   * Ela não é um campo gravado: é o próprio conteúdo da OS. Guardar um "modo"
+   * separado das peças criaria a chance de os dois discordarem, e aí não dá
+   * para saber qual dos dois está certo.
+   */
+  const varios = nomes.length > 0;
+  const escolhida = opcaoAtual(os);
+  const faixa = faixaOS(os);
+
+  /** Começa a oferecer opções: duas, que é o mínimo para haver escolha */
+  const usarVariosOrcamentos = () => {
+    const a = "Opção 1";
+    const b = "Opção 2";
+    setOs({
+      ...os,
+      // As peças que já estavam digitadas continuam valendo para as duas —
+      // jogá-las numa opção obrigaria a redigitar tudo na outra.
+      pecas: [
+        ...os.pecas,
+        { descricao: "", quantidade: 1, custoUnit: 0, precoUnit: 0, opcao: a },
+        { descricao: "", quantidade: 1, custoUnit: 0, precoUnit: 0, opcao: b },
+      ],
+      opcaoEscolhida: undefined,
+    });
+  };
+
+  const usarOrcamentoUnico = () => {
+    if (
+      varios &&
+      !confirm(
+        "Voltar para um orçamento só?\n\nAs peças das opções passam a somar todas juntas. Nenhuma peça é apagada."
+      )
+    )
+      return;
+    setOs(juntarEmUmOrcamento(os));
+  };
+
+  const addOpcao = () => addPeca(proximoNomeDeOpcao(os));
+
+  const renomear = (nome: string) => {
+    const novo = prompt("Nome desta opção (aparece para o cliente):", nome);
+    if (novo === null) return;
+    if (!novo.trim()) return aviso.alerta("A opção precisa de um nome.");
+    if (novo.trim() !== nome && nomes.includes(novo.trim()))
+      return aviso.alerta("Já existe uma opção com esse nome.");
+    setOs(renomearOpcao(os, nome, novo));
+  };
+
+  const remover = (nome: string) => {
+    if (!confirm(`Apagar a "${nome}" e as peças dela?`)) return;
+    setOs(removerOpcao(os, nome));
+  };
 
   const vincularProduto = (i: number, produtoId: string) => {
     const prod = produtos.find((p) => p.id === produtoId);
@@ -523,6 +713,67 @@ const OSForm: React.FC<{
       custoUnit: prod.custo,
     });
   };
+
+  /**
+   * Uma linha de peça. Vira função porque a mesma linha aparece na lista
+   * única e dentro de cada opção — duas cópias divergiriam na primeira
+   * mudança de campo.
+   */
+  const linhaPeca = (p: PecaOS, i: number) => (
+    <div key={i} className="grid grid-cols-12 items-end gap-2">
+      <div className="col-span-12 sm:col-span-4">
+        <label className="label">Descrição</label>
+        <input
+          className="input"
+          value={p.descricao}
+          onChange={(e) => setPeca(i, { ...p, descricao: e.target.value })}
+        />
+      </div>
+      <div className="col-span-6 sm:col-span-3">
+        <label className="label">Do estoque</label>
+        <select
+          className="input"
+          value={p.produtoId || ""}
+          onChange={(e) => vincularProduto(i, e.target.value)}
+        >
+          <option value="">Manual</option>
+          {produtos.map((pr) => (
+            <option key={pr.id} value={pr.id}>{pr.nome}</option>
+          ))}
+        </select>
+      </div>
+      <div className="col-span-3 sm:col-span-1">
+        <label className="label">Qtd</label>
+        <InputNumero
+          min={1}
+          className="input"
+          value={p.quantidade}
+          onChange={(v) => setPeca(i, { ...p, quantidade: v ?? 0 })}
+        />
+      </div>
+      <div className="col-span-4 sm:col-span-1">
+        <label className="label">Custo</label>
+        <InputNumero
+          className="input"
+          value={p.custoUnit}
+          onChange={(v) => setPeca(i, { ...p, custoUnit: v ?? 0 })}
+        />
+      </div>
+      <div className="col-span-4 sm:col-span-2">
+        <label className="label">Preço</label>
+        <InputNumero
+          className="input"
+          value={p.precoUnit}
+          onChange={(v) => setPeca(i, { ...p, precoUnit: v ?? 0 })}
+        />
+      </div>
+      <div className="col-span-1">
+        <button className="btn-ghost !p-2 text-red-500" onClick={() => delPeca(i)}>
+          <Trash size={16} />
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <Modal
@@ -657,61 +908,123 @@ const OSForm: React.FC<{
           </div>
         </div>
 
+        <div>
+          <label className="label">Fotos do aparelho na entrada</label>
+          <FotosAparelho
+            fotos={os.fotos || []}
+            onChange={(fotos) => setOs({ ...os, fotos })}
+          />
+        </div>
+
         {/* Peças */}
         <fieldset className="rounded-xl border border-slate-200 p-4">
           <legend className="px-2 text-sm font-bold text-slate-600">Peças e produtos</legend>
-          <div className="space-y-2">
-            {os.pecas.map((p, i) => (
-              <div key={i} className="grid grid-cols-12 items-end gap-2">
-                <div className="col-span-12 sm:col-span-4">
-                  <label className="label">Descrição</label>
-                  <input className="input" value={p.descricao} onChange={(e) => setPeca(i, { ...p, descricao: e.target.value })} />
+
+          {/*
+            A escolha vem antes de digitar: um orçamento ou vários. Decidir
+            depois obriga a remexer peça por peça, e cada opção pode ter mais
+            de uma peça (fonte E SSD), não só uma alternativa isolada.
+          */}
+          <div className="mb-3 flex flex-wrap gap-2 text-xs">
+            <button
+              type="button"
+              onClick={usarOrcamentoUnico}
+              className={`rounded-full px-3 py-1.5 font-semibold ${
+                varios ? "bg-white text-slate-600 ring-1 ring-slate-200" : "bg-brand-600 text-white"
+              }`}
+            >
+              Orçamento único
+            </button>
+            <button
+              type="button"
+              onClick={varios ? undefined : usarVariosOrcamentos}
+              className={`rounded-full px-3 py-1.5 font-semibold ${
+                varios ? "bg-brand-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200"
+              }`}
+            >
+              Mais de uma opção para o cliente
+            </button>
+          </div>
+
+          {varios ? (
+            <div className="space-y-4">
+              <div>
+                <p className="label">Entra em qualquer opção</p>
+                <div className="space-y-2">
+                  {os.pecas.map((p, i) =>
+                    opcaoDaPeca(p) ? null : linhaPeca(p, i)
+                  )}
                 </div>
-                <div className="col-span-6 sm:col-span-3">
-                  <label className="label">Do estoque</label>
-                  <select className="input" value={p.produtoId || ""} onChange={(e) => vincularProduto(i, e.target.value)}>
-                    <option value="">Manual</option>
-                    {produtos.map((pr) => (
-                      <option key={pr.id} value={pr.id}>{pr.nome}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-span-3 sm:col-span-1">
-                  <label className="label">Qtd</label>
-                  <InputNumero
-                    min={1}
-                    className="input"
-                    value={p.quantidade}
-                    onChange={(v) => setPeca(i, { ...p, quantidade: (v ?? 0) })}
-                  />
-                </div>
-                <div className="col-span-4 sm:col-span-1">
-                  <label className="label">Custo</label>
-                  <InputNumero
-                    className="input"
-                    value={p.custoUnit}
-                    onChange={(v) => setPeca(i, { ...p, custoUnit: (v ?? 0) })}
-                  />
-                </div>
-                <div className="col-span-4 sm:col-span-2">
-                  <label className="label">Preço</label>
-                  <InputNumero
-                    className="input"
-                    value={p.precoUnit}
-                    onChange={(v) => setPeca(i, { ...p, precoUnit: (v ?? 0) })}
-                  />
-                </div>
-                <div className="col-span-1">
-                  <button className="btn-ghost !p-2 text-red-500" onClick={() => delPeca(i)}>
-                    <Trash size={16} />
+                <button
+                  className="btn-secondary mt-2 !py-1.5 text-xs"
+                  onClick={() => addPeca(undefined)}
+                >
+                  <Plus size={14} /> Item comum
+                </button>
+              </div>
+
+              {nomes.map((nome) => (
+                <div
+                  key={nome}
+                  className={`rounded-xl border-2 p-3 ${
+                    nome === escolhida ? "border-brand-400 bg-brand-50/40" : "border-slate-200"
+                  }`}
+                >
+                  <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                    <label className="flex cursor-pointer items-center gap-1.5 text-sm font-bold text-slate-700">
+                      <input
+                        type="radio"
+                        className="accent-brand-600"
+                        name="opcao-escolhida-os"
+                        checked={nome === escolhida}
+                        onChange={() => setOs(comOpcao(os, nome))}
+                      />
+                      {nome}
+                    </label>
+                    <button className="btn-ghost !p-1 text-xs" onClick={() => renomear(nome)}>
+                      <Pencil size={13} /> Renomear
+                    </button>
+                    <button className="btn-ghost !p-1 text-xs text-red-500" onClick={() => remover(nome)}>
+                      <Trash size={13} /> Apagar opção
+                    </button>
+                    <span className="ml-auto text-sm">
+                      Serviço com esta opção:{" "}
+                      <b className="text-slate-800">{brl(totalComOpcao(os, nome))}</b>
+                      <span className="ml-2 text-xs text-slate-500">
+                        lucro {brl(totalComOpcao(os, nome) - custoComOpcao(os, nome))}
+                      </span>
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {os.pecas.map((p, i) => (opcaoDaPeca(p) === nome ? linhaPeca(p, i) : null))}
+                  </div>
+                  <button
+                    className="btn-secondary mt-2 !py-1.5 text-xs"
+                    onClick={() => addPeca(nome)}
+                  >
+                    <Plus size={14} /> Peça nesta opção
                   </button>
                 </div>
-              </div>
-            ))}
-          </div>
-          <button className="btn-secondary mt-3 !py-1.5 text-xs" onClick={addPeca}>
-            <Plus size={14} /> Adicionar peça
-          </button>
+              ))}
+
+              <button className="btn-secondary !py-1.5 text-xs" onClick={addOpcao}>
+                <Plus size={14} /> Adicionar outra opção
+              </button>
+
+              <p className="text-xs text-slate-500">
+                O marcado é o que a loja sugere. O cliente troca pelo link de
+                acompanhamento, e só a opção escolhida entra no total e baixa
+                do estoque.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">{os.pecas.map(linhaPeca)}</div>
+              <button className="btn-secondary mt-3 !py-1.5 text-xs" onClick={() => addPeca()}>
+                <Plus size={14} /> Adicionar peça
+              </button>
+            </>
+          )}
         </fieldset>
 
         {/* Financeiro */}
@@ -735,11 +1048,22 @@ const OSForm: React.FC<{
           </Field>
         </div>
 
-        <div className="flex flex-wrap justify-end gap-6 rounded-xl bg-slate-50 p-4 text-sm">
-          <span>Peças: <b>{brl(totalPecas(os))}</b></span>
-          <span>Custo: <b className="text-red-600">{brl(custoPecas(os))}</b></span>
-          <span>Total: <b className="text-lg text-slate-800">{brl(totalOS(os))}</b></span>
-          <span>Lucro: <b className="text-emerald-600">{brl(lucroOS(os))}</b></span>
+        <div className="rounded-xl bg-slate-50 p-4 text-sm">
+          <div className="flex flex-wrap justify-end gap-6">
+            <span>Peças: <b>{brl(totalPecas(os))}</b></span>
+            <span>Custo: <b className="text-red-600">{brl(custoPecas(os))}</b></span>
+            <span>Total: <b className="text-lg text-slate-800">{brl(totalOS(os))}</b></span>
+            <span>Lucro: <b className="text-emerald-600">{brl(lucroOS(os))}</b></span>
+          </div>
+          {/* O total mostra a opção sugerida. Sem este aviso a loja cobrava
+              pela sugestão achando que era decisão do cliente. */}
+          {!faixa.definido && (
+            <p className="mt-2 text-right text-xs text-amber-700">
+              O cliente ainda não escolheu. O serviço vai sair de{" "}
+              <b>{brl(faixa.minimo)}</b> a <b>{brl(faixa.maximo)}</b> — o total
+              acima é o da opção sugerida (<b>{escolhida}</b>).
+            </p>
+          )}
         </div>
 
         <Field label="Observações internas">
@@ -773,7 +1097,11 @@ const OSDetalhe: React.FC<{
   // o link leva a loja: a consulta pública só devolve dados desta loja
   const trackingUrl = `${window.location.origin}${window.location.pathname}#/rastreio/${codigoOS(os.numero)}?loja=${obterLoja() || ""}`;
   const imprimir = () => {
-    printHTML(reciboOS(os, cliente, config, { incluirCliente }), codigoOS(os.numero));
+    printHTML(
+      reciboOS(os, cliente, config, { incluirCliente }),
+      codigoOS(os.numero),
+      config.papelImpressao || "a4"
+    );
   };
   const linkRastreio = () => {
     const url = trackingUrl;
@@ -912,6 +1240,50 @@ const OSDetalhe: React.FC<{
           </div>
         )}
 
+        {/* Garantia: resposta pronta, com botão para colar no WhatsApp.
+            Negar garantia válida perde o cliente; honrar garantia vencida
+            paga peça que já foi paga uma vez. */}
+        {(() => {
+          const g = garantiaDaOS(os);
+          if (g.situacao === "sem_garantia") return null;
+          return (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-3 no-print">
+              <span className={`badge ${GARANTIA_META[g.situacao].cor}`}>
+                <ShieldCheck size={12} /> {GARANTIA_META[g.situacao].label}
+              </span>
+              <span className="min-w-0 flex-1 text-sm text-slate-600">
+                {textoDaGarantia(os)}
+              </span>
+              {cliente?.telefone && (
+                <button
+                  className="btn-secondary !py-1.5 text-xs"
+                  onClick={() => abrirWhatsapp(txt(cliente.telefone), textoDaGarantia(os))}
+                >
+                  <MessageCircle size={14} /> Responder
+                </button>
+              )}
+            </div>
+          );
+        })()}
+
+        {/* Fotos da entrada: saem na impressão junto com o termo de guarda,
+            que é onde elas valem como prova do estado do aparelho. */}
+        {(os.fotos || []).length > 0 && (
+          <div>
+            <p className="label">Estado na entrada</p>
+            <div className="flex flex-wrap gap-2">
+              {(os.fotos || []).map((url) => (
+                <img
+                  key={url}
+                  src={url}
+                  alt=""
+                  className="h-24 w-24 rounded-lg border border-slate-200 object-cover"
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Peças */}
         {os.pecas.length > 0 && (
           <div>
@@ -926,14 +1298,26 @@ const OSDetalhe: React.FC<{
                 </tr>
               </thead>
               <tbody>
-                {os.pecas.map((p, i) => (
-                  <tr key={i} className="border-b border-slate-100">
-                    <td className="py-1.5">{p.descricao}</td>
-                    <td className="py-1.5 text-center">{p.quantidade}</td>
-                    <td className="py-1.5 text-right">{brl(p.precoUnit)}</td>
-                    <td className="py-1.5 text-right">{brl(p.precoUnit * p.quantidade)}</td>
-                  </tr>
-                ))}
+                {os.pecas.map((p, i) => {
+                  // Opção recusada continua à vista, mas apagada: some do
+                  // total sem sumir do histórico do orçamento.
+                  const nome = opcaoDaPeca(p);
+                  const recusada = !!nome && nome !== opcaoAtual(os);
+                  return (
+                    <tr
+                      key={i}
+                      className={`border-b border-slate-100 ${recusada ? "text-slate-400 line-through" : ""}`}
+                    >
+                      <td className="py-1.5">
+                        {p.descricao}
+                        {nome && <span className="ml-1.5 text-xs no-underline">({nome})</span>}
+                      </td>
+                      <td className="py-1.5 text-center">{p.quantidade}</td>
+                      <td className="py-1.5 text-right">{brl(p.precoUnit)}</td>
+                      <td className="py-1.5 text-right">{brl(p.precoUnit * p.quantidade)}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

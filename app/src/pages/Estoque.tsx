@@ -1,10 +1,22 @@
 import React, { useMemo, useState } from "react";
 import { aviso } from "../components/Aviso";
-import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck, FileQuestion, Wrench, CalendarX } from "lucide-react";
+import { ImagemUpload } from "../components/ImagemUpload";
+import { Etiquetas } from "../components/Etiquetas";
+import { EntradaNota } from "../components/EntradaNota";
+import { Inventario } from "../components/Inventario";
+import { Reposicao } from "../components/Reposicao";
+import { minimoSugerido } from "../lib/reposicao";
+import { aoApagarProduto, textoDaConfirmacao } from "../lib/exclusao";
+import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck, FileQuestion, Wrench, CalendarX, Tag, ClipboardCheck, ShoppingBasket } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { temRecurso } from "../lib/ramos";
 import { situacaoValidade, produtosVencendo, VALIDADE_META } from "../lib/pdv";
+import {
+  promocaoValendo,
+  percentualDaPromocao,
+  problemaNaPromocao,
+} from "../lib/promocao";
 import { Cotacoes } from "../components/Cotacoes";
 import { uid, nowISO, brl, txt, formatDate } from "../lib/format";
 import type { Produto, Categoria, Fornecedor } from "../lib/types";
@@ -26,13 +38,17 @@ const vazio = (): Produto => ({
 });
 
 export const Estoque: React.FC = () => {
-  const { produtos, categorias, fornecedores, cotacoes, ramo, saveProduto, removeProduto, saveCategoria, removeCategoria, saveFornecedor, removeFornecedor } = useApp();
+  const { produtos, categorias, fornecedores, cotacoes, vendas, ordens, ramo, saveProduto, removeProduto, saveCategoria, removeCategoria, saveFornecedor, removeFornecedor } = useApp();
   const [busca, setBusca] = useState("");
   const [editando, setEditando] = useState<Produto | null>(null);
   const [soBaixo, setSoBaixo] = useState(false);
   const [gerCategorias, setGerCategorias] = useState(false);
   const [gerFornecedores, setGerFornecedores] = useState(false);
   const [verCotacoes, setVerCotacoes] = useState(false);
+  const [etiquetas, setEtiquetas] = useState(false);
+  const [entrada, setEntrada] = useState(false);
+  const [inventario, setInventario] = useState(false);
+  const [reposicao, setReposicao] = useState(false);
 
   const classes = useMemo(
     () => categorias.filter((c) => !c.paiId).sort((a, b) => txt(a.nome).localeCompare(txt(b.nome))),
@@ -92,6 +108,14 @@ export const Estoque: React.FC = () => {
   const salvar = async () => {
     if (!editando) return;
     if (!editando.nome.trim()) return aviso.alerta("Informe o nome do produto.");
+    // Promoção mais cara que o preço normal só aparece quando o cliente
+    // reclama no balcão. Abaixo do custo passa com confirmação: queima de
+    // estoque vencendo às vezes vale a pena.
+    const aviProm = problemaNaPromocao(editando);
+    if (aviProm.startsWith("O preço promocional") || aviProm.startsWith("A promoção termina")) {
+      return aviso.alerta(aviProm);
+    }
+    if (aviProm && !confirm(`${aviProm}\n\nSalvar assim mesmo?`)) return;
     // grava os textos de categoria/fornecedor para exibição/compatibilidade
     const p = {
       ...editando,
@@ -124,6 +148,18 @@ export const Estoque: React.FC = () => {
             <button className="btn-secondary" onClick={() => setGerFornecedores(true)}>
               <Truck size={18} /> Fornecedores
             </button>
+            <button className="btn-secondary" onClick={() => setReposicao(true)}>
+              <ShoppingBasket size={18} /> O que comprar
+            </button>
+            <button className="btn-secondary" onClick={() => setEntrada(true)}>
+              <Truck size={18} /> Entrada
+            </button>
+            <button className="btn-secondary" onClick={() => setInventario(true)}>
+              <ClipboardCheck size={18} /> Contagem
+            </button>
+            <button className="btn-secondary" onClick={() => setEtiquetas(true)}>
+              <Tag size={18} /> Etiquetas
+            </button>
             <button className="btn-secondary" onClick={() => setGerCategorias(true)}>
               <FolderTree size={18} /> Categorias
             </button>
@@ -133,6 +169,11 @@ export const Estoque: React.FC = () => {
           </div>
         }
       />
+
+      {etiquetas && <Etiquetas onClose={() => setEtiquetas(false)} />}
+      {entrada && <EntradaNota onClose={() => setEntrada(false)} />}
+      {inventario && <Inventario onClose={() => setInventario(false)} />}
+      {reposicao && <Reposicao onClose={() => setReposicao(false)} />}
 
       {/* Vencimento: só para quem vende coisa que estraga */}
       {temRecurso(ramo, "validade") && vencendo.length > 0 && (
@@ -207,23 +248,42 @@ export const Estoque: React.FC = () => {
                 return (
                   <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50">
                     <td className="px-4 py-3">
-                      <p className="flex flex-wrap items-center gap-1.5 font-semibold text-slate-800">
-                        {p.nome}
-                        {(() => {
-                          const v = situacaoValidade(p);
-                          return v === "vencido" || v === "vence_perto" ? (
-                            <span className={`badge ${VALIDADE_META[v].cor}`}>
-                              {VALIDADE_META[v].label}
-                            </span>
-                          ) : null;
-                        })()}
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        {nomeCat(p)}
-                        {p.sku ? ` · ${p.sku}` : ""}
-                        {p.porPeso ? " · por kg" : ""}
-                        {p.validade ? ` · vence ${formatDate(p.validade)}` : ""}
-                      </p>
+                      <div className="flex items-center gap-3">
+                        {/* Miniatura só quando existe: um quadro cinza vazio
+                            em cada linha só faz a lista ficar mais alta. */}
+                        {p.imagemUrl && (
+                          <img
+                            src={p.imagemUrl}
+                            alt=""
+                            loading="lazy"
+                            className="h-10 w-10 shrink-0 rounded-lg border border-slate-200 object-cover"
+                          />
+                        )}
+                        <div className="min-w-0">
+                          <p className="flex flex-wrap items-center gap-1.5 font-semibold text-slate-800">
+                            {p.nome}
+                            {promocaoValendo(p) && (
+                              <span className="badge bg-emerald-100 text-emerald-700">
+                                <Tag size={11} /> -{percentualDaPromocao(p)}%
+                              </span>
+                            )}
+                            {(() => {
+                              const v = situacaoValidade(p);
+                              return v === "vencido" || v === "vence_perto" ? (
+                                <span className={`badge ${VALIDADE_META[v].cor}`}>
+                                  {VALIDADE_META[v].label}
+                                </span>
+                              ) : null;
+                            })()}
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            {nomeCat(p)}
+                            {p.sku ? ` · ${p.sku}` : ""}
+                            {p.porPeso ? " · por kg" : ""}
+                            {p.validade ? ` · vence ${formatDate(p.validade)}` : ""}
+                          </p>
+                        </div>
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-center">
                       {p.servico ? (
@@ -243,7 +303,14 @@ export const Estoque: React.FC = () => {
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1">
                         <button className="btn-ghost !p-2" onClick={() => setEditando(p)}><Pencil size={15} /></button>
-                        <button className="btn-ghost !p-2 text-red-500" onClick={() => { if (confirm(`Excluir ${p.nome}?`)) removeProduto(p.id); }}><Trash2 size={15} /></button>
+                        <button className="btn-ghost !p-2 text-red-500" onClick={() => {
+                          // Produto já vendido não se apaga: o cupom do
+                          // cliente cita o nome, e o relatório passaria a
+                          // mostrar venda de item que não existe.
+                          const r = aoApagarProduto(p, { vendas, ordens });
+                          if (!r.pode) return aviso.alerta(`${r.titulo}\n\n${r.saida}`);
+                          if (confirm(textoDaConfirmacao(r))) removeProduto(p.id);
+                        }}><Trash2 size={15} /></button>
                       </div>
                     </td>
                   </tr>
@@ -304,6 +371,19 @@ export const Estoque: React.FC = () => {
             <Field label="Código / SKU">
               <input className="input" value={editando.sku} onChange={(e) => setEditando({ ...editando, sku: e.target.value })} />
             </Field>
+
+            {/* Foto do produto: no balcão cheio, achar pela imagem é mais
+                rápido do que ler o nome de dez itens parecidos. */}
+            <div className="sm:col-span-2">
+              <ImagemUpload
+                label="Foto do produto"
+                url={editando.imagemUrl}
+                onChange={(imagemUrl) => setEditando({ ...editando, imagemUrl })}
+                pasta="produtos"
+                lado={600}
+                dica="Aparece na lista do estoque e na frente de caixa. Enviada na hora."
+              />
+            </div>
 
             {/* Recursos do ramo: só aparecem para quem realmente usa */}
             {(temRecurso(ramo, "peso") || temRecurso(ramo, "validade")) && (
@@ -391,6 +471,26 @@ export const Estoque: React.FC = () => {
                     onChange={(v) => setEditando({ ...editando, quantidade: (v ?? 0) })}
                   />
                 </Field>
+
+            {/* Estoque mínimo sugerido pelo consumo real. O número do
+                cadastro é um chute que ninguém revisita — este diz quanto ele
+                deveria ser para o produto não acabar antes da próxima compra. */}
+            {(() => {
+              const sugerido = minimoSugerido(editando, vendas);
+              if (sugerido <= 0 || sugerido === editando.estoqueMinimo) return null;
+              return (
+                <p className="sm:col-span-2 -mt-2 text-xs text-slate-500">
+                  Pelo consumo dos últimos 30 dias, o mínimo deveria ser{" "}
+                  <button
+                    className="font-bold text-brand-600 underline"
+                    onClick={() => setEditando({ ...editando, estoqueMinimo: sugerido })}
+                  >
+                    {sugerido}
+                  </button>{" "}
+                  para cobrir uma semana.
+                </p>
+              );
+            })()}
                 <Field label="Estoque mínimo (alerta)">
                   <InputNumero
                     className="input"
@@ -414,6 +514,49 @@ export const Estoque: React.FC = () => {
                 onChange={(v) => setEditando({ ...editando, preco: (v ?? 0) })}
               />
             </Field>
+
+            {/* Promoção com prazo. O preço cheio fica de pé e volta sozinho:
+                promover editando o preço na mão dava certo até a hora de
+                destrocar, que ninguém lembrava. */}
+            <div className="sm:col-span-2 rounded-xl border border-slate-200 p-3">
+              <p className="mb-2 flex items-center gap-1.5 text-sm font-semibold text-slate-600">
+                <Tag size={15} /> Promoção (opcional)
+              </p>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <Field label={editando.porPeso ? "Preço promocional /kg" : "Preço promocional"}>
+                  <InputNumero
+                    className="input"
+                    value={editando.precoPromocional}
+                    onChange={(v) => setEditando({ ...editando, precoPromocional: v })}
+                  />
+                </Field>
+                <Field label="Começa em">
+                  <input
+                    type="date"
+                    className="input"
+                    value={editando.promocaoInicio || ""}
+                    onChange={(e) => setEditando({ ...editando, promocaoInicio: e.target.value })}
+                  />
+                </Field>
+                <Field label="Termina em">
+                  <input
+                    type="date"
+                    className="input"
+                    value={editando.promocaoFim || ""}
+                    onChange={(e) => setEditando({ ...editando, promocaoFim: e.target.value })}
+                  />
+                </Field>
+              </div>
+              {problemaNaPromocao(editando) && (
+                <p className="mt-2 text-xs text-amber-700">{problemaNaPromocao(editando)}</p>
+              )}
+              {promocaoValendo(editando) && (
+                <p className="mt-2 text-xs text-emerald-700">
+                  Valendo hoje: {percentualDaPromocao(editando)}% de desconto. Sem data de
+                  fim, vale até você tirar.
+                </p>
+              )}
+            </div>
             <Field label="Fornecedor" className="sm:col-span-2">
               <select
                 className="input"

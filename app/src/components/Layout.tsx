@@ -22,6 +22,7 @@ import {
   CalendarDays,
   ShoppingCart,
   RefreshCw,
+  CloudOff,
   AlertTriangle,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
@@ -58,7 +59,7 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
   onLogout,
   sessao,
 }) => {
-  const { config, online, erroCarga, loading, reload, ramo, ramoAparelho, trocarRamoAparelho } = useApp();
+  const { config, online, erroCarga, loading, reload, pendentes, sincronizar, ramo, ramoAparelho, trocarRamoAparelho } = useApp();
   const [open, setOpen] = useState(false);
   const [busca, setBusca] = useState(false);
   const navigate = useNavigate();
@@ -290,6 +291,24 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
             </p>
             <button className="btn-secondary mt-2 !py-1.5 text-xs" onClick={() => reload()}>
               <RefreshCw size={14} /> Tentar de novo
+            </button>
+          </div>
+        )}
+
+        {/* Venda que não gravou por falta de internet PRECISA estar à vista.
+            O cliente já levou a mercadoria e o troco já saiu da gaveta: o
+            operador tem que saber que aquilo ainda não existe no banco. */}
+        {pendentes > 0 && (
+          <div className="mx-4 mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 sm:mx-6 lg:mx-8 no-print">
+            <p className="flex items-center gap-2 text-sm font-bold text-amber-800">
+              <CloudOff size={16} /> {pendentes} registro(s) esperando internet
+            </p>
+            <p className="mt-1 text-sm text-amber-700">
+              Foram salvos neste aparelho e vão para a nuvem sozinhos quando a conexão
+              voltar. Não feche o navegador nem limpe os dados do site até o aviso sumir.
+            </p>
+            <button className="btn-secondary mt-2 !py-1.5 text-xs" onClick={() => sincronizar()}>
+              <RefreshCw size={14} /> Tentar enviar agora
             </button>
           </div>
         )}

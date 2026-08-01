@@ -10,6 +10,7 @@ import {
   ThumbsUp,
   ThumbsDown,
   ShieldCheck,
+  ListChecks,
 } from "lucide-react";
 import { supabase, supabaseEnabled } from "../lib/supabase";
 import { brl, formatDateTime, codigoOS } from "../lib/format";
@@ -25,6 +26,27 @@ const FLUXO: OSStatus[] = [
   "entregue",
 ];
 
+/** Uma peça dentro de um orçamento */
+interface ItemPublico {
+  descricao: string;
+  quantidade: number;
+  valor: number;
+}
+
+/**
+ * Um orçamento alternativo, como o servidor devolve.
+ *
+ * O total já é o do SERVIÇO INTEIRO com esta opção — mão de obra e itens
+ * comuns incluídos. É sobre este número que o cliente decide, e ele não tem
+ * como somar de cabeça o que está espalhado em três lugares.
+ */
+interface OpcaoPublica {
+  nome: string;
+  total: number;
+  escolhida: boolean;
+  itens: ItemPublico[] | null;
+}
+
 /** Dados mínimos que o cliente pode ver — nada além disso sai do servidor */
 interface OSPublica {
   numero: number;
@@ -33,6 +55,7 @@ interface OSPublica {
   modelo: string | null;
   primeiroNome: string | null;
   total: number | null;
+  opcoes: OpcaoPublica[] | null;
   atualizadoEm: string | null;
 }
 
@@ -48,6 +71,8 @@ export const Rastreio: React.FC = () => {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
+  /** Nome do orçamento que o cliente marcou */
+  const [escolha, setEscolha] = useState("");
   const loja = lojaDoLink();
 
   const numero = codigo ? parseInt(codigo.replace(/\D/g, ""), 10) : 0;
@@ -71,7 +96,10 @@ export const Rastreio: React.FC = () => {
         setOs(null);
         setErro("Ordem não encontrada.");
       } else {
-        setOs(linha as OSPublica);
+        const publica = linha as OSPublica;
+        setOs(publica);
+        // A sugestão da loja já vem marcada; o cliente troca se quiser.
+        setEscolha((publica.opcoes || []).find((o) => o.escolhida)?.nome || "");
       }
     } catch {
       setErro("Não foi possível consultar agora. Tente novamente em instantes.");
@@ -90,10 +118,23 @@ export const Rastreio: React.FC = () => {
     if (n) navigate(`/rastreio/${codigoOS(n)}?loja=${loja}`);
   };
 
+  // Um orçamento só não é escolha: ele já está somado no total.
+  const opcoes = (os?.opcoes || []).length >= 2 ? os?.opcoes || [] : [];
+  const marcada = opcoes.find((o) => o.nome === escolha);
+  const faltaEscolher = opcoes.length > 0 && !marcada;
+
+  /** O total do orçamento marcado; sem opções, o total que o servidor mandou */
+  const totalEscolhido = (): number =>
+    marcada ? Number(marcada.total) || 0 : Number(os?.total) || 0;
+
   const decidir = async (aprovar: boolean) => {
     if (!os || enviando || !supabase) return;
+    if (aprovar && faltaEscolher) {
+      aviso.erro("Escolha uma das opções antes de aprovar.");
+      return;
+    }
     const texto = aprovar
-      ? "Confirma a APROVAÇÃO do orçamento e a execução do serviço?"
+      ? `Confirma a APROVAÇÃO do orçamento de ${brl(totalEscolhido())} e a execução do serviço?`
       : "Confirma que NÃO deseja realizar o serviço?";
     if (!confirm(texto)) return;
     setEnviando(true);
@@ -102,6 +143,7 @@ export const Rastreio: React.FC = () => {
         p_loja: loja,
         p_numero: os.numero,
         p_aprovar: aprovar,
+        p_escolha: marcada?.nome ?? null,
       });
       if (error || data === false) throw new Error();
       await consultar();
@@ -168,10 +210,70 @@ export const Rastreio: React.FC = () => {
                 <p className="mt-1 text-sm opacity-90">{meta.cliente}</p>
               </div>
 
+              {/*
+                Escolha do orçamento. Vem ANTES do valor porque é ela que
+                define o valor: mostrar o total primeiro e a escolha depois
+                fazia o número mudar debaixo do olho do cliente.
+              */}
+              {opcoes.length > 0 && (
+                <div className="mb-5">
+                  <p className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
+                    <ListChecks size={16} /> Escolha uma opção de conserto
+                  </p>
+                  <p className="mb-3 mt-0.5 text-xs text-slate-500">
+                    Cada opção já é o valor do serviço completo.
+                  </p>
+                  <div className="space-y-2">
+                    {opcoes.map((op) => {
+                      const ativa = escolha === op.nome;
+                      return (
+                        <label
+                          key={op.nome}
+                          className={`flex cursor-pointer gap-3 rounded-xl border-2 p-3 ${
+                            ativa ? "border-brand-600 bg-brand-50" : "border-slate-200 bg-white"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="opcao-orcamento"
+                            className="mt-1 h-4 w-4 shrink-0 accent-brand-600"
+                            checked={ativa}
+                            onChange={() => setEscolha(op.nome)}
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-baseline justify-between gap-2">
+                              <b className="text-sm text-slate-800">{op.nome}</b>
+                              <b className="shrink-0 text-base text-slate-800">
+                                {brl(Number(op.total) || 0)}
+                              </b>
+                            </span>
+                            {/* Sem os itens o cliente escolhe entre dois preços
+                                sem saber o que muda de um para o outro. */}
+                            <span className="mt-1 block space-y-0.5 text-xs text-slate-500">
+                              {(op.itens || []).map((i, n) => (
+                                <span key={n} className="block">
+                                  {i.descricao}
+                                  {Number(i.quantidade) > 1 ? ` (${i.quantidade}x)` : ""} —{" "}
+                                  {brl(Number(i.valor) || 0)}
+                                </span>
+                              ))}
+                            </span>
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {os.total != null && os.total > 0 && (
                 <div className="mb-5 rounded-xl bg-emerald-50 p-4 text-center">
-                  <p className="text-sm text-emerald-700">Valor do serviço</p>
-                  <p className="text-2xl font-bold text-emerald-700">{brl(Number(os.total))}</p>
+                  <p className="text-sm text-emerald-700">
+                    {opcoes.length > 0 ? "Total com a opção escolhida" : "Valor do serviço"}
+                  </p>
+                  <p className="text-2xl font-bold text-emerald-700">
+                    {brl(totalEscolhido())}
+                  </p>
                 </div>
               )}
 
@@ -180,8 +282,17 @@ export const Rastreio: React.FC = () => {
                   <p className="mb-3 text-center text-sm font-semibold text-amber-800">
                     Podemos executar o serviço?
                   </p>
+                  {faltaEscolher && (
+                    <p className="mb-3 text-center text-xs text-amber-700">
+                      Antes de aprovar, escolha uma das opções acima.
+                    </p>
+                  )}
                   <div className="flex gap-2">
-                    <button className="btn-success flex-1" disabled={enviando} onClick={() => decidir(true)}>
+                    <button
+                      className="btn-success flex-1"
+                      disabled={enviando || faltaEscolher}
+                      onClick={() => decidir(true)}
+                    >
                       <ThumbsUp size={16} /> Aprovar
                     </button>
                     <button className="btn-secondary flex-1" disabled={enviando} onClick={() => decidir(false)}>
