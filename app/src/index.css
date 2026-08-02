@@ -59,6 +59,38 @@ body {
 .animar-entrada { animation: entrada 0.18s ease-out both; }
 .animar-surgir  { animation: surgir 0.15s ease-out both; }
 
+/* ====== MARCA VIVA ======
+   A tela de entrada era uma foto parada, e foto parada com o campo de senha
+   em cima parece sistema travado. A marca respira e solta um anel: movimento
+   suficiente para dizer que está vivo, devagar o bastante para não brigar
+   com quem está digitando. Mesmo desenho da abertura em index.html. */
+@keyframes respira {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50%      { transform: translateY(-4px) scale(1.04); }
+}
+@keyframes anel {
+  0%        { transform: scale(1); opacity: .55; }
+  70%, 100% { transform: scale(1.55); opacity: 0; }
+}
+.marca-viva { animation: respira 2.4s ease-in-out infinite; }
+.marca-viva::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 2px solid rgb(251 191 36 / 0.55);
+  animation: anel 2.4s ease-out infinite;
+}
+
+/* Fundo da tela de entrada: o mesmo da abertura, para a passagem de uma
+   para a outra não ser um corte de cor na cara de quem está entrando. */
+.fundo-entrada {
+  background:
+    radial-gradient(65% 45% at 50% 8%, rgb(249 115 22 / 0.30), transparent 72%),
+    radial-gradient(70% 50% at 50% 105%, rgb(251 191 36 / 0.14), transparent 70%),
+    #0f172a;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

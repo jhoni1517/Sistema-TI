@@ -59,20 +59,47 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        background: #0f172a;
+        /* O MESMO fundo do background_color do manifest. Diferentes, a
+           abertura do Android piscava de marrom para azul no primeiro
+           segundo — e é esse segundo que dá a impressão de app mal-acabado. */
+        background:
+          radial-gradient(58% 34% at 50% 44%, rgba(249, 115, 22, .26), transparent 72%),
+          radial-gradient(70% 45% at 50% 105%, rgba(251, 191, 36, .12), transparent 70%),
+          #0f172a;
         font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
         transition: opacity .35s ease;
       }
       #abertura.saindo { opacity: 0; pointer-events: none; }
       .ab-caixa { text-align: center; padding: 0 24px; max-width: 340px; }
       .ab-marca {
+        position: relative;
         width: 76px; height: 76px; margin: 0 auto 18px;
         border-radius: 20px;
         display: flex; align-items: center; justify-content: center;
-        background: linear-gradient(135deg, #fbbf24, #ea580c);
+        background: linear-gradient(135deg, #fcd34d, #f59e0b 45%, #e2530a);
         color: #1c1917;
         box-shadow: 0 14px 34px rgba(234, 88, 12, .32);
         overflow: hidden;
+        /* O ícone respira enquanto carrega. Sem isso a abertura é uma foto
+           parada, e foto parada por dois segundos parece travamento. */
+        animation: ab-respira 2.4s ease-in-out infinite;
+      }
+      /* Anel que sai da marca: diz que a coisa está viva sem pedir atenção */
+      .ab-marca::after {
+        content: "";
+        position: absolute; inset: 0;
+        border-radius: 20px;
+        border: 2px solid rgba(251, 191, 36, .55);
+        animation: ab-anel 2.4s ease-out infinite;
+      }
+      @keyframes ab-respira {
+        0%, 100% { transform: translateY(0) scale(1); }
+        50%      { transform: translateY(-4px) scale(1.04); }
+      }
+      @keyframes ab-anel {
+        0%   { transform: scale(1); opacity: .55; }
+        70%  { transform: scale(1.55); opacity: 0; }
+        100% { transform: scale(1.55); opacity: 0; }
       }
       /* Logo da loja: preenche a caixa toda, sem o fundo laranja aparecendo */
       .ab-marca.tem-logo { background: #fff; padding: 0; }
@@ -100,6 +127,8 @@
       /* Quem pediu menos animação no aparelho não leva animação nenhuma */
       @media (prefers-reduced-motion: reduce) {
         .ab-barra span { animation: none; width: 100%; }
+        .ab-marca, .ab-marca::after { animation: none; }
+        .ab-marca::after { opacity: 0; }
       }
     </style>
 

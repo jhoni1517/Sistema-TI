@@ -11,6 +11,7 @@ import {
   CONVITE_PENDENTE,
 } from "../lib/auth";
 import { supabaseEnabled } from "../lib/supabase";
+import { marcaDoAparelho } from "../lib/db";
 import {
   RAMOS,
   RAMO_META,
@@ -52,6 +53,14 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
   const [ramo, setRamo] = useState<Ramo | null>(() => lerRamoAparelho());
   /** Mostra os quatro tipos mesmo quando o aparelho já conhece a conta */
   const [verTipos, setVerTipos] = useState(false);
+  /**
+   * Nome e logo que este aparelho já tem guardados.
+   *
+   * Lido uma vez: é o mesmo dado que a abertura em index.html mostra, e ele
+   * não muda enquanto ninguém entrou. Some no logout junto com o resto do
+   * cache — num balcão compartilhado, a loja anterior não fica na porta.
+   */
+  const [marca] = useState(marcaDoAparelho);
 
   const escolherRamo = (r: Ramo) => {
     const novo = ramo === r ? null : r;
@@ -203,16 +212,46 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
     modo === "entrar" ? "Entrar" : modo === "criar" ? "Criar conta" : "Recuperar senha";
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-brand-900 p-4">
+    <div className="fundo-entrada flex min-h-screen items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
-          {/* Mesma marca do ícone do app: quem toca no âmbar na tela inicial
-              precisa cair numa tela que confirma que abriu o app certo. */}
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-400 to-orange-600 shadow-lg">
-            <Wrench className="text-stone-900" size={30} strokeWidth={2.5} />
+          {/*
+           * A porta é da LOJA, não do sistema.
+           *
+           * Com a logo guardada neste aparelho, é ela que aparece — quem abre
+           * às sete da manhã é o dono, e ver a marca dele antes de digitar a
+           * senha é a diferença entre um app que é da loja e um app genérico
+           * que a loja usa. Sem logo, fica a marca do sistema, que é a mesma
+           * do ícone da tela inicial: quem toca no âmbar precisa cair numa
+           * tela que confirma que abriu o app certo.
+           */}
+          <div
+            className={`marca-viva relative mx-auto mb-4 flex h-[72px] w-[72px] items-center justify-center overflow-hidden rounded-[20px] shadow-lg shadow-orange-900/40 ${
+              marca.logoUrl
+                ? "bg-white"
+                : "bg-gradient-to-br from-amber-300 via-amber-500 to-orange-600"
+            }`}
+          >
+            {marca.logoUrl ? (
+              <img
+                src={marca.logoUrl}
+                alt=""
+                className="h-full w-full object-contain"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            ) : (
+              <Wrench className="text-stone-900" size={32} strokeWidth={2.6} />
+            )}
           </div>
-          <h1 className="text-2xl font-bold text-white">Sistema TI</h1>
-          <p className="text-sm text-slate-400">
+          <h1 className="text-2xl font-bold tracking-tight text-white">
+            {marca.nomeLoja || "Sistema TI"}
+          </h1>
+          <p className="mt-1.5 text-[13px] leading-snug text-slate-400">
+            Abre, vende, conserta e fecha o dia certo.
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
             {ramoNaTela ? RAMO_META[ramoNaTela].descricao : "Caixa, estoque e atendimento"}
           </p>
         </div>
@@ -372,7 +411,21 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
             </p>
           )}
 
-          <button type="submit" className="btn-primary mt-4 w-full" disabled={carregando}>
+          {/*
+           * Âmbar fixo, e não a cor de destaque da loja.
+           *
+           * `btn-primary` segue `corDestaque`, que nasce AZUL. Antes de
+           * entrar não existe loja para ter cor: a tela mostrava um botão
+           * azul embaixo de uma marca âmbar, com a barra do navegador
+           * laranja em volta. Três cores brigando na primeira tela é o que
+           * faz um sistema parecer montado às pressas. Aqui quem manda é a
+           * marca do sistema; lá dentro, a cor que a loja escolheu.
+           */}
+          <button
+            type="submit"
+            className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-orange-600/25 transition-all duration-150 hover:from-amber-500 hover:to-orange-700 active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={carregando}
+          >
             {carregando ? "Aguarde..." : titulo}
           </button>
 
@@ -381,7 +434,7 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
               <>
                 <button
                   type="button"
-                  className="text-brand-600 hover:underline"
+                  className="font-semibold text-orange-600 hover:underline"
                   onClick={() => setModo("criar")}
                 >
                   Tenho um convite — criar conta
@@ -399,7 +452,7 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
             {modo !== "entrar" && (
               <button
                 type="button"
-                className="text-brand-600 hover:underline"
+                className="font-semibold text-orange-600 hover:underline"
                 onClick={() => setModo("entrar")}
               >
                 Voltar para o login

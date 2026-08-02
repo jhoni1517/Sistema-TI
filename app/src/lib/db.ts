@@ -81,6 +81,28 @@ export const obterLoja = (): string | null => lojaAtual;
  */
 const CHAVES_DO_APARELHO = [PREFIX + "config", PREFIX + "ramo-por-conta"];
 
+/**
+ * O que este aparelho já sabe da loja, sem esperar a nuvem.
+ *
+ * Serve para a tela de entrada se apresentar como a LOJA e não como o
+ * sistema: quem abre isso às sete da manhã é o dono, e ver o nome e a logo
+ * dele antes de digitar a senha é a diferença entre um app que é da loja e
+ * um app genérico que a loja usa.
+ *
+ * Sai do mesmo lugar que a abertura em index.html lê, e some no logout
+ * junto com o resto do cache — num balcão compartilhado, a loja anterior
+ * não pode ficar estampada na porta.
+ */
+export const marcaDoAparelho = (): { nomeLoja?: string; logoUrl?: string } => {
+  try {
+    const c = JSON.parse(localStorage.getItem(PREFIX + "config") || "{}");
+    return { nomeLoja: c.nomeLoja || undefined, logoUrl: c.logoUrl || undefined };
+  } catch {
+    // Configuração ilegível é enfeite a menos, não tela de erro.
+    return {};
+  }
+};
+
 export const limparCacheLocal = () => {
   for (const chave of Object.keys(localStorage)) {
     if (chave.startsWith(PREFIX) && !CHAVES_DO_APARELHO.includes(chave)) {
