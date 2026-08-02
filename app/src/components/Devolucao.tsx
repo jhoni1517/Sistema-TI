@@ -12,6 +12,7 @@ import {
   disponivelParaDevolver,
   podeDevolver,
   descricaoDaDevolucao,
+  formasDaDevolucao,
   type Devolvidos,
 } from "../lib/devolucao";
 import type { MovimentoCaixa, Venda } from "../lib/types";
@@ -81,20 +82,36 @@ export const Devolucao: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       // O dinheiro SAI primeiro, como na venda: se algo falhar depois, sobra
       // lançamento sem baixa — que se conserta olhando o estoque. O
       // contrário some com a devolução e ninguém percebe.
-      const movimento: MovimentoCaixa = {
-        id: uid(),
-        tipo: "saida",
-        categoria: "Devolução",
-        descricao: descricaoDaDevolucao(venda, resumo) + (motivo ? ` - ${motivo}` : ""),
-        valor: resumo.valor,
-        formaPagamento: venda.formaPagamento,
-        sessaoId: sessao?.id,
-        // Estorna o custo da venda desfeita: sem isso o CMV do mês continua
-        // contando mercadoria que voltou para a prateleira.
-        custoRelacionado: -resumo.custo,
-        data: nowISO(),
-      };
-      await saveMovimento(movimento);
+      //
+      // Um lançamento POR FORMA, igual à venda dividida. Devolver R$ 200 de
+      // uma venda de R$ 190 no crédito e R$ 10 em espécie por um lançamento
+      // só, na forma principal, dizia que a maquininha estornou R$ 200 e
+      // deixava os R$ 10 que saíram da gaveta sem origem no papel.
+      const formas = formasDaDevolucao(venda, resumo.valor);
+      const base = nowISO();
+      let movimentoId = "";
+      for (const [i, f] of formas.entries()) {
+        const movimento: MovimentoCaixa = {
+          id: uid(),
+          tipo: "saida",
+          categoria: "Devolução",
+          descricao:
+            descricaoDaDevolucao(venda, resumo) +
+            (formas.length > 1 ? ` - ${f.forma}` : "") +
+            (motivo ? ` - ${motivo}` : ""),
+          valor: f.valor,
+          formaPagamento: f.forma,
+          sessaoId: sessao?.id,
+          // Estorna o custo da venda desfeita: sem isso o CMV do mês continua
+          // contando mercadoria que voltou para a prateleira. Vai INTEIRO no
+          // primeiro lançamento — repartir o custo entre formas de pagamento
+          // não significa nada e só atrapalha conferir de onde saiu o número.
+          custoRelacionado: i === 0 ? -resumo.custo : 0,
+          data: base,
+        };
+        await saveMovimento(movimento);
+        if (i === 0) movimentoId = movimento.id;
+      }
 
       await saveVenda({
         ...venda,
@@ -102,11 +119,11 @@ export const Devolucao: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           ...(venda.devolucoes || []),
           {
             id: uid(),
-            data: nowISO(),
+            data: base,
             itens: escolha,
             valor: resumo.valor,
             motivo: motivo.trim() || undefined,
-            movimentoId: movimento.id,
+            movimentoId,
           },
         ],
       });

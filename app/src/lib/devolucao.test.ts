@@ -6,6 +6,7 @@ import {
   jaDevolvido,
   podeDevolver,
   descricaoDaDevolucao,
+  formasDaDevolucao,
 } from "./devolucao";
 import type { Venda, ItemVenda } from "./types";
 
@@ -140,6 +141,78 @@ describe("o que já voltou não volta de novo", () => {
 
   it("devolução válida não gera recusa", () => {
     expect(problemaNaDevolucao(venda(), { 0: 1 })).toBe("");
+  });
+});
+
+/**
+ * O dinheiro volta por onde entrou.
+ *
+ * A venda dividida já grava um lançamento POR FORMA — é o que faz o
+ * fechamento separar a gaveta da maquininha. A devolução não: ela devolvia
+ * tudo pela forma PRINCIPAL da venda.
+ *
+ * Numa venda de R$ 200 com R$ 190 no crédito e R$ 10 em espécie, devolver
+ * tudo lançava R$ 200 de saída no crédito. O caixa passa a dizer que a
+ * maquininha estornou R$ 200 quando estornou R$ 190, e os R$ 10 que saíram
+ * da gaveta de verdade não saem de lugar nenhum — falta de R$ 10 no papel,
+ * todo dia em que alguém devolve uma compra dividida.
+ */
+describe("a devolução volta pelas formas em que a venda foi paga", () => {
+  const dividida = (v: Partial<Venda> = {}) =>
+    venda({
+      formaPagamento: "credito",
+      pagamentos: [
+        { forma: "credito", valor: 90 },
+        { forma: "dinheiro", valor: 10 },
+      ],
+      ...v,
+    });
+
+  it("venda de uma forma só continua com um lançamento", () => {
+    expect(formasDaDevolucao(venda(), 40)).toEqual([{ forma: "dinheiro", valor: 40 }]);
+  });
+
+  it("devolução total desfaz cada forma pelo que ela pagou", () => {
+    expect(formasDaDevolucao(dividida(), 100)).toEqual([
+      { forma: "credito", valor: 90 },
+      { forma: "dinheiro", valor: 10 },
+    ]);
+  });
+
+  it("devolução parcial reparte na proporção do que cada forma pagou", () => {
+    expect(formasDaDevolucao(dividida(), 50)).toEqual([
+      { forma: "credito", valor: 45 },
+      { forma: "dinheiro", valor: 5 },
+    ]);
+  });
+
+  it("a soma das formas fecha EXATO com o valor devolvido", () => {
+    // Três terços de dez reais dão 3,33 cada e sobra um centavo. Sem sobrar
+    // para alguém, a devolução lança R$ 9,99 por uma nota de R$ 10.
+    const v = venda({
+      formaPagamento: "credito",
+      pagamentos: [
+        { forma: "dinheiro", valor: 33.33 },
+        { forma: "pix", valor: 33.33 },
+        { forma: "credito", valor: 33.34 },
+      ],
+    });
+    const formas = formasDaDevolucao(v, 10);
+    expect(formas.reduce((s, f) => s + f.valor, 0)).toBe(10);
+    // O centavo que sobra vai para a forma que mais pagou, igual ao que a
+    // venda faz para escolher a forma principal.
+    expect(formas.find((f) => f.forma === "credito")?.valor).toBe(3.34);
+  });
+
+  it("pagamento com uma linha só não vira lista de um item errado", () => {
+    const v = venda({ formaPagamento: "pix", pagamentos: [{ forma: "pix", valor: 100 }] });
+    expect(formasDaDevolucao(v, 30)).toEqual([{ forma: "pix", valor: 30 }]);
+  });
+
+  it("devolução de zero ainda registra a saída, para a venda não sumir do caixa", () => {
+    // Venda inteira coberta por desconto: o valor é zero e o lançamento
+    // continua sendo o rastro de que a mercadoria voltou.
+    expect(formasDaDevolucao(dividida(), 0)).toEqual([{ forma: "credito", valor: 0 }]);
   });
 });
 

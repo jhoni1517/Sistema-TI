@@ -178,6 +178,84 @@ describe("dinheiro em espécie na gaveta", () => {
   });
 });
 
+/**
+ * Saída que não é em papel não sai da gaveta.
+ *
+ * A entrada já respeitava isto: cartão e Pix ficam de fora do "na gaveta".
+ * A saída não — ela descontava tudo, com a desculpa de que saída fora do
+ * dinheiro seria rara. Deixou de ser: a devolução de mercadoria lança uma
+ * saída na forma de pagamento da venda ORIGINAL, a perda de inventário
+ * lança "outro" e a compra por cotação lança "pix". Nenhuma delas tira uma
+ * nota da gaveta.
+ *
+ * E o estrago não fica no aviso de sangria: `diferenca` é contado menos
+ * `emEspecie`. Um estorno de R$ 500 no cartão fazia o fechamento acusar
+ * sobra de R$ 500 — o mesmo erro que já tinha sido consertado do lado das
+ * entradas, do outro lado da conta.
+ */
+describe("saída que não é em papel não sai da gaveta", () => {
+  it("devolução de venda no cartão não mexe no papel", () => {
+    const r = resumoCaixa(sessao({ valorAbertura: 200, valorContado: 200 }), [
+      mov({ id: "a", tipo: "entrada", valor: 500, formaPagamento: "credito" }),
+      mov({
+        id: "b",
+        tipo: "saida",
+        categoria: "Devolução",
+        valor: 500,
+        formaPagamento: "credito",
+      }),
+    ]);
+    expect(r.emEspecie).toBe(200);
+    expect(r.diferenca).toBe(0);
+    expect(conferencia(r)).toBe("certo");
+  });
+
+  it("perda de inventário não é dinheiro saindo da gaveta", () => {
+    // Mercadoria que sumiu da prateleira não tira nota do caixa. Lançada
+    // como "outro", ela acusava sobra do valor da perda no fechamento.
+    const r = resumoCaixa(sessao({ valorAbertura: 100, valorContado: 100 }), [
+      mov({ tipo: "saida", categoria: "Perda de estoque", valor: 300, formaPagamento: "outro" }),
+    ]);
+    expect(r.emEspecie).toBe(100);
+    expect(r.diferenca).toBe(0);
+  });
+
+  it("saída em dinheiro continua saindo", () => {
+    const r = resumoCaixa(sessao({ valorAbertura: 100 }), [
+      mov({ tipo: "saida", valor: 40, formaPagamento: "dinheiro" }),
+    ]);
+    expect(r.emEspecie).toBe(60);
+  });
+
+  it("saída antiga sem forma conta como dinheiro", () => {
+    // Lançamento gravado antes de a coluna existir volta da nuvem sem forma.
+    // Tratar como dinheiro é o que o histórico já assumia — e é o erro
+    // seguro: mostra menos papel do que tem, nunca mais.
+    const r = resumoCaixa(sessao({ valorAbertura: 100 }), [
+      mov({ tipo: "saida", valor: 40, formaPagamento: undefined }),
+    ]);
+    expect(r.emEspecie).toBe(60);
+  });
+
+  it("sangria sempre sai da gaveta: ela é papel indo para o cofre", () => {
+    const r = resumoCaixa(sessao({ valorAbertura: 100 }), [
+      mov({ tipo: "sangria", valor: 40, formaPagamento: "outro" }),
+    ]);
+    expect(r.emEspecie).toBe(60);
+  });
+
+  it("o saldo do dia continua descontando toda saída", () => {
+    // O saldo é a conta do dia inteiro, não a da gaveta: o estorno no cartão
+    // desfaz a receita e precisa continuar aparecendo ali.
+    const r = resumoCaixa(sessao({ valorAbertura: 0 }), [
+      mov({ tipo: "entrada", valor: 500, formaPagamento: "credito" }),
+      mov({ tipo: "saida", valor: 500, formaPagamento: "credito" }),
+    ]);
+    expect(r.saldo).toBe(0);
+    expect(r.saidas).toBe(500);
+  });
+});
+
 describe("procurar no caixa", () => {
   const m = (p: Partial<MovimentoCaixa>): MovimentoCaixa =>
     ({
