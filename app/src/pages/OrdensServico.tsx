@@ -555,6 +555,26 @@ export const OrdensServico: React.FC = () => {
                 "Esta OS está com valor zero. Informe a mão de obra ou as peças antes de receber."
               );
             }
+            /*
+             * Já existe dinheiro lançado para esta OS?
+             *
+             * "Entregue" não pode ser marcado no seletor, mas SAIR dele pode
+             * — e precisa poder: aparelho volta com defeito e a OS reabre.
+             * Só que aí o bloco de "Receber e entregar" aparece de novo,
+             * limpo, sem lembrar que a receita já entrou. Um clique lança o
+             * valor cheio outra vez e desconta as mesmas peças de novo.
+             *
+             * Não bloqueia: cobrar de novo por um segundo serviço é
+             * legítimo. Só não deixa acontecer sem ninguém decidir.
+             */
+            if (!semPagamento({ ...detalhe, status: "entregue" })) {
+              const ok = confirm(
+                `A ${codigoOS(detalhe.numero)} já tem pagamento registrado.\n\n` +
+                  `Receber de novo lança mais ${brl(valor)} no caixa e desconta as ` +
+                  `peças do estoque outra vez.\n\nÉ um serviço novo?`
+              );
+              if (!ok) return;
+            }
             if (registrando) return; // clique duplo no balcão acontece o tempo todo
             setRegistrando(true);
             try {
@@ -612,6 +632,14 @@ export const OrdensServico: React.FC = () => {
               !confirm(`${teto.motivo}\n\nLançar em A Receber mesmo assim?`)
             ) {
               return;
+            }
+            if (!semPagamento({ ...detalhe, status: "entregue" })) {
+              const ok = confirm(
+                `A ${codigoOS(detalhe.numero)} já tem pagamento registrado.\n\n` +
+                  "Lançar fiado agora cria uma segunda dívida para o cliente.\n\n" +
+                  "É um serviço novo?"
+              );
+              if (!ok) return;
             }
             if (registrando) return; // dois cliques = o cliente devendo o dobro
             setRegistrando(true);
