@@ -1,5 +1,6 @@
 import { hojeISO, soData, diasAteVencer } from "./contas";
-import type { Produto, Venda, ItemVenda } from "./types";
+import { saidasDeEstoque, type SaidaDeEstoque } from "./consumo";
+import type { Produto, Venda, OrdemServico } from "./types";
 
 /**
  * O que vale a pena repor, e o que está só ocupando prateleira.
@@ -46,8 +47,8 @@ export interface GiroProduto {
   valorEmEstoque: number;
 }
 
-/** Casa o item da venda com o produto: por id, e pelo nome quando falta id */
-const chaveDoItem = (i: ItemVenda): string =>
+/** Casa a saída com o produto: por id, e pelo nome quando falta id */
+const chaveDaSaida = (i: SaidaDeEstoque): string =>
   i.produtoId || `nome:${(i.descricao || "").trim().toLowerCase()}`;
 
 const chaveDoProduto = (p: Produto): string[] => [
@@ -60,37 +61,39 @@ const chaveDoProduto = (p: Produto): string[] => [
  *
  * Serviço fica de fora: não tem prateleira, não empata capital e apareceria
  * eternamente como "parado" só por não ter estoque.
+ *
+ * `ordens` não é enfeite: na assistência técnica a peça sai por OS, não por
+ * venda. Sem elas, a curva ABC vinha vazia e o estoque INTEIRO era listado
+ * como capital parado, no mesmo mês em que a loja trocou trinta telas.
  */
 export function giroDosProdutos(
   produtos: Produto[],
   vendas: Venda[],
-  hoje = hojeISO()
+  hoje = hojeISO(),
+  ordens: OrdemServico[] = []
 ): GiroProduto[] {
   const somas = new Map<
     string,
     { quantidade: number; receita: number; lucro: number; vendas: number; ultima: string }
   >();
 
-  for (const v of vendas) {
-    const dia = soData(v.criadoEm);
-    for (const item of v.itens || []) {
-      const chave = chaveDoItem(item);
-      const atual = somas.get(chave) || {
-        quantidade: 0,
-        receita: 0,
-        lucro: 0,
-        vendas: 0,
-        ultima: "",
-      };
-      const q = n(item.quantidade);
-      const receita = q * n(item.precoUnit);
-      atual.quantidade += q;
-      atual.receita += receita;
-      atual.lucro += receita - q * n(item.custoUnit);
-      atual.vendas += 1;
-      if (dia > atual.ultima) atual.ultima = dia;
-      somas.set(chave, atual);
-    }
+  for (const saida of saidasDeEstoque(vendas, ordens)) {
+    const chave = chaveDaSaida(saida);
+    const atual = somas.get(chave) || {
+      quantidade: 0,
+      receita: 0,
+      lucro: 0,
+      vendas: 0,
+      ultima: "",
+    };
+    const q = n(saida.quantidade);
+    const receita = q * n(saida.precoUnit);
+    atual.quantidade += q;
+    atual.receita += receita;
+    atual.lucro += receita - q * n(saida.custoUnit);
+    atual.vendas += 1;
+    if (saida.dia > atual.ultima) atual.ultima = saida.dia;
+    somas.set(chave, atual);
   }
 
   return produtos

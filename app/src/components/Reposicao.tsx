@@ -22,14 +22,14 @@ import {
  * reposição de item parado é exatamente como o estoque encalha.
  */
 export const Reposicao: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const { produtos, vendas, fornecedores, config } = useApp();
+  const { produtos, vendas, ordens, fornecedores, config } = useApp();
   const [diasObservados, setDiasObservados] = useState(30);
   const [coberturaDias, setCoberturaDias] = useState(15);
   const [fora, setFora] = useState<Set<string>>(new Set());
 
   const lista = useMemo(
-    () => sugestaoDeCompra(produtos, vendas, { diasObservados, coberturaDias }),
-    [produtos, vendas, diasObservados, coberturaDias]
+    () => sugestaoDeCompra(produtos, vendas, { diasObservados, coberturaDias, ordens }),
+    [produtos, vendas, ordens, diasObservados, coberturaDias]
   );
   const escolhidos = lista.filter((r) => !fora.has(r.produtoId));
 

@@ -142,7 +142,13 @@ export const Relatorios: React.FC = () => {
   const pico = useMemo(() => horariosDePico(vendas), [vendas]);
   const comissao = useMemo(() => comissoes(ordens, config), [ordens, config]);
 
-  const giro = useMemo(() => giroDosProdutos(produtos, vendas), [produtos, vendas]);
+  // As ordens entram no giro: na assistência a peça sai por OS, não por
+  // venda. Sem elas a curva ABC vinha vazia e o estoque inteiro aparecia
+  // como capital parado.
+  const giro = useMemo(
+    () => giroDosProdutos(produtos, vendas, undefined, ordens),
+    [produtos, vendas, ordens]
+  );
   const abc = useMemo(() => curvaABC(giro), [giro]);
   const parados = useMemo(() => produtosParados(giro, produtos), [giro, produtos]);
 

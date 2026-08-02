@@ -1,7 +1,8 @@
 import { soData, hojeISO } from "./contas";
 import { centavos } from "./pdv";
 import { txt } from "./format";
-import type { Produto, Venda } from "./types";
+import { saidasDeEstoque } from "./consumo";
+import type { OrdemServico, Produto, Venda } from "./types";
 
 /**
  * O que repor, quanto, e o que já era para ter reposto.
@@ -43,6 +44,10 @@ export interface Reposicao {
  * fornecedor.
  *
  * Serviço fica de fora: não tem prateleira para repor.
+ *
+ * `ordens` entra porque na assistência técnica a peça sai por OS, não por
+ * venda. Sem elas tudo girava zero, e como esta conta pula justamente o que
+ * gira zero, a sugestão de compra nunca sugeria nada — sem parecer quebrada.
  */
 export function sugestaoDeCompra(
   produtos: Produto[],
@@ -51,32 +56,44 @@ export function sugestaoDeCompra(
     diasObservados = 30,
     coberturaDias = 15,
     hoje = hojeISO(),
-  }: { diasObservados?: number; coberturaDias?: number; hoje?: string } = {}
+    ordens = [],
+  }: {
+    diasObservados?: number;
+    coberturaDias?: number;
+    hoje?: string;
+    ordens?: OrdemServico[];
+  } = {}
 ): Reposicao[] {
   const inicio = new Date(Date.parse(soData(hoje) + "T00:00:00Z") - diasObservados * 86400000)
     .toISOString()
     .slice(0, 10);
 
   const saiu = new Map<string, number>();
-  for (const v of vendas) {
-    const dia = soData(v.criadoEm);
-    if (dia < inicio || dia > soData(hoje)) continue;
-    for (const i of v.itens || []) {
-      if (!i.produtoId) continue;
-      saiu.set(i.produtoId, (saiu.get(i.produtoId) || 0) + n(i.quantidade));
-    }
+  for (const s of saidasDeEstoque(vendas, ordens)) {
+    if (s.dia < inicio || s.dia > soData(hoje)) continue;
+    if (!s.produtoId) continue;
+    saiu.set(s.produtoId, (saiu.get(s.produtoId) || 0) + n(s.quantidade));
   }
 
   const out: Reposicao[] = [];
   for (const p of produtos) {
     if (p.servico) continue;
     const total = saiu.get(p.id) || 0;
-    const porDia = centavos(total / Math.max(1, diasObservados));
+    /*
+     * O consumo por dia é uma TAXA, não dinheiro, e não pode ser arredondado
+     * em centavos.
+     *
+     * Duas telas em trinta dias dão 0,0667 por dia. Arredondado para 0,07,
+     * o alvo de quinze dias vira 1,05 em vez de 1,00 — e como a sugestão
+     * arredonda para cima, ela mandava comprar DUAS telas onde uma resolve.
+     * Numa lista de trinta itens, isso é a loja comprando um a mais de cada.
+     */
+    const porDiaExato = total / Math.max(1, diasObservados);
     const emEstoque = n(p.quantidade);
-    const diasAteAcabar = porDia > 0 ? emEstoque / porDia : Infinity;
+    const diasAteAcabar = porDiaExato > 0 ? emEstoque / porDiaExato : Infinity;
 
     // Quanto falta para cobrir a cobertura desejada.
-    const alvo = porDia * coberturaDias;
+    const alvo = porDiaExato * coberturaDias;
     const faltando = alvo - emEstoque;
 
     /*
@@ -94,7 +111,7 @@ export function sugestaoDeCompra(
      * Ele era inalcançável: se vendeu na janela, porDia nunca é zero. O teste
      * do caso é que revelou o código morto.
      */
-    if (porDia <= 0) continue;
+    if (porDiaExato <= 0) continue;
     if (faltando <= 0) continue;
 
     // Produto por peso aceita fração; o resto arredonda para cima, porque
@@ -105,7 +122,9 @@ export function sugestaoDeCompra(
       produtoId: p.id,
       nome: txt(p.nome),
       emEstoque,
-      porDia,
+      // Arredondado só para a tela: quem lê "0,07 por dia" não precisa das
+      // outras casas, mas a conta acima precisou.
+      porDia: centavos(porDiaExato),
       diasAteAcabar: centavos(diasAteAcabar),
       sugerido,
       custo: centavos(sugerido * n(p.custo)),
