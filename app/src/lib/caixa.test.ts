@@ -7,6 +7,7 @@ import {
   conferencia,
   filtrarMovimentos,
   agruparPorDia,
+  movimentosPorSessao,
 } from "./caixa";
 import type { MovimentoCaixa, SessaoCaixa } from "./types";
 
@@ -359,5 +360,51 @@ describe("a gaveta se confere contra o PAPEL, não contra o saldo", () => {
     const r = resumoCaixa(sessao(), dia);
     expect(r.diferenca).toBeUndefined();
     expect(conferencia(r)).toBe("nao_conferido");
+  });
+});
+
+describe("o histórico de fechamentos não pode ficar quadrático", () => {
+  /**
+   * Chamar movimentosDaSessao dentro do laço varre a lista inteira de
+   * movimentos para CADA sessão. Com um ano de fechamentos diários e dez mil
+   * lançamentos são três milhões e meio de comparações por renderização — o
+   * mesmo erro que já tinha travado o painel na conferência de integridade.
+   */
+  const mov = (id: string, sessaoId?: string): MovimentoCaixa =>
+    ({
+      id,
+      tipo: "entrada",
+      categoria: "Venda",
+      descricao: "",
+      valor: 10,
+      formaPagamento: "dinheiro",
+      data: "2026-08-01T10:00:00.000Z",
+      sessaoId,
+    }) as MovimentoCaixa;
+
+  it("agrupa por sessão", () => {
+    const mapa = movimentosPorSessao([mov("1", "s1"), mov("2", "s2"), mov("3", "s1")]);
+    expect(mapa.get("s1")?.map((m) => m.id)).toEqual(["1", "3"]);
+    expect(mapa.get("s2")?.map((m) => m.id)).toEqual(["2"]);
+  });
+
+  it("movimento sem sessão não entra: ele não pertence a fechamento nenhum", () => {
+    const mapa = movimentosPorSessao([mov("1"), mov("2", "")]);
+    expect(mapa.size).toBe(0);
+  });
+
+  it("sessão sem movimento nenhum simplesmente não aparece no índice", () => {
+    // Quem consulta precisa tratar o vazio, e não receber undefined por erro.
+    const mapa = movimentosPorSessao([mov("1", "s1")]);
+    expect(mapa.get("s9")).toBeUndefined();
+    expect(mapa.get("s9") ?? []).toEqual([]);
+  });
+
+  it("dá o mesmo resultado que filtrar na mão, que é o que ele substitui", () => {
+    const lista = [mov("1", "s1"), mov("2", "s2"), mov("3", "s1"), mov("4")];
+    const mapa = movimentosPorSessao(lista);
+    for (const s of ["s1", "s2"]) {
+      expect(mapa.get(s) ?? []).toEqual(lista.filter((m) => m.sessaoId === s));
+    }
   });
 });

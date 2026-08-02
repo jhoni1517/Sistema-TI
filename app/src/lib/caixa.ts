@@ -225,3 +225,25 @@ export function agruparPorDia(movimentos: MovimentoCaixa[]): DiaDeCaixa[] {
       };
     });
 }
+
+/**
+ * Índice de movimentos por sessão, montado uma vez.
+ *
+ * O histórico de fechamentos chamava `movimentosDaSessao` dentro do laço,
+ * e cada chamada varre a lista inteira de movimentos. Com um ano de
+ * fechamentos diários e dez mil lançamentos, são três milhões e meio de
+ * comparações a cada renderização da tela — o mesmo erro que já tinha
+ * travado o painel na conferência de integridade.
+ */
+export function movimentosPorSessao(
+  movimentos: MovimentoCaixa[]
+): Map<string, MovimentoCaixa[]> {
+  const mapa = new Map<string, MovimentoCaixa[]>();
+  for (const m of movimentos) {
+    const id = txt(m.sessaoId);
+    if (!id) continue;
+    if (!mapa.has(id)) mapa.set(id, []);
+    mapa.get(id)!.push(m);
+  }
+  return mapa;
+}

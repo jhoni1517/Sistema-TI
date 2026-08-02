@@ -32,6 +32,7 @@ import {
   CONFERENCIA_META,
   filtrarMovimentos,
   agruparPorDia,
+  movimentosPorSessao,
 } from "../lib/caixa";
 import type { MovimentoCaixa, TipoMovimento, FormaPagamento, SessaoCaixa, Produto, Cliente } from "../lib/types";
 
@@ -880,6 +881,19 @@ const Fechamentos: React.FC<{
   onVer: (s: SessaoCaixa) => void;
   onImprimir: (s: SessaoCaixa) => void;
 }> = ({ sessoes, movimentos, onVer, onImprimir }) => {
+  /*
+   * Índice montado uma vez. Chamar movimentosDaSessao dentro do laço varre
+   * a lista inteira para CADA sessão: com um ano de fechamentos diários e
+   * dez mil lançamentos são milhões de comparações por renderização.
+   */
+  const porSessao = useMemo(() => movimentosPorSessao(movimentos), [movimentos]);
+
+  /*
+   * Um ano de fechamento diário são 365 cartões numa tela só. Ninguém rola
+   * até o de março; quem precisa de um antigo vai pelo botão.
+   */
+  const [quantos, setQuantos] = useState(30);
+
   if (sessoes.length === 0) {
     return (
       <EmptyState
@@ -891,8 +905,8 @@ const Fechamentos: React.FC<{
   }
   return (
     <div className="space-y-2">
-      {sessoes.map((s) => {
-        const r = resumoCaixa(s, movimentosDaSessao(s, movimentos));
+      {sessoes.slice(0, quantos).map((s) => {
+        const r = resumoCaixa(s, porSessao.get(s.id) ?? []);
         const conf = conferencia(r);
         return (
           <div key={s.id} className="card flex flex-wrap items-center gap-3">
@@ -930,6 +944,15 @@ const Fechamentos: React.FC<{
           </div>
         );
       })}
+
+      {sessoes.length > quantos && (
+        <button
+          className="btn-secondary w-full"
+          onClick={() => setQuantos((n) => n + 30)}
+        >
+          Ver mais 30 ({sessoes.length - quantos} anteriores)
+        </button>
+      )}
     </div>
   );
 };
