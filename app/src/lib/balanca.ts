@@ -1,4 +1,5 @@
 import { txt } from "./format";
+import { buscarProduto } from "./pdv";
 import type { Produto } from "./types";
 
 /**
@@ -37,7 +38,8 @@ export interface EtiquetaBalanca {
 }
 
 /** Só os dígitos, para tolerar espaço e hífen que o leitor às vezes manda */
-const digitos = (v: string): string => txt(v).replace(/\D/g, "");
+export const apenasDigitos = (v: string): string => txt(v).replace(/\D/g, "");
+const digitos = apenasDigitos;
 
 /**
  * Dígito verificador do EAN-13.
@@ -60,11 +62,45 @@ export const ean13Valido = (codigo: string): boolean => {
   return digitoVerificadorEAN13(d.slice(0, 12)) === Number(d[12]);
 };
 
-/** É uma etiqueta de balança, e não um código de fábrica? */
+/**
+ * Tem a FORMA de uma etiqueta de balança, e não a de um código de fábrica.
+ *
+ * Só a forma. Quem decide o que fazer com o código lido é
+ * `ehLeituraDeBalanca` — ver o porquê lá.
+ */
 export const ehEtiquetaBalanca = (codigo: string): boolean => {
   const d = digitos(codigo);
   return d.length === 13 && d[0] === "2";
 };
+
+/**
+ * O código que acabou de ser lido deve ser tratado como etiqueta de balança?
+ *
+ * A forma sozinha não serve, e isso custou caro: o código interno que o
+ * PRÓPRIO sistema gera para produto sem código de fábrica (`codigoInterno`,
+ * em lib/etiqueta.ts) é `2` + 11 dígitos + verificador — a mesma forma que
+ * a etiqueta de balança `2 CCCCCC VVVVV D`, dígito por dígito. O arquivo de
+ * etiquetas já avisava que misturar os dois "faria a frente de caixa ler um
+ * preço onde está um código", e era exatamente o que a frente de caixa
+ * fazia, porque perguntava só pela forma.
+ *
+ * Resultado no balcão: o operador passa no leitor a etiqueta que a própria
+ * loja imprimiu e o sistema responde que aquele produto não existe. Quando
+ * existe algum produto com o código de balança que sai do meio do código
+ * interno, é pior — entra no carrinho o produto errado, com um peso
+ * inventado. O código interno de sequência 123456 vira "produto 1,
+ * 23,456 kg", com o mesmo bipe de sempre.
+ *
+ * O critério certo não é a forma, é a ORIGEM: código que está no cadastro
+ * foi a loja que escreveu ali, e cadastro é decisão, não palpite. A etiqueta
+ * de balança é única por pacote — o mesmo queijo pesado duas vezes gera dois
+ * códigos diferentes —, então ela nunca vai estar cadastrada, e olhar o
+ * cadastro primeiro não tira nada dela.
+ */
+export function ehLeituraDeBalanca(codigo: string, produtos: Produto[]): boolean {
+  if (!ehEtiquetaBalanca(codigo)) return false;
+  return !buscarProduto(produtos, digitos(codigo));
+}
 
 /**
  * Lê a etiqueta. Devolve null quando não é etiqueta de balança ou quando o

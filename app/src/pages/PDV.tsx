@@ -26,7 +26,8 @@ import {
   lerEtiqueta,
   produtoDaEtiqueta,
   quantidadeDaEtiqueta,
-  ehEtiquetaBalanca,
+  ehLeituraDeBalanca,
+  apenasDigitos,
 } from "../lib/balanca";
 import {
   subtotalItem,
@@ -189,7 +190,11 @@ export const PDV: React.FC = () => {
     // Etiqueta de balança vem primeiro: ela é única por pacote, então nunca
     // vai casar com um código de barras cadastrado. Se caísse na busca
     // comum, o operador levaria "nada encontrado" a cada pesagem.
-    if (ehEtiquetaBalanca(t)) {
+    //
+    // Mas quem decide é o CADASTRO, não a forma do código: o código interno
+    // que o próprio sistema imprime tem a mesma forma da etiqueta de balança
+    // e era lido como peso. Ver ehLeituraDeBalanca.
+    if (ehLeituraDeBalanca(t, produtos)) {
       const etiqueta = lerEtiqueta(t, config.formatoBalanca || "peso");
       if (!etiqueta) {
         setTermo("");
@@ -212,14 +217,21 @@ export const PDV: React.FC = () => {
       if (qtd <= 0) {
         setTermo("");
         focarBusca();
+        // Duas causas diferentes, duas saídas diferentes. O texto único
+        // mandava conferir o cadastro do preço quando o problema estava na
+        // balança, e a pessoa procurava no lugar errado.
         return aviso.alerta(
-          `${p.nome} está sem preço por quilo cadastrado — não dá para calcular o peso.`
+          typeof etiqueta.peso === "number"
+            ? `A etiqueta de ${p.nome} veio com peso zero. Pese o produto de novo na balança.`
+            : `${p.nome} está sem preço por quilo cadastrado — não dá para tirar o peso do valor impresso.`
         );
       }
       return addProduto({ ...p, porPeso: true }, qtd);
     }
 
-    const p = buscarProduto(produtos, t);
+    // O leitor às vezes manda espaço ou hífen junto; no cadastro o código
+    // está só com os dígitos.
+    const p = buscarProduto(produtos, t) || buscarProduto(produtos, apenasDigitos(t));
     if (p) return addProduto(p);
     if (sugestoes.length === 1) return addProduto(sugestoes[0]);
     aviso.alerta(`Nada encontrado para "${t}". Cadastre em Estoque ou use item avulso.`);

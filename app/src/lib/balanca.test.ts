@@ -3,11 +3,13 @@ import {
   digitoVerificadorEAN13,
   ean13Valido,
   ehEtiquetaBalanca,
+  ehLeituraDeBalanca,
   lerEtiqueta,
   produtoDaEtiqueta,
   quantidadeDaEtiqueta,
   montarEtiqueta,
 } from "./balanca";
+import { codigoInterno } from "./etiqueta";
 import type { Produto } from "./types";
 
 const prod = (p: Partial<Produto> = {}): Produto => ({
@@ -121,6 +123,71 @@ describe("achar o produto pela etiqueta", () => {
     // Sem esta guarda, o campo vazio casaria com qualquer código.
     const e = lerEtiqueta(montarEtiqueta(999, 0.3))!;
     expect(produtoDaEtiqueta(lista, e)).toBeUndefined();
+  });
+});
+
+/**
+ * O código do cadastro ganha do palpite da balança.
+ *
+ * "É etiqueta de balança" era só a forma: 13 dígitos começando com 2. Só
+ * que o código interno que o PRÓPRIO sistema gera para produto sem código
+ * de fábrica é 2 + 11 dígitos + verificador — a mesma forma, dígito por
+ * dígito. O `lib/etiqueta.ts` já avisava que misturar os dois "faria a
+ * frente de caixa ler um preço onde está um código", e era exatamente
+ * isso que acontecia.
+ *
+ * O operador passa no leitor a etiqueta que a loja imprimiu e o sistema
+ * responde que o produto não existe. Quando existe um produto com aquele
+ * código de balança, é pior: entra no carrinho o produto errado, com um
+ * peso inventado a partir do meio do código.
+ *
+ * O critério certo não é a forma, é a origem: código que está no cadastro
+ * foi a loja que escreveu. Etiqueta de balança é única por pacote e nunca
+ * vai estar cadastrada.
+ */
+describe("o cadastro ganha do palpite da balança", () => {
+  const interno = () => codigoInterno(123456);
+
+  it("mostra o estrago: o código interno lido como balança vira 23 kg de outro produto", () => {
+    const e = lerEtiqueta(interno(), "peso")!;
+    expect(e.codigo).toBe("1");
+    expect(e.peso).toBe(23.456);
+  });
+
+  it("o código interno que o sistema gera não é lido como etiqueta", () => {
+    const doce = prod({ id: "d", nome: "Doce da caixa", porPeso: false, codigoBarras: interno() });
+    const queijo = prod({ id: "q", nome: "Queijo", codigoBalanca: "1" });
+    // A forma continua sendo a de uma etiqueta: é o cadastro que desempata.
+    expect(ehEtiquetaBalanca(interno())).toBe(true);
+    expect(ehLeituraDeBalanca(interno(), [doce, queijo])).toBe(false);
+  });
+
+  it("etiqueta de balança de verdade continua sendo etiqueta", () => {
+    const lista = [prod({ id: "q", codigoBalanca: "123" })];
+    expect(ehLeituraDeBalanca(montarEtiqueta(123, 0.315), lista)).toBe(true);
+  });
+
+  it("sem nada casando no cadastro, o palpite da balança continua valendo", () => {
+    // Produto de balança não cadastrado precisa cair no aviso da balança,
+    // que diz onde cadastrar o código — e não em "nada encontrado".
+    expect(ehLeituraDeBalanca(montarEtiqueta(777, 0.5), [])).toBe(true);
+  });
+
+  it("código de fábrica nunca é etiqueta de balança", () => {
+    expect(ehLeituraDeBalanca("7891000315507", [])).toBe(false);
+  });
+
+  it("o SKU também é cadastro: quem digitou ali foi a loja", () => {
+    const p = prod({ id: "x", sku: montarEtiqueta(99, 1.5) });
+    expect(ehLeituraDeBalanca(montarEtiqueta(99, 1.5), [p])).toBe(false);
+  });
+
+  it("código interno com verificador quebrado também não vira etiqueta ilegível", () => {
+    // Sem o cadastro na frente, este caía em "etiqueta ilegível, passe de
+    // novo" — e passar de novo nunca ia resolver.
+    const torto = "2" + "00000123456";
+    const p = prod({ id: "y", codigoBarras: torto + "9" });
+    expect(ehLeituraDeBalanca(torto + "9", [p])).toBe(false);
   });
 });
 
