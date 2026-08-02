@@ -387,6 +387,7 @@ sem saída vira tela que a pessoa aprende a fechar sem ler.
 |---|---|---|
 | Venda sem lançamento no caixa | Erro | O cupom existe, a mercadoria saiu, o dinheiro não foi registrado |
 | OS entregue sem pagamento | Erro | O aparelho saiu da loja e não há registro de pagamento |
+| OS cobrada duas vezes | Erro | Os lançamentos somam mais do que a ordem vale. É o espelho do de cima, e o mais caro: receita a menos aparece na gaveta, receita a mais não aparece em lugar nenhum |
 | Estoque negativo | Alerta | Saiu mercadoria que o sistema não sabia que tinha |
 | Fiado sem cliente | Alerta | O cliente foi apagado com dívida em aberto |
 | Caixa aberto há dias | Alerta | O fechamento deixou de ser "o dia" |
