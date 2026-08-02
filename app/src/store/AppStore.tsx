@@ -4,6 +4,7 @@ import React, {
   useEffect,
   useState,
   useCallback,
+  useRef,
 } from "react";
 import { db, sincronizarPendentes } from "../lib/db";
 import { tamanhoDaFila } from "../lib/fila";
@@ -181,6 +182,8 @@ export const AppProvider: React.FC<{
    * chat do Telegram.
    */
   const [configCarregada, setConfigCarregada] = useState(false);
+  /** A última configuração que ESTE aparelho conseguiu mandar para a nuvem */
+  const ultimoEnviado = useRef<Config | null>(null);
 
   // Aplica o tema (cor + claro/escuro) e reage à mudança do sistema no modo "auto"
   useEffect(() => {
@@ -608,11 +611,24 @@ export const AppProvider: React.FC<{
       );
       return;
     }
-    // Só aparência mudou: não vale uma gravação na nuvem a cada clique na
-    // paleta de cores, que é o que a pré-visualização ao vivo faria.
-    if (!precisaGravarNaNuvem(config, c)) return;
+    /*
+     * Pular a gravação quando só a aparência mudou existe para a paleta de
+     * cores não virar uma escrita por clique na pré-visualização ao vivo.
+     *
+     * Mas a comparação tem que ser contra o que ESTE APARELHO já mandou para
+     * a nuvem, não contra o que ele tem na tela. Comparando com a tela, o
+     * conserto ficava impossível: o computador tinha logo, limite da gaveta e
+     * chat do Telegram guardados só nele, a nuvem não tinha nenhum dos três,
+     * e clicar em Salvar "sem mudar nada" era descartado — justamente o
+     * clique que ia consertar. O celular continuava abrindo sem eles.
+     *
+     * Nulo = nada foi enviado nesta sessão ainda, então manda.
+     */
+    const carga = paraNuvem(c);
+    if (ultimoEnviado.current && !precisaGravarNaNuvem(ultimoEnviado.current, c)) return;
     try {
-      await db.config.save(paraNuvem(c));
+      await db.config.save(carga);
+      ultimoEnviado.current = c;
     } catch (e) {
       aviso.erro(
         "As configurações foram salvas neste aparelho, mas NÃO subiram para a " +
