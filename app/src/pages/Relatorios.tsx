@@ -31,7 +31,7 @@ import {
   capitalParado,
 } from "../lib/giro";
 import { brl, monthKey } from "../lib/format";
-import { receitaBruta, despesasOperacionais, comprasEstoque, custoProdutos, lucroLiquido, totalOS } from "../lib/calc";
+import { receitaBruta, despesasOperacionais, comprasEstoque, custoProdutos, lucroLiquido } from "../lib/calc";
 import { accentHex, isDark } from "../lib/themes";
 import { OS_STATUS_META, type OSStatus } from "../lib/types";
 
@@ -46,23 +46,6 @@ export const Relatorios: React.FC = () => {
   const gridColor = dark ? "#26314a" : "#e2e8f0";
   const tickColor = dark ? "#94a3b8" : "#475569";
   const CORES = [acc, "#10b981", "#f59e0b", "#8b5cf6", "#ef4444", "#06b6d4", "#ec4899", "#64748b"];
-
-  // Comissão por técnico (baseada nas OS entregues)
-  const porTecnico = useMemo(() => {
-    const pct = (config.comissaoPadrao || 0) / 100;
-    const map: Record<string, { qtd: number; total: number }> = {};
-    ordens
-      .filter((o) => o.status === "entregue")
-      .forEach((o) => {
-        const nome = (o.tecnico || "").trim() || "Sem técnico";
-        if (!map[nome]) map[nome] = { qtd: 0, total: 0 };
-        map[nome].qtd += 1;
-        map[nome].total += totalOS(o);
-      });
-    return Object.entries(map)
-      .map(([nome, v]) => ({ nome, qtd: v.qtd, total: v.total, comissao: v.total * pct }))
-      .sort((a, b) => b.total - a.total);
-  }, [ordens, config.comissaoPadrao]);
 
   // Série mensal
   const serie = useMemo(() => {
@@ -233,36 +216,6 @@ export const Relatorios: React.FC = () => {
           )}
         </div>
       </div>
-
-      {/* Comissão: sobre o LUCRO, não sobre o faturamento. Sobre faturamento
-          premia quem usa peça cara, não quem conserta bem. */}
-      {comissao.length > 0 && (
-        <div className="card mb-6">
-          <h3 className="mb-1 flex items-center gap-2 font-bold text-slate-700">
-            <Percent size={17} /> Comissão por técnico
-          </h3>
-          <p className="mb-3 text-xs text-slate-500">
-            Sobre o lucro da ordem entregue, a {config.comissaoPadrao || 0}% (ajuste em
-            Configurações). Sobre faturamento, dois técnicos com o mesmo esforço
-            receberiam valores diferentes só porque um usou uma peça cara.
-          </p>
-          <div className="space-y-1">
-            {comissao.map((c) => (
-              <div key={c.tecnico} className="flex flex-wrap items-center gap-2 text-sm">
-                <span className="min-w-0 flex-1 truncate font-medium text-slate-700">
-                  {c.tecnico}
-                </span>
-                <span className="text-xs text-slate-400">{c.ordens} ordem(ns)</span>
-                <span className="w-24 text-right text-slate-600">{brl(c.faturado)}</span>
-                <span className="w-24 text-right text-slate-600">lucro {brl(c.lucro)}</span>
-                <span className="w-24 text-right font-bold text-emerald-600">
-                  {brl(c.valor)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Curva ABC e o que está parado.
           A tela respondia "quanto entrou". Não respondia a pergunta que
@@ -436,11 +389,23 @@ export const Relatorios: React.FC = () => {
           )}
         </div>
 
-        {/* Comissão por técnico */}
+        {/*
+          Comissão por técnico.
+          A conta é UMA, e vem de lib/desempenho.ts. Esta tabela tinha a
+          própria, escrita à mão, multiplicando o percentual pelo TOTAL da
+          ordem — comissão sobre faturamento. As duas apareciam na mesma
+          página, com números diferentes, debaixo do mesmo título, e a errada
+          era a que pagava mais.
+        */}
         <div className="card lg:col-span-2">
           <h3 className="mb-1 flex items-center gap-2 font-bold text-slate-700"><Users size={16} /> Comissão por técnico</h3>
-          <p className="mb-4 text-xs text-slate-400">Baseado nas OS entregues · comissão de {config.comissaoPadrao || 0}% (ajuste em Configurações)</p>
-          {porTecnico.length === 0 ? (
+          <p className="mb-4 text-xs text-slate-400">
+            {/* comissao-na-tela: só o texto, a conta vem da lib */}
+            Sobre o LUCRO das OS entregues, a {config.comissaoPadrao || 0}% (ajuste em
+            Configurações). Sobre faturamento, quem usa peça cara receberia mais
+            do que quem conserta melhor.
+          </p>
+          {comissao.length === 0 ? (
             <p className="py-8 text-center text-sm text-slate-400">Nenhuma OS entregue ainda.</p>
           ) : (
             <div className="overflow-x-auto">
@@ -449,17 +414,19 @@ export const Relatorios: React.FC = () => {
                   <tr>
                     <th className="px-3 py-2">Técnico</th>
                     <th className="px-3 py-2 text-center">OS entregues</th>
-                    <th className="px-3 py-2 text-right">Total produzido</th>
+                    <th className="px-3 py-2 text-right">Faturado</th>
+                    <th className="px-3 py-2 text-right">Lucro</th>
                     <th className="px-3 py-2 text-right">Comissão</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {porTecnico.map((t) => (
-                    <tr key={t.nome} className="border-b border-slate-100">
-                      <td className="px-3 py-2 font-semibold text-slate-800">{t.nome}</td>
-                      <td className="px-3 py-2 text-center text-slate-600">{t.qtd}</td>
-                      <td className="px-3 py-2 text-right text-slate-700">{brl(t.total)}</td>
-                      <td className="px-3 py-2 text-right font-bold text-emerald-600">{brl(t.comissao)}</td>
+                  {comissao.map((t) => (
+                    <tr key={t.tecnico} className="border-b border-slate-100">
+                      <td className="px-3 py-2 font-semibold text-slate-800">{t.tecnico}</td>
+                      <td className="px-3 py-2 text-center text-slate-600">{t.ordens}</td>
+                      <td className="px-3 py-2 text-right text-slate-700">{brl(t.faturado)}</td>
+                      <td className="px-3 py-2 text-right text-slate-700">{brl(t.lucro)}</td>
+                      <td className="px-3 py-2 text-right font-bold text-emerald-600">{brl(t.valor)}</td>
                     </tr>
                   ))}
                 </tbody>
