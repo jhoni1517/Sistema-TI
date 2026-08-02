@@ -9,6 +9,21 @@ createRoot(document.getElementById("root")!).render(
   </StrictMode>
 );
 
+/*
+ * Tira a abertura assim que a interface está pronta.
+ *
+ * O quadro seguinte, e não um tempo fixo: cronômetro deixa a abertura
+ * atravessada por cima de uma tela que já podia ser usada, e no celular
+ * lento faz o contrário — some antes de ter o que mostrar.
+ */
+requestAnimationFrame(() => {
+  const abertura = document.getElementById("abertura");
+  if (!abertura) return;
+  abertura.classList.add("saindo");
+  // Só remove depois do desvanecer, senão ela some com um corte seco.
+  setTimeout(() => abertura.remove(), 400);
+});
+
 // Registra o service worker (PWA / offline) apenas em produção
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   let recarregando = false;
