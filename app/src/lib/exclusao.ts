@@ -186,3 +186,50 @@ export function textoDaConfirmacao(c: Consequencia): string {
     "\n\nIsto não pode ser desfeito."
   );
 }
+
+/**
+ * Apagar um fiado.
+ *
+ * O botão perguntava "Excluir este fiado?" e apagava. Era a mesma armadilha
+ * do cliente, com dinheiro dentro: um fiado de R$ 500 com R$ 300 já pagos
+ * tem TRÊS lançamentos de entrada no caixa apontando para ele. Some a
+ * dívida, ficam as entradas — receita sem origem, que ninguém consegue
+ * explicar no fim do mês, e some junto o registro de que o cliente pagou.
+ *
+ * Com pagamento recebido, não se apaga: isso não é cadastro, é histórico
+ * contábil. Em aberto e sem nada recebido, apaga — mas dizendo quanto o
+ * cliente deixa de dever, porque é isso que a loja está perdoando.
+ */
+export function aoApagarFiado(
+  fiado: Fiado,
+  nomeCliente = ""
+): Consequencia {
+  const recebido = centavos((fiado.pagamentos || []).reduce((s, p) => s + n(p.valor), 0));
+  const saldo = saldoFiado(fiado);
+  const de = txt(nomeCliente).trim();
+
+  if (recebido > 0) {
+    return {
+      pode: false,
+      titulo: `Este fiado já tem ${recebido.toFixed(2)} recebidos`,
+      perdas: [
+        `${(fiado.pagamentos || []).length} pagamento(s) lançados no caixa`,
+        `o registro de que ${de || "o cliente"} pagou`,
+      ],
+      saida:
+        "Apagar deixa as entradas do caixa apontando para uma dívida que não " +
+        "existe mais, e o mês fecha com receita sem origem. Se a dívida acabou, " +
+        "receba o saldo restante — ela some da lista sozinha ao quitar.",
+    };
+  }
+
+  return {
+    pode: true,
+    titulo: `Apagar este fiado${de ? ` de ${de}` : ""}?`,
+    perdas:
+      saldo > 0
+        ? [`${de || "O cliente"} deixa de dever ${saldo.toFixed(2)}`]
+        : [],
+    saida: "",
+  };
+}

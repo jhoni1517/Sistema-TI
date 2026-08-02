@@ -13,6 +13,8 @@ import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { uid, nowISO, brl, formatDate, abrirWhatsapp, txt } from "../lib/format";
 import { saldoFiado, pagoFiado } from "../lib/calc";
+import { travaAtendimento, travaFiado } from "../lib/clientes";
+import { aoApagarFiado, textoDaConfirmacao } from "../lib/exclusao";
 import { sessaoAberta as achaSessaoAberta } from "../lib/caixa";
 import type { Fiado, FormaPagamento } from "../lib/types";
 
@@ -70,6 +72,30 @@ export const AReceber: React.FC = () => {
     if (!novo) return;
     if (!novo.clienteId) return aviso.alerta("Selecione o cliente.");
     if (novo.valor <= 0) return aviso.alerta("Informe o valor.");
+
+    /*
+     * O teto de fiado e a classificação valiam SÓ pelo caminho da ordem de
+     * serviço. Este aqui — "Novo fiado", digitado no balcão — é o caminho
+     * mais curto e mais usado para fiar alguém, e passava direto.
+     *
+     * O teto existe justamente para isso: é decisão do dono, tomada uma vez
+     * com a cabeça fria, em vez de decisão do atendente com fila esperando.
+     * Deixar o atalho aberto é o mesmo que não ter teto.
+     *
+     * Nenhum dos dois bloqueia: a tela pergunta e o dono autoriza. Sistema
+     * que não deixa fazer nada é contornado por fora, e aí o fiado volta a
+     * não existir no sistema.
+     */
+    const c = clientes.find((x) => x.id === novo.clienteId);
+    const trava = travaAtendimento(c);
+    if (
+      trava.bloqueia &&
+      !confirm(`${trava.titulo}\n\nMotivo: ${trava.motivo}\n\nFiar mesmo assim?`)
+    ) {
+      return;
+    }
+    const teto = travaFiado(c, fiados, novo.valor);
+    if (teto.estoura && !confirm(`${teto.motivo}\n\nLançar mesmo assim?`)) return;
     // Dois cliques = a mesma dívida lançada duas vezes, e o cliente cobrado
     // pelo dobro do que deve.
     if (lancando) return;
@@ -139,6 +165,31 @@ export const AReceber: React.FC = () => {
       );
     } finally {
       setRecebendo(false);
+    }
+  };
+
+  /**
+   * "Excluir este fiado?" não é pergunta, é armadilha — a mesma do cliente,
+   * com dinheiro dentro. Fiado com pagamento recebido tem lançamento de
+   * entrada no caixa apontando para ele: some a dívida, ficam as entradas.
+   */
+  const apagar = async (f: Fiado) => {
+    const r = aoApagarFiado(f, nomeCliente(f.clienteId));
+    if (!r.pode) {
+      return aviso.alerta(
+        `${r.titulo}\n\n${r.perdas.map((p) => `- ${p}`).join("\n")}\n\n${r.saida}`
+      );
+    }
+    if (!confirm(textoDaConfirmacao(r))) return;
+    try {
+      await removeFiado(f.id);
+    } catch (e) {
+      // Antes nem await tinha: a exclusão falhava calada e o fiado voltava
+      // na carga seguinte, como se o sistema o tivesse ressuscitado.
+      aviso.erro(
+        "Não foi possível excluir o fiado:\n\n" +
+          (e instanceof Error ? e.message : String(e))
+      );
     }
   };
 
@@ -229,7 +280,11 @@ export const AReceber: React.FC = () => {
                       </button>
                     </>
                   )}
-                  <button className="btn-ghost !p-2 text-red-400" title="Excluir" onClick={() => { if (confirm("Excluir este fiado?")) removeFiado(f.id); }}>
+                  <button
+                    className="btn-ghost !p-2 text-red-400"
+                    title="Excluir"
+                    onClick={() => apagar(f)}
+                  >
                     <Trash2 size={16} />
                   </button>
                 </div>
