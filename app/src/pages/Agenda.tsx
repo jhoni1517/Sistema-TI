@@ -313,7 +313,16 @@ export const Agenda: React.FC = () => {
                     onExcluir={async () => {
                       if (!o.eventoId) return;
                       if (!confirm(`Excluir "${o.titulo}"?`)) return;
-                      await removeEvento(o.eventoId);
+                      try {
+                        await removeEvento(o.eventoId);
+                      } catch (e) {
+                        // Compromisso que some da tela e volta na próxima
+                        // carga faz a agenda parecer defeituosa.
+                        aviso.erro(
+                          "Não foi possível excluir o compromisso:\n\n" +
+                            (e instanceof Error ? e.message : String(e))
+                        );
+                      }
                     }}
                     onParabenizar={() => parabenizar(o)}
                   />

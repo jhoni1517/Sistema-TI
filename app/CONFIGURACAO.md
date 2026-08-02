@@ -139,7 +139,16 @@ https://supabase.com/dashboard/project/nviagibefxqtognowqwe/sql/new:
 12. `supabase-migracao-imagens.sql`
 13. `supabase-migracao-catalogo.sql`
 14. `supabase-migracao-ramo-email.sql`
-15. `supabase-corrigir-colunas.sql`
+15. `supabase-migracao-rastreio-token.sql`
+16. `supabase-corrigir-colunas.sql`
+
+O de número 15 fecha o rastreio público. A consulta pedia só a loja e o
+número da OS, e o número é sequencial: quem recebia um link de rastreio
+trocava o número e lia — ou CANCELAVA — a fila inteira da loja. Ele cria o
+segredo por ordem, preenche as ordens que já existem e derruba as versões
+antigas das funções públicas. **Depois de rodar, os links de rastreio já
+enviados param de funcionar**; o cliente que abrir um deles lê um aviso
+pedindo o link novo, e o botão de WhatsApp da OS já manda o link certo.
 
 O de número 11 é o que faz a página do cliente entender mais de um orçamento
 na mesma OS ("fonte de 500W mais SSD" contra "só a fonte de 200W"). Sem ele,

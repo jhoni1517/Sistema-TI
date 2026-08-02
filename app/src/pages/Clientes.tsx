@@ -245,7 +245,7 @@ export const Clientes: React.FC = () => {
                 </button>
                 <button
                   className="btn-secondary !py-1.5 !px-2.5 text-red-600"
-                  onClick={() => {
+                  onClick={async () => {
                     {
                         // "Excluir Fulano?" não é pergunta, é armadilha: quem
                         // responde sim não sabe que ele deve R$ 340 e tem um
@@ -254,7 +254,18 @@ export const Clientes: React.FC = () => {
                         if (!r.pode) {
                           return aviso.alerta(`${r.titulo}\n\n${r.saida}`);
                         }
-                        if (confirm(textoDaConfirmacao(r))) removeCliente(c.id);
+                        if (!confirm(textoDaConfirmacao(r))) return;
+                        try {
+                          await removeCliente(c.id);
+                        } catch (e) {
+                          // Sem await e sem catch, a falha era uma promessa
+                          // rejeitada que ninguém escutava: o cliente sumia
+                          // da tela e voltava na carga seguinte.
+                          aviso.erro(
+                            "Não foi possível excluir o cliente:\n\n" +
+                              (e instanceof Error ? e.message : String(e))
+                          );
+                        }
                       }
                   }}
                 >

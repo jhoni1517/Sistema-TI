@@ -66,6 +66,52 @@ export const faltaPara = (total: number, recebido?: number): number => {
 };
 
 /**
+ * O que impede de fechar a venda, em português. Vazio = pode fechar.
+ *
+ * A quantidade do produto por peso é campo livre — tem que ser, porque é
+ * ali que o operador digita 0,315 sem abrir janela nenhuma, com a fila
+ * andando. Só que ele aceitava zero e NEGATIVO, e o fechamento conferia
+ * apenas o preço.
+ *
+ * Linha negativa é a pior das duas: ela desconta do total E soma no
+ * estoque, porque a baixa é `quantidade - vendida`. Vender "Arroz 2" junto
+ * de "Feijão -2" fecha a venda por R$ 0,00 e ainda credita dois quilos de
+ * feijão na prateleira. E não sobra nada para a conferência achar: o
+ * estoque não fica negativo, o preço não é zero, e lucro inflado ninguém
+ * procura.
+ *
+ * Linha com quantidade zero é mercadoria saindo de graça: total zero e
+ * baixa zero.
+ *
+ * A recusa é por item e diz o nome, porque com dez linhas na tela "tem item
+ * sem preço" não diz qual.
+ */
+export function problemaNoCarrinho(itens: ItemVenda[]): string {
+  if (itens.length === 0) return "Carrinho vazio.";
+
+  for (const i of itens) {
+    const nome = txt(i.descricao).trim() || "Item";
+    const q = Number(i.quantidade) || 0;
+
+    if (q < 0) {
+      return (
+        `"${nome}" está com quantidade negativa. Isso desconta do total e ` +
+        `DEVOLVE mercadoria ao estoque. Se o cliente está devolvendo alguma ` +
+        `coisa, feche esta venda e use Devolução.`
+      );
+    }
+    if (q === 0) {
+      return `"${nome}" está com quantidade zero. Informe quanto está saindo, ou tire o item do carrinho.`;
+    }
+    if ((Number(i.precoUnit) || 0) <= 0) {
+      return `"${nome}" está sem preço. Informe o valor antes de fechar.`;
+    }
+  }
+
+  return "";
+}
+
+/**
  * Item de carrinho a partir de um produto do estoque.
  *
  * O preço vem de precoEfetivo, nunca de `produto.preco` direto: é aqui que a

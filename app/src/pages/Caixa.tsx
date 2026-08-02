@@ -48,6 +48,8 @@ interface Extra {
 
 export const Caixa: React.FC = () => {
   const { movimentos, sessoes, produtos, clientes, config, saveMovimento, removeMovimento, saveSessao, saveProduto } = useApp();
+  /** Lançamento de movimento em andamento: barra o segundo clique */
+  const [lancandoMov, setLancandoMov] = useState(false);
   const [modal, setModal] = useState<TipoMovimento | null>(null);
   const [abrindo, setAbrindo] = useState(false);
   const [fechando, setFechando] = useState(false);
@@ -452,6 +454,16 @@ export const Caixa: React.FC = () => {
         clientes={clientes}
         onClose={() => setModal(null)}
         onSave={async (m, extra) => {
+          /*
+           * A trava do clique duplo tem que morar AQUI, junto do await.
+           *
+           * A janela levanta a dela e baixa por um `setTimeout` de 1,5s, que
+           * é um chute: no 4G do balcão a gravação passa disso, o botão
+           * volta a aceitar clique com a primeira ainda no ar, e o
+           * lançamento entra duas vezes no caixa.
+           */
+          if (lancandoMov) return;
+          setLancandoMov(true);
           try {
             // Lança o dinheiro primeiro e só então mexe no estoque. Se algo
             // falhar, o erro APARECE — antes a falha era engolida e sobrava
@@ -475,6 +487,8 @@ export const Caixa: React.FC = () => {
               "Não foi possível registrar no caixa:\n\n" +
                 (e instanceof Error ? e.message : String(e))
             );
+          } finally {
+            setLancandoMov(false);
           }
         }}
       />

@@ -1,5 +1,5 @@
 import { centavos, subtotalItem } from "./pdv";
-import type { ItemVenda, Venda } from "./types";
+import type { FormaPagamento, ItemVenda, Venda } from "./types";
 
 /**
  * Devolução e troca de mercadoria.
@@ -138,3 +138,67 @@ export function calcularDevolucao(venda: Venda, escolha: Devolvidos): ResumoDevo
 /** Descrição do lançamento no caixa — é o que o dono lê no fechamento */
 export const descricaoDaDevolucao = (venda: Venda, resumo: ResumoDevolucao): string =>
   `Devolução ${resumo.total ? "total" : "parcial"} da venda ${venda.numero}`;
+
+/* ------------------------------------------------------------------ */
+/* Por onde o dinheiro volta                                           */
+/* ------------------------------------------------------------------ */
+
+export interface FormaDevolvida {
+  forma: FormaPagamento;
+  valor: number;
+}
+
+/**
+ * Como repartir o valor devolvido entre as formas em que a venda foi paga.
+ *
+ * A venda dividida já grava um lançamento POR FORMA — é isso que faz o
+ * fechamento separar o que está na gaveta do que caiu na maquininha. A
+ * devolução não fazia: ela lançava tudo pela forma PRINCIPAL da venda.
+ *
+ * Numa venda de R$ 200 com R$ 190 no crédito e R$ 10 em espécie, devolver
+ * tudo lançava R$ 200 de saída no crédito. O caixa passa a dizer que a
+ * maquininha estornou R$ 200 quando estornou R$ 190, e os R$ 10 que saíram
+ * da gaveta de verdade não saem de lugar nenhum — falta de R$ 10 no papel,
+ * todo dia em que alguém devolve uma compra dividida.
+ *
+ * A proporção é a única repartição que não precisa de decisão do atendente
+ * com fila esperando, e é a que sobrevive a duas devoluções parciais: a
+ * soma delas nunca estoura o que cada forma pagou.
+ */
+export function formasDaDevolucao(venda: Venda, valor: number): FormaDevolvida[] {
+  const pagos = (venda.pagamentos || []).filter((p) => n(p.valor) > 0);
+  const total = centavos(pagos.reduce((s, p) => s + n(p.valor), 0));
+
+  // Venda de uma forma só (a esmagadora maioria) ou venda antiga, gravada
+  // antes de existir pagamento dividido: continua com um lançamento.
+  if (pagos.length < 2 || total <= 0 || n(valor) <= 0) {
+    return [{ forma: venda.formaPagamento, valor: centavos(Math.max(0, n(valor))) }];
+  }
+
+  const alvo = centavos(n(valor));
+  const partes = pagos.map((p) => ({
+    forma: p.forma,
+    valor: centavos((alvo * n(p.valor)) / total),
+  }));
+
+  /*
+   * O centavo que sobra do arredondamento vai para quem mais pagou.
+   *
+   * Sem isto, devolver R$ 10 de uma venda paga em três formas iguais lança
+   * R$ 9,99 no caixa: a saída não bate com a nota que saiu da gaveta, e a
+   * diferença de um centavo aparece na conferência sem origem.
+   */
+  const sobra = centavos(alvo - partes.reduce((s, p) => s + p.valor, 0));
+  if (sobra !== 0) {
+    // Quem mais PAGOU, não quem tem a maior fatia arredondada: as fatias
+    // empatam justamente no caso que gera sobra, e aí o centavo cairia na
+    // primeira linha da lista, que não quer dizer nada.
+    let maior = 0;
+    for (let i = 1; i < pagos.length; i++) {
+      if (n(pagos[i].valor) > n(pagos[maior].valor)) maior = i;
+    }
+    partes[maior].valor = centavos(partes[maior].valor + sobra);
+  }
+
+  return partes;
+}

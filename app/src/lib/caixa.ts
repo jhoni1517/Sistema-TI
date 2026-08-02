@@ -71,12 +71,27 @@ export function resumoCaixa(
    * sem ter um centavo a mais em papel — e o aviso que dispara sem motivo é
    * o aviso que a pessoa aprende a ignorar.
    *
-   * Saída e sangria entram porque saem da gaveta de verdade. Saída paga no
-   * cartão da loja não deveria descontar daqui, mas ela é rara e descontar a
-   * mais só faz o aviso ser conservador — o erro seguro é para este lado.
+   * A entrada já respeitava isso; a SAÍDA não. Ela descontava tudo, com a
+   * justificativa de que saída fora do dinheiro seria rara. Deixou de ser:
+   * a devolução de mercadoria lança na forma da venda original (estorno de
+   * cartão), a perda de inventário lança "outro" e a compra por cotação
+   * lança "pix". Nenhuma delas tira uma nota da gaveta.
+   *
+   * E o estrago não fica no aviso de sangria: `diferenca` é contado menos
+   * `emEspecie`. Um estorno de R$ 500 no cartão fazia o fechamento acusar
+   * sobra de R$ 500 — o mesmo erro de sempre, do outro lado da conta. E
+   * diferença que aparece sempre é diferença que a pessoa aprende a
+   * ignorar, justamente para o dia em que falta dinheiro de verdade.
+   *
+   * Sangria fica de fora da checagem de propósito: ela é, por definição,
+   * papel saindo da gaveta para o cofre ou para o banco.
    */
+  const saidasEmEspecie = movimentos
+    .filter((m) => m.tipo === "saida" && ehEspecie(m.formaPagamento))
+    .reduce((s, m) => s + (Number(m.valor) || 0), 0);
+
   const emEspecie = arredonda(
-    abertura + (porForma.dinheiro || 0) - saidas - sangrias
+    abertura + (porForma.dinheiro || 0) - saidasEmEspecie - sangrias
   );
 
   const contado = typeof sessao?.valorContado === "number" ? sessao.valorContado : undefined;
@@ -112,6 +127,19 @@ export function resumoCaixa(
  * "- R$ 0,00" e faria a pessoa procurar um erro que não existe.
  */
 const arredonda = (v: number): number => Math.round(v * 100) / 100 + 0;
+
+/**
+ * Este lançamento é papel na mão?
+ *
+ * Vazio conta como dinheiro porque é assim que volta da nuvem o lançamento
+ * gravado antes de a coluna existir — e porque o erro seguro é para este
+ * lado: mostrar menos papel do que tem faz o aviso de sangria ser
+ * conservador, o contrário esconde falta de caixa.
+ */
+const ehEspecie = (forma?: string): boolean => {
+  const f = txt(forma).trim().toLowerCase();
+  return f === "" || f === "dinheiro";
+};
 
 /** Sessões já fechadas, da mais recente para a mais antiga */
 export const sessoesFechadas = (sessoes: SessaoCaixa[]): SessaoCaixa[] =>

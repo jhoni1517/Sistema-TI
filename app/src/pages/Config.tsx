@@ -54,12 +54,26 @@ export const Config: React.FC = () => {
     carregarSessao().then(setSessao);
   }, []);
 
-  const salvar = () => {
+  const salvar = async () => {
     // Recusa antes de gravar. Só avisar não bastaria: o campo já sobe para o
     // banco, e um token que chegou lá já saiu no backup.
     const erroChat = problemaNoChatId(form.telegramChatId || "");
     if (erroChat) return aviso.erro(erroChat);
-    saveConfig(form);
+
+    /*
+     * "Salvo!" só depois de a nuvem confirmar.
+     *
+     * Antes a tela dizia "Salvo!" e zerava `mexeu` na hora, sem esperar. Com
+     * a gravação recusada — leitura da nuvem ainda em curso, assinatura
+     * vencida, rede fora — acontecia o pior dos dois mundos: a pessoa lia
+     * "Salvo!" e, como o formulário voltava a seguir a nuvem, tudo que ela
+     * tinha digitado era descartado na sincronização seguinte.
+     *
+     * `mexeu` continua ligado quando falha: é ele que segura o texto na tela
+     * para a pessoa tentar de novo sem redigitar.
+     */
+    const subiu = await saveConfig(form);
+    if (!subiu) return;
     setMexeu(false);
     setSalvo(true);
     setTimeout(() => setSalvo(false), 2500);

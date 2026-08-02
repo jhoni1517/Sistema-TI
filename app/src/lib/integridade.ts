@@ -126,6 +126,64 @@ function ordensSemPagamento(d: Dados): Achado[] {
 }
 
 /**
+ * OS cobrada duas vezes.
+ *
+ * O espelho de `ordensSemPagamento`, e o mais caro dos dois — porque
+ * ninguém procura por ele. Receita a menos aparece: o dono conta a gaveta e
+ * sente falta. Receita a MAIS não aparece em lugar nenhum; o mês fecha
+ * melhor do que foi e a conta some no meio do movimento.
+ *
+ * Acontece de três jeitos, todos vistos: clique duplo no botão Receber com
+ * o 4G ruim, OS reaberta e cobrada de novo, e a mensagem de erro que dizia
+ * "nada foi alterado" depois de o dinheiro já ter entrado.
+ *
+ * O valor do achado é o EXCESSO, não o total: é isso que precisa sair.
+ */
+function ordensPagasDuasVezes(d: Dados): Achado[] {
+  const porOrdem = new Map<string, { caixa: number; fiado: number; valor: number }>();
+
+  for (const m of d.movimentos) {
+    const id = txt(m.osId);
+    if (!id || m.tipo !== "entrada") continue;
+    const atual = porOrdem.get(id) || { caixa: 0, fiado: 0, valor: 0 };
+    atual.caixa += 1;
+    atual.valor = centavos(atual.valor + n(m.valor));
+    porOrdem.set(id, atual);
+  }
+  for (const f of d.fiados) {
+    const id = txt(f.osId);
+    if (!id) continue;
+    const atual = porOrdem.get(id) || { caixa: 0, fiado: 0, valor: 0 };
+    atual.fiado += 1;
+    atual.valor = centavos(atual.valor + n(f.valor));
+    porOrdem.set(id, atual);
+  }
+
+  const achados: Achado[] = [];
+  for (const [id, c] of porOrdem) {
+    if (c.caixa + c.fiado < 2) continue;
+    const o = d.ordens.find((x) => x.id === id);
+    if (!o) continue;
+    const excesso = centavos(c.valor - totalOS(o));
+    // Só acusa quando lançaram MAIS do que a OS vale. Duas entradas somando
+    // o total é pagamento em duas formas, que é normal e não é problema.
+    if (excesso <= 0.01) continue;
+    achados.push({
+      gravidade: "erro",
+      tipo: "os-paga-duas-vezes",
+      titulo: `${codigoOS(o.numero)} tem ${c.caixa + c.fiado} lançamentos somando mais do que ela vale`,
+      saida:
+        `A ordem vale ${totalOS(o).toFixed(2)} e existem ${c.valor.toFixed(2)} lançados. ` +
+        "Confira em Caixa e em A Receber e apague o lançamento repetido — " +
+        "receita a mais não aparece na conferência da gaveta, só infla o mês.",
+      valor: excesso,
+      ref: { tela: "/ordens", id: o.id },
+    });
+  }
+  return achados;
+}
+
+/**
  * Estoque negativo.
  *
  * Sempre significa que saiu mercadoria que o sistema não sabia que existia:
@@ -240,6 +298,7 @@ export function conferirTudo(d: Dados, hoje = new Date()): Achado[] {
   return [
     ...vendasSemCaixa(d),
     ...ordensSemPagamento(d),
+    ...ordensPagasDuasVezes(d),
     ...estoqueNegativo(d),
     ...fiadosOrfaos(d),
     ...caixaEsquecido(d, hoje),

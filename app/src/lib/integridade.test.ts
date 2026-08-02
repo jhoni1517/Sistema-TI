@@ -343,3 +343,82 @@ describe("a conferência não pode travar o painel", () => {
     expect(doisMil / mil).toBeLessThan(2.5);
   });
 });
+
+/**
+ * O espelho de "OS entregue sem pagamento", e o mais caro dos dois.
+ *
+ * Receita a menos aparece: o dono conta a gaveta e sente falta. Receita a
+ * MAIS não aparece em lugar nenhum — o mês fecha melhor do que foi.
+ */
+describe("OS cobrada duas vezes", () => {
+  const os200 = (): OrdemServico =>
+    ({
+      id: "o1",
+      numero: 7,
+      status: "entregue",
+      pecas: [],
+      maoDeObra: 200,
+      desconto: 0,
+      historico: [],
+      criadoEm: "2026-07-01T10:00:00.000Z",
+    }) as unknown as OrdemServico;
+
+  const entrada = (id: string, valor: number): MovimentoCaixa =>
+    ({
+      id,
+      tipo: "entrada",
+      categoria: "OS",
+      descricao: "OS00007",
+      valor,
+      formaPagamento: "dinheiro",
+      osId: "o1",
+      data: "2026-07-02T10:00:00.000Z",
+    }) as MovimentoCaixa;
+
+  const base = (p: Partial<Dados> = {}): Dados => ({
+    ordens: [os200()],
+    vendas: [],
+    movimentos: [],
+    produtos: [],
+    fiados: [],
+    clientes: [],
+    sessoes: [],
+    ...p,
+  });
+
+  it("acusa quando os lançamentos somam mais do que a OS vale", () => {
+    const a = conferirTudo(base({ movimentos: [entrada("m1", 200), entrada("m2", 200)] }))
+      .filter((x) => x.tipo === "os-paga-duas-vezes");
+    expect(a).toHaveLength(1);
+    expect(a[0].gravidade).toBe("erro");
+    // O valor do achado é o EXCESSO: é isso que precisa sair.
+    expect(a[0].valor).toBe(200);
+  });
+
+  it("pagamento dividido em duas formas NÃO é cobrança dupla", () => {
+    // Duas entradas somando o total é o normal da venda dividida.
+    const a = conferirTudo(base({ movimentos: [entrada("m1", 150), entrada("m2", 50)] }))
+      .filter((x) => x.tipo === "os-paga-duas-vezes");
+    expect(a).toEqual([]);
+  });
+
+  it("pega também caixa mais fiado pela mesma OS", () => {
+    const fiado = { id: "f1", clienteId: "c1", osId: "o1", valor: 200, pagamentos: [], quitado: false, criadoEm: "" } as unknown as Fiado;
+    const a = conferirTudo(base({ movimentos: [entrada("m1", 200)], fiados: [fiado] }))
+      .filter((x) => x.tipo === "os-paga-duas-vezes");
+    expect(a).toHaveLength(1);
+  });
+
+  it("um lançamento só não acusa nada", () => {
+    expect(
+      conferirTudo(base({ movimentos: [entrada("m1", 200)] })).filter(
+        (x) => x.tipo === "os-paga-duas-vezes"
+      )
+    ).toEqual([]);
+  });
+
+  it("o excesso entra no dinheiro em risco", () => {
+    const achados = conferirTudo(base({ movimentos: [entrada("m1", 200), entrada("m2", 200)] }));
+    expect(dinheiroEmRisco(achados)).toBeGreaterThanOrEqual(200);
+  });
+});

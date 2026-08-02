@@ -109,20 +109,42 @@ export function problemaNoPagamento(total: number, parcelas: Parcela[]): string 
  * quer saber quanto entrou em cada forma, não em quantas etapas.
  */
 export function consolidar(parcelas: Parcela[]): Parcela[] {
-  const mapa = new Map<FormaPagamento, Parcela>();
+  /*
+   * `recebido` é POR PARCELA, e quem não informou entregou exatamente o que
+   * foi lançado. A soma do entregue usava o valor JÁ juntado no lugar do
+   * valor da própria linha — o dobro — e é de `entregue - lançado` que sai o
+   * troco que a gaveta paga.
+   *
+   * `informou` existe para não inventar um "Recebido" no cupom quando
+   * ninguém digitou nada: guardar entregue igual ao valor não muda a conta,
+   * mas faz o cupom afirmar uma coisa que não aconteceu.
+   */
+  const mapa = new Map<
+    FormaPagamento,
+    { forma: FormaPagamento; valor: number; entregue: number; informou: boolean }
+  >();
+
   for (const p of parcelas) {
-    if (n(p.valor) <= 0) continue;
+    const valor = centavos(n(p.valor));
+    if (valor <= 0) continue;
+    const informou = p.recebido !== undefined;
+    const entregue = informou ? centavos(n(p.recebido)) : valor;
+
     const atual = mapa.get(p.forma);
     if (!atual) {
-      mapa.set(p.forma, { ...p, valor: centavos(n(p.valor)) });
+      mapa.set(p.forma, { forma: p.forma, valor, entregue, informou });
     } else {
-      atual.valor = centavos(atual.valor + n(p.valor));
-      if (p.recebido !== undefined) {
-        atual.recebido = centavos(n(atual.recebido ?? atual.valor) + n(p.recebido));
-      }
+      atual.valor = centavos(atual.valor + valor);
+      atual.entregue = centavos(atual.entregue + entregue);
+      atual.informou = atual.informou || informou;
     }
   }
-  return [...mapa.values()];
+
+  return [...mapa.values()].map((x) =>
+    x.informou
+      ? { forma: x.forma, valor: x.valor, recebido: x.entregue }
+      : { forma: x.forma, valor: x.valor }
+  );
 }
 
 /**

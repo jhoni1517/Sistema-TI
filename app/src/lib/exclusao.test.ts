@@ -3,6 +3,7 @@ import {
   aoApagarCliente,
   aoApagarProduto,
   aoApagarOrdem,
+  aoApagarFiado,
   textoDaConfirmacao,
 } from "./exclusao";
 import type { Cliente, Fiado, MovimentoCaixa, OrdemServico, Produto, Venda } from "./types";
@@ -211,5 +212,39 @@ describe("o texto que aparece na confirmação", () => {
   it("sem perdas, ainda avisa que não tem volta", () => {
     const t = textoDaConfirmacao({ pode: true, titulo: "Apagar?", perdas: [], saida: "" });
     expect(t).toContain("não pode ser desfeito");
+  });
+});
+
+/**
+ * O botão de excluir fiado perguntava "Excluir este fiado?" e apagava.
+ *
+ * Um fiado de R$ 500 com R$ 300 já pagos tem três lançamentos de entrada no
+ * caixa apontando para ele. Some a dívida, ficam as entradas: receita sem
+ * origem, e o registro de que o cliente pagou vai junto.
+ */
+describe("apagar um fiado", () => {
+  const fiado = (f: Partial<Fiado> = {}): Fiado =>
+    ({ id: "f1", clienteId: "c1", descricao: "Conserto", valor: 500, pagamentos: [], quitado: false, criadoEm: "2026-07-01T10:00:00.000Z", ...f }) as Fiado;
+
+  it("recusa quando já houve pagamento, e diz o que fazer", () => {
+    const r = aoApagarFiado(
+      fiado({ pagamentos: [{ data: "x", valor: 300, formaPagamento: "dinheiro" }] }),
+      "Fulano"
+    );
+    expect(r.pode).toBe(false);
+    expect(r.titulo).toContain("300");
+    expect(r.saida).toContain("receita sem origem");
+  });
+
+  it("deixa apagar o que nunca foi pago, dizendo quanto se perdoa", () => {
+    const r = aoApagarFiado(fiado(), "Fulano");
+    expect(r.pode).toBe(true);
+    expect(r.perdas.join(" ")).toContain("500");
+  });
+
+  it("fiado zerado e sem pagamento apaga sem drama", () => {
+    const r = aoApagarFiado(fiado({ valor: 0 }));
+    expect(r.pode).toBe(true);
+    expect(r.perdas).toEqual([]);
   });
 });
