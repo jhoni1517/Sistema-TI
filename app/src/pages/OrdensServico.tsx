@@ -240,6 +240,8 @@ export const OrdensServico: React.FC = () => {
    * informado em vez de sumir em silêncio.
    */
   const baixarEstoqueEEntregar = async (o: OrdemServico) => {
+    // erro-tratado-por-quem-chama: só roda dentro do try de onReceber e de
+    // onFiado, que são quem sabe se o dinheiro já entrou e o que dizer.
     const semVinculo: string[] = [];
 
     // Só a alternativa escolhida sai da prateleira. Baixar as duas fontes
@@ -542,10 +544,19 @@ export const OrdensServico: React.FC = () => {
                 `${r.titulo}\n\n${r.perdas.map((p) => `- ${p}`).join("\n")}\n\n${r.saida}`
               );
             }
-            if (confirm(textoDaConfirmacao(r))) {
+            if (!confirm(textoDaConfirmacao(r))) return;
+            try {
               await removeOrdem(detalhe.id);
-              setDetalhe(null);
+            } catch (e) {
+              // A janela fechava como se tivesse apagado. Assinatura vencida
+              // ou permissão derrubam a exclusão em silêncio, e a OS volta
+              // na próxima carga.
+              return aviso.erro(
+                "Não foi possível excluir a OS:\n\n" +
+                  (e instanceof Error ? e.message : String(e))
+              );
             }
+            setDetalhe(null);
           }}
           onReceber={async (forma) => {
             if (escolhaPendente(detalhe)) return;
@@ -577,6 +588,15 @@ export const OrdensServico: React.FC = () => {
             }
             if (registrando) return; // clique duplo no balcão acontece o tempo todo
             setRegistrando(true);
+            /*
+             * Depois desta linha virar true, "nada foi alterado" é mentira.
+             *
+             * A mensagem de erro dizia sempre "Nada foi alterado. Tente de
+             * novo." Só que a ordem é dinheiro primeiro: quando a falha
+             * acontece na baixa do estoque, o lançamento no caixa JÁ entrou.
+             * Quem lê "tente de novo" tenta — e lança a receita duas vezes.
+             */
+            let dinheiroEntrou = false;
             try {
               // O dinheiro ENTRA primeiro. Se a gravação falhar, o estoque não
               // é baixado — antes o erro sumia e sobrava aparelho entregue sem
@@ -596,6 +616,7 @@ export const OrdensServico: React.FC = () => {
                 sessaoId: sessaoAberta?.id,
                 data: nowISO(),
               });
+              dinheiroEntrou = true;
               if (detalhe.status === "entregue") {
                 // OS já entregue: não dá para saber se a baixa foi feita, e
                 // descontar duas vezes estraga o estoque. Quem estava no
@@ -613,9 +634,14 @@ export const OrdensServico: React.FC = () => {
               aviso.sucesso(`${brl(valor)} lançado no caixa.`);
             } catch (e) {
               aviso.erro(
-                "Não foi possível registrar o pagamento:\n\n" +
+                "Não foi possível concluir a entrega:\n\n" +
                   (e instanceof Error ? e.message : String(e)) +
-                  "\n\nNada foi alterado. Tente de novo."
+                  "\n\n" +
+                  (dinheiroEntrou
+                    ? `ATENÇÃO: os ${brl(valor)} JÁ entraram no caixa. NÃO receba de novo. ` +
+                      "O que faltou foi a baixa das peças e a entrega — acerte em Estoque " +
+                      "e mude o status da OS na mão."
+                    : "Nada foi alterado. Tente de novo.")
               );
             } finally {
               setRegistrando(false);
@@ -643,6 +669,7 @@ export const OrdensServico: React.FC = () => {
             }
             if (registrando) return; // dois cliques = o cliente devendo o dobro
             setRegistrando(true);
+            let fiadoEntrou = false;
             try {
               await saveFiado({
                 id: uid(),
@@ -654,6 +681,7 @@ export const OrdensServico: React.FC = () => {
                 quitado: false,
                 criadoEm: nowISO(),
               });
+              fiadoEntrou = true;
               await baixarEstoqueEEntregar(detalhe);
               setDetalhe(null);
               // Deixa explícito que NÃO entrou dinheiro: quem clica em fiado
@@ -664,8 +692,13 @@ export const OrdensServico: React.FC = () => {
               );
             } catch (e) {
               aviso.erro(
-                "Não foi possível lançar o fiado:\n\n" +
-                  (e instanceof Error ? e.message : String(e))
+                "Não foi possível concluir a entrega no fiado:\n\n" +
+                  (e instanceof Error ? e.message : String(e)) +
+                  "\n\n" +
+                  (fiadoEntrou
+                    ? "ATENÇÃO: a dívida JÁ foi lançada em A Receber. NÃO lance de novo. " +
+                      "O que faltou foi a baixa das peças e a entrega."
+                    : "Nada foi alterado. Tente de novo.")
               );
             } finally {
               setRegistrando(false);

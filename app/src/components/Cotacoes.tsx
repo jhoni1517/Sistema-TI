@@ -141,7 +141,18 @@ export const Cotacoes: React.FC<{
       txt(f?.telefone),
       mensagemFornecedor(c, f, precos, config.nomeLoja)
     );
-    if (!c.enviadoEm) await saveCotacao({ ...c, enviadoEm: nowISO() });
+    if (!c.enviadoEm) {
+      try {
+        await saveCotacao({ ...c, enviadoEm: nowISO() });
+      } catch (e) {
+        // O WhatsApp já abriu. Sem aviso, a cotação continua marcada como
+        // não enviada e o fornecedor recebe o mesmo pedido de novo.
+        aviso.erro(
+          "A mensagem abriu, mas não foi possível marcar a cotação como enviada:\n\n" +
+            (e instanceof Error ? e.message : String(e))
+        );
+      }
+    }
   };
 
   /**
@@ -302,7 +313,16 @@ export const Cotacoes: React.FC<{
 
   const apagar = async (c: Cotacao) => {
     if (!confirm(`Excluir a cotação nº ${c.numero}?`)) return;
-    await removeCotacao(c.id);
+    try {
+      await removeCotacao(c.id);
+    } catch (e) {
+      // Some da tela sem sumir do banco: na próxima carga ela volta, e
+      // quem apagou acha que o sistema ressuscitou a cotação.
+      aviso.erro(
+        "Não foi possível excluir a cotação:\n\n" +
+          (e instanceof Error ? e.message : String(e))
+      );
+    }
   };
 
   return (
