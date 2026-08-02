@@ -24,7 +24,27 @@ const n = (v?: number | null): number => Number(v) || 0;
 /** Só a data, sem hora — comparar horários faz "vence hoje" virar "atrasada" */
 export const soData = (iso?: string | null): string => txt(iso).slice(0, 10);
 
-export const hojeISO = (): string => new Date().toISOString().slice(0, 10);
+/**
+ * O dia de HOJE, no relógio de quem está no balcão.
+ *
+ * A regra da casa — data é texto AAAA-MM-DD e a conta é em UTC — vale para a
+ * ARITMÉTICA: somar um mês, virar o ano, dia 31 em fevereiro. Ela nunca quis
+ * dizer que o dia de hoje fosse o de Greenwich, e era isso que acontecia:
+ * `toISOString()` devolve a data em UTC, então no Brasil (UTC-3) o sistema
+ * inteiro virava o dia às 21h. Três horas por dia, todo dia, e justamente as
+ * horas cheias de uma pizzaria ou de uma loja de bebidas.
+ *
+ * Das 21h em diante: promoção que termina hoje parava de valer (a gôndola
+ * dizia um preço e o caixa cobrava outro), produto que vence amanhã já
+ * entrava como vencido no PDV, e conta que vence hoje aparecia atrasada.
+ *
+ * Deslocar pelo fuso antes de cortar devolve a data LOCAL como texto puro —
+ * e daí para a frente toda a aritmética continua em UTC, como sempre foi.
+ */
+export const hojeISO = (): string => {
+  const d = new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+};
 
 /**
  * Dias até o vencimento. Negativo = atrasada.

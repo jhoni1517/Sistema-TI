@@ -10,6 +10,8 @@
  * No iPhone só funciona com o site instalado na tela de início (iOS 16.4+).
  */
 
+import { hojeISO } from "./contas";
+
 const CHAVE_VISTOS = "sistema-ti:avisos-vistos";
 
 export type PermissaoAviso = "concedida" | "negada" | "pendente" | "indisponivel";
@@ -48,7 +50,7 @@ function vistos(): Record<string, string> {
 
 function marcarVisto(chave: string) {
   const v = vistos();
-  v[chave] = new Date().toISOString().slice(0, 10);
+  v[chave] = hojeISO();
   // Mantém a lista enxuta: 200 chaves cobrem meses de uso
   const entradas = Object.entries(v);
   if (entradas.length > 200) {
@@ -61,7 +63,7 @@ function marcarVisto(chave: string) {
 
 /** Já avisamos isto hoje neste aparelho? */
 export const jaAvisadoHoje = (chave: string): boolean =>
-  vistos()[chave] === new Date().toISOString().slice(0, 10);
+  vistos()[chave] === hojeISO();
 
 /**
  * Mostra a notificação. Devolve false quando não foi possível — sem

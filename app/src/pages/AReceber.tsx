@@ -14,6 +14,7 @@ import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../componen
 import { uid, nowISO, brl, formatDate, abrirWhatsapp, txt } from "../lib/format";
 import { saldoFiado, pagoFiado } from "../lib/calc";
 import { travaAtendimento, travaFiado } from "../lib/clientes";
+import { hojeISO } from "../lib/contas";
 import { aoApagarFiado, textoDaConfirmacao } from "../lib/exclusao";
 import { sessaoAberta as achaSessaoAberta } from "../lib/caixa";
 import type { Fiado, FormaPagamento } from "../lib/types";
@@ -50,7 +51,7 @@ export const AReceber: React.FC = () => {
   const vencidos = useMemo(
     () =>
       fiados.filter(
-        (f) => !f.quitado && f.vencimento && f.vencimento < nowISO().slice(0, 10)
+        (f) => !f.quitado && f.vencimento && f.vencimento < hojeISO()
       ).length,
     [fiados]
   );
@@ -246,7 +247,7 @@ export const AReceber: React.FC = () => {
         <div className="space-y-3">
           {lista.map((f) => {
             const saldo = saldoFiado(f);
-            const vencido = !f.quitado && f.vencimento && f.vencimento < nowISO().slice(0, 10);
+            const vencido = !f.quitado && f.vencimento && f.vencimento < hojeISO();
             return (
               <div key={f.id} className={`card flex flex-wrap items-center gap-4 ${vencido ? "ring-2 ring-red-200" : ""}`}>
                 <div className="min-w-0 flex-1">
