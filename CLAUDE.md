@@ -170,6 +170,10 @@ página pública calcula sozinha.
 Tela que lê `produto.preco` direto faz a gôndola dizer um valor e o caixa
 cobrar outro — e quem aparece como mentiroso é a loja, não o sistema.
 
+Foi quebrada na entrada manual do Caixa, que lia `p.preco` direto. Virou
+`preco-unico.test.ts`: ele varre as telas procurando conta feita com o preço
+cru. Cadastro e a própria promoção marcam a linha com `preco-cru-proposital`.
+
 ### Dinheiro primeiro, sempre
 
 Toda gravação que mexe em caixa E em estoque grava o **movimento antes**.
