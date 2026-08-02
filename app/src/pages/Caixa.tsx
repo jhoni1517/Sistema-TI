@@ -348,8 +348,12 @@ export const Caixa: React.FC = () => {
         />
       ) : (
         <div className="space-y-4">
-          {listaMovs.map((d) => (
-            <div key={d.dia}>
+          {listaMovs.map((d, i) => (
+            <div
+              key={d.dia}
+              className="entra-item"
+              style={{ "--i": Math.min(i, 6) } as React.CSSProperties}
+            >
               {/* O subtotal do dia responde "quanto entrou ontem" sem
                   ninguém somar nada na cabeça. */}
               <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-3 px-1">
@@ -365,7 +369,7 @@ export const Caixa: React.FC = () => {
                 {d.movimentos.map((m) => (
                   /* Linha, não célula de tabela: cinco colunas num celular
                      viram rolagem lateral, e o dono lê no celular. */
-                  <div key={m.id} className="flex items-center gap-3 p-3 hover:bg-slate-50">
+                  <div key={m.id} className="toca flex items-center gap-3 p-3 hover:bg-slate-50">
                     <span className="shrink-0">
                       {m.tipo === "entrada" ? (
                         <ArrowDownCircle size={20} className="text-emerald-500" />
