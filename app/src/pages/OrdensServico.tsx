@@ -68,6 +68,7 @@ import {
 } from "../lib/types";
 import { travaAtendimento, classificacaoDe, travaFiado } from "../lib/clientes";
 import { saldosApos } from "../lib/estoque";
+import { proximoNumero as proximoNum, problemaParaNumerar } from "../lib/numeracao";
 import { aoApagarOrdem, textoDaConfirmacao } from "../lib/exclusao";
 import {
   garantiaDaOS,
@@ -118,7 +119,7 @@ const novaOS = (numero: number): OrdemServico => ({
 });
 
 export const OrdensServico: React.FC = () => {
-  const { ordens, clientes, produtos, sessoes, movimentos, fiados, config, saveOrdem, removeOrdem, saveMovimento, saveProduto, saveFiado } = useApp();
+  const { ordens, clientes, produtos, sessoes, movimentos, fiados, config, fontesComFalha, saveOrdem, removeOrdem, saveMovimento, saveProduto, saveFiado } = useApp();
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<OSStatus | "todas" | "abertas">("abertas");
   const [editando, setEditando] = useState<OrdemServico | null>(null);
@@ -127,10 +128,7 @@ export const OrdensServico: React.FC = () => {
   const nomeCliente = (id: string) => clientes.find((c) => c.id === id)?.nome || "—";
   const cliente = (id: string) => clientes.find((c) => c.id === id);
 
-  const proximoNumero = useMemo(
-    () => (ordens.reduce((m, o) => Math.max(m, o.numero), 0) || 0) + 1,
-    [ordens]
-  );
+  const proximoNumero = useMemo(() => proximoNum(ordens), [ordens]);
 
   const lista = useMemo(() => {
     const b = busca.toLowerCase();
@@ -316,7 +314,17 @@ export const OrdensServico: React.FC = () => {
         action={
           <button
             className="btn-primary"
-            onClick={() => setEditando(novaOS(proximoNumero))}
+            onClick={() => {
+              /*
+               * Com a lista de ordens quebrada, a próxima nasce OS00001 e
+               * colide com a primeira da loja. E o rastreio público procura
+               * PELO NÚMERO: o cliente abriria o link e veria o conserto de
+               * outra pessoa, com nome e valor.
+               */
+              const semNumero = problemaParaNumerar(fontesComFalha, "ordens", "uma ordem de serviço");
+              if (semNumero) return aviso.erro(semNumero);
+              setEditando(novaOS(proximoNumero));
+            }}
           >
             <Plus size={18} /> Nova OS
           </button>

@@ -81,6 +81,16 @@ interface AppState {
    */
   erroCarga: string;
   /**
+   * Nomes das tabelas que NÃO carregaram nesta última leitura.
+   *
+   * A mensagem de erro serve para a pessoa; esta lista serve para o código.
+   * Numerar uma venda em cima de uma lista que falhou faz o próximo número
+   * nascer 1 e colidir com a primeira venda da loja — e na OS o rastreio
+   * público procura pelo número, então o cliente vê o conserto de outra
+   * pessoa.
+   */
+  fontesComFalha: string[];
+  /**
    * Ramo que vale na tela agora.
    *
    * Pode vir da loja (Configurações) ou da escolha feita na tela de entrada,
@@ -164,6 +174,7 @@ export const AppProvider: React.FC<{
   const [eventos, setEventos] = useState<Evento[]>([]);
   /** Mensagem do que não carregou. Vazio = carregou tudo. */
   const [erroCarga, setErroCarga] = useState("");
+  const [fontesComFalha, setFontesComFalha] = useState<string[]>([]);
   const [ramoAparelho, setRamoAparelho] = useState<Ramo | null>(() => lerRamoAparelho());
   /** Ramo CONTRATADO, vindo da loja. Nulo = assistência, como o sistema nasceu. */
   const [ramoLoja, setRamoLoja] = useState<string | null>(null);
@@ -212,6 +223,7 @@ export const AppProvider: React.FC<{
   const reload = useCallback(async () => {
     setLoading(true);
     setErroCarga("");
+    setFontesComFalha([]);
 
     const fontes = [
       { nome: "clientes", carregar: db.clientes.all, aplicar: setClientes },
@@ -232,6 +244,7 @@ export const AppProvider: React.FC<{
 
     const resultados = await Promise.allSettled(fontes.map((f) => f.carregar()));
     const falhas: string[] = [];
+    const quebradas: string[] = [];
 
     resultados.forEach((r, i) => {
       if (r.status === "fulfilled") {
@@ -241,8 +254,10 @@ export const AppProvider: React.FC<{
         const msg = r.reason instanceof Error ? r.reason.message : String(r.reason);
         console.error(`Falha ao carregar ${fontes[i].nome}:`, r.reason);
         falhas.push(msg);
+        quebradas.push(fontes[i].nome);
       }
     });
+    setFontesComFalha(quebradas);
 
     // O ramo contratado vem da loja, não da configuração: é o que foi
     // vendido, e a loja não muda sozinha.
@@ -660,6 +675,7 @@ export const AppProvider: React.FC<{
     vendas,
     config,
     erroCarga,
+    fontesComFalha,
     // A prévia do aparelho só vale para quem administra o sistema. Para a
     // loja, o que manda é o que ela contratou — senão bastaria escolher
     // outro tipo na tela de entrada para usar o que não pagou.
