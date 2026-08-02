@@ -140,6 +140,15 @@ export interface OrdemServico {
    * vale o primeiro, que é a sugestão da loja. Ver lib/orcamento.ts.
    */
   opcaoEscolhida?: string;
+  /**
+   * Segredo do link público, sorteado pelo BANCO.
+   *
+   * O número da OS é sequencial porque precisa ser lido no balcão — então
+   * ele não serve de senha. Sem este segredo, quem recebia um link de
+   * rastreio trocava o número e lia (ou cancelava) a fila inteira da loja.
+   * A tela nunca gera: caminho montado no navegador não protege nada.
+   */
+  rastreio?: string;
   maoDeObra: number;
   desconto: number;
   // Fluxo

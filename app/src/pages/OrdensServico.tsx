@@ -29,6 +29,7 @@ import { PatternLock } from "../components/PatternLock";
 import { FotosAparelho } from "../components/FotosAparelho";
 import { printHTML } from "../lib/print";
 import { obterLoja } from "../lib/db";
+import { linkDeRastreio } from "../lib/rastreio";
 import { registrarAcessoSigilo } from "../lib/auth";
 import { reciboOS } from "../lib/recibo";
 import { mensagemCliente } from "../lib/mensagens";
@@ -308,10 +309,13 @@ export const OrdensServico: React.FC = () => {
   const avisarCliente = (o: OrdemServico) => {
     const c = cliente(o.clienteId);
     if (!txt(c?.telefone)) return aviso.alerta("Cliente sem telefone cadastrado.");
-    const loja = obterLoja();
-    const link = loja
-      ? `${window.location.origin}${window.location.pathname}#/rastreio/${codigoOS(o.numero)}?loja=${loja}`
-      : undefined;
+    // O link leva o segredo da ordem. Sem ele, quem recebe troca o número e
+    // lê a fila inteira da loja. Ver lib/rastreio.ts.
+    const link = linkDeRastreio(
+      `${window.location.origin}${window.location.pathname}`,
+      obterLoja(),
+      o
+    ) || undefined;
     abrirWhatsapp(txt(c?.telefone), mensagemCliente(o, c, config, link));
   };
 
@@ -1123,7 +1127,11 @@ const OSDetalhe: React.FC<{
   const [incluirCliente, setIncluirCliente] = useState(true);
 
   // o link leva a loja: a consulta pública só devolve dados desta loja
-  const trackingUrl = `${window.location.origin}${window.location.pathname}#/rastreio/${codigoOS(os.numero)}?loja=${obterLoja() || ""}`;
+  const trackingUrl = linkDeRastreio(
+    `${window.location.origin}${window.location.pathname}`,
+    obterLoja(),
+    os
+  );
   const imprimir = () => {
     printHTML(
       reciboOS(os, cliente, config, { incluirCliente }),

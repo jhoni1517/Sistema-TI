@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { aviso } from "../components/Aviso";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import {
-  Search,
   Wrench,
   CheckCircle2,
   Clock,
@@ -15,6 +14,7 @@ import {
 import { supabase, supabaseEnabled } from "../lib/supabase";
 import { brl, formatDateTime, codigoOS } from "../lib/format";
 import { OS_STATUS_META, type OSStatus } from "../lib/types";
+import { tokenDoLink, problemaNoLink } from "../lib/rastreio";
 
 const FLUXO: OSStatus[] = [
   "aberta",
@@ -65,8 +65,6 @@ const lojaDoLink = (): string =>
 
 export const Rastreio: React.FC = () => {
   const { codigo } = useParams();
-  const navigate = useNavigate();
-  const [busca, setBusca] = useState(codigo || "");
   const [os, setOs] = useState<OSPublica | null>(null);
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState("");
@@ -74,13 +72,22 @@ export const Rastreio: React.FC = () => {
   /** Nome do orçamento que o cliente marcou */
   const [escolha, setEscolha] = useState("");
   const loja = lojaDoLink();
+  /**
+   * Segredo da ordem, que vem no link.
+   *
+   * O número da OS é sequencial porque precisa ser lido no balcão — ele não
+   * serve de senha. Sem este segredo, quem recebia um link trocava o número
+   * e lia (ou CANCELAVA) a fila inteira da loja. Ver lib/rastreio.ts.
+   */
+  const token = tokenDoLink(window.location.hash);
 
   const numero = codigo ? parseInt(codigo.replace(/\D/g, ""), 10) : 0;
 
   const consultar = React.useCallback(async () => {
     if (!numero || !supabaseEnabled || !supabase) return;
-    if (!loja) {
-      setErro("Link incompleto. Peça um novo link para a assistência.");
+    const incompleto = problemaNoLink(loja, token);
+    if (incompleto) {
+      setErro(incompleto);
       return;
     }
     setCarregando(true);
@@ -89,6 +96,7 @@ export const Rastreio: React.FC = () => {
       const { data, error } = await supabase.rpc("consultar_os", {
         p_loja: loja,
         p_numero: numero,
+        p_token: token,
       });
       if (error) throw error;
       const linha = Array.isArray(data) ? data[0] : data;
@@ -106,17 +114,11 @@ export const Rastreio: React.FC = () => {
     } finally {
       setCarregando(false);
     }
-  }, [numero, loja]);
+  }, [numero, loja, token]);
 
   useEffect(() => {
     consultar();
   }, [consultar]);
-
-  const buscar = (e: React.FormEvent) => {
-    e.preventDefault();
-    const n = parseInt(busca.replace(/\D/g, ""), 10);
-    if (n) navigate(`/rastreio/${codigoOS(n)}?loja=${loja}`);
-  };
 
   // Um orçamento só não é escolha: ele já está somado no total.
   const opcoes = (os?.opcoes || []).length >= 2 ? os?.opcoes || [] : [];
@@ -144,6 +146,7 @@ export const Rastreio: React.FC = () => {
         p_numero: os.numero,
         p_aprovar: aprovar,
         p_escolha: marcada?.nome ?? null,
+        p_token: token,
       });
       if (error || data === false) throw new Error();
       await consultar();
@@ -167,29 +170,23 @@ export const Rastreio: React.FC = () => {
           <p className="text-sm text-slate-400">Consulte pelo código da ordem de serviço</p>
         </div>
 
-        <form onSubmit={buscar} className="mb-6 flex gap-2">
-          <div className="relative flex-1">
-            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              className="input pl-10"
-              placeholder="Código da OS (ex: OS00001)"
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-            />
-          </div>
-          <button type="submit" className="btn-primary">Buscar</button>
-        </form>
-
         {carregando ? (
           <div className="rounded-2xl bg-white p-10 text-center text-slate-400">Consultando...</div>
         ) : !codigo ? (
           <div className="rounded-2xl bg-white/10 p-8 text-center text-slate-300">
-            Digite o código da sua ordem de serviço para ver o status.
+            Abra o link que a assistência enviou para acompanhar o seu aparelho.
           </div>
         ) : erro || !os || !meta ? (
           <div className="rounded-2xl bg-white p-8 text-center">
-            <p className="font-semibold text-slate-700">{erro || "Ordem não encontrada"}</p>
-            <p className="mt-1 text-sm text-slate-400">Confira o código e tente novamente.</p>
+            <p className="font-semibold text-slate-700">
+              {erro || "Não encontramos esta ordem de serviço."}
+            </p>
+            {/* "Confira o código" mandava conferir o que está certo: o código
+                o cliente tem. O que falta é o link inteiro, e quem resolve
+                isso é a loja. */}
+            <p className="mt-1 text-sm text-slate-400">
+              Use sempre o link que a assistência enviou. Se ele não abrir, peça um novo.
+            </p>
           </div>
         ) : (
           <div className="overflow-hidden rounded-2xl bg-white shadow-2xl">

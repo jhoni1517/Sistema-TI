@@ -35,6 +35,9 @@ alter table ordens add column if not exists "assinaturaCliente" text;
 alter table ordens add column if not exists "prontaEm" text;
 -- Qual dos orçamentos o cliente escolheu, quando a OS oferece mais de um.
 alter table ordens add column if not exists "opcaoEscolhida" text;
+-- Segredo do link público. O valor padrão e o preenchimento das ordens que
+-- já existem estão em supabase-migracao-rastreio-token.sql.
+alter table ordens add column if not exists rastreio text;
 -- Fotos do aparelho na entrada. Só os endereços; os arquivos ficam no
 -- depósito de imagens. É o que encerra discussão de arranhão na retirada.
 alter table ordens add column if not exists fotos jsonb default '[]'::jsonb;
