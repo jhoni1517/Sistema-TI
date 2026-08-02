@@ -77,9 +77,15 @@ const svg = ({ raio = 112, escala = 8.6, traco = 3.5, enfeite = true } = {}) => 
       <stop offset="0" stop-color="#7c2d12" stop-opacity="0"/>
       <stop offset="1" stop-color="#7c2d12" stop-opacity="0.28"/>
     </linearGradient>
-    <!-- Região explícita: deixada em porcentagem, o renderizador desenha um
-         retângulo mais escuro em volta da chave, que aparece como uma caixa
-         no meio do ícone. -->
+    <!--
+      Região explícita, e o filtro fica num grupo SEM transform.
+
+      Em porcentagem, o renderizador desenhava um retângulo mais escuro em
+      volta da chave — uma caixa no meio do ícone. Só que a região é medida
+      no espaço do elemento que chama o filtro: pendurada no grupo que já
+      tem translate+scale, "0 0 512 512" vira uma área gigante e deslocada,
+      e a caixa voltava. Por isso o filtro mora no grupo de fora.
+    -->
     <filter id="sombra" filterUnits="userSpaceOnUse"
             x="0" y="0" width="512" height="512">
       <feDropShadow dx="0" dy="9" stdDeviation="10"
@@ -95,10 +101,12 @@ ${
     : ""
 }
 
-  <g transform="translate(256 256) scale(${escala}) translate(-12 -12)"
-     fill="none" stroke="${MARCA}" stroke-width="${traco}"
-     stroke-linecap="round" stroke-linejoin="round"${enfeite ? ' filter="url(#sombra)"' : ""}>
-    <path d="${CHAVE}"/>
+  <g${enfeite ? ' filter="url(#sombra)"' : ""}>
+    <g transform="translate(256 256) scale(${escala}) translate(-12 -12)"
+       fill="none" stroke="${MARCA}" stroke-width="${traco}"
+       stroke-linecap="round" stroke-linejoin="round">
+      <path d="${CHAVE}"/>
+    </g>
   </g>
 ${
   enfeite
@@ -121,7 +129,9 @@ writeFileSync(resolve(publico, "favicon.svg"), arredondado);
 const png = (fonte, tamanho, nome) =>
   sharp(Buffer.from(fonte))
     .resize(tamanho, tamanho)
-    .png({ compressionLevel: 9 })
+    // Paleta: o ícone cheio dava 114 KB, e a diferença não se enxerga nem
+    // lado a lado. No 4G do balcão, enfeite não pode custar download.
+    .png({ compressionLevel: 9, palette: true })
     .toFile(resolve(publico, nome));
 
 await Promise.all([

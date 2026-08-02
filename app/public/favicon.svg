@@ -14,9 +14,15 @@
       <stop offset="0" stop-color="#7c2d12" stop-opacity="0"/>
       <stop offset="1" stop-color="#7c2d12" stop-opacity="0.28"/>
     </linearGradient>
-    <!-- Região explícita: deixada em porcentagem, o renderizador desenha um
-         retângulo mais escuro em volta da chave, que aparece como uma caixa
-         no meio do ícone. -->
+    <!--
+      Região explícita, e o filtro fica num grupo SEM transform.
+
+      Em porcentagem, o renderizador desenhava um retângulo mais escuro em
+      volta da chave — uma caixa no meio do ícone. Só que a região é medida
+      no espaço do elemento que chama o filtro: pendurada no grupo que já
+      tem translate+scale, "0 0 512 512" vira uma área gigante e deslocada,
+      e a caixa voltava. Por isso o filtro mora no grupo de fora.
+    -->
     <filter id="sombra" filterUnits="userSpaceOnUse"
             x="0" y="0" width="512" height="512">
       <feDropShadow dx="0" dy="9" stdDeviation="10"
@@ -28,10 +34,12 @@
   <rect width="512" height="512" rx="112" fill="url(#pe)"/>
   <rect width="512" height="512" rx="112" fill="url(#brilho)"/>
 
-  <g transform="translate(256 256) scale(8.6) translate(-12 -12)"
-     fill="none" stroke="#1c1917" stroke-width="3.5"
-     stroke-linecap="round" stroke-linejoin="round" filter="url(#sombra)">
-    <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+  <g filter="url(#sombra)">
+    <g transform="translate(256 256) scale(8.6) translate(-12 -12)"
+       fill="none" stroke="#1c1917" stroke-width="3.5"
+       stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+    </g>
   </g>
   <rect x="1.5" y="1.5" width="509" height="509" rx="110.5"
         fill="none" stroke="#ffffff" stroke-opacity="0.3" stroke-width="3"/>
