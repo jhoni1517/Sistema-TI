@@ -90,6 +90,35 @@ body {
   .card {
     @apply rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200 transition-shadow duration-200 hover:shadow-md;
   }
+
+  /*
+   * Troca de tela.
+   *
+   * Sem transição, mudar de página é um piscar: o conteúdo velho some e o
+   * novo aparece no mesmo quadro, e o olho não acompanha para onde foi. Um
+   * deslize curto de baixo para cima dá a direção sem atrasar ninguém —
+   * 180ms é abaixo do que se percebe como espera.
+   */
+  .entra-pagina {
+    animation: entra-pagina 0.18s ease-out both;
+  }
+
+  /*
+   * Lista que aparece em cascata.
+   *
+   * O atraso vem de uma variável para cada item entrar um pouquinho depois
+   * do anterior. Passando do sexto item o atraso para de crescer: numa lista
+   * de cem produtos, a cascata viraria espera de verdade.
+   */
+  .entra-item {
+    animation: entra-item 0.22s ease-out both;
+    animation-delay: calc(var(--i, 0) * 35ms);
+  }
+
+  /* Pressionar de verdade: o dedo no celular precisa de resposta imediata */
+  .toca {
+    @apply transition-transform duration-100 active:scale-[0.98];
+  }
   .input {
     @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30;
   }
@@ -211,5 +240,46 @@ body {
     background: #fff !important;
     color: #000 !important;
     box-shadow: none !important;
+  }
+}
+
+/* ---------- Animações ---------- */
+@keyframes entra-pagina {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes entra-item {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/*
+ * Quem pediu menos animação no sistema operacional não leva animação
+ * nenhuma. Não é preferência estética: enjoo e crise vestibular são reais, e
+ * o sistema fica aberto o dia inteiro na frente da pessoa.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .entra-pagina,
+  .entra-item {
+    animation: none;
+  }
+  .toca {
+    @apply active:scale-100;
+  }
+  * {
+    scroll-behavior: auto !important;
   }
 }

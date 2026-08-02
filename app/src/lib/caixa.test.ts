@@ -7,6 +7,7 @@ import {
   conferencia,
   filtrarMovimentos,
   agruparPorDia,
+  movimentosPorSessao,
 } from "./caixa";
 import type { MovimentoCaixa, SessaoCaixa } from "./types";
 
@@ -282,5 +283,128 @@ describe("o caixa agrupado por dia", () => {
   it("centavos não viram dízima no subtotal", () => {
     const dias = agruparPorDia([m({ id: "1", valor: 0.1 }), m({ id: "2", valor: 0.2 })]);
     expect(dias[0].resultado).toBe(0.3);
+  });
+});
+
+describe("a gaveta se confere contra o PAPEL, não contra o saldo", () => {
+  /**
+   * O bug que quebrava a conferência inteira em qualquer loja com maquininha.
+   *
+   * O saldo soma cartão e Pix, que nunca passaram pela gaveta. Numa loja que
+   * vendeu R$ 3.000 no cartão e tem R$ 200 em papel, o sistema pedia
+   * R$ 3.200 contados e acusava falta de R$ 3.000 — todo santo dia.
+   *
+   * Diferença que aparece sempre é diferença que a pessoa aprende a ignorar,
+   * e aí a conferência deixa de existir justamente para o dia em que falta
+   * dinheiro de verdade.
+   */
+  const sessao = (v: Partial<SessaoCaixa> = {}): SessaoCaixa =>
+    ({ id: "s1", abertoEm: "2026-08-01T08:00:00.000Z", valorAbertura: 100, ...v }) as SessaoCaixa;
+
+  const mov = (p: Partial<MovimentoCaixa>): MovimentoCaixa =>
+    ({
+      id: "m",
+      tipo: "entrada",
+      categoria: "Venda",
+      descricao: "",
+      valor: 0,
+      formaPagamento: "dinheiro",
+      data: "2026-08-01T10:00:00.000Z",
+      ...p,
+    }) as MovimentoCaixa;
+
+  const dia = [
+    mov({ id: "1", valor: 3000, formaPagamento: "credito" }),
+    mov({ id: "2", valor: 100, formaPagamento: "dinheiro" }),
+  ];
+
+  it("o esperado em papel ignora cartão e Pix", () => {
+    // Abertura 100 + 100 em dinheiro = 200 na gaveta. Os 3.000 do cartão
+    // estão no saldo, mas não em papel.
+    const r = resumoCaixa(sessao(), dia);
+    expect(r.saldo).toBe(3200);
+    expect(r.emEspecie).toBe(200);
+  });
+
+  it("contar exatamente o que está na gaveta dá diferença ZERO", () => {
+    // Antes isto acusava falta de R$ 3.000.
+    const r = resumoCaixa(sessao({ valorContado: 200 }), dia);
+    expect(r.diferenca).toBe(0);
+    expect(conferencia(r)).toBe("certo");
+  });
+
+  it("falta de verdade continua aparecendo", () => {
+    const r = resumoCaixa(sessao({ valorContado: 180 }), dia);
+    expect(r.diferenca).toBe(-20);
+    expect(conferencia(r)).toBe("falta");
+  });
+
+  it("sobra de verdade continua aparecendo", () => {
+    const r = resumoCaixa(sessao({ valorContado: 230 }), dia);
+    expect(r.diferenca).toBe(30);
+    expect(conferencia(r)).toBe("sobra");
+  });
+
+  it("sangria e despesa saem do papel", () => {
+    const r = resumoCaixa(sessao({ valorContado: 120 }), [
+      ...dia,
+      mov({ id: "3", tipo: "sangria", valor: 50 }),
+      mov({ id: "4", tipo: "saida", categoria: "Despesa", valor: 30 }),
+    ]);
+    // 100 abertura + 100 dinheiro - 50 sangria - 30 despesa = 120
+    expect(r.emEspecie).toBe(120);
+    expect(r.diferenca).toBe(0);
+  });
+
+  it("sem contagem, não existe diferença: não conferido não é conferido e bateu", () => {
+    const r = resumoCaixa(sessao(), dia);
+    expect(r.diferenca).toBeUndefined();
+    expect(conferencia(r)).toBe("nao_conferido");
+  });
+});
+
+describe("o histórico de fechamentos não pode ficar quadrático", () => {
+  /**
+   * Chamar movimentosDaSessao dentro do laço varre a lista inteira de
+   * movimentos para CADA sessão. Com um ano de fechamentos diários e dez mil
+   * lançamentos são três milhões e meio de comparações por renderização — o
+   * mesmo erro que já tinha travado o painel na conferência de integridade.
+   */
+  const mov = (id: string, sessaoId?: string): MovimentoCaixa =>
+    ({
+      id,
+      tipo: "entrada",
+      categoria: "Venda",
+      descricao: "",
+      valor: 10,
+      formaPagamento: "dinheiro",
+      data: "2026-08-01T10:00:00.000Z",
+      sessaoId,
+    }) as MovimentoCaixa;
+
+  it("agrupa por sessão", () => {
+    const mapa = movimentosPorSessao([mov("1", "s1"), mov("2", "s2"), mov("3", "s1")]);
+    expect(mapa.get("s1")?.map((m) => m.id)).toEqual(["1", "3"]);
+    expect(mapa.get("s2")?.map((m) => m.id)).toEqual(["2"]);
+  });
+
+  it("movimento sem sessão não entra: ele não pertence a fechamento nenhum", () => {
+    const mapa = movimentosPorSessao([mov("1"), mov("2", "")]);
+    expect(mapa.size).toBe(0);
+  });
+
+  it("sessão sem movimento nenhum simplesmente não aparece no índice", () => {
+    // Quem consulta precisa tratar o vazio, e não receber undefined por erro.
+    const mapa = movimentosPorSessao([mov("1", "s1")]);
+    expect(mapa.get("s9")).toBeUndefined();
+    expect(mapa.get("s9") ?? []).toEqual([]);
+  });
+
+  it("dá o mesmo resultado que filtrar na mão, que é o que ele substitui", () => {
+    const lista = [mov("1", "s1"), mov("2", "s2"), mov("3", "s1"), mov("4")];
+    const mapa = movimentosPorSessao(lista);
+    for (const s of ["s1", "s2"]) {
+      expect(mapa.get(s) ?? []).toEqual(lista.filter((m) => m.sessaoId === s));
+    }
   });
 });

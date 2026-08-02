@@ -18,6 +18,7 @@ import { useApp } from "../store/AppStore";
 import { SectionTitle, EmptyState, InputNumero } from "../components/ui";
 import { uid, nowISO, brl, txt } from "../lib/format";
 import { saldosApos, faltaNoEstoque, avisoDeFalta } from "../lib/estoque";
+import { proximoNumero as proximoNum, problemaParaNumerar } from "../lib/numeracao";
 import { printHTML } from "../lib/print";
 import { reciboPDV } from "../lib/recibo";
 import { sessaoAberta as achaSessaoAberta } from "../lib/caixa";
@@ -77,7 +78,7 @@ const FORMAS: { k: FormaPagamento; nome: string }[] = [
  * um pão é o caminho mais curto para o sistema não ser usado.
  */
 export const PDV: React.FC = () => {
-  const { produtos, clientes, sessoes, vendas, config, saveVenda, saveMovimento, saveProduto } =
+  const { produtos, clientes, sessoes, vendas, config, fontesComFalha, saveVenda, saveMovimento, saveProduto } =
     useApp();
 
   const [itens, setItens] = useState<ItemVenda[]>([]);
@@ -160,10 +161,7 @@ export const PDV: React.FC = () => {
   const falta = dividido ? faltaNoPagamento(total, parcelas) : faltaPara(total, recebido);
   const sugestoes = useMemo(() => sugerirProdutos(produtos, termo), [produtos, termo]);
 
-  const proximoNumero = useMemo(
-    () => (vendas.reduce((m, v) => Math.max(m, v.numero || 0), 0) || 0) + 1,
-    [vendas]
-  );
+  const proximoNumero = useMemo(() => proximoNum(vendas), [vendas]);
 
   const addProduto = (p: Produto, quantidade = 1) => {
     // Sem etiqueta de balança, peso entra com 1 kg e o campo fica editável
@@ -347,6 +345,14 @@ export const PDV: React.FC = () => {
     if (semEstoque.length > 0 && !confirm(avisoDeFalta(semEstoque) + "\n\nFechar a venda assim?")) {
       return;
     }
+
+    /*
+     * Com a lista de vendas quebrada, o próximo número nasce 1 e colide com
+     * a primeira venda da loja. O cupom do cliente sai com número repetido e
+     * a conferência passa a casar a venda com o movimento errado.
+     */
+    const semNumero = problemaParaNumerar(fontesComFalha, "vendas", "uma venda");
+    if (semNumero) return aviso.erro(semNumero);
 
     if (gravando) return; // clique duplo no balcão acontece o tempo todo
     setGravando(true);

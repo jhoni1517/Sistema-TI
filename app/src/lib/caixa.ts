@@ -29,6 +29,7 @@ export interface ResumoCaixa {
    * undefined quando não houve contagem: zero aqui seria mentira, porque
    * "não conferido" não é a mesma coisa que "conferido e bateu".
    */
+  /** Contado menos o que devia estar EM ESPÉCIE. Nunca contra o saldo. */
   diferenca?: number;
   quantidade: number;
   /** Entradas separadas por forma de pagamento */
@@ -88,7 +89,18 @@ export function resumoCaixa(
     saldo,
     emEspecie,
     contado,
-    diferenca: contado === undefined ? undefined : arredonda(contado - saldo),
+    /*
+     * A diferença é contra o que está EM ESPÉCIE, nunca contra o saldo.
+     *
+     * O saldo soma cartão e Pix, que nunca passaram pela gaveta. Numa loja
+     * que vendeu R$ 3.000 na maquininha e tem R$ 200 em papel, o sistema
+     * pedia R$ 3.200 contados e acusava falta de R$ 3.000 — todo santo dia.
+     *
+     * Diferença que aparece sempre é diferença que a pessoa aprende a
+     * ignorar, e aí a conferência da gaveta deixa de existir justamente
+     * para pegar o dia em que falta dinheiro de verdade.
+     */
+    diferenca: contado === undefined ? undefined : arredonda(contado - emEspecie),
     quantidade: movimentos.length,
     porForma,
   };
@@ -212,4 +224,26 @@ export function agruparPorDia(movimentos: MovimentoCaixa[]): DiaDeCaixa[] {
         resultado: arredonda(entradas - saidas - sangrias),
       };
     });
+}
+
+/**
+ * Índice de movimentos por sessão, montado uma vez.
+ *
+ * O histórico de fechamentos chamava `movimentosDaSessao` dentro do laço,
+ * e cada chamada varre a lista inteira de movimentos. Com um ano de
+ * fechamentos diários e dez mil lançamentos, são três milhões e meio de
+ * comparações a cada renderização da tela — o mesmo erro que já tinha
+ * travado o painel na conferência de integridade.
+ */
+export function movimentosPorSessao(
+  movimentos: MovimentoCaixa[]
+): Map<string, MovimentoCaixa[]> {
+  const mapa = new Map<string, MovimentoCaixa[]>();
+  for (const m of movimentos) {
+    const id = txt(m.sessaoId);
+    if (!id) continue;
+    if (!mapa.has(id)) mapa.set(id, []);
+    mapa.get(id)!.push(m);
+  }
+  return mapa;
 }

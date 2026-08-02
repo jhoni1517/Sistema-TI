@@ -18,6 +18,7 @@ import {
 import { useApp } from "../store/AppStore";
 import { Modal, Field, SectionTitle, EmptyState, InputNumero } from "../components/ui";
 import { sangriaSugerida } from "../lib/desempenho";
+import { precoEfetivo } from "../lib/promocao";
 import { uid, nowISO, brl, formatDate, formatDateTime, txt } from "../lib/format";
 import { aposBaixa } from "../lib/estoque";
 import { printHTML } from "../lib/print";
@@ -31,6 +32,7 @@ import {
   CONFERENCIA_META,
   filtrarMovimentos,
   agruparPorDia,
+  movimentosPorSessao,
 } from "../lib/caixa";
 import type { MovimentoCaixa, TipoMovimento, FormaPagamento, SessaoCaixa, Produto, Cliente } from "../lib/types";
 
@@ -346,8 +348,12 @@ export const Caixa: React.FC = () => {
         />
       ) : (
         <div className="space-y-4">
-          {listaMovs.map((d) => (
-            <div key={d.dia}>
+          {listaMovs.map((d, i) => (
+            <div
+              key={d.dia}
+              className="entra-item"
+              style={{ "--i": Math.min(i, 6) } as React.CSSProperties}
+            >
               {/* O subtotal do dia responde "quanto entrou ontem" sem
                   ninguém somar nada na cabeça. */}
               <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-3 px-1">
@@ -363,7 +369,7 @@ export const Caixa: React.FC = () => {
                 {d.movimentos.map((m) => (
                   /* Linha, não célula de tabela: cinco colunas num celular
                      viram rolagem lateral, e o dono lê no celular. */
-                  <div key={m.id} className="flex items-center gap-3 p-3 hover:bg-slate-50">
+                  <div key={m.id} className="toca flex items-center gap-3 p-3 hover:bg-slate-50">
                     <span className="shrink-0">
                       {m.tipo === "entrada" ? (
                         <ArrowDownCircle size={20} className="text-emerald-500" />
@@ -490,6 +496,7 @@ export const Caixa: React.FC = () => {
           saidas={saidas}
           sangrias={sangrias}
           saldo={saldo}
+          emEspecie={resumo.emEspecie}
           movs={movsSessao}
           onImprimir={imprimirResumo}
           onClose={() => setFechando(false)}
@@ -509,9 +516,20 @@ const Resumo: React.FC<{ label: string; value: number; color: string; icon: Reac
 
 const AbrirCaixaModal: React.FC<{ open: boolean; onClose: () => void; onConfirm: (v: number) => void }> = ({ open, onClose, onConfirm }) => {
   const [valor, setValor] = useState(0);
+  const [abrindo, setAbrindo] = useState(false);
+
+  // A janela não é desmontada ao fechar: sem isto, o troco da abertura de
+  // ontem continua no campo amanhã, e ninguém confere um campo preenchido.
+  React.useEffect(() => {
+    if (open) {
+      setValor(0);
+      setAbrindo(false);
+    }
+  }, [open]);
+
   return (
     <Modal open={open} onClose={onClose} title="Abrir caixa" maxWidth="max-w-md"
-      footer={<><button className="btn-secondary" onClick={onClose}>Cancelar</button><button className="btn-success" onClick={() => onConfirm(valor)}>Abrir caixa</button></>}
+      footer={<><button className="btn-secondary" onClick={onClose}>Cancelar</button><button className="btn-success" disabled={abrindo} onClick={() => { if (abrindo) return; setAbrindo(true); onConfirm(valor); }}>{abrindo ? "Abrindo..." : "Abrir caixa"}</button></>}
     >
       <Field label="Valor de abertura (troco inicial)">
         <InputNumero autoFocus value={valor} onChange={(v) => setValor(v ?? 0)} />
@@ -541,6 +559,9 @@ const MovimentoModal: React.FC<{
   const [buscaProd, setBuscaProd] = useState("");
   const [abertoProd, setAbertoProd] = useState(false);
   const [clienteId, setClienteId] = useState("");
+  /* Antes do `if (!tipo) return null` de propósito: hook depois de um return
+     condicional muda de ordem entre renderizações e o React quebra. */
+  const [gravando, setGravando] = useState(false);
 
   React.useEffect(() => {
     if (tipo) {
@@ -555,6 +576,7 @@ const MovimentoModal: React.FC<{
       setBaixa(true);
       setBuscaProd("");
       setClienteId("");
+      setGravando(false);
     }
   }, [tipo]);
 
@@ -566,7 +588,10 @@ const MovimentoModal: React.FC<{
     setProdId(p.id);
     setDescricao(p.nome);
     setProdCusto(p.custo || 0);
-    setValor((p.preco || 0) * quantidade);
+    // precoEfetivo, nunca p.preco: com promoção valendo, a gôndola e a
+    // etiqueta anunciam um valor e esta tela cobrava o cheio. Quem aparece
+    // como mentiroso é a loja, não o sistema.
+    setValor(precoEfetivo(p) * quantidade);
     setCategoria("Venda");
     setBuscaProd(p.nome);
     setAbertoProd(false);
@@ -575,7 +600,7 @@ const MovimentoModal: React.FC<{
     setQuantidade(q);
     if (prodId) {
       const p = produtos.find((x) => x.id === prodId);
-      if (p) setValor((p.preco || 0) * q);
+      if (p) setValor(precoEfetivo(p) * q);
     }
   };
 
@@ -589,6 +614,10 @@ const MovimentoModal: React.FC<{
 
   const salvar = () => {
     if (valor <= 0) return aviso.alerta("Informe um valor válido.");
+    // Clique duplo no balcão acontece o tempo todo, e aqui ele vira dinheiro
+    // lançado duas vezes.
+    if (gravando) return;
+    setGravando(true);
     const catFinal = categoria === "Outro" ? catCustom.trim() || "Outro" : categoria;
     onSave(
       {
@@ -608,11 +637,14 @@ const MovimentoModal: React.FC<{
       },
       tipo === "entrada" && prodId ? { produtoId: prodId, quantidade, baixa, custo: prodCusto * quantidade } : undefined
     );
+    // A janela fecha sozinha ao terminar; se der erro ela continua aberta e
+    // o botão precisa voltar a funcionar.
+    setTimeout(() => setGravando(false), 1500);
   };
 
   return (
     <Modal open={!!tipo} onClose={onClose} title={titulo} maxWidth="max-w-md"
-      footer={<><button className="btn-secondary" onClick={onClose}>Cancelar</button><button className={tipo === "entrada" ? "btn-success" : "btn-primary"} onClick={salvar}>Registrar</button></>}
+      footer={<><button className="btn-secondary" onClick={onClose}>Cancelar</button><button className={tipo === "entrada" ? "btn-success" : "btn-primary"} onClick={salvar} disabled={gravando}>{gravando ? "Registrando..." : "Registrar"}</button></>}
     >
       <div className="space-y-4">
         {/* Busca de produto (só entrada) */}
@@ -724,11 +756,13 @@ const FecharCaixaModal: React.FC<{
   saidas: number;
   sangrias: number;
   saldo: number;
+  /** O que devia estar em PAPEL na gaveta. É contra isto que se confere. */
+  emEspecie: number;
   movs: MovimentoCaixa[];
   onImprimir: () => void;
   onClose: () => void;
   onConfirm: (contado?: number) => void;
-}> = ({ abertura, entradas, saidas, sangrias, saldo, movs, onImprimir, onClose, onConfirm }) => {
+}> = ({ abertura, entradas, saidas, sangrias, saldo, emEspecie, movs, onImprimir, onClose, onConfirm }) => {
   const formas = useMemo(() => {
     const map: Record<string, number> = {};
     movs.filter((m) => m.tipo === "entrada").forEach((m) => (map[m.formaPagamento] = (map[m.formaPagamento] || 0) + m.valor));
@@ -740,7 +774,13 @@ const FecharCaixaModal: React.FC<{
   const [contadoTxt, setContadoTxt] = useState("");
   const contado = contadoTxt.trim() === "" ? undefined : Number(contadoTxt.replace(",", "."));
   const invalido = contado !== undefined && Number.isNaN(contado);
-  const diferenca = contado === undefined || invalido ? undefined : Math.round((contado - saldo) * 100) / 100 + 0;
+  /*
+   * Contra o que está EM ESPÉCIE, nunca contra o saldo. O saldo soma cartão
+   * e Pix, que nunca passaram pela gaveta: uma loja com R$ 3.000 na
+   * maquininha e R$ 200 em papel via "falta R$ 3.000" todo dia, e diferença
+   * que aparece sempre é diferença que ninguém mais lê.
+   */
+  const diferenca = contado === undefined || invalido ? undefined : Math.round((contado - emEspecie) * 100) / 100 + 0;
 
   return (
     <Modal open onClose={onClose} title="Fechamento de caixa" maxWidth="max-w-lg"
@@ -758,8 +798,15 @@ const FecharCaixaModal: React.FC<{
           <Linha label="Entradas" value={`+ ${brl(entradas)}`} cls="text-emerald-600" />
           <Linha label="Saídas / despesas" value={`- ${brl(saidas)}`} cls="text-red-600" />
           <Linha label="Sangrias" value={`- ${brl(sangrias)}`} cls="text-amber-600" />
-          <div className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2 text-lg font-bold">
-            <span>Saldo esperado em caixa</span><span>{brl(saldo)}</span>
+          <div className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2 font-semibold">
+            <span className="text-slate-600">Saldo do dia (com cartão e Pix)</span>
+            <span>{brl(saldo)}</span>
+          </div>
+          {/* Este é o número que a mão confere. Ele vem depois do saldo e em
+              destaque de propósito: era o saldo que aparecia grande, e era
+              contra ele que a pessoa contava. */}
+          <div className="mt-1 flex items-center justify-between text-lg font-bold text-slate-900">
+            <span>Esperado em papel na gaveta</span><span>{brl(emEspecie)}</span>
           </div>
         </div>
 
@@ -783,10 +830,13 @@ const FecharCaixaModal: React.FC<{
             de verdade. Sem isso o sistema só concorda consigo mesmo. */}
         <div>
           <label className="label">Dinheiro contado na gaveta (opcional)</label>
+          <p className="mb-1 text-xs text-slate-500">
+            Só o que está em papel. Cartão e Pix não passam pela gaveta.
+          </p>
           <input
             className="input"
             inputMode="decimal"
-            placeholder={`Esperado: ${brl(saldo)}`}
+            placeholder={`Esperado em papel: ${brl(emEspecie)}`}
             value={contadoTxt}
             onChange={(e) => setContadoTxt(e.target.value)}
           />
@@ -835,6 +885,19 @@ const Fechamentos: React.FC<{
   onVer: (s: SessaoCaixa) => void;
   onImprimir: (s: SessaoCaixa) => void;
 }> = ({ sessoes, movimentos, onVer, onImprimir }) => {
+  /*
+   * Índice montado uma vez. Chamar movimentosDaSessao dentro do laço varre
+   * a lista inteira para CADA sessão: com um ano de fechamentos diários e
+   * dez mil lançamentos são milhões de comparações por renderização.
+   */
+  const porSessao = useMemo(() => movimentosPorSessao(movimentos), [movimentos]);
+
+  /*
+   * Um ano de fechamento diário são 365 cartões numa tela só. Ninguém rola
+   * até o de março; quem precisa de um antigo vai pelo botão.
+   */
+  const [quantos, setQuantos] = useState(30);
+
   if (sessoes.length === 0) {
     return (
       <EmptyState
@@ -846,8 +909,8 @@ const Fechamentos: React.FC<{
   }
   return (
     <div className="space-y-2">
-      {sessoes.map((s) => {
-        const r = resumoCaixa(s, movimentosDaSessao(s, movimentos));
+      {sessoes.slice(0, quantos).map((s) => {
+        const r = resumoCaixa(s, porSessao.get(s.id) ?? []);
         const conf = conferencia(r);
         return (
           <div key={s.id} className="card flex flex-wrap items-center gap-3">
@@ -885,6 +948,15 @@ const Fechamentos: React.FC<{
           </div>
         );
       })}
+
+      {sessoes.length > quantos && (
+        <button
+          className="btn-secondary w-full"
+          onClick={() => setQuantos((n) => n + 30)}
+        >
+          Ver mais 30 ({sessoes.length - quantos} anteriores)
+        </button>
+      )}
     </div>
   );
 };

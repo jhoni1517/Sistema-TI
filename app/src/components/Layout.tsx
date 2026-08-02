@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { BuscaGlobal } from "./BuscaGlobal";
 import { AvisoAssinatura } from "./AvisoAssinatura";
 import {
@@ -61,6 +61,7 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
   sessao,
 }) => {
   const { config, online, erroCarga, loading, reload, pendentes, sincronizar, ramo, ramoAparelho, trocarRamoAparelho } = useApp();
+  const local = useLocation();
   const [open, setOpen] = useState(false);
   const [busca, setBusca] = useState(false);
   const navigate = useNavigate();
@@ -315,7 +316,10 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
           </div>
         )}
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8">
+        {/* A chave é a rota: sem ela o React reaproveita o nó e a animação
+            não roda de novo, então só a primeira troca de tela teria
+            transição. */}
+        <main key={local.pathname} className="entra-pagina flex-1 p-4 sm:p-6 lg:p-8">
           <Outlet />
         </main>
       </div>

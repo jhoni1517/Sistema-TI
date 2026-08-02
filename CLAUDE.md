@@ -95,6 +95,25 @@ Leitura é sempre `Promise.allSettled`, e falha de carga aparece na tela.
 Sem isso não há como o usuário diferenciar "está vazio" de "não carregou".
 Ver `carga.test.ts`.
 
+### Numerar em cima de lista que não carregou repete número
+
+A leitura é tolerante a falha parcial de propósito. Mas `max(numero) + 1`
+sobre uma lista vazia POR ERRO devolve 1, colidindo com o primeiro registro
+da história da loja.
+
+Na venda, o cupom sai com número repetido e a conferência passa a casar a
+venda com o movimento errado. Na OS é pior: o rastreio público procura a
+ordem PELO NÚMERO, e o cliente abre o link e vê o conserto de outra pessoa,
+com nome e valor.
+
+`fontesComFalha` diz quais tabelas não carregaram. Quem numera pergunta
+antes e RECUSA, dizendo que nada foi perdido — senão a pessoa refaz a venda
+inteira achando que sumiu.
+
+Continua faltando resolver dois aparelhos vendendo ao mesmo tempo: isso o
+banco resolveria com uma sequência. Enquanto não existe, pelo menos não se
+erra sozinho.
+
 ### Gravação sem tratamento de erro é a pior classe de bug
 
 Erro que aparece na tela custa cinco minutos. Erro engolido custa uma
@@ -110,6 +129,20 @@ Os três casos que sempre quebram, todos com teste:
 - Dia 31 + 1 mês → 28 em fevereiro, e **volta para 31** em março
 - 29/02 anual → 28/02 nos anos comuns
 - Virada de ano
+
+### A gaveta se confere contra o papel, nunca contra o saldo
+
+O saldo soma cartão e Pix, que nunca passaram pela gaveta. O fechamento
+pedia o saldo contado e acusava falta: numa loja que vendeu R$ 3.000 na
+maquininha e tem R$ 200 em papel, aparecia "falta R$ 3.000" todo santo dia.
+
+Diferença que aparece sempre é diferença que a pessoa aprende a ignorar — e
+aí a conferência deixa de existir justamente para o dia em que falta
+dinheiro de verdade.
+
+`resumoCaixa.diferenca` é contado menos `emEspecie`. Vale na tela, no
+fechamento impresso e no aviso de sangria. O mesmo erro já tinha sido
+consertado no aviso e passou batido no fechamento, que é onde mais importa.
 
 ### Compra de estoque não é despesa do mês
 
@@ -169,6 +202,10 @@ página pública calcula sozinha.
 
 Tela que lê `produto.preco` direto faz a gôndola dizer um valor e o caixa
 cobrar outro — e quem aparece como mentiroso é a loja, não o sistema.
+
+Foi quebrada na entrada manual do Caixa, que lia `p.preco` direto. Virou
+`preco-unico.test.ts`: ele varre as telas procurando conta feita com o preço
+cru. Cadastro e a própria promoção marcam a linha com `preco-cru-proposital`.
 
 ### Dinheiro primeiro, sempre
 
