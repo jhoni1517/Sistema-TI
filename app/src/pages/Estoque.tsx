@@ -312,13 +312,21 @@ export const Estoque: React.FC = () => {
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1">
                         <button className="btn-ghost !p-2" onClick={() => setEditando(p)}><Pencil size={15} /></button>
-                        <button className="btn-ghost !p-2 text-red-500" onClick={() => {
+                        <button className="btn-ghost !p-2 text-red-500" onClick={async () => {
                           // Produto já vendido não se apaga: o cupom do
                           // cliente cita o nome, e o relatório passaria a
                           // mostrar venda de item que não existe.
                           const r = aoApagarProduto(p, { vendas, ordens });
                           if (!r.pode) return aviso.alerta(`${r.titulo}\n\n${r.saida}`);
-                          if (confirm(textoDaConfirmacao(r))) removeProduto(p.id);
+                          if (!confirm(textoDaConfirmacao(r))) return;
+                          try {
+                            await removeProduto(p.id);
+                          } catch (e) {
+                            aviso.erro(
+                              "Não foi possível excluir o produto:\n\n" +
+                                (e instanceof Error ? e.message : String(e))
+                            );
+                          }
                         }}><Trash2 size={15} /></button>
                       </div>
                     </td>

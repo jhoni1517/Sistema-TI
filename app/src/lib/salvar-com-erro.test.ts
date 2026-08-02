@@ -26,7 +26,11 @@ const RAIZ = new URL("../..", import.meta.url).pathname;
 const GRAVACOES = [
   "saveMovimento(", "saveProduto(", "saveOrdem(", "saveVenda(", "saveFiado(",
   "saveConta(", "saveCliente(", "saveSessao(", "saveEvento(", "saveCotacao(",
-  "saveConfig(", "saveCategoria(", "saveFornecedor(", "saveMeta(",
+  "saveCategoria(", "saveFornecedor(", "saveMeta(",
+  // saveConfig fica de fora: ela trata o próprio erro por dentro, e precisa
+  // tratar, porque é a única que sabe separar "salvo neste aparelho" de
+  // "subiu para a nuvem" — e é essa diferença que evita o pior bug já visto
+  // aqui, o formulário em branco apagando a loja inteira.
   "removeProduto(", "removeCliente(", "removeOrdem(", "removeMovimento(",
   "removeFiado(", "removeConta(", "removeEvento(", "removeCotacao(",
 ];
@@ -34,7 +38,18 @@ const GRAVACOES = [
 const LIBERADO = "erro-tratado-por-quem-chama";
 
 export function gravaSemTratarErro(codigo: string): string[] {
-  const marcas = [...codigo.matchAll(/\basync\s*(?:function\b|\()/g)].map((m) => m.index!);
+  /*
+   * Corta também em `=> {`, não só em `async`.
+   *
+   * O detector só olhava funções assíncronas, e o pior caso que ele deixou
+   * passar era justamente uma que não era: o botão de excluir fiado
+   * chamava `removeFiado(f.id)` solto dentro de um `onClick` comum, sem
+   * `await` e sem `catch`. A falha nem chegava a virar erro na tela — era
+   * uma promessa rejeitada que ninguém escutava.
+   */
+  const marcas = [
+    ...codigo.matchAll(/\basync\s*(?:function\b|\()|=>\s*\{|\bfunction\s+\w+\s*\(/g),
+  ].map((m) => m.index!);
   const problemas: string[] = [];
 
   for (const [k, inicio] of marcas.entries()) {
@@ -88,6 +103,13 @@ describe("gravação sem tratamento de erro é a pior classe de bug", () => {
       try { await saveProduto(p); } catch {}
     };`;
     expect(gravaSemTratarErro(errado)).toEqual(["saveOrdem grava sem try/catch"]);
+  });
+
+  it("pega a gravação solta em onClick, que nem async era", () => {
+    // Era o caso do botão de excluir fiado: promessa rejeitada que ninguém
+    // escuta, e o registro volta na carga seguinte.
+    const errado = `<button onClick={() => { if (confirm("Excluir?")) removeFiado(f.id); }}>`;
+    expect(gravaSemTratarErro(errado)).toEqual(["removeFiado grava sem try/catch"]);
   });
 
   it("a marca explícita libera a função auxiliar", () => {
