@@ -124,6 +124,15 @@ export const OrdensServico: React.FC = () => {
   const [filtro, setFiltro] = useState<OSStatus | "todas" | "abertas">("abertas");
   const [editando, setEditando] = useState<OrdemServico | null>(null);
   const [detalhe, setDetalhe] = useState<OrdemServico | null>(null);
+  /**
+   * Clique duplo no balcão acontece o tempo todo.
+   *
+   * Receber duas vezes lançava a receita duas vezes E baixava as peças duas
+   * vezes; fiado duas vezes fazia o cliente dever o dobro, com o robô de
+   * cobrança indo atrás do valor errado. A conferência não pega nenhum dos
+   * dois: ela procura OS entregue SEM lançamento, não com dois.
+   */
+  const [registrando, setRegistrando] = useState(false);
 
   const nomeCliente = (id: string) => clientes.find((c) => c.id === id)?.nome || "—";
   const cliente = (id: string) => clientes.find((c) => c.id === id);
@@ -542,6 +551,8 @@ export const OrdensServico: React.FC = () => {
                 "Esta OS está com valor zero. Informe a mão de obra ou as peças antes de receber."
               );
             }
+            if (registrando) return; // clique duplo no balcão acontece o tempo todo
+            setRegistrando(true);
             try {
               // O dinheiro ENTRA primeiro. Se a gravação falhar, o estoque não
               // é baixado — antes o erro sumia e sobrava aparelho entregue sem
@@ -582,6 +593,8 @@ export const OrdensServico: React.FC = () => {
                   (e instanceof Error ? e.message : String(e)) +
                   "\n\nNada foi alterado. Tente de novo."
               );
+            } finally {
+              setRegistrando(false);
             }
           }}
           onFiado={async () => {
@@ -596,6 +609,8 @@ export const OrdensServico: React.FC = () => {
             ) {
               return;
             }
+            if (registrando) return; // dois cliques = o cliente devendo o dobro
+            setRegistrando(true);
             try {
               await saveFiado({
                 id: uid(),
@@ -620,8 +635,11 @@ export const OrdensServico: React.FC = () => {
                 "Não foi possível lançar o fiado:\n\n" +
                   (e instanceof Error ? e.message : String(e))
               );
+            } finally {
+              setRegistrando(false);
             }
           }}
+          registrando={registrando}
         />
       )}
     </div>
@@ -1098,7 +1116,9 @@ const OSDetalhe: React.FC<{
   /** Já existe lançamento no caixa ou fiado para esta OS? */
   pagamentoRegistrado: boolean;
   historicoAparelho: OrdemServico[];
-}> = ({ os, clienteNome, cliente, config, onClose, onStatus, onAvisar, onEditar, onExcluir, onReceber, onFiado, pagamentoRegistrado, historicoAparelho }) => {
+  /** Gravação em andamento: o botão não pode aceitar o segundo clique */
+  registrando: boolean;
+}> = ({ os, clienteNome, cliente, config, onClose, onStatus, onAvisar, onEditar, onExcluir, onReceber, onFiado, pagamentoRegistrado, historicoAparelho, registrando }) => {
   const [forma, setForma] = useState<FormaPagamento>("dinheiro");
   const [incluirCliente, setIncluirCliente] = useState(true);
 
@@ -1366,10 +1386,10 @@ const OSDetalhe: React.FC<{
                 <option value="credito">Crédito</option>
                 <option value="transferencia">Transferência</option>
               </select>
-              <button className="btn-success !py-1.5 text-sm" onClick={() => onReceber(forma)}>
-                Registrar {brl(totalOS(os))} no caixa
+              <button className="btn-success !py-1.5 text-sm" disabled={registrando} onClick={() => onReceber(forma)}>
+                {registrando ? "Registrando..." : `Registrar ${brl(totalOS(os))} no caixa`}
               </button>
-              <button className="btn-secondary !py-1.5 text-sm" onClick={onFiado}>
+              <button className="btn-secondary !py-1.5 text-sm" disabled={registrando} onClick={onFiado}>
                 <HandCoins size={15} /> Lançar como fiado
               </button>
             </div>
@@ -1388,10 +1408,10 @@ const OSDetalhe: React.FC<{
               <option value="credito">Crédito</option>
               <option value="transferencia">Transferência</option>
             </select>
-            <button className="btn-success !py-1.5 text-sm" onClick={() => onReceber(forma)}>
-              Receber {brl(totalOS(os))}
+            <button className="btn-success !py-1.5 text-sm" disabled={registrando} onClick={() => onReceber(forma)}>
+              {registrando ? "Registrando..." : `Receber ${brl(totalOS(os))}`}
             </button>
-            <button className="btn-secondary !py-1.5 text-sm" onClick={onFiado} title="Entregar e deixar para pagar depois">
+            <button className="btn-secondary !py-1.5 text-sm" disabled={registrando} onClick={onFiado} title="Entregar e deixar para pagar depois">
               <HandCoins size={15} /> Fiado
             </button>
           </div>

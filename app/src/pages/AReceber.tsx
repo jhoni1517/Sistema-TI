@@ -64,16 +64,24 @@ export const AReceber: React.FC = () => {
     criadoEm: nowISO(),
   });
 
+  const [lancando, setLancando] = useState(false);
+
   const salvarNovo = async () => {
     if (!novo) return;
     if (!novo.clienteId) return aviso.alerta("Selecione o cliente.");
     if (novo.valor <= 0) return aviso.alerta("Informe o valor.");
+    // Dois cliques = a mesma dívida lançada duas vezes, e o cliente cobrado
+    // pelo dobro do que deve.
+    if (lancando) return;
+    setLancando(true);
     try {
       await saveFiado(novo);
     } catch (e) {
       return aviso.erro(
         "Não foi possível lançar a dívida:\n\n" + (e instanceof Error ? e.message : String(e))
       );
+    } finally {
+      setLancando(false);
     }
     setNovo(null);
   };
@@ -240,7 +248,7 @@ export const AReceber: React.FC = () => {
         footer={
           <>
             <button className="btn-secondary" onClick={() => setNovo(null)}>Cancelar</button>
-            <button className="btn-primary" onClick={salvarNovo}>Salvar</button>
+            <button className="btn-primary" disabled={lancando} onClick={salvarNovo}>{lancando ? "Salvando..." : "Salvar"}</button>
           </>
         }
       >

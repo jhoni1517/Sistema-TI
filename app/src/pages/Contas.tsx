@@ -104,6 +104,8 @@ export const Contas: React.FC = () => {
 
   const [editando, setEditando] = useState<ContaPagar | null>(null);
   const [pagando, setPagando] = useState<ContaPagar | null>(null);
+  /** Gravação em andamento: o segundo clique pagaria a conta duas vezes */
+  const [pagandoAgora, setPagandoAgora] = useState(false);
   const [formaPg, setFormaPg] = useState<FormaPagamento>("pix");
   const [valorPg, setValorPg] = useState(0);
   const [editMeta, setEditMeta] = useState<Meta | null>(null);
@@ -240,6 +242,10 @@ export const Contas: React.FC = () => {
   const confirmarPagamento = async () => {
     if (!pagando) return;
     if (!(valorPg > 0)) return aviso.alerta("Informe o valor pago.");
+    // Dois cliques = a mesma conta paga duas vezes: o dinheiro sai do caixa
+    // em dobro e a recorrente pula dois meses de uma vez.
+    if (pagandoAgora) return;
+    setPagandoAgora(true);
     try {
       const atualizada = pagarConta(pagando, { valor: valorPg, formaPagamento: formaPg });
 
@@ -273,6 +279,8 @@ export const Contas: React.FC = () => {
       );
     } catch (e) {
       aviso.erro(e instanceof Error ? e.message : String(e));
+    } finally {
+      setPagandoAgora(false);
     }
   };
 
@@ -779,7 +787,7 @@ export const Contas: React.FC = () => {
             <button className="btn-secondary" onClick={() => setPagando(null)}>
               Cancelar
             </button>
-            <button className="btn-success" onClick={confirmarPagamento}>
+            <button className="btn-success" disabled={pagandoAgora} onClick={confirmarPagamento}>
               <CheckCircle2 size={16} /> Confirmar
             </button>
           </>
