@@ -41,6 +41,7 @@ import {
   buscarProduto,
   sugerirProdutos,
   situacaoValidade,
+  problemaNoCarrinho,
   VALIDADE_META,
 } from "../lib/pdv";
 import { precoEfetivo, promocaoValendo } from "../lib/promocao";
@@ -123,6 +124,15 @@ export const PDV: React.FC = () => {
   const finalizarRef = useRef<() => void>(undefined);
   const limparRef = useRef<() => void>(undefined);
   const consultaRef = useRef<() => void>(undefined);
+  /**
+   * Com a janela de devolução aberta, os atalhos são do balcão de trás.
+   *
+   * O listener é da janela inteira e não sabia da janela por cima: apertar
+   * F2 ali fechava a VENDA que estava no carrinho, por trás do modal, e F4
+   * apagava o carrinho. Quem aperta F2 aperta por hábito, e o hábito não
+   * espera a janela fechar.
+   */
+  const devolvendoRef = useRef(false);
 
   /**
    * Atalhos de balcão.
@@ -138,6 +148,9 @@ export const PDV: React.FC = () => {
    */
   useEffect(() => {
     const atalho = (e: KeyboardEvent) => {
+      // A janela de devolução tem os atalhos dela; o carrinho atrás dela não
+      // pode ser fechado nem apagado por um F2 de hábito.
+      if (devolvendoRef.current) return;
       if (e.key === "F2") {
         e.preventDefault();
         finalizarRef.current?.();
@@ -339,10 +352,11 @@ export const PDV: React.FC = () => {
   };
 
   const finalizar = async () => {
-    if (itens.length === 0) return aviso.alerta("Carrinho vazio.");
-    if (itens.some((i) => (Number(i.precoUnit) || 0) <= 0)) {
-      return aviso.alerta("Tem item sem preço. Informe o valor antes de fechar.");
-    }
+    // Quantidade zero ou negativa também é recusa aqui: negativa desconta do
+    // total e CREDITA o estoque, e não deixa rastro nenhum para a
+    // conferência achar depois. Ver problemaNoCarrinho.
+    const problema = problemaNoCarrinho(itens);
+    if (problema) return aviso.alerta(problema);
     if (dividido) {
       const erro = problemaNoPagamento(total, parcelas);
       if (erro) return aviso.alerta(erro);
@@ -441,6 +455,7 @@ export const PDV: React.FC = () => {
   finalizarRef.current = finalizar;
   limparRef.current = limpar;
   consultaRef.current = consultarPreco;
+  devolvendoRef.current = devolvendo;
 
   const imprimir = (v: Venda) => {
     printHTML(
@@ -627,8 +642,13 @@ export const PDV: React.FC = () => {
                     {/* Quantidade: no peso, campo livre; no resto, mais e menos */}
                     {item.porPeso ? (
                       <div className="flex items-center gap-1">
+                        {/* min=0: o campo é livre porque o peso precisa ser
+                            digitado com a fila andando, mas o "-" ao lado do
+                            teclado numérico não pode virar uma linha que
+                            desconta do total e credita o estoque. */}
                         <InputNumero
                           className="input !w-24 !py-1.5 text-sm"
+                          min={0}
                           value={item.quantidade}
                           onChange={(v) => mudarItem(i, { quantidade: v ?? 0 })}
                         />
@@ -659,6 +679,7 @@ export const PDV: React.FC = () => {
                     {/* Preço editável: item avulso nasce sem valor */}
                     <InputNumero
                       className="input !w-24 !py-1.5 text-sm"
+                      min={0}
                       value={item.precoUnit}
                       onChange={(v) => mudarItem(i, { precoUnit: v ?? 0 })}
                     />

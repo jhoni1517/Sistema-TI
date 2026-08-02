@@ -14,7 +14,9 @@ import {
   sugerirProdutos,
   situacaoValidade,
   produtosVencendo,
+  problemaNoCarrinho,
 } from "./pdv";
+import { saldosApos } from "./estoque";
 import type { ItemVenda, Produto } from "./types";
 
 const prod = (p: Partial<Produto> = {}): Produto => ({
@@ -219,5 +221,69 @@ describe("validade", () => {
       prod({ id: "sem" }),
     ];
     expect(produtosVencendo(lista, 7, hoje).map((p) => p.id)).toEqual(["vencido", "perto"]);
+  });
+});
+
+/**
+ * O carrinho não fecha com linha que não é venda.
+ *
+ * A quantidade do produto por peso é campo livre — tem que ser, porque é
+ * ali que o operador digita 0,315 sem abrir janela nenhuma. Só que ele
+ * aceitava zero e NEGATIVO, e o fechamento só conferia o preço.
+ *
+ * Linha negativa é o pior dos dois: ela desconta do total E soma no
+ * estoque. Vender "Arroz 2" junto de "Feijão -2" fecha a venda por R$ 0,00
+ * e ainda credita dois quilos de feijão na prateleira. Não sobra nada para
+ * a conferência achar: o estoque não fica negativo, o preço não é zero, e o
+ * lucro inflado ninguém procura.
+ *
+ * Linha com quantidade zero é a mercadoria saindo de graça: total zero e
+ * baixa zero.
+ */
+describe("o carrinho não fecha com linha que não é venda", () => {
+  it("carrinho vazio", () => {
+    expect(problemaNoCarrinho([])).toContain("vazio");
+  });
+
+  it("recusa quantidade negativa e diz onde é a saída", () => {
+    const p = problemaNoCarrinho([item(), item({ descricao: "Feijão", quantidade: -2 })]);
+    expect(p).toContain("Feijão");
+    expect(p).toContain("negativa");
+    // Quem quer tirar mercadoria da venda tem um caminho próprio, com
+    // comprovante e lançamento no caixa.
+    expect(p).toContain("Devolução");
+  });
+
+  it("recusa quantidade zero", () => {
+    const p = problemaNoCarrinho([item({ descricao: "Queijo", quantidade: 0, porPeso: true })]);
+    expect(p).toContain("Queijo");
+    expect(p).toContain("zero");
+  });
+
+  it("recusa item sem preço, dizendo qual", () => {
+    const p = problemaNoCarrinho([item(), item({ descricao: "Item avulso", precoUnit: 0 })]);
+    expect(p).toContain("Item avulso");
+    expect(p).toContain("preço");
+  });
+
+  it("recusa preço negativo", () => {
+    expect(problemaNoCarrinho([item({ precoUnit: -1 })])).toContain("preço");
+  });
+
+  it("carrinho normal fecha", () => {
+    expect(problemaNoCarrinho([item(), item({ descricao: "Queijo", quantidade: 0.315, precoUnit: 24.9, porPeso: true })])).toBe("");
+  });
+
+  it("mostra o estrago: a linha negativa zerava a venda e CREDITAVA o estoque", () => {
+    // É este resultado que a recusa impede. Sem ela, a venda vai para o
+    // banco com total zero e dois quilos entram na prateleira sem nota.
+    const itens = [
+      item({ produtoId: "a", descricao: "Arroz", quantidade: 2, precoUnit: 30 }),
+      item({ produtoId: "b", descricao: "Feijão", quantidade: -2, precoUnit: 30 }),
+    ];
+    expect(totalVenda({ itens, desconto: 0 })).toBe(0);
+    const feijao = prod({ id: "b", nome: "Feijão", quantidade: 10 });
+    const saldos = saldosApos(itens, [prod({ id: "a" }), feijao]);
+    expect(saldos.find((s) => s.produto.id === "b")?.quantidade).toBe(12);
   });
 });
