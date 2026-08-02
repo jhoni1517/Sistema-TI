@@ -111,6 +111,20 @@ Os três casos que sempre quebram, todos com teste:
 - 29/02 anual → 28/02 nos anos comuns
 - Virada de ano
 
+### A gaveta se confere contra o papel, nunca contra o saldo
+
+O saldo soma cartão e Pix, que nunca passaram pela gaveta. O fechamento
+pedia o saldo contado e acusava falta: numa loja que vendeu R$ 3.000 na
+maquininha e tem R$ 200 em papel, aparecia "falta R$ 3.000" todo santo dia.
+
+Diferença que aparece sempre é diferença que a pessoa aprende a ignorar — e
+aí a conferência deixa de existir justamente para o dia em que falta
+dinheiro de verdade.
+
+`resumoCaixa.diferenca` é contado menos `emEspecie`. Vale na tela, no
+fechamento impresso e no aviso de sangria. O mesmo erro já tinha sido
+consertado no aviso e passou batido no fechamento, que é onde mais importa.
+
 ### Compra de estoque não é despesa do mês
 
 Repor peça é troca de dinheiro por mercadoria; vira custo quando a peça é

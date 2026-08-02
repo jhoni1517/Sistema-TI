@@ -491,6 +491,7 @@ export const Caixa: React.FC = () => {
           saidas={saidas}
           sangrias={sangrias}
           saldo={saldo}
+          emEspecie={resumo.emEspecie}
           movs={movsSessao}
           onImprimir={imprimirResumo}
           onClose={() => setFechando(false)}
@@ -750,11 +751,13 @@ const FecharCaixaModal: React.FC<{
   saidas: number;
   sangrias: number;
   saldo: number;
+  /** O que devia estar em PAPEL na gaveta. É contra isto que se confere. */
+  emEspecie: number;
   movs: MovimentoCaixa[];
   onImprimir: () => void;
   onClose: () => void;
   onConfirm: (contado?: number) => void;
-}> = ({ abertura, entradas, saidas, sangrias, saldo, movs, onImprimir, onClose, onConfirm }) => {
+}> = ({ abertura, entradas, saidas, sangrias, saldo, emEspecie, movs, onImprimir, onClose, onConfirm }) => {
   const formas = useMemo(() => {
     const map: Record<string, number> = {};
     movs.filter((m) => m.tipo === "entrada").forEach((m) => (map[m.formaPagamento] = (map[m.formaPagamento] || 0) + m.valor));
@@ -766,7 +769,13 @@ const FecharCaixaModal: React.FC<{
   const [contadoTxt, setContadoTxt] = useState("");
   const contado = contadoTxt.trim() === "" ? undefined : Number(contadoTxt.replace(",", "."));
   const invalido = contado !== undefined && Number.isNaN(contado);
-  const diferenca = contado === undefined || invalido ? undefined : Math.round((contado - saldo) * 100) / 100 + 0;
+  /*
+   * Contra o que está EM ESPÉCIE, nunca contra o saldo. O saldo soma cartão
+   * e Pix, que nunca passaram pela gaveta: uma loja com R$ 3.000 na
+   * maquininha e R$ 200 em papel via "falta R$ 3.000" todo dia, e diferença
+   * que aparece sempre é diferença que ninguém mais lê.
+   */
+  const diferenca = contado === undefined || invalido ? undefined : Math.round((contado - emEspecie) * 100) / 100 + 0;
 
   return (
     <Modal open onClose={onClose} title="Fechamento de caixa" maxWidth="max-w-lg"
@@ -784,8 +793,15 @@ const FecharCaixaModal: React.FC<{
           <Linha label="Entradas" value={`+ ${brl(entradas)}`} cls="text-emerald-600" />
           <Linha label="Saídas / despesas" value={`- ${brl(saidas)}`} cls="text-red-600" />
           <Linha label="Sangrias" value={`- ${brl(sangrias)}`} cls="text-amber-600" />
-          <div className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2 text-lg font-bold">
-            <span>Saldo esperado em caixa</span><span>{brl(saldo)}</span>
+          <div className="mt-2 flex items-center justify-between border-t border-slate-200 pt-2 font-semibold">
+            <span className="text-slate-600">Saldo do dia (com cartão e Pix)</span>
+            <span>{brl(saldo)}</span>
+          </div>
+          {/* Este é o número que a mão confere. Ele vem depois do saldo e em
+              destaque de propósito: era o saldo que aparecia grande, e era
+              contra ele que a pessoa contava. */}
+          <div className="mt-1 flex items-center justify-between text-lg font-bold text-slate-900">
+            <span>Esperado em papel na gaveta</span><span>{brl(emEspecie)}</span>
           </div>
         </div>
 
@@ -809,10 +825,13 @@ const FecharCaixaModal: React.FC<{
             de verdade. Sem isso o sistema só concorda consigo mesmo. */}
         <div>
           <label className="label">Dinheiro contado na gaveta (opcional)</label>
+          <p className="mb-1 text-xs text-slate-500">
+            Só o que está em papel. Cartão e Pix não passam pela gaveta.
+          </p>
           <input
             className="input"
             inputMode="decimal"
-            placeholder={`Esperado: ${brl(saldo)}`}
+            placeholder={`Esperado em papel: ${brl(emEspecie)}`}
             value={contadoTxt}
             onChange={(e) => setContadoTxt(e.target.value)}
           />

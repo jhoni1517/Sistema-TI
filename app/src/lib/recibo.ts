@@ -366,7 +366,11 @@ export function reciboFechamento(
         <div class="line"><span>Entradas</span><span>${brl(entradas)}</span></div>
         <div class="line"><span>Saídas</span><span>- ${brl(saidas)}</span></div>
         <div class="line"><span>Sangrias</span><span>- ${brl(sangrias)}</span></div>
-        <div class="line grand"><span>Saldo em caixa</span><span>${brl(saldo)}</span></div>
+        <div class="line"><span>Saldo do dia (com cartão e Pix)</span><span>${brl(saldo)}</span></div>
+        <!-- O número que a mão confere. O saldo acima soma cartão e Pix, que
+             nunca passaram pela gaveta: conferir contra ele acusava falta
+             todo dia numa loja com maquininha. -->
+        <div class="line grand"><span>Esperado em papel</span><span>${brl(r.emEspecie)}</span></div>
         ${
           r.contado !== undefined
             ? `<div class="line"><span>Contado na gaveta</span><span>${brl(r.contado)}</span></div>
