@@ -22,6 +22,116 @@
     <title>Sistema TI · Caixa e Ordens de Serviço</title>
   </head>
   <body>
+    <!--
+      Abertura.
+
+      Ela existe porque o primeiro segundo do sistema era uma tela preta com
+      uma chave inglesa laranja no meio. Quem abre isso é o dono da loja, no
+      celular, às sete da manhã — e o que ele via não dizia nada.
+
+      A abertura mostra a LOJA, não o sistema: nome e logo saem do que o
+      aparelho já tem guardado, sem esperar a nuvem. Numa primeira vez, ou
+      num aparelho novo, cai no nome do sistema, que é o certo — inventar o
+      nome de uma loja que ainda não existe seria pior.
+
+      Tudo aqui é inline de propósito: folha de estilo externa chegaria
+      depois, e a abertura só serve se aparecer imediatamente.
+    -->
+    <div id="abertura" aria-hidden="true">
+      <div class="ab-caixa">
+        <div class="ab-marca" id="ab-marca">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+               stroke-linecap="round" stroke-linejoin="round" width="38" height="38">
+            <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+          </svg>
+        </div>
+        <p class="ab-nome" id="ab-nome">Sistema TI</p>
+        <p class="ab-frase" id="ab-frase">Abrindo o caixa...</p>
+        <div class="ab-barra"><span></span></div>
+      </div>
+    </div>
+
+    <style>
+      #abertura {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #0f172a;
+        font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+        transition: opacity .35s ease;
+      }
+      #abertura.saindo { opacity: 0; pointer-events: none; }
+      .ab-caixa { text-align: center; padding: 0 24px; max-width: 340px; }
+      .ab-marca {
+        width: 76px; height: 76px; margin: 0 auto 18px;
+        border-radius: 20px;
+        display: flex; align-items: center; justify-content: center;
+        background: linear-gradient(135deg, #fbbf24, #ea580c);
+        color: #1c1917;
+        box-shadow: 0 14px 34px rgba(234, 88, 12, .32);
+        overflow: hidden;
+      }
+      /* Logo da loja: preenche a caixa toda, sem o fundo laranja aparecendo */
+      .ab-marca.tem-logo { background: #fff; padding: 0; }
+      .ab-marca img { width: 100%; height: 100%; object-fit: contain; }
+      .ab-nome {
+        margin: 0; color: #fff; font-size: 20px; font-weight: 800;
+        letter-spacing: -.02em; line-height: 1.25;
+      }
+      .ab-frase {
+        margin: 8px 0 0; color: #94a3b8; font-size: 13.5px; line-height: 1.45;
+      }
+      .ab-barra {
+        margin: 22px auto 0; width: 132px; height: 3px;
+        border-radius: 99px; background: rgba(148,163,184,.22); overflow: hidden;
+      }
+      .ab-barra span {
+        display: block; width: 40%; height: 100%; border-radius: 99px;
+        background: linear-gradient(90deg, #fbbf24, #ea580c);
+        animation: ab-anda 1.15s ease-in-out infinite;
+      }
+      @keyframes ab-anda {
+        0%   { transform: translateX(-100%); }
+        100% { transform: translateX(330%); }
+      }
+      /* Quem pediu menos animação no aparelho não leva animação nenhuma */
+      @media (prefers-reduced-motion: reduce) {
+        .ab-barra span { animation: none; width: 100%; }
+      }
+    </style>
+
+    <script>
+      (function () {
+        try {
+          var c = JSON.parse(localStorage.getItem("sistema-ti:config") || "{}");
+          if (c.nomeLoja) document.getElementById("ab-nome").textContent = c.nomeLoja;
+          if (c.logoUrl) {
+            var m = document.getElementById("ab-marca");
+            m.className = "ab-marca tem-logo";
+            m.innerHTML = '<img src="' + c.logoUrl.replace(/"/g, "&quot;") + '" alt="" />';
+          }
+          /*
+           * A frase muda com a hora porque quem abre às sete da manhã está
+           * abrindo a loja, e quem abre às oito da noite está fechando. Uma
+           * frase só, sempre igual, vira parte do fundo em uma semana.
+           */
+          var h = new Date().getHours();
+          var frases = h < 12
+            ? ["Bom dia. Abrindo o caixa...", "Bom dia. Preparando o balcão..."]
+            : h < 18
+              ? ["Boa tarde. Carregando a loja...", "Boa tarde. Conferindo o caixa..."]
+              : ["Boa noite. Hora de fechar o dia...", "Boa noite. Carregando a loja..."];
+          document.getElementById("ab-frase").textContent =
+            frases[Math.floor(Math.random() * frases.length)];
+        } catch (e) {
+          /* abertura é enfeite: se falhar, o padrão já está na tela */
+        }
+      })();
+    </script>
+
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

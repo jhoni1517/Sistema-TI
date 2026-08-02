@@ -26,6 +26,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
+import { MarcaDaLoja } from "./MarcaDaLoja";
 import { pode, NOME_PAPEL, type Sessao } from "../lib/auth";
 import { temModulo, vocabulario, RAMO_META, type Modulo } from "../lib/ramos";
 
@@ -122,9 +123,7 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
         }`}
       >
         <div className="flex h-16 shrink-0 items-center gap-2 border-b border-slate-800 px-5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 to-orange-600">
-            <Wrench size={18} className="text-stone-900" strokeWidth={2.5} />
-          </div>
+          <MarcaDaLoja logoUrl={config.logoUrl} tamanho={36} />
           <div className="truncate">
             <p className="truncate text-sm font-bold text-white">
               {config.nomeLoja}
@@ -242,6 +241,9 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
           >
             <Menu size={22} />
           </button>
+          {/* A loja no topo do celular também: é a tela que fica aberta o
+              dia inteiro no balcão. */}
+          <MarcaDaLoja logoUrl={config.logoUrl} tamanho={30} />
           <span className="flex-1 truncate font-bold text-slate-800">{config.nomeLoja}</span>
           <button
             onClick={() => reload()}
