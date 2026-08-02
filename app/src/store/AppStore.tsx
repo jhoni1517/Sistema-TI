@@ -130,7 +130,15 @@ interface AppState {
   removeCotacao: (id: string) => Promise<void>;
   savePreco: (p: PrecoFornecedor) => Promise<void>;
   removeFornecedor: (id: string) => Promise<void>;
-  saveConfig: (c: Config) => Promise<void>;
+  /**
+   * Devolve `true` só quando a configuração chegou à NUVEM.
+   *
+   * Void, a tela não tinha como saber: ela mostrava "Salvo!" e liberava o
+   * formulário para voltar a seguir a nuvem, mesmo quando a gravação tinha
+   * sido recusada. O que a pessoa digitou era descartado na sincronização
+   * seguinte — depois de o sistema ter dito que salvou.
+   */
+  saveConfig: (c: Config) => Promise<boolean>;
 }
 
 const Ctx = createContext<AppState | null>(null);
@@ -613,7 +621,7 @@ export const AppProvider: React.FC<{
    *    faltando deixavam o dono trocar o nome da loja, ver "salvo", e nada
    *    ir para a nuvem.
    */
-  const saveConfig = async (c: Config) => {
+  const saveConfig = async (c: Config): Promise<boolean> => {
     localStorage.setItem("sistema-ti:config", JSON.stringify(c));
     setConfig(c);
     if (!configCarregada) {
@@ -624,7 +632,7 @@ export const AppProvider: React.FC<{
           "Foram salvas neste aparelho, mas NÃO subiram — subir agora apagaria " +
           "o que está gravado. Atualize a página e salve de novo."
       );
-      return;
+      return false;
     }
     /*
      * Pular a gravação quando só a aparência mudou existe para a paleta de
@@ -640,10 +648,12 @@ export const AppProvider: React.FC<{
      * Nulo = nada foi enviado nesta sessão ainda, então manda.
      */
     const carga = paraNuvem(c);
-    if (ultimoEnviado.current && !precisaGravarNaNuvem(ultimoEnviado.current, c)) return;
+    // Nada a enviar é sucesso: a nuvem já está com este conteúdo.
+    if (ultimoEnviado.current && !precisaGravarNaNuvem(ultimoEnviado.current, c)) return true;
     try {
       await db.config.save(carga);
       ultimoEnviado.current = c;
+      return true;
     } catch (e) {
       aviso.erro(
         "As configurações foram salvas neste aparelho, mas NÃO subiram para a " +
@@ -651,6 +661,7 @@ export const AppProvider: React.FC<{
           (e instanceof Error ? e.message : String(e)) +
           "\n\nEm outro aparelho elas ainda estão como antes."
       );
+      return false;
     }
   };
 
