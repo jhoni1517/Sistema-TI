@@ -115,6 +115,38 @@ describe("como a venda aparece depois", () => {
     expect(consolidar([p("pix", 50), p("dinheiro", 0)])).toHaveLength(1);
   });
 
+  /**
+   * `recebido` é POR PARCELA: quanto o cliente entregou naquela linha. Quem
+   * não informou entregou exatamente o que foi lançado.
+   *
+   * Ao juntar duas linhas de dinheiro, a soma do entregue usava o valor JÁ
+   * juntado no lugar do valor da própria linha — o dobro. E daí sai troco:
+   * é `entregue - lançado` que a gaveta paga.
+   */
+  it("juntar linhas de dinheiro não infla o que o cliente entregou", () => {
+    // 30 lançados sem informar (entregou 30) + 20 lançados com 30 na mão.
+    // Entregue 60, lançado 50, troco 10.
+    const r = consolidar([p("dinheiro", 30), p("dinheiro", 20, 30)]);
+    expect(r).toHaveLength(1);
+    expect(r[0].valor).toBe(50);
+    expect(r[0].recebido).toBe(60);
+    expect(trocoDoPagamento(50, r)).toBe(10);
+  });
+
+  it("a linha que não informou o entregue entra pelo próprio valor", () => {
+    const r = consolidar([p("dinheiro", 30, 50), p("dinheiro", 20)]);
+    expect(r[0].valor).toBe(50);
+    expect(r[0].recebido).toBe(70);
+  });
+
+  it("sem ninguém informar entregue, a forma juntada também não informa", () => {
+    // Guardar um "recebido" igual ao valor não é errado na conta, mas
+    // inventa no cupom um "Recebido" que ninguém digitou.
+    const r = consolidar([p("dinheiro", 30), p("dinheiro", 20)]);
+    expect(r[0].valor).toBe(50);
+    expect(r[0].recebido).toBeUndefined();
+  });
+
   it("a forma da venda é a de MAIOR valor", () => {
     // Chamar de "dinheiro" uma venda de 200 com 190 no cartão seria mentir
     // sobre onde o dinheiro está.

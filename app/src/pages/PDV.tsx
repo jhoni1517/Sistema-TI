@@ -174,6 +174,8 @@ export const PDV: React.FC = () => {
   const troco = dividido ? trocoDoPagamento(total, parcelas) : trocoDe(total, recebido);
   const falta = dividido ? faltaNoPagamento(total, parcelas) : faltaPara(total, recebido);
   const sugestoes = useMemo(() => sugerirProdutos(produtos, termo), [produtos, termo]);
+  /** A primeira forma que ainda não está na venda dividida */
+  const formaLivre = FORMAS.map((f) => f.k).find((k) => !parcelas.some((p) => p.forma === k));
 
   const proximoNumero = useMemo(() => proximoNum(vendas), [vendas]);
 
@@ -389,7 +391,11 @@ export const PDV: React.FC = () => {
       itens,
       desconto,
       formaPagamento: dividido ? formaPrincipal(parcelas) : forma,
-      valorRecebido: forma === "dinheiro" ? recebido : undefined,
+      // Na venda dividida quem guarda o entregue é `pagamentos`. Levar junto
+      // o campo da venda de uma forma só fazia o cupom imprimir "Recebido" e
+      // um troco que ninguém deu: o valor tinha sido digitado ANTES de
+      // dividir e ficava lá, sem relação com o que foi combinado depois.
+      valorRecebido: dividido ? undefined : forma === "dinheiro" ? recebido : undefined,
       pagamentos: dividido ? consolidar(parcelas) : undefined,
       clienteId: clienteId || undefined,
       sessaoId: sessao?.id,
@@ -812,7 +818,15 @@ export const PDV: React.FC = () => {
                       )
                     }
                   >
-                    {FORMAS.map((f) => (
+                    {/* Cada forma aparece uma vez só. Com duas linhas de
+                        dinheiro, o campo "Recebido em dinheiro" — que é um
+                        só e vale pelo total em espécie — grava numa delas e
+                        o troco sai maior do que o cliente tem a receber. */}
+                    {FORMAS.filter(
+                      (f) =>
+                        f.k === pc.forma ||
+                        !parcelas.some((x, n) => n !== i && x.forma === f.k)
+                    ).map((f) => (
                       <option key={f.k} value={f.k}>
                         {f.nome}
                       </option>
@@ -841,12 +855,16 @@ export const PDV: React.FC = () => {
               ))}
 
               <div className="flex flex-wrap items-center gap-2">
-                <button
-                  className="btn-secondary !py-1 text-xs"
-                  onClick={() => setParcelas((v) => [...v, { forma: "dinheiro", valor: falta }])}
-                >
-                  <Plus size={13} /> Outra forma
-                </button>
+                {/* Só enquanto sobrar forma sem usar: repetir uma delas é o
+                    que quebra o campo do recebido em espécie. */}
+                {formaLivre && (
+                  <button
+                    className="btn-secondary !py-1 text-xs"
+                    onClick={() => setParcelas((v) => [...v, { forma: formaLivre, valor: falta }])}
+                  >
+                    <Plus size={13} /> Outra forma
+                  </button>
+                )}
                 {falta > 0 && (
                   <button
                     className="btn-secondary !py-1 text-xs"
