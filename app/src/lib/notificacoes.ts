@@ -95,3 +95,29 @@ export function notificar(
     return false;
   }
 }
+
+/**
+ * Aviso do checklist, com o sistema ABERTO.
+ *
+ * É o que dá para fazer sem servidor de push: a notificação do navegador só
+ * chega enquanto o app está aberto ou instalado. Quem precisa ser alcançado
+ * com o sistema desligado vai pelo Telegram, no robô diário.
+ *
+ * A chave leva a tarefa E o dia: sem a tarefa, a primeira do dia calaria as
+ * outras; sem o dia, a tarefa avisaria uma vez na vida.
+ */
+export function avisarChecklist(
+  tarefas: { id: string; titulo: string; horario?: string }[],
+  hoje: string
+): number {
+  let mostrados = 0;
+  for (const t of tarefas) {
+    const ok = notificar(
+      "Checklist do dia",
+      `${t.horario ? t.horario + " - " : ""}${t.titulo}`,
+      { chave: `checklist:${t.id}:${hoje}`, url: "#/checklist" }
+    );
+    if (ok) mostrados++;
+  }
+  return mostrados;
+}

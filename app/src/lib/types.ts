@@ -597,6 +597,38 @@ export const REPETIR_META: Record<RepetirEvento, { label: string }> = {
   anual: { label: "Todo ano" },
 };
 
+/**
+ * Tarefa do checklist diário.
+ *
+ * Não é agenda e não é conta a pagar. A agenda guarda compromisso com data
+ * — "dia 14, buscar o notebook do Fulano". Isto é o que se repete sem data
+ * nenhuma: beber água, conferir a bancada, passar no fornecedor às duas.
+ */
+export interface TarefaDiaria {
+  id: string;
+  titulo: string;
+  /** "HH:MM". Vazio = vale para o dia todo, sem hora para cobrar. */
+  horario?: string;
+  /** Dias da semana (0 = domingo). Vazio = todo dia. */
+  dias?: number[];
+  /**
+   * Datas AAAA-MM-DD em que foi cumprida.
+   *
+   * Uma bandeira `feito` obrigaria a desmarcar tudo toda manhã, e ninguém
+   * faz isso: no terceiro dia a lista está toda marcada e não diz mais
+   * nada. Guardando os dias, ela nasce limpa sozinha. Podada em 90 dias,
+   * porque a tabela é lida inteira a cada carga.
+   */
+  feitoEm?: string[];
+  /** Manda lembrete no Telegram no horário marcado */
+  avisar?: boolean;
+  /** Último dia em que o robô já mandou, para não repetir o mesmo aviso */
+  avisadoEm?: string;
+  ativo?: boolean;
+  criadoEm: string;
+  atualizadoEm?: string;
+}
+
 export interface Evento {
   id: ID;
   titulo: string;

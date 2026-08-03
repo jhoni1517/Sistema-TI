@@ -32,6 +32,7 @@ import type {
   ContaPagar,
   Meta,
   Evento,
+  TarefaDiaria,
   Venda,
   Config,
 } from "../lib/types";
@@ -71,6 +72,7 @@ interface AppState {
   metas: Meta[];
   eventos: Evento[];
   vendas: Venda[];
+  tarefas: TarefaDiaria[];
   config: Config;
   /**
    * O que falhou na última carga.
@@ -123,6 +125,8 @@ interface AppState {
   removeConta: (id: string) => Promise<void>;
   saveEvento: (e: Evento) => Promise<void>;
   removeEvento: (id: string) => Promise<void>;
+  saveTarefa: (t: TarefaDiaria) => Promise<void>;
+  removeTarefa: (id: string) => Promise<void>;
   saveVenda: (v: Venda) => Promise<void>;
   saveMeta: (m: Meta) => Promise<void>;
   removeMeta: (id: string) => Promise<void>;
@@ -180,6 +184,7 @@ export const AppProvider: React.FC<{
   const [contas, setContas] = useState<ContaPagar[]>([]);
   const [metas, setMetas] = useState<Meta[]>([]);
   const [eventos, setEventos] = useState<Evento[]>([]);
+  const [tarefas, setTarefas] = useState<TarefaDiaria[]>([]);
   /** Mensagem do que não carregou. Vazio = carregou tudo. */
   const [erroCarga, setErroCarga] = useState("");
   const [fontesComFalha, setFontesComFalha] = useState<string[]>([]);
@@ -247,6 +252,7 @@ export const AppProvider: React.FC<{
       { nome: "contas", carregar: db.contas.all, aplicar: setContas },
       { nome: "metas", carregar: db.metas.all, aplicar: setMetas },
       { nome: "agenda", carregar: db.eventos.all, aplicar: setEventos },
+      { nome: "checklist", carregar: db.tarefas.all, aplicar: setTarefas },
       { nome: "vendas", carregar: db.vendas.all, aplicar: setVendas },
     ] as const;
 
@@ -572,6 +578,22 @@ export const AppProvider: React.FC<{
     await db.eventos.remove(id);
     setEventos((prev) => prev.filter((x) => x.id !== id));
   };
+  const saveTarefa = async (t: TarefaDiaria) => {
+    await db.tarefas.save(t);
+    setTarefas((prev) => {
+      const i = prev.findIndex((x) => x.id === t.id);
+      if (i >= 0) {
+        const n = [...prev];
+        n[i] = t;
+        return n;
+      }
+      return [...prev, t];
+    });
+  };
+  const removeTarefa = async (id: string) => {
+    await db.tarefas.remove(id);
+    setTarefas((prev) => prev.filter((x) => x.id !== id));
+  };
   const trocarRamoAparelho = (r: Ramo | null) => {
     definirRamoAparelho(r);
     setRamoAparelho(r);
@@ -683,6 +705,7 @@ export const AppProvider: React.FC<{
     contas,
     metas,
     eventos,
+    tarefas,
     vendas,
     config,
     erroCarga,
@@ -714,6 +737,8 @@ export const AppProvider: React.FC<{
     removeConta,
     saveEvento,
     removeEvento,
+    saveTarefa,
+    removeTarefa,
     saveVenda,
     saveMeta,
     removeMeta,

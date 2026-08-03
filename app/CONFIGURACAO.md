@@ -140,7 +140,26 @@ https://supabase.com/dashboard/project/nviagibefxqtognowqwe/sql/new:
 13. `supabase-migracao-catalogo.sql`
 14. `supabase-migracao-ramo-email.sql`
 15. `supabase-migracao-rastreio-token.sql`
-16. `supabase-corrigir-colunas.sql`
+16. `supabase-migracao-checklist.sql`
+17. `supabase-corrigir-colunas.sql`
+
+O de número 16 cria o Checklist diário — a rotina que se repete sem data
+(beber água, conferir a bancada, passar no fornecedor às duas). Sem ele a
+tela abre dizendo que a tabela `tarefas` não existe, e o resto do sistema
+continua funcionando normalmente.
+
+**Lembrete no horário certo.** A tarefa com "avisar" marcado chega no
+Telegram, no celular, com o sistema fechado — mas quem dispara é o robô
+diário, e ele roda uma vez por dia (`0 12 * * *` em `vercel.json`, nove da
+manhã no Brasil). Ou seja: só as tarefas marcadas para antes das nove
+recebem o recado.
+
+Para o lembrete cair na hora marcada, troque o `schedule` do cron para
+`0 * * * *` (de hora em hora). **Isso exige o plano Pro da Vercel** — no
+plano gratuito o cron só pode rodar uma vez por dia, e o deploy é recusado
+com qualquer outro horário. Com o sistema ABERTO no celular ou instalado
+como aplicativo, a notificação do navegador já toca na hora certa em
+qualquer plano.
 
 O de número 15 fecha o rastreio público. A consulta pedia só a loja e o
 número da OS, e o número é sequencial: quem recebia um link de rastreio

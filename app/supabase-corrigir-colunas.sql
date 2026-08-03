@@ -38,6 +38,17 @@ alter table ordens add column if not exists "opcaoEscolhida" text;
 -- Segredo do link público. O valor padrão e o preenchimento das ordens que
 -- já existem estão em supabase-migracao-rastreio-token.sql.
 alter table ordens add column if not exists rastreio text;
+
+-- ---------- Checklist diário ----------
+-- A tabela inteira nasce em supabase-migracao-checklist.sql; estas linhas
+-- existem para o caso de o arquivo antigo já ter rodado sem elas.
+alter table tarefas add column if not exists horario text;
+alter table tarefas add column if not exists dias jsonb not null default '[]'::jsonb;
+alter table tarefas add column if not exists "feitoEm" jsonb not null default '[]'::jsonb;
+alter table tarefas add column if not exists avisar boolean not null default false;
+alter table tarefas add column if not exists "avisadoEm" text;
+alter table tarefas add column if not exists ativo boolean not null default true;
+alter table tarefas add column if not exists "atualizadoEm" text;
 -- Fotos do aparelho na entrada. Só os endereços; os arquivos ficam no
 -- depósito de imagens. É o que encerra discussão de arranhão na retirada.
 alter table ordens add column if not exists fotos jsonb default '[]'::jsonb;
