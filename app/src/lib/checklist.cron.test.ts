@@ -37,7 +37,13 @@ type Linha = Record<string, unknown>;
 const valeHojeDoCron = criar<(t: Linha, hoje: string) => boolean>("tarefaValeHoje");
 const paraAvisarDoCron = criar<(t: Linha[], hoje: string, agora: string) => Linha[]>(
   "tarefasParaAvisar",
-  "tarefaValeHoje"
+  "tarefaValeHoje",
+  "tarefasComAviso"
+);
+const maisTardeDoCron = criar<(t: Linha[], hoje: string, agora: string) => Linha[]>(
+  "tarefasMaisTarde",
+  "tarefaValeHoje",
+  "tarefasComAviso"
 );
 const horaDaLoja = criar<(d: Date, fuso: number) => string>("horaDaLoja");
 const diaDaLoja = criar<(d: Date, fuso: number) => string>("diaDaLoja");
@@ -143,5 +149,50 @@ describe("o relógio é o do balcão, não o de Greenwich", () => {
     // 21h em São Paulo ainda é dia 3, embora em UTC já seja dia 4.
     expect(diaDaLoja(new Date("2026-08-04T00:30:00Z"), -3)).toBe("2026-08-03");
     expect(diaDaLoja(new Date("2026-08-03T12:00:00Z"), -3)).toBe("2026-08-03");
+  });
+});
+
+/**
+ * Com o robô rodando UMA VEZ POR DIA — que é o teto do plano gratuito da
+ * Vercel — a tarefa das 14h nunca receberia recado: às 9h ela ainda não
+ * venceu, e o próximo disparo já é amanhã. O resumo manda tudo junto de
+ * manhã, com o horário de cada uma.
+ */
+describe("o resumo do dia cobre o que ainda vai vencer", () => {
+  const lista = (): TarefaDiaria[] => [
+    t({ id: "cedo", titulo: "Abrir", horario: "08:00", avisar: true }),
+    t({ id: "tarde", titulo: "Fornecedor", horario: "14:00", avisar: true }),
+    t({ id: "noite", titulo: "Fechar caixa", horario: "18:00", avisar: true }),
+  ];
+
+  it("às nove, o que já venceu e o que ainda vem se completam", () => {
+    const agora = "09:00";
+    const linhas = lista() as unknown as Linha[];
+    expect(paraAvisarDoCron(linhas, SEGUNDA, agora).map((x) => x.id)).toEqual(["cedo"]);
+    expect(maisTardeDoCron(linhas, SEGUNDA, agora).map((x) => x.id)).toEqual([
+      "tarde",
+      "noite",
+    ]);
+  });
+
+  it("os dois lados nunca repetem a mesma tarefa", () => {
+    // Sair na parte de cima E na de baixo do mesmo recado é o tipo de coisa
+    // que faz a pessoa parar de ler a mensagem.
+    const linhas = lista() as unknown as Linha[];
+    for (const agora of ["00:00", "08:00", "14:00", "23:59"]) {
+      const a = paraAvisarDoCron(linhas, SEGUNDA, agora).map((x) => x.id);
+      const b = maisTardeDoCron(linhas, SEGUNDA, agora).map((x) => x.id);
+      expect(a.filter((x) => b.includes(x as string))).toEqual([]);
+      expect([...a, ...b].sort()).toEqual(["cedo", "noite", "tarde"]);
+    }
+  });
+
+  it("tarefa feita ou já avisada some das duas listas", () => {
+    const linhas = [
+      marcar(t({ id: "feita", horario: "08:00", avisar: true }), SEGUNDA, true),
+      t({ id: "avisada", horario: "14:00", avisar: true, avisadoEm: SEGUNDA }),
+    ] as unknown as Linha[];
+    expect(paraAvisarDoCron(linhas, SEGUNDA, "09:00")).toEqual([]);
+    expect(maisTardeDoCron(linhas, SEGUNDA, "09:00")).toEqual([]);
   });
 });

@@ -616,6 +616,16 @@ async function avisarFiado(chats) {
  */
 const FUSO_LOJA = -3;
 
+/**
+ * O robô roda uma vez por dia?
+ *
+ * No plano gratuito da Vercel o cron só pode disparar diariamente, e aí o
+ * recado das 14h precisa sair junto com o das 9h — senão nunca sai. Quem
+ * trocar o cron para de hora em hora põe CHECKLIST_RESUMO_DIARIO=0 e cada
+ * tarefa passa a chegar na hora dela.
+ */
+const RESUMO_DIARIO = process.env.CHECKLIST_RESUMO_DIARIO !== "0";
+
 /** "HH:MM" no relógio da loja */
 function horaDaLoja(agora, fuso) {
   const d = new Date(agora.getTime() + fuso * 3600000);
@@ -643,23 +653,32 @@ function tarefaValeHoje(t, hoje) {
 }
 
 /**
- * O que já passou da hora, ainda não foi feito e ainda não foi avisado hoje.
- * Espelha pendentesAgora() de src/lib/checklist.ts.
+ * Tarefas que ainda esperam recado hoje: pediram aviso, valem hoje, não
+ * foram feitas e ainda não foram avisadas.
  *
  * `avisadoEm` é o que impede o mesmo recado de sair a cada disparo do robô:
  * aviso repetido é o jeito mais rápido de a pessoa desligar tudo.
  */
-function tarefasParaAvisar(tarefas, hoje, agora) {
+function tarefasComAviso(tarefas, hoje) {
   return tarefas
     .filter((t) => t.avisar === true)
     .filter((t) => tarefaValeHoje(t, hoje))
     .filter((t) => !(Array.isArray(t.feitoEm) ? t.feitoEm : []).includes(hoje))
     .filter((t) => String(t.avisadoEm || "").slice(0, 10) !== hoje)
-    .filter((t) => {
-      const h = String(t.horario || "").trim();
-      return /^\d{2}:\d{2}$/.test(h) && h <= agora;
-    })
+    .filter((t) => /^\d{2}:\d{2}$/.test(String(t.horario || "").trim()))
     .sort((a, b) => String(a.horario).localeCompare(String(b.horario)));
+}
+
+/**
+ * O que já passou da hora. Espelha pendentesAgora() de src/lib/checklist.ts.
+ */
+function tarefasParaAvisar(tarefas, hoje, agora) {
+  return tarefasComAviso(tarefas, hoje).filter((t) => String(t.horario) <= agora);
+}
+
+/** O que ainda vai chegar hoje */
+function tarefasMaisTarde(tarefas, hoje, agora) {
+  return tarefasComAviso(tarefas, hoje).filter((t) => String(t.horario) > agora);
 }
 
 async function avisarChecklist(chats) {
@@ -683,12 +702,36 @@ async function avisarChecklist(chats) {
   let itens = 0;
 
   for (const [lojaId, chat] of chats) {
-    const pendentes = tarefasParaAvisar(porLojaId.get(lojaId) || [], hoje, hora);
-    if (pendentes.length === 0) continue;
+    const daLoja = porLojaId.get(lojaId) || [];
+    const pendentes = tarefasParaAvisar(daLoja, hoje, hora);
+    /*
+     * Com o robô rodando UMA VEZ POR DIA, esta é a única chance do dia.
+     *
+     * Sem o resumo, a tarefa marcada para as 14h nunca receberia recado
+     * nenhum: às 9h ela ainda não venceu, e o próximo disparo já é amanhã.
+     * O resumo manda tudo junto de manhã, com o horário de cada uma, e
+     * marca como avisadas — senão sairiam de novo no dia seguinte como se
+     * fossem de hoje.
+     *
+     * Rodando mais de uma vez por dia, isto atrapalha: o resumo repetiria a
+     * cada disparo e cada tarefa perderia o aviso na hora dela. Por isso é
+     * desligável em CHECKLIST_RESUMO_DIARIO=0, que é o que se faz junto com
+     * trocar o cron para de hora em hora.
+     */
+    const maisTarde = RESUMO_DIARIO ? tarefasMaisTarde(daLoja, hoje, hora) : [];
+    if (pendentes.length === 0 && maisTarde.length === 0) continue;
 
     // Sem emoji: em alguns aparelhos chegam como "?" e sujam o recado.
-    const linhas = pendentes.map((t) => `• ${t.horario} ${t.titulo}`);
-    if (!(await enviarPara(chat, `*Checklist do dia*\n\n${linhas.join("\n")}`))) continue;
+    const partes = ["*Checklist do dia*"];
+    if (pendentes.length) {
+      partes.push(`AGORA\n${pendentes.map((t) => `• ${t.horario} ${t.titulo}`).join("\n")}`);
+    }
+    if (maisTarde.length) {
+      partes.push(
+        `MAIS TARDE HOJE\n${maisTarde.map((t) => `• ${t.horario} ${t.titulo}`).join("\n")}`
+      );
+    }
+    if (!(await enviarPara(chat, partes.join("\n\n")))) continue;
 
     /*
      * Marca o aviso DEPOIS de o envio dar certo.
@@ -698,7 +741,7 @@ async function avisarChecklist(chats) {
      * depois, o pior caso é o recado sair duas vezes, que a pessoa
      * percebe e não custa nada.
      */
-    for (const t of pendentes) {
+    for (const t of [...pendentes, ...maisTarde]) {
       try {
         await sb(`tarefas?id=eq.${encodeURIComponent(t.id)}`, {
           method: "PATCH",
@@ -710,7 +753,7 @@ async function avisarChecklist(chats) {
     }
 
     lojasAvisadas++;
-    itens += pendentes.length;
+    itens += pendentes.length + maisTarde.length;
   }
 
   return lojasAvisadas === 0
