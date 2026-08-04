@@ -31,6 +31,46 @@ export const OS_STATUS_META: Record<
   cancelada: { label: "Cancelada", color: "bg-red-100 text-red-700", cliente: "Ordem de serviço cancelada." },
 };
 
+/**
+ * Backup dos dados do cliente.
+ *
+ * Formatação e troca de SSD apagam tudo, e apagar não tem desfazer. O que a
+ * loja combinou com o cliente vivia solto no meio do texto do defeito —
+ * "extremamente lento, não precisa backup" — onde some assim que alguém
+ * escreve mais uma linha. Como campo, ele fica na cara de quem vai
+ * formatar e sai impresso no papel que o cliente assina.
+ *
+ * "pendente" é o estado de propósito INCÔMODO: enquanto ninguém decidir,
+ * o sistema cobra antes de deixar a OS ficar pronta.
+ */
+export type BackupOS = "pendente" | "nao_precisa" | "a_fazer" | "feito";
+
+export const BACKUP_META: Record<
+  BackupOS,
+  { label: string; cor: string; curto: string }
+> = {
+  pendente: {
+    label: "Ainda não perguntei",
+    cor: "bg-amber-100 text-amber-700",
+    curto: "a definir",
+  },
+  nao_precisa: {
+    label: "Cliente dispensou o backup",
+    cor: "bg-slate-100 text-slate-600",
+    curto: "dispensado pelo cliente",
+  },
+  a_fazer: {
+    label: "Fazer backup antes",
+    cor: "bg-red-100 text-red-700",
+    curto: "a fazer",
+  },
+  feito: {
+    label: "Backup feito",
+    cor: "bg-emerald-100 text-emerald-700",
+    curto: "feito",
+  },
+};
+
 export type TipoPessoa = "fisica" | "juridica";
 
 /**
@@ -149,6 +189,14 @@ export interface OrdemServico {
    * A tela nunca gera: caminho montado no navegador não protege nada.
    */
   rastreio?: string;
+  /**
+   * O que foi combinado sobre o backup dos dados.
+   *
+   * Formatação e troca de SSD apagam tudo, e apagar não tem desfazer.
+   * Antes isto ficava solto no texto do defeito, onde some na linha
+   * seguinte. Ausente = OS antiga, tratada como "pendente".
+   */
+  backup?: BackupOS;
   maoDeObra: number;
   desconto: number;
   // Fluxo

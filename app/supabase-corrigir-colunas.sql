@@ -38,6 +38,9 @@ alter table ordens add column if not exists "opcaoEscolhida" text;
 -- Segredo do link público. O valor padrão e o preenchimento das ordens que
 -- já existem estão em supabase-migracao-rastreio-token.sql.
 alter table ordens add column if not exists rastreio text;
+-- O que foi combinado sobre o backup dos dados do cliente. Formatação e
+-- troca de SSD apagam tudo, e apagar não tem desfazer.
+alter table ordens add column if not exists backup text;
 
 -- ---------- Checklist diário ----------
 -- A tabela inteira nasce em supabase-migracao-checklist.sql; estas linhas

@@ -106,3 +106,67 @@ describe("pedido de avaliação", () => {
     expect(pedidoDeAvaliacao(ordem("cancelada"), conf({ linkAvaliacao: link }))).toBe("");
   });
 });
+
+/**
+ * Linha zerada no recibo é ruído com cara de erro.
+ *
+ * "Mão de obra R$ 0,00" numa OS que é só troca de peça faz o cliente parar
+ * para entender se está faltando alguma coisa — e, na formatação, "Peças
+ * R$ 0,00" dá a impressão de que o valor não foi lançado.
+ */
+describe("o recibo não mostra linha zerada", () => {
+  const semMaoDeObra = {
+    ...os,
+    maoDeObra: 0,
+    pecas: [{ descricao: "Formatação", quantidade: 1, precoUnit: 150, custoUnit: 0 }],
+  } as unknown as OrdemServico;
+
+  const semPecas = { ...os, maoDeObra: 100, pecas: [] } as unknown as OrdemServico;
+
+  it("mão de obra zerada some do recibo", () => {
+    const html = reciboOS(semMaoDeObra, cliente, cfg);
+    expect(html).not.toContain("Mão de obra");
+    expect(html).toContain("Peças");
+  });
+
+  it("sem peça nenhuma, a linha de peças some", () => {
+    const html = reciboOS(semPecas, cliente, cfg);
+    expect(html).not.toContain(">Peças<");
+    expect(html).toContain("Mão de obra");
+  });
+
+  it("o TOTAL sai sempre, mesmo zerado", () => {
+    // O total é o que o cliente confere e assina: sumir com ele deixaria o
+    // documento sem o número que importa.
+    const zerada = { ...os, maoDeObra: 0, pecas: [] } as unknown as OrdemServico;
+    expect(reciboOS(zerada, cliente, cfg)).toContain("Total");
+  });
+
+  it("com os dois valores, os dois aparecem", () => {
+    const html = reciboOS(
+      { ...os, maoDeObra: 100, pecas: [{ descricao: "Tela", quantidade: 1, precoUnit: 300, custoUnit: 0 }] } as unknown as OrdemServico,
+      cliente,
+      cfg
+    );
+    expect(html).toContain("Mão de obra");
+    expect(html).toContain("Peças");
+  });
+
+  it("desconto zerado continua fora, como já era", () => {
+    expect(reciboOS(os, cliente, cfg)).not.toContain("Desconto");
+  });
+});
+
+describe("o backup vai para o papel que o cliente assina", () => {
+  it("dispensa vira declaração de ciência no recibo", () => {
+    const html = reciboOS({ ...os, backup: "nao_precisa" } as unknown as OrdemServico, cliente, cfg);
+    expect(html).toContain("Backup dos dados");
+    expect(html).toContain("dispensou");
+  });
+
+  it("OS sem nada combinado não imprime bloco nenhum", () => {
+    // "Ainda não perguntei" no documento do cliente não informa nada e
+    // ainda expõe a loja.
+    expect(reciboOS(os, cliente, cfg)).not.toContain("Backup dos dados");
+  });
+});

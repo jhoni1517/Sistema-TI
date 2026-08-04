@@ -60,6 +60,8 @@ import {
 import {
   OS_STATUS_META,
   CLASSIFICACAO_META,
+  BACKUP_META,
+  type BackupOS,
   type Cliente,
   type OrdemServico,
   type OSStatus,
@@ -68,6 +70,7 @@ import {
   type Config,
 } from "../lib/types";
 import { travaAtendimento, classificacaoDe, travaFiado } from "../lib/clientes";
+import { backupDe, avisoDeBackup, perguntaAntesDeConcluir } from "../lib/backup";
 import { saldosApos } from "../lib/estoque";
 import { proximoNumero as proximoNum, problemaParaNumerar } from "../lib/numeracao";
 import { aoApagarOrdem, textoDaConfirmacao } from "../lib/exclusao";
@@ -211,6 +214,16 @@ export const OrdensServico: React.FC = () => {
         "Para entregar, use o botão Receber (dinheiro entra no caixa) ou Fiado " +
           "(fica em A Receber). Assim o estoque baixa e o valor é registrado."
       );
+    }
+    /*
+     * A cobrança do backup vem AQUI, e não na entrega.
+     *
+     * Perguntar sobre backup com o aparelho já formatado não serve para
+     * nada. "Pronta" é o último momento em que ainda dá para voltar.
+     */
+    if (status === "pronta") {
+      const pergunta = perguntaAntesDeConcluir(o);
+      if (pergunta && !confirm(pergunta)) return;
     }
     const atualizado: OrdemServico = {
       ...o,
@@ -982,6 +995,39 @@ const OSForm: React.FC<{
           </Field>
         </div>
 
+        {/*
+          Backup: o único erro desta loja que nenhum conserto posterior
+          resolve. Peça errada se troca, valor errado se acerta, foto de
+          casamento apagada acabou. Antes isto vivia solto no meio do texto
+          do defeito, onde some na linha seguinte e onde ninguém procura na
+          hora de formatar.
+        */}
+        <div>
+          <label className="label">Backup dos dados do cliente</label>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {(Object.keys(BACKUP_META) as BackupOS[]).map((b) => (
+              <button
+                key={b}
+                type="button"
+                onClick={() => setOs({ ...os, backup: b })}
+                className={`rounded-lg border px-3 py-2 text-left text-xs font-semibold transition ${
+                  backupDe(os) === b
+                    ? "border-brand-500 bg-brand-50 text-brand-700"
+                    : "border-slate-200 text-slate-500 hover:bg-slate-50"
+                }`}
+              >
+                {BACKUP_META[b].label}
+              </button>
+            ))}
+          </div>
+          {avisoDeBackup(os) && (
+            <p className="mt-2 flex items-start gap-2 rounded-lg bg-amber-50 p-2.5 text-xs text-amber-800">
+              <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+              {avisoDeBackup(os)}
+            </p>
+          )}
+        </div>
+
         <div>
           <label className="label">Checklist de entrada</label>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -1290,6 +1336,7 @@ const OSDetalhe: React.FC<{
         <div className="grid gap-4 sm:grid-cols-2">
           <Info label="Defeito relatado" value={os.defeitoRelatado} />
           <Info label="Laudo técnico" value={os.defeitoConstatado || "—"} />
+          <Info label="Backup dos dados" value={BACKUP_META[backupDe(os)].label} />
         </div>
 
         {/* Alerta de permanência / taxa de guarda */}
