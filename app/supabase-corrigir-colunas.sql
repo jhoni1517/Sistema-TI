@@ -42,6 +42,12 @@ alter table ordens add column if not exists rastreio text;
 -- troca de SSD apagam tudo, e apagar não tem desfazer.
 alter table ordens add column if not exists backup text;
 
+-- ---------- Fatura do cartão ----------
+-- Cada compra no crédito já é despesa quando acontece. Marcar o pagamento
+-- da fatura impede o mês de contar tudo duas vezes.
+alter table movimentos add column if not exists "faturaCartao" boolean;
+alter table contas_pagar add column if not exists "faturaCartao" boolean;
+
 -- ---------- Checklist diário ----------
 -- A tabela inteira nasce em supabase-migracao-checklist.sql; estas linhas
 -- existem para o caso de o arquivo antigo já ter rodado sem elas.

@@ -1,4 +1,5 @@
 import type { OrdemServico, MovimentoCaixa, Fiado } from "./types";
+import { ehPagamentoDeFatura } from "./cartao";
 import {
   pecasEfetivas,
   subtotalPeca,
@@ -82,13 +83,19 @@ export const totalDespesas = (movs: MovimentoCaixa[]): number =>
 
 /**
  * Despesas que pesam no RESULTADO: aluguel, energia, salário...
- * Compra de peça fica de fora porque o custo dela entra no resultado quando
- * a peça é vendida. Contar nos dois lugares descontava a mesma peça duas
- * vezes e chegava a mostrar prejuízo em serviço lucrativo.
+ *
+ * Duas coisas ficam de fora, pelo mesmo motivo — elas já foram contadas em
+ * outro momento, e contar de novo mostra prejuízo onde não houve:
+ *
+ * - **Compra de peça**: o custo dela entra no resultado quando a peça é
+ *   vendida. Contar nos dois lugares descontava a mesma peça duas vezes.
+ * - **Pagamento da fatura do cartão**: cada compra no crédito já virou
+ *   despesa no dia em que aconteceu. Um mês com R$ 2.000 no cartão fecharia
+ *   mostrando R$ 4.000 de despesa. Ver lib/cartao.ts.
  */
 export const despesasOperacionais = (movs: MovimentoCaixa[]): number =>
   movs
-    .filter((m) => m.tipo === "saida" && !ehCompraEstoque(m))
+    .filter((m) => m.tipo === "saida" && !ehCompraEstoque(m) && !ehPagamentoDeFatura(m))
     .reduce((s, m) => s + n(m.valor), 0);
 
 /** Quanto foi investido em reposição de estoque no período */

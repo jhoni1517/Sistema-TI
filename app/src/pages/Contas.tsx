@@ -25,6 +25,7 @@ import {
   TrendingDown,
   CalendarClock,
   Power,
+  CreditCard,
 } from "lucide-react";
 import { aviso } from "../components/Aviso";
 import { Modal, Field, SectionTitle, EmptyState, InputNumero } from "../components/ui";
@@ -46,6 +47,7 @@ import {
   soData,
   CORES_META,
 } from "../lib/contas";
+import { gastoNoCartao, porCategoria } from "../lib/cartao";
 import {
   notificar,
   pedirPermissao,
@@ -179,6 +181,19 @@ export const Contas: React.FC = () => {
 
   const gastos = useMemo(() => gastosPorCategoria(movimentos, mesGasto), [movimentos, mesGasto]);
 
+  /**
+   * O que vai vir na fatura do cartão neste mês.
+   *
+   * A pergunta que decide o mês é "quanto vem no cartão?", e sem juntar
+   * isso em algum lugar ela só é respondida quando a fatura chega. Ver
+   * lib/cartao.ts, inclusive para a armadilha da contagem dupla.
+   */
+  const cartao = useMemo(
+    () => gastoNoCartao(movimentos, { de: `${mesGasto}-01`, ate: `${mesGasto}-31` }),
+    [movimentos, mesGasto]
+  );
+  const cartaoPorCategoria = useMemo(() => porCategoria(cartao), [cartao]);
+
   const mesesDisponiveis = useMemo(() => {
     const set = new Set<string>();
     for (const m of movimentos) if (m.tipo === "saida") set.add(soData(m.data).slice(0, 7));
@@ -266,6 +281,9 @@ export const Contas: React.FC = () => {
         formaPagamento: formaPg,
         sessaoId: sessaoAberta?.id,
         compraEstoque: pagando.compraEstoque === true,
+        // Sem levar a marca junto, o lançamento no caixa vira despesa nova
+        // e o mês conta o cartão duas vezes.
+        faturaCartao: pagando.faturaCartao === true,
         data: nowISO(),
       });
 
@@ -557,6 +575,50 @@ export const Contas: React.FC = () => {
         )}
       </div>
 
+      {/* ---------- Cartão de crédito ---------- */}
+      {(cartao.total > 0 || cartao.pago > 0) && (
+        <div className="card mb-5">
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+            <h3 className="flex items-center gap-2 font-bold text-slate-700">
+              <CreditCard size={18} /> Cartão de crédito
+            </h3>
+            <span className="text-xs text-slate-400">
+              {mesGasto.split("-").reverse().join("/")}
+            </span>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 p-4 text-white">
+              <p className="text-xs text-slate-300">Comprado no crédito neste mês</p>
+              <p className="mt-1 text-3xl font-bold">{brl(cartao.total)}</p>
+              <p className="mt-1 text-xs text-slate-400">
+                {cartao.itens.length} lançamento(s) — é o que vem na fatura
+              </p>
+            </div>
+            <div className="rounded-xl bg-slate-50 p-4">
+              <p className="text-xs text-slate-500">Fatura já paga neste mês</p>
+              <p className="mt-1 text-2xl font-bold text-slate-700">{brl(cartao.pago)}</p>
+              {/* A regra que evita o mês fechar com prejuízo inventado. */}
+              <p className="mt-1 text-xs text-slate-500">
+                Pagar a fatura não conta como despesa nova: cada compra no crédito
+                já entrou no resultado no dia em que aconteceu.
+              </p>
+            </div>
+          </div>
+
+          {cartaoPorCategoria.length > 0 && (
+            <div className="mt-3 space-y-1">
+              {cartaoPorCategoria.slice(0, 6).map((c) => (
+                <div key={c.categoria} className="flex items-center justify-between text-sm">
+                  <span className="min-w-0 flex-1 truncate text-slate-600">{c.categoria}</span>
+                  <span className="font-semibold text-slate-700">{brl(c.valor)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ---------- Relatório de gastos ---------- */}
       <div className="grid gap-5 lg:grid-cols-2">
         <div className="card">
@@ -747,6 +809,23 @@ export const Contas: React.FC = () => {
                 ))}
               </select>
             </Field>
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-slate-50 p-3 sm:col-span-2">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4"
+                checked={editando.faturaCartao === true}
+                onChange={(e) => setEditando({ ...editando, faturaCartao: e.target.checked })}
+              />
+              <span className="text-sm">
+                <b className="text-slate-700">É o pagamento da fatura do cartão</b>
+                <span className="mt-0.5 block text-xs text-slate-500">
+                  Marque só na conta da fatura. Cada compra no crédito já virou
+                  despesa no dia em que aconteceu — sem esta marca o mês conta
+                  tudo duas vezes e fecha com um prejuízo que não existiu.
+                </span>
+              </span>
+            </label>
 
             <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-slate-50 p-3 sm:col-span-2">
               <input

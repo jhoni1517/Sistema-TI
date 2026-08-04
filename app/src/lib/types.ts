@@ -395,6 +395,15 @@ export interface ContaPagar {
   ativo: boolean;
   /** Reposição de estoque não é despesa do resultado (mesma regra do caixa) */
   compraEstoque?: boolean;
+  /**
+   * Esta conta é o pagamento da FATURA do cartão?
+   *
+   * Cada compra no crédito já é despesa quando acontece. Se a fatura também
+   * contasse, o mês somaria tudo duas vezes e mostraria um prejuízo que não
+   * existiu. Mesma regra da compra de estoque: sai do caixa, não entra no
+   * resultado.
+   */
+  faturaCartao?: boolean;
   pagamentos: PagamentoConta[];
   observacoes?: string;
   criadoEm: string;
@@ -482,6 +491,8 @@ export interface MovimentoCaixa {
    * vezes do lucro.
    */
   compraEstoque?: boolean;
+  /** Pagamento da fatura do cartão: sai do caixa, mas não é despesa nova */
+  faturaCartao?: boolean;
   data: string;
   sessaoId?: ID;
 }
