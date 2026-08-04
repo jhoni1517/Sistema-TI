@@ -26,6 +26,7 @@ import {
   CalendarClock,
   Power,
   CreditCard,
+  Search,
 } from "lucide-react";
 import { aviso } from "../components/Aviso";
 import { Modal, Field, SectionTitle, EmptyState, InputNumero } from "../components/ui";
@@ -46,6 +47,9 @@ import {
   hojeISO,
   soData,
   CORES_META,
+  filtrarContas,
+  ORDEM_CONTAS_META,
+  type OrdemContas,
 } from "../lib/contas";
 import { gastoNoCartao, porCategoria } from "../lib/cartao";
 import {
@@ -169,14 +173,21 @@ export const Contas: React.FC = () => {
     [contas]
   );
 
+  /**
+   * Procurar e ordenar.
+   *
+   * A lista vinha numa ordem só, que serve para o dia a dia e não serve
+   * para as duas perguntas de quando o mês aperta: "o que está atrasado há
+   * mais tempo?" e "qual é a maior conta?". Com trinta contas cadastradas,
+   * responder isso era rolar a tela comparando de cabeça. A regra mora em
+   * lib/contas.ts, com teste.
+   */
+  const [buscaConta, setBuscaConta] = useState("");
+  const [ordem, setOrdem] = useState<OrdemContas>("vencimento");
+
   const lista = useMemo(
-    () =>
-      [...contas].sort((a, b) => {
-        // Desligadas por último; o resto pela urgência do vencimento
-        if (a.ativo !== b.ativo) return a.ativo ? -1 : 1;
-        return diasAteVencer(a.vencimento) - diasAteVencer(b.vencimento);
-      }),
-    [contas]
+    () => filtrarContas(contas, { termo: buscaConta, ordem }),
+    [contas, buscaConta, ordem]
   );
 
   const gastos = useMemo(() => gastosPorCategoria(movimentos, mesGasto), [movimentos, mesGasto]);
@@ -416,12 +427,48 @@ export const Contas: React.FC = () => {
         <Cartao label="Contas ativas" valor={String(resumo.ativas)} icone={<Receipt size={18} />} />
       </div>
 
+      {/* Procurar e ordenar */}
+      {contas.length > 0 && (
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              className="input w-full !pl-9"
+              placeholder="Procurar por nome, categoria ou observação..."
+              value={buscaConta}
+              onChange={(e) => setBuscaConta(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-1.5 overflow-x-auto">
+            {(Object.keys(ORDEM_CONTAS_META) as OrdemContas[]).map((o) => (
+              <button
+                key={o}
+                onClick={() => setOrdem(o)}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
+                  ordem === o
+                    ? "bg-slate-800 text-white"
+                    : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                {ORDEM_CONTAS_META[o]}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Lista de contas */}
       {lista.length === 0 ? (
         <EmptyState
           icon={<Receipt size={48} />}
-          title="Nenhuma conta cadastrada"
-          hint="Cadastre aluguel, energia, internet e o que mais sai todo mês."
+          title={
+            contas.length === 0 ? "Nenhuma conta cadastrada" : "Nada encontrado"
+          }
+          hint={
+            contas.length === 0
+              ? "Cadastre aluguel, energia, internet e o que mais sai todo mês."
+              : "Tente outra palavra, ou limpe a busca para ver a lista inteira."
+          }
         />
       ) : (
         <div className="mb-6 space-y-2">

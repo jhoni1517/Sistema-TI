@@ -180,6 +180,81 @@ export function pagarConta(
 type PagamentoFormas = ContaPagar["pagamentos"][number]["formaPagamento"];
 
 /* ------------------------------------------------------------------ */
+/* Procurar e ordenar a lista de contas                                */
+/* ------------------------------------------------------------------ */
+
+export type OrdemContas = "vencimento" | "atraso" | "valor" | "nome";
+
+export const ORDEM_CONTAS_META: Record<OrdemContas, string> = {
+  vencimento: "Vencimento",
+  atraso: "Mais atrasada",
+  valor: "Maior valor",
+  nome: "Nome",
+};
+
+export interface FiltroContas {
+  /** Casa com descrição, categoria e observações */
+  termo?: string;
+  ordem?: OrdemContas;
+  /** Só as que estão nesta situação. Vazio = todas. */
+  situacao?: SituacaoConta | "";
+  /** Esconder as desligadas */
+  soAtivas?: boolean;
+}
+
+/**
+ * A lista de contas, do jeito que se procura nela.
+ *
+ * A tela mostrava tudo numa ordem só — desligadas por último, o resto pelo
+ * vencimento. Serve para o dia a dia e não serve para as duas perguntas que
+ * aparecem quando o mês aperta: "o que está atrasado há mais tempo?" e "qual
+ * é a maior conta?". Com trinta contas cadastradas, responder isso era rolar
+ * a tela comparando de cabeça.
+ *
+ * A desligada continua sempre por último, em qualquer ordenação: ela não
+ * cobra nada e só atrapalharia a leitura de cima para baixo.
+ */
+export function filtrarContas(
+  contas: ContaPagar[],
+  filtro: FiltroContas = {},
+  hoje = hojeISO()
+): ContaPagar[] {
+  const termo = txt(filtro.termo).trim().toLowerCase();
+  const ordem = filtro.ordem || "vencimento";
+
+  const filtradas = contas.filter((c) => {
+    if (filtro.soAtivas && !c.ativo) return false;
+    if (filtro.situacao && situacaoConta(c, hoje) !== filtro.situacao) return false;
+    if (!termo) return true;
+    // Categoria e observação entram na busca porque é assim que a pessoa
+    // lembra: "aquela do contador", "as de energia".
+    const alvo = `${txt(c.descricao)} ${txt(c.categoria)} ${txt(c.observacoes)}`.toLowerCase();
+    return alvo.includes(termo);
+  });
+
+  return filtradas.sort((a, b) => {
+    if (a.ativo !== b.ativo) return a.ativo ? -1 : 1;
+    switch (ordem) {
+      case "atraso": {
+        // Quanto mais negativo o "dias até vencer", mais atrasada. Conta em
+        // dia vai para o fim: ela não é resposta para esta pergunta.
+        const da = diasAteVencer(a.vencimento, hoje);
+        const db = diasAteVencer(b.vencimento, hoje);
+        const atrasadaA = da < 0 ? 0 : 1;
+        const atrasadaB = db < 0 ? 0 : 1;
+        return atrasadaA - atrasadaB || da - db;
+      }
+      case "valor":
+        return n(b.valor) - n(a.valor);
+      case "nome":
+        return txt(a.descricao).localeCompare(txt(b.descricao), "pt-BR");
+      default:
+        return diasAteVencer(a.vencimento, hoje) - diasAteVencer(b.vencimento, hoje);
+    }
+  });
+}
+
+/* ------------------------------------------------------------------ */
 /* Relatório de gastos                                                 */
 /* ------------------------------------------------------------------ */
 

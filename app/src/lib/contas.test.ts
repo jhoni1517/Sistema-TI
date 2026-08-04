@@ -10,6 +10,7 @@ import {
   custoFixoMensal,
   gastosPorCategoria,
   progressoMeta,
+  filtrarContas,
 } from "./contas";
 import type { ContaPagar, Meta } from "./types";
 
@@ -204,5 +205,100 @@ describe("objetivos", () => {
       { status: "pronta", entregueEm: "2026-07-11" },
     ] as never;
     expect(progressoMeta(M({ tipo: "os", alvo: 2 }), [], ordens, "2026-07-27").atual).toBe(1);
+  });
+});
+
+/**
+ * A tela mostrava tudo numa ordem só. Serve para o dia a dia e não serve
+ * para as duas perguntas que aparecem quando o mês aperta: "o que está
+ * atrasado há mais tempo?" e "qual é a maior conta?".
+ */
+describe("procurar e ordenar as contas", () => {
+  const hoje = "2026-08-10";
+  const c = (p: Partial<ContaPagar>): ContaPagar =>
+    ({
+      id: Math.random().toString(36).slice(2),
+      descricao: "Conta",
+      categoria: "Despesa",
+      valor: 100,
+      vencimento: hoje,
+      recorrencia: "mensal",
+      lembreteDias: 3,
+      ativo: true,
+      pagamentos: [],
+      criadoEm: "2026-01-01T00:00:00.000Z",
+      ...p,
+    }) as ContaPagar;
+
+  const lista = () => [
+    c({ id: "aluguel", descricao: "Aluguel", valor: 2000, vencimento: "2026-08-15" }),
+    c({ id: "energia", descricao: "Energia", valor: 380, vencimento: "2026-07-25" }),
+    c({ id: "internet", descricao: "Internet", valor: 120, vencimento: "2026-08-05" }),
+    c({ id: "contador", descricao: "Contador", valor: 500, vencimento: "2026-08-20", ativo: false }),
+  ];
+
+  it("por padrão, a mais próxima de vencer primeiro", () => {
+    expect(filtrarContas(lista(), {}, hoje).map((x) => x.id)).toEqual([
+      "energia",
+      "internet",
+      "aluguel",
+      "contador",
+    ]);
+  });
+
+  it("por atraso, a mais atrasada primeiro e as em dia no fim", () => {
+    // "Qual está atrasada há mais tempo" é a pergunta; conta em dia não é
+    // resposta para ela.
+    const r = filtrarContas(lista(), { ordem: "atraso" }, hoje).map((x) => x.id);
+    expect(r[0]).toBe("energia");
+    expect(r.slice(0, 2)).toEqual(["energia", "internet"]);
+  });
+
+  it("por valor, a maior primeiro", () => {
+    expect(filtrarContas(lista(), { ordem: "valor" }, hoje).map((x) => x.id)).toEqual([
+      "aluguel",
+      "energia",
+      "internet",
+      "contador",
+    ]);
+  });
+
+  it("por nome, em ordem alfabética de gente", () => {
+    expect(filtrarContas(lista(), { ordem: "nome" }, hoje).map((x) => x.id)).toEqual([
+      "aluguel",
+      "energia",
+      "internet",
+      "contador",
+    ]);
+  });
+
+  it("a desligada fica por último em QUALQUER ordenação", () => {
+    // Ela não cobra nada e só atrapalharia a leitura de cima para baixo.
+    for (const ordem of ["vencimento", "atraso", "valor", "nome"] as const) {
+      const r = filtrarContas(lista(), { ordem }, hoje);
+      expect(r[r.length - 1].id).toBe("contador");
+    }
+  });
+
+  it("busca por nome, categoria ou observação", () => {
+    expect(filtrarContas(lista(), { termo: "ener" }, hoje).map((x) => x.id)).toEqual(["energia"]);
+    const comObs = [c({ id: "x", descricao: "Boleto", observacoes: "do contador" })];
+    expect(filtrarContas(comObs, { termo: "contador" }, hoje)).toHaveLength(1);
+  });
+
+  it("filtra por situação", () => {
+    const r = filtrarContas(lista(), { situacao: "atrasada" }, hoje).map((x) => x.id);
+    expect(r).toContain("energia");
+    expect(r).not.toContain("aluguel");
+  });
+
+  it("esconde as desligadas quando pedido", () => {
+    expect(
+      filtrarContas(lista(), { soAtivas: true }, hoje).map((x) => x.id)
+    ).not.toContain("contador");
+  });
+
+  it("busca que não acha nada devolve lista vazia, não a lista inteira", () => {
+    expect(filtrarContas(lista(), { termo: "zzz" }, hoje)).toEqual([]);
   });
 });

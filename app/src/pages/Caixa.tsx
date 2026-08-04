@@ -14,9 +14,12 @@ import {
   Receipt,
   History,
   ListOrdered,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, SectionTitle, EmptyState, InputNumero } from "../components/ui";
+import { lerDetalhes, gravarDetalhes } from "../lib/preferencias";
 import { sangriaSugerida } from "../lib/desempenho";
 import { precoEfetivo } from "../lib/promocao";
 import { uid, nowISO, brl, formatDate, formatDateTime, txt } from "../lib/format";
@@ -33,6 +36,9 @@ import {
   filtrarMovimentos,
   agruparPorDia,
   movimentosPorSessao,
+  baseDaLista,
+  rotuloDaLista,
+  type EscopoCaixa,
 } from "../lib/caixa";
 import type { MovimentoCaixa, TipoMovimento, FormaPagamento, SessaoCaixa, Produto, Cliente } from "../lib/types";
 
@@ -81,14 +87,33 @@ export const Caixa: React.FC = () => {
    * O corte em 300 é depois do filtro, de propósito: cortar antes fazia a
    * busca não achar o que estava na posição 101.
    */
+  /**
+   * A lista acompanha o topo.
+   *
+   * Os números de cima são da SESSÃO; a lista mostrava os últimos 300
+   * lançamentos de toda a história da loja. Quem rola a tela supõe que a
+   * lista é o que compõe o número de cima — e abrir o caixa para ver o dia
+   * trazia meses de histórico junto. Ver baseDaLista em lib/caixa.ts.
+   */
+  const [escopo, setEscopo] = useState<EscopoCaixa>("sessao");
+  /** Preferência de leitura deste aparelho: celular enxuto, computador aberto */
+  const [detalhes, setDetalhes] = useState(lerDetalhes);
+  const mudarDetalhes = (v: boolean) => {
+    setDetalhes(v);
+    gravarDetalhes(v);
+  };
+
   const listaMovs = useMemo(
     () =>
       agruparPorDia(
-        filtrarMovimentos(movimentos, { termo: busca, tipo: filtroTipo })
+        filtrarMovimentos(baseDaLista(escopo, busca, movimentos, movsSessao), {
+          termo: busca,
+          tipo: filtroTipo,
+        })
           .sort((a, b) => txt(b.data).localeCompare(txt(a.data)))
           .slice(0, 300)
       ),
-    [movimentos, busca, filtroTipo]
+    [movimentos, movsSessao, escopo, busca, filtroTipo]
   );
   const quantosNaLista = useMemo(
     () => listaMovs.reduce((n, d) => n + d.movimentos.length, 0),
@@ -211,8 +236,17 @@ export const Caixa: React.FC = () => {
         }
       />
 
-      {/* Saldo e resumo */}
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {/*
+        O resumo encolhe.
+        Antes eram quatro cartões mais até cinco de forma de pagamento mais
+        três botões antes de aparecer a primeira movimentação: no celular,
+        que é onde o dono lê, dava meia tela de rolagem para chegar no que
+        ele veio ver. Os dois números que decidem o dia — saldo e o que está
+        na gaveta — ficam sempre; o resto vira detalhe de conferência, que é
+        quando ele importa. A escolha fica no aparelho porque é preferência
+        de leitura, não dado da loja.
+      */}
+      <div className={`mb-5 grid gap-3 ${detalhes ? "sm:grid-cols-2 lg:grid-cols-4" : ""}`}>
         <div className="card bg-gradient-to-br from-brand-600 to-brand-800 text-white ring-brand-700">
           <p className="flex items-center gap-2 text-sm text-brand-100"><Wallet size={16} /> Saldo em caixa</p>
           <p className="mt-1 text-3xl font-bold">{brl(saldo)}</p>
@@ -241,16 +275,20 @@ export const Caixa: React.FC = () => {
             </span>
           </div>
         </div>
-        <Resumo label="Entradas" value={entradas} color="text-emerald-600" icon={<ArrowDownCircle size={18} className="text-emerald-600" />} />
-        <Resumo label="Saídas" value={saidas} color="text-red-600" icon={<ArrowUpCircle size={18} className="text-red-600" />} />
-        <Resumo label="Sangrias" value={sangrias} color="text-amber-600" icon={<Scissors size={18} className="text-amber-600" />} />
+        {detalhes && (
+          <>
+            <Resumo label="Entradas" value={entradas} color="text-emerald-600" icon={<ArrowDownCircle size={18} className="text-emerald-600" />} />
+            <Resumo label="Saídas" value={saidas} color="text-red-600" icon={<ArrowUpCircle size={18} className="text-red-600" />} />
+            <Resumo label="Sangrias" value={sangrias} color="text-amber-600" icon={<Scissors size={18} className="text-amber-600" />} />
+          </>
+        )}
       </div>
 
       {/* Entradas por forma de pagamento.
           Era o número que só existia no fechamento impresso, e é o primeiro
           que alguém procura: quanto foi na maquininha, quanto foi no Pix,
           quanto tem que estar em papel. */}
-      {Object.keys(resumo.porForma).length > 0 && (
+      {detalhes && Object.keys(resumo.porForma).length > 0 && (
         <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
           {(["dinheiro", "pix", "debito", "credito", "outro"] as const)
             .filter((f) => resumo.porForma[f])
@@ -272,6 +310,13 @@ export const Caixa: React.FC = () => {
         <button className="btn-success" onClick={() => setModal("entrada")}><Plus size={16} /> Entrada / Venda</button>
         <button className="btn-danger" onClick={() => setModal("saida")}><ArrowUpCircle size={16} /> Saída / Despesa</button>
         <button className="btn-secondary" onClick={() => setModal("sangria")}><Scissors size={16} /> Sangria</button>
+        <button
+          className="btn-ghost ml-auto !px-2 text-sm"
+          onClick={() => mudarDetalhes(!detalhes)}
+        >
+          {detalhes ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+          {detalhes ? "Menos detalhes" : "Ver detalhes"}
+        </button>
       </div>
 
       {/* Abas: o dia a dia e o histórico de conferência */}
@@ -306,6 +351,22 @@ export const Caixa: React.FC = () => {
       {/* Busca e filtro. Sem isto, achar "aquela saída de uns cinquenta de
           terça" era rolar com o dedo até cansar — e no celular, que é onde o
           dono lê, isso é desistir. */}
+      {/* O recorte fica escrito: tela que mostra um pedaço sem dizer qual
+          faz a pessoa achar que lançamento sumiu. */}
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+          {rotuloDaLista(escopo, busca, !!sessaoAberta)}
+        </p>
+        {!busca.trim() && (
+          <button
+            className="text-xs text-brand-600 underline"
+            onClick={() => setEscopo(escopo === "sessao" ? "tudo" : "sessao")}
+          >
+            {escopo === "sessao" ? "Ver todo o histórico" : "Ver só este caixa"}
+          </button>
+        )}
+      </div>
+
       <div className="mb-3 flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
