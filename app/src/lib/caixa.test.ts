@@ -8,6 +8,8 @@ import {
   filtrarMovimentos,
   agruparPorDia,
   movimentosPorSessao,
+  baseDaLista,
+  rotuloDaLista,
 } from "./caixa";
 import type { MovimentoCaixa, SessaoCaixa } from "./types";
 
@@ -484,5 +486,41 @@ describe("o histórico de fechamentos não pode ficar quadrático", () => {
     for (const s of ["s1", "s2"]) {
       expect(mapa.get(s) ?? []).toEqual(lista.filter((m) => m.sessaoId === s));
     }
+  });
+});
+
+/**
+ * O topo do Caixa mostra os números da SESSÃO. A lista embaixo mostrava os
+ * últimos 300 lançamentos de toda a história da loja — quem rola a tela
+ * supõe que a lista é o que compõe o número de cima, e não era.
+ */
+describe("a lista acompanha o que o topo mostra", () => {
+  const daSessao = [mov({ id: "hoje" })];
+  const todos = [mov({ id: "hoje" }), mov({ id: "mes-passado" })];
+
+  it("por padrão, só o que está no caixa aberto", () => {
+    expect(baseDaLista("sessao", "", todos, daSessao).map((m) => m.id)).toEqual(["hoje"]);
+  });
+
+  it("pedindo o histórico, mostra tudo", () => {
+    expect(baseDaLista("tudo", "", todos, daSessao)).toHaveLength(2);
+  });
+
+  it("a BUSCA amplia sozinha, mesmo no escopo da sessão", () => {
+    // "Aquela saída de uns cinquenta de terça" não está na sessão de hoje, e
+    // busca que não acha o que existe é pior do que não ter busca: a pessoa
+    // conclui que o lançamento sumiu.
+    expect(baseDaLista("sessao", "cinquenta", todos, daSessao)).toHaveLength(2);
+  });
+
+  it("espaço em branco não conta como busca", () => {
+    expect(baseDaLista("sessao", "   ", todos, daSessao)).toHaveLength(1);
+  });
+
+  it("o rótulo diz o recorte, para a tela não mentir", () => {
+    expect(rotuloDaLista("sessao", "", true)).toBe("Este caixa");
+    expect(rotuloDaLista("sessao", "", false)).toBe("Hoje");
+    expect(rotuloDaLista("tudo", "", true)).toBe("Todo o histórico");
+    expect(rotuloDaLista("sessao", "cinquenta", true)).toContain("histórico");
   });
 });

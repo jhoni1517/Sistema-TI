@@ -210,6 +210,48 @@ export function filtrarMovimentos(
   });
 }
 
+/* ------------------------------------------------------------------ */
+/* O que a lista mostra                                                */
+/* ------------------------------------------------------------------ */
+
+export type EscopoCaixa = "sessao" | "tudo";
+
+/**
+ * Quais movimentos entram na lista da tela.
+ *
+ * O topo do Caixa mostra os números da SESSÃO — saldo, na gaveta, entradas,
+ * saídas. A lista embaixo mostrava os últimos 300 lançamentos de toda a
+ * história da loja. Quem rola a tela naturalmente supõe que a lista é o que
+ * compõe o número de cima, e não é: abrir o caixa para ver o dia trazia
+ * meses de histórico junto.
+ *
+ * Por padrão a lista acompanha o topo. O histórico inteiro continua a um
+ * toque, e é o que a aba de Fechamentos já servia.
+ *
+ * A BUSCA AMPLIA SOZINHA. "Aquela saída de uns cinquenta de terça" não está
+ * na sessão de hoje, e uma busca que não acha o que existe é pior do que
+ * não ter busca: a pessoa conclui que o lançamento sumiu. Digitou, procura
+ * em tudo.
+ */
+export const baseDaLista = (
+  escopo: EscopoCaixa,
+  busca: string,
+  todos: MovimentoCaixa[],
+  daSessao: MovimentoCaixa[]
+): MovimentoCaixa[] =>
+  escopo === "tudo" || txt(busca).trim() !== "" ? todos : daSessao;
+
+/** O rótulo do que está sendo mostrado, para a tela não mentir sobre o recorte */
+export const rotuloDaLista = (
+  escopo: EscopoCaixa,
+  busca: string,
+  temSessao: boolean
+): string => {
+  if (txt(busca).trim() !== "") return "Procurando em todo o histórico";
+  if (escopo === "tudo") return "Todo o histórico";
+  return temSessao ? "Este caixa" : "Hoje";
+};
+
 export interface DiaDeCaixa {
   /** AAAA-MM-DD */
   dia: string;

@@ -7,6 +7,7 @@ import { resumoCaixa, conferencia, CONFERENCIA_META } from "./caixa";
 import { subtotalItem, subtotalVenda, totalVenda, trocoDe } from "./pdv";
 import { barrasEAN13, precoDaEtiqueta, type Etiqueta } from "./etiqueta";
 import { trocoDoPagamento } from "./pagamento";
+import { linhaDoRecibo } from "./backup";
 
 /**
  * Escapa texto antes de entrar no HTML do recibo.
@@ -119,8 +120,21 @@ export function reciboOS(
   }
 
   <div class="tot">
-    <div class="line"><span>Peças</span><span>${brl(totalPecas(os))}</span></div>
-    <div class="line"><span>Mão de obra</span><span>${brl(os.maoDeObra || 0)}</span></div>
+    ${
+      // Linha zerada é ruído com cara de erro: "Mão de obra R$ 0,00" numa
+      // troca de peça faz o cliente parar para entender se falta alguma
+      // coisa, e "Peças R$ 0,00" numa formatação dá a impressão de que o
+      // valor não foi lançado. O TOTAL sai sempre — é o número que ele
+      // confere e assina.
+      totalPecas(os) > 0
+        ? `<div class="line"><span>Peças</span><span>${brl(totalPecas(os))}</span></div>`
+        : ""
+    }
+    ${
+      Number(os.maoDeObra) > 0
+        ? `<div class="line"><span>Mão de obra</span><span>${brl(os.maoDeObra || 0)}</span></div>`
+        : ""
+    }
     ${os.desconto ? `<div class="line"><span>Desconto</span><span>- ${brl(os.desconto)}</span></div>` : ""}
     <div class="line grand"><span>Total</span><span>${brl(totalOS(os))}</span></div>
   </div>
@@ -142,6 +156,18 @@ export function reciboOS(
               )
               .join("")}
           </div>
+        </div>`
+      : ""
+  }
+
+  ${
+    // O combinado sobre o backup sai no papel que o cliente ASSINA. É o
+    // documento que vale quando alguém volta dizendo que perdeu as fotos —
+    // e é o motivo de "dispensou" virar declaração de ciência.
+    linhaDoRecibo(os)
+      ? `<div class="box" style="margin-top:14px">
+          <div class="label">Backup dos dados</div>
+          <div style="font-size:11px;color:#333">${esc(linhaDoRecibo(os))}</div>
         </div>`
       : ""
   }

@@ -31,6 +31,46 @@ export const OS_STATUS_META: Record<
   cancelada: { label: "Cancelada", color: "bg-red-100 text-red-700", cliente: "Ordem de serviço cancelada." },
 };
 
+/**
+ * Backup dos dados do cliente.
+ *
+ * Formatação e troca de SSD apagam tudo, e apagar não tem desfazer. O que a
+ * loja combinou com o cliente vivia solto no meio do texto do defeito —
+ * "extremamente lento, não precisa backup" — onde some assim que alguém
+ * escreve mais uma linha. Como campo, ele fica na cara de quem vai
+ * formatar e sai impresso no papel que o cliente assina.
+ *
+ * "pendente" é o estado de propósito INCÔMODO: enquanto ninguém decidir,
+ * o sistema cobra antes de deixar a OS ficar pronta.
+ */
+export type BackupOS = "pendente" | "nao_precisa" | "a_fazer" | "feito";
+
+export const BACKUP_META: Record<
+  BackupOS,
+  { label: string; cor: string; curto: string }
+> = {
+  pendente: {
+    label: "Ainda não perguntei",
+    cor: "bg-amber-100 text-amber-700",
+    curto: "a definir",
+  },
+  nao_precisa: {
+    label: "Cliente dispensou o backup",
+    cor: "bg-slate-100 text-slate-600",
+    curto: "dispensado pelo cliente",
+  },
+  a_fazer: {
+    label: "Fazer backup antes",
+    cor: "bg-red-100 text-red-700",
+    curto: "a fazer",
+  },
+  feito: {
+    label: "Backup feito",
+    cor: "bg-emerald-100 text-emerald-700",
+    curto: "feito",
+  },
+};
+
 export type TipoPessoa = "fisica" | "juridica";
 
 /**
@@ -149,6 +189,14 @@ export interface OrdemServico {
    * A tela nunca gera: caminho montado no navegador não protege nada.
    */
   rastreio?: string;
+  /**
+   * O que foi combinado sobre o backup dos dados.
+   *
+   * Formatação e troca de SSD apagam tudo, e apagar não tem desfazer.
+   * Antes isto ficava solto no texto do defeito, onde some na linha
+   * seguinte. Ausente = OS antiga, tratada como "pendente".
+   */
+  backup?: BackupOS;
   maoDeObra: number;
   desconto: number;
   // Fluxo
@@ -347,6 +395,15 @@ export interface ContaPagar {
   ativo: boolean;
   /** Reposição de estoque não é despesa do resultado (mesma regra do caixa) */
   compraEstoque?: boolean;
+  /**
+   * Esta conta é o pagamento da FATURA do cartão?
+   *
+   * Cada compra no crédito já é despesa quando acontece. Se a fatura também
+   * contasse, o mês somaria tudo duas vezes e mostraria um prejuízo que não
+   * existiu. Mesma regra da compra de estoque: sai do caixa, não entra no
+   * resultado.
+   */
+  faturaCartao?: boolean;
   pagamentos: PagamentoConta[];
   observacoes?: string;
   criadoEm: string;
@@ -434,6 +491,8 @@ export interface MovimentoCaixa {
    * vezes do lucro.
    */
   compraEstoque?: boolean;
+  /** Pagamento da fatura do cartão: sai do caixa, mas não é despesa nova */
+  faturaCartao?: boolean;
   data: string;
   sessaoId?: ID;
 }
@@ -596,6 +655,38 @@ export const REPETIR_META: Record<RepetirEvento, { label: string }> = {
   mensal: { label: "Todo mês" },
   anual: { label: "Todo ano" },
 };
+
+/**
+ * Tarefa do checklist diário.
+ *
+ * Não é agenda e não é conta a pagar. A agenda guarda compromisso com data
+ * — "dia 14, buscar o notebook do Fulano". Isto é o que se repete sem data
+ * nenhuma: beber água, conferir a bancada, passar no fornecedor às duas.
+ */
+export interface TarefaDiaria {
+  id: string;
+  titulo: string;
+  /** "HH:MM". Vazio = vale para o dia todo, sem hora para cobrar. */
+  horario?: string;
+  /** Dias da semana (0 = domingo). Vazio = todo dia. */
+  dias?: number[];
+  /**
+   * Datas AAAA-MM-DD em que foi cumprida.
+   *
+   * Uma bandeira `feito` obrigaria a desmarcar tudo toda manhã, e ninguém
+   * faz isso: no terceiro dia a lista está toda marcada e não diz mais
+   * nada. Guardando os dias, ela nasce limpa sozinha. Podada em 90 dias,
+   * porque a tabela é lida inteira a cada carga.
+   */
+  feitoEm?: string[];
+  /** Manda lembrete no Telegram no horário marcado */
+  avisar?: boolean;
+  /** Último dia em que o robô já mandou, para não repetir o mesmo aviso */
+  avisadoEm?: string;
+  ativo?: boolean;
+  criadoEm: string;
+  atualizadoEm?: string;
+}
 
 export interface Evento {
   id: ID;

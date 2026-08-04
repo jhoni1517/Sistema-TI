@@ -199,6 +199,7 @@ export default async function handler(req, res) {
         contas: await avisarContas(chats),
         agenda: await avisarAgenda(chats),
         fiado: await avisarFiado(chats),
+        checklist: await avisarChecklist(chats),
         backup: await conferirBackup(chats),
       });
     }
@@ -235,6 +236,7 @@ export default async function handler(req, res) {
     const contas = await avisarContas(chats);
     const agenda = await avisarAgenda(chats);
     const fiado = await avisarFiado(chats);
+    const checklist = await avisarChecklist(chats);
     const backup = await conferirBackup(chats);
 
     return res.status(200).json({
@@ -243,6 +245,7 @@ export default async function handler(req, res) {
       contas,
       agenda,
       fiado,
+      checklist,
       backup,
       telegram: enviou ? "enviado" : "não configurado ou falhou",
     });
@@ -595,6 +598,169 @@ async function avisarFiado(chats) {
  * Domingo, e só quando há o que perder: lembrar loja vazia de fazer backup
  * é o jeito mais rápido de a pessoa parar de ler os avisos.
  */
+/* ------------------------------------------------------------------ */
+/* Checklist diário                                                    */
+/* ------------------------------------------------------------------ */
+
+/**
+ * O fuso do balcão.
+ *
+ * O robô roda no servidor, em UTC. A tarefa marcada para as 14h é 14h no
+ * relógio de quem está na loja, não em Greenwich — sem isto o lembrete das
+ * duas da tarde chegaria às onze da manhã.
+ *
+ * Brasil não tem mais horário de verão desde 2019, então -3 é estável para
+ * a maior parte do país. Acre e parte do Amazonas ficariam uma ou duas
+ * horas adiantados; quando aparecer a primeira loja de lá, isto vira campo
+ * de configuração.
+ */
+const FUSO_LOJA = -3;
+
+/**
+ * O robô roda uma vez por dia?
+ *
+ * No plano gratuito da Vercel o cron só pode disparar diariamente, e aí o
+ * recado das 14h precisa sair junto com o das 9h — senão nunca sai. Quem
+ * trocar o cron para de hora em hora põe CHECKLIST_RESUMO_DIARIO=0 e cada
+ * tarefa passa a chegar na hora dela.
+ */
+const RESUMO_DIARIO = process.env.CHECKLIST_RESUMO_DIARIO !== "0";
+
+/** "HH:MM" no relógio da loja */
+function horaDaLoja(agora, fuso) {
+  const d = new Date(agora.getTime() + fuso * 3600000);
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
+/** "AAAA-MM-DD" no relógio da loja */
+function diaDaLoja(agora, fuso) {
+  return new Date(agora.getTime() + fuso * 3600000).toISOString().slice(0, 10);
+}
+
+/**
+ * A tarefa vale hoje? Espelha valeHoje() de src/lib/checklist.ts.
+ *
+ * Dia da semana lido em UTC a partir da data pura, como no resto da casa:
+ * ler em hora local devolveria o dia anterior em qualquer fuso negativo.
+ */
+function tarefaValeHoje(t, hoje) {
+  if (t.ativo === false) return false;
+  const dias = Array.isArray(t.dias) ? t.dias : [];
+  if (dias.length === 0) return true;
+  return dias.includes(new Date(hoje + "T00:00:00Z").getUTCDay());
+}
+
+/**
+ * Tarefas que ainda esperam recado hoje: pediram aviso, valem hoje, não
+ * foram feitas e ainda não foram avisadas.
+ *
+ * `avisadoEm` é o que impede o mesmo recado de sair a cada disparo do robô:
+ * aviso repetido é o jeito mais rápido de a pessoa desligar tudo.
+ */
+function tarefasComAviso(tarefas, hoje) {
+  return tarefas
+    .filter((t) => t.avisar === true)
+    .filter((t) => tarefaValeHoje(t, hoje))
+    .filter((t) => !(Array.isArray(t.feitoEm) ? t.feitoEm : []).includes(hoje))
+    .filter((t) => String(t.avisadoEm || "").slice(0, 10) !== hoje)
+    .filter((t) => /^\d{2}:\d{2}$/.test(String(t.horario || "").trim()))
+    .sort((a, b) => String(a.horario).localeCompare(String(b.horario)));
+}
+
+/**
+ * O que já passou da hora. Espelha pendentesAgora() de src/lib/checklist.ts.
+ */
+function tarefasParaAvisar(tarefas, hoje, agora) {
+  return tarefasComAviso(tarefas, hoje).filter((t) => String(t.horario) <= agora);
+}
+
+/** O que ainda vai chegar hoje */
+function tarefasMaisTarde(tarefas, hoje, agora) {
+  return tarefasComAviso(tarefas, hoje).filter((t) => String(t.horario) > agora);
+}
+
+async function avisarChecklist(chats) {
+  if (chats.size === 0) return "nenhuma loja com Telegram configurado";
+
+  let tarefas;
+  try {
+    tarefas = await sb(
+      'tarefas?select=id,titulo,horario,dias,"feitoEm",avisar,"avisadoEm",ativo,"lojaId"&avisar=is.true'
+    );
+  } catch {
+    return "tabela de tarefas ainda não existe";
+  }
+
+  const agora = new Date();
+  const hoje = diaDaLoja(agora, FUSO_LOJA);
+  const hora = horaDaLoja(agora, FUSO_LOJA);
+  const porLojaId = porLoja(tarefas);
+
+  let lojasAvisadas = 0;
+  let itens = 0;
+
+  for (const [lojaId, chat] of chats) {
+    const daLoja = porLojaId.get(lojaId) || [];
+    const pendentes = tarefasParaAvisar(daLoja, hoje, hora);
+    /*
+     * Com o robô rodando UMA VEZ POR DIA, esta é a única chance do dia.
+     *
+     * Sem o resumo, a tarefa marcada para as 14h nunca receberia recado
+     * nenhum: às 9h ela ainda não venceu, e o próximo disparo já é amanhã.
+     * O resumo manda tudo junto de manhã, com o horário de cada uma, e
+     * marca como avisadas — senão sairiam de novo no dia seguinte como se
+     * fossem de hoje.
+     *
+     * Rodando mais de uma vez por dia, isto atrapalha: o resumo repetiria a
+     * cada disparo e cada tarefa perderia o aviso na hora dela. Por isso é
+     * desligável em CHECKLIST_RESUMO_DIARIO=0, que é o que se faz junto com
+     * trocar o cron para de hora em hora.
+     */
+    const maisTarde = RESUMO_DIARIO ? tarefasMaisTarde(daLoja, hoje, hora) : [];
+    if (pendentes.length === 0 && maisTarde.length === 0) continue;
+
+    // Sem emoji: em alguns aparelhos chegam como "?" e sujam o recado.
+    const partes = ["*Checklist do dia*"];
+    if (pendentes.length) {
+      partes.push(`AGORA\n${pendentes.map((t) => `• ${t.horario} ${t.titulo}`).join("\n")}`);
+    }
+    if (maisTarde.length) {
+      partes.push(
+        `MAIS TARDE HOJE\n${maisTarde.map((t) => `• ${t.horario} ${t.titulo}`).join("\n")}`
+      );
+    }
+    if (!(await enviarPara(chat, partes.join("\n\n")))) continue;
+
+    /*
+     * Marca o aviso DEPOIS de o envio dar certo.
+     *
+     * Marcar antes e o envio falhar apagaria o lembrete sem ele ter
+     * chegado — e ninguém procura por um aviso que nunca veio. Marcando
+     * depois, o pior caso é o recado sair duas vezes, que a pessoa
+     * percebe e não custa nada.
+     */
+    for (const t of [...pendentes, ...maisTarde]) {
+      try {
+        await sb(`tarefas?id=eq.${encodeURIComponent(t.id)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ avisadoEm: hoje }),
+        });
+      } catch {
+        // Falhar aqui só faz o recado repetir no próximo disparo.
+      }
+    }
+
+    lojasAvisadas++;
+    itens += pendentes.length + maisTarde.length;
+  }
+
+  return lojasAvisadas === 0
+    ? "nada pendente no checklist"
+    : `${itens} tarefa(s) em ${lojasAvisadas} loja(s)`;
+}
+
 async function conferirBackup(chats) {
   if (new Date().getUTCDay() !== 0) return "fora do dia (só domingo)";
   if (chats.size === 0) return "nenhuma loja com Telegram configurado";

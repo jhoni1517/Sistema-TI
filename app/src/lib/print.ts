@@ -51,24 +51,50 @@ export function printHTML(inner: string, title = "Impressão", papel: Papel = "a
            table { font-size: ${MEDIDAS[papel].fonte}; }
            th, td { padding: 2px 1px; }`
     }
+    /*
+     * Uma OS curta tem que caber numa folha.
+     *
+     * Saía em duas: o conteúdo passava uns poucos milímetros do fim da
+     * página e empurrava só o bloco de assinaturas para a segunda folha —
+     * uma folha inteira gasta com dois riscos, e o cliente assinando um
+     * papel solto que não mostra o que ele está assinando.
+     *
+     * Três coisas resolvem, nesta ordem de importância:
+     *
+     * 1. NADA se parte no meio. Caixa, tabela e assinatura pedem para não
+     *    ser quebradas: partir o termo de guarda ao meio é pior do que
+     *    gastar a folha.
+     * 2. A assinatura não fica órfã: ela pede para não começar em página
+     *    nova, então desce junto com o que vem antes dela.
+     * 3. Os espaços encolhem um pouco. Sozinho não resolveria, mas é o que
+     *    dá a folga para os dois de cima trabalharem.
+     */
+    @media print {
+      .box, .sign, .head, .tot { page-break-inside: avoid; break-inside: avoid; }
+      table { page-break-inside: auto; }
+      tr { page-break-inside: avoid; break-inside: avoid; }
+      thead { display: table-header-group; }
+      /* Assinatura nunca sozinha: ela vai junto do que vem antes. */
+      .sign { page-break-before: avoid; break-before: avoid; }
+    }
     h1,h2,h3 { margin: 0; }
     .center { text-align: center; }
     .right { text-align: right; }
     .muted { color: #666; }
-    .head { text-align: center; border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 14px; }
+    .head { text-align: center; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 10px; }
     .head h1 { font-size: 20px; }
     .head p { margin: 2px 0; font-size: 12px; color: #444; }
     .row { display: flex; justify-content: space-between; gap: 16px; }
-    .box { border: 1px solid #ddd; border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; }
+    .box { border: 1px solid #ddd; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
     .label { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: #888; }
-    .val { font-size: 13px; margin-bottom: 6px; }
+    .val { font-size: 13px; margin-bottom: 4px; }
     table { width: 100%; border-collapse: collapse; margin: 8px 0; }
     th { text-align: left; font-size: 11px; text-transform: uppercase; color: #888; border-bottom: 1px solid #ccc; padding: 6px 4px; }
-    td { padding: 6px 4px; border-bottom: 1px solid #eee; }
+    td { padding: 4px 4px; border-bottom: 1px solid #eee; }
     .tot { margin-left: auto; width: 260px; }
     .tot .line { display: flex; justify-content: space-between; padding: 3px 0; }
     .tot .grand { border-top: 1px solid #111; margin-top: 4px; padding-top: 6px; font-size: 16px; font-weight: bold; }
-    .sign { display: flex; gap: 40px; margin-top: 40px; }
+    .sign { display: flex; gap: 40px; margin-top: 28px; }
     .sign div { flex: 1; text-align: center; border-top: 1px solid #111; padding-top: 4px; font-size: 11px; }
     .foot { margin-top: 20px; text-align: center; font-size: 11px; color: #666; }
     .badge { display: inline-block; padding: 2px 8px; border: 1px solid #111; border-radius: 999px; font-size: 11px; font-weight: bold; }

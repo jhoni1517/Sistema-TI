@@ -292,6 +292,30 @@ fontes, descia uma. Some as linhas por produto e grave **uma vez** por produto.
 Compromissos com repetição (semanal, mensal, anual) e antecedência de aviso.
 Aniversários de clientes entram sozinhos.
 
+### 4.9-b Checklist diário
+
+O que se repete todo dia e não tem data: beber água, conferir a bancada,
+passar no fornecedor às duas, fechar o caixa antes de sair.
+
+Não é agenda. A agenda guarda compromisso **com** data; enfiar rotina lá
+obrigaria a criar um evento por dia, para sempre, e o compromisso de verdade
+se perderia no meio.
+
+- Horário opcional. Sem horário, vale para o dia todo e não cobra hora
+- Dias da semana opcionais. Nenhum marcado = todo dia
+- Marcar é um toque: é o que se faz vinte vezes por dia, entre um cliente e
+  outro
+- Sequência de dias seguidos, que é o número que faz não querer quebrar a
+  corrente
+- Lembrete no Telegram no horário, que alcança o celular com o sistema
+  fechado
+
+**Feito é POR DIA, não uma bandeira.** Um campo `feito` obrigaria alguém a
+desmarcar tudo toda manhã, e ninguém faz isso: no terceiro dia a lista está
+toda marcada e não quer dizer mais nada. Guardando os dias em que foi
+cumprida, ela nasce limpa sozinha — e o histórico é podado em 90 dias,
+porque a tabela é lida inteira a cada carga.
+
 ### 4.10 Relatórios
 
 Faturamento, lucro, CMV, despesas, ticket médio, horários de pico, curva ABC,

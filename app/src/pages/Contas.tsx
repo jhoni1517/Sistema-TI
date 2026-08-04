@@ -25,6 +25,8 @@ import {
   TrendingDown,
   CalendarClock,
   Power,
+  CreditCard,
+  Search,
 } from "lucide-react";
 import { aviso } from "../components/Aviso";
 import { Modal, Field, SectionTitle, EmptyState, InputNumero } from "../components/ui";
@@ -45,7 +47,11 @@ import {
   hojeISO,
   soData,
   CORES_META,
+  filtrarContas,
+  ORDEM_CONTAS_META,
+  type OrdemContas,
 } from "../lib/contas";
+import { gastoNoCartao, porCategoria } from "../lib/cartao";
 import {
   notificar,
   pedirPermissao,
@@ -167,17 +173,37 @@ export const Contas: React.FC = () => {
     [contas]
   );
 
+  /**
+   * Procurar e ordenar.
+   *
+   * A lista vinha numa ordem só, que serve para o dia a dia e não serve
+   * para as duas perguntas de quando o mês aperta: "o que está atrasado há
+   * mais tempo?" e "qual é a maior conta?". Com trinta contas cadastradas,
+   * responder isso era rolar a tela comparando de cabeça. A regra mora em
+   * lib/contas.ts, com teste.
+   */
+  const [buscaConta, setBuscaConta] = useState("");
+  const [ordem, setOrdem] = useState<OrdemContas>("vencimento");
+
   const lista = useMemo(
-    () =>
-      [...contas].sort((a, b) => {
-        // Desligadas por último; o resto pela urgência do vencimento
-        if (a.ativo !== b.ativo) return a.ativo ? -1 : 1;
-        return diasAteVencer(a.vencimento) - diasAteVencer(b.vencimento);
-      }),
-    [contas]
+    () => filtrarContas(contas, { termo: buscaConta, ordem }),
+    [contas, buscaConta, ordem]
   );
 
   const gastos = useMemo(() => gastosPorCategoria(movimentos, mesGasto), [movimentos, mesGasto]);
+
+  /**
+   * O que vai vir na fatura do cartão neste mês.
+   *
+   * A pergunta que decide o mês é "quanto vem no cartão?", e sem juntar
+   * isso em algum lugar ela só é respondida quando a fatura chega. Ver
+   * lib/cartao.ts, inclusive para a armadilha da contagem dupla.
+   */
+  const cartao = useMemo(
+    () => gastoNoCartao(movimentos, { de: `${mesGasto}-01`, ate: `${mesGasto}-31` }),
+    [movimentos, mesGasto]
+  );
+  const cartaoPorCategoria = useMemo(() => porCategoria(cartao), [cartao]);
 
   const mesesDisponiveis = useMemo(() => {
     const set = new Set<string>();
@@ -266,6 +292,9 @@ export const Contas: React.FC = () => {
         formaPagamento: formaPg,
         sessaoId: sessaoAberta?.id,
         compraEstoque: pagando.compraEstoque === true,
+        // Sem levar a marca junto, o lançamento no caixa vira despesa nova
+        // e o mês conta o cartão duas vezes.
+        faturaCartao: pagando.faturaCartao === true,
         data: nowISO(),
       });
 
@@ -398,12 +427,48 @@ export const Contas: React.FC = () => {
         <Cartao label="Contas ativas" valor={String(resumo.ativas)} icone={<Receipt size={18} />} />
       </div>
 
+      {/* Procurar e ordenar */}
+      {contas.length > 0 && (
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row">
+          <div className="relative flex-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              className="input w-full !pl-9"
+              placeholder="Procurar por nome, categoria ou observação..."
+              value={buscaConta}
+              onChange={(e) => setBuscaConta(e.target.value)}
+            />
+          </div>
+          <div className="flex gap-1.5 overflow-x-auto">
+            {(Object.keys(ORDEM_CONTAS_META) as OrdemContas[]).map((o) => (
+              <button
+                key={o}
+                onClick={() => setOrdem(o)}
+                className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
+                  ordem === o
+                    ? "bg-slate-800 text-white"
+                    : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                }`}
+              >
+                {ORDEM_CONTAS_META[o]}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Lista de contas */}
       {lista.length === 0 ? (
         <EmptyState
           icon={<Receipt size={48} />}
-          title="Nenhuma conta cadastrada"
-          hint="Cadastre aluguel, energia, internet e o que mais sai todo mês."
+          title={
+            contas.length === 0 ? "Nenhuma conta cadastrada" : "Nada encontrado"
+          }
+          hint={
+            contas.length === 0
+              ? "Cadastre aluguel, energia, internet e o que mais sai todo mês."
+              : "Tente outra palavra, ou limpe a busca para ver a lista inteira."
+          }
         />
       ) : (
         <div className="mb-6 space-y-2">
@@ -556,6 +621,50 @@ export const Contas: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* ---------- Cartão de crédito ---------- */}
+      {(cartao.total > 0 || cartao.pago > 0) && (
+        <div className="card mb-5">
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+            <h3 className="flex items-center gap-2 font-bold text-slate-700">
+              <CreditCard size={18} /> Cartão de crédito
+            </h3>
+            <span className="text-xs text-slate-400">
+              {mesGasto.split("-").reverse().join("/")}
+            </span>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 p-4 text-white">
+              <p className="text-xs text-slate-300">Comprado no crédito neste mês</p>
+              <p className="mt-1 text-3xl font-bold">{brl(cartao.total)}</p>
+              <p className="mt-1 text-xs text-slate-400">
+                {cartao.itens.length} lançamento(s) — é o que vem na fatura
+              </p>
+            </div>
+            <div className="rounded-xl bg-slate-50 p-4">
+              <p className="text-xs text-slate-500">Fatura já paga neste mês</p>
+              <p className="mt-1 text-2xl font-bold text-slate-700">{brl(cartao.pago)}</p>
+              {/* A regra que evita o mês fechar com prejuízo inventado. */}
+              <p className="mt-1 text-xs text-slate-500">
+                Pagar a fatura não conta como despesa nova: cada compra no crédito
+                já entrou no resultado no dia em que aconteceu.
+              </p>
+            </div>
+          </div>
+
+          {cartaoPorCategoria.length > 0 && (
+            <div className="mt-3 space-y-1">
+              {cartaoPorCategoria.slice(0, 6).map((c) => (
+                <div key={c.categoria} className="flex items-center justify-between text-sm">
+                  <span className="min-w-0 flex-1 truncate text-slate-600">{c.categoria}</span>
+                  <span className="font-semibold text-slate-700">{brl(c.valor)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ---------- Relatório de gastos ---------- */}
       <div className="grid gap-5 lg:grid-cols-2">
@@ -747,6 +856,23 @@ export const Contas: React.FC = () => {
                 ))}
               </select>
             </Field>
+
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-slate-50 p-3 sm:col-span-2">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4"
+                checked={editando.faturaCartao === true}
+                onChange={(e) => setEditando({ ...editando, faturaCartao: e.target.checked })}
+              />
+              <span className="text-sm">
+                <b className="text-slate-700">É o pagamento da fatura do cartão</b>
+                <span className="mt-0.5 block text-xs text-slate-500">
+                  Marque só na conta da fatura. Cada compra no crédito já virou
+                  despesa no dia em que aconteceu — sem esta marca o mês conta
+                  tudo duas vezes e fecha com um prejuízo que não existiu.
+                </span>
+              </span>
+            </label>
 
             <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-slate-50 p-3 sm:col-span-2">
               <input

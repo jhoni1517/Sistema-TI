@@ -15,6 +15,7 @@ import type {
   Meta,
   Evento,
   Venda,
+  TarefaDiaria,
 } from "./types";
 
 /**
@@ -44,7 +45,8 @@ type TableName =
   | "contas_pagar"
   | "metas"
   | "eventos"
-  | "vendas";
+  | "vendas"
+  | "tarefas";
 
 interface WithId {
   id: string;
@@ -297,6 +299,7 @@ export interface DumpLoja {
   metas?: Meta[];
   eventos?: Evento[];
   vendas?: Venda[];
+  tarefas?: TarefaDiaria[];
 }
 
 const TABELA_DO_CAMPO: Record<keyof DumpLoja, TableName> = {
@@ -314,6 +317,7 @@ const TABELA_DO_CAMPO: Record<keyof DumpLoja, TableName> = {
   metas: "metas",
   eventos: "eventos",
   vendas: "vendas",
+  tarefas: "tarefas",
 };
 
 /**
@@ -423,6 +427,11 @@ export const db = {
     all: () => getAll<Evento>("eventos"),
     save: (e: Evento) => upsert("eventos", e),
     remove: (id: string) => remove("eventos", id),
+  },
+  tarefas: {
+    all: () => getAll<TarefaDiaria>("tarefas"),
+    save: (t: TarefaDiaria) => upsert("tarefas", t),
+    remove: (id: string) => remove("tarefas", id),
   },
   vendas: {
     all: () => getAll<Venda>("vendas"),

@@ -8,7 +8,13 @@
 // WHATSAPP_VERIFY_TOKEN e (opcional) WHATSAPP_ALLOWED_FROM
 // ============================================================
 
-import { parseMensagem, registrarMovimento, brl, AJUDA } from "./_caixa.js";
+import {
+  parseMensagem,
+  registrarMovimento,
+  brl,
+  AJUDA,
+  ROTULO_FORMA,
+} from "./_caixa.js";
 
 /**
  * Responde no WhatsApp, e DIZ quando não conseguiu.
@@ -94,7 +100,8 @@ export default async function handler(req, res) {
 
     const rotulo =
       parsed.tipo === "entrada" ? "Entrada" : parsed.tipo === "sangria" ? "Sangria" : "Despesa";
-    await responder(from, `${rotulo} registrada!\n${parsed.descricao} - ${brl(parsed.valor)}`);
+    await responder(from, `${rotulo} registrada!\n${parsed.descricao} - ${brl(parsed.valor)}` +
+      `\nForma: ${ROTULO_FORMA[parsed.forma] || parsed.forma}`);
 
     return res.status(200).json({ ok: true });
   } catch (e) {

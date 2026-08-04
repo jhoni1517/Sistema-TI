@@ -32,6 +32,7 @@ import type {
   ContaPagar,
   Meta,
   Evento,
+  TarefaDiaria,
   Venda,
   Config,
 } from "../lib/types";
@@ -71,6 +72,7 @@ interface AppState {
   metas: Meta[];
   eventos: Evento[];
   vendas: Venda[];
+  tarefas: TarefaDiaria[];
   config: Config;
   /**
    * O que falhou na última carga.
@@ -123,6 +125,8 @@ interface AppState {
   removeConta: (id: string) => Promise<void>;
   saveEvento: (e: Evento) => Promise<void>;
   removeEvento: (id: string) => Promise<void>;
+  saveTarefa: (t: TarefaDiaria) => Promise<void>;
+  removeTarefa: (id: string) => Promise<void>;
   saveVenda: (v: Venda) => Promise<void>;
   saveMeta: (m: Meta) => Promise<void>;
   removeMeta: (id: string) => Promise<void>;
@@ -180,6 +184,7 @@ export const AppProvider: React.FC<{
   const [contas, setContas] = useState<ContaPagar[]>([]);
   const [metas, setMetas] = useState<Meta[]>([]);
   const [eventos, setEventos] = useState<Evento[]>([]);
+  const [tarefas, setTarefas] = useState<TarefaDiaria[]>([]);
   /** Mensagem do que não carregou. Vazio = carregou tudo. */
   const [erroCarga, setErroCarga] = useState("");
   const [fontesComFalha, setFontesComFalha] = useState<string[]>([]);
@@ -247,6 +252,7 @@ export const AppProvider: React.FC<{
       { nome: "contas", carregar: db.contas.all, aplicar: setContas },
       { nome: "metas", carregar: db.metas.all, aplicar: setMetas },
       { nome: "agenda", carregar: db.eventos.all, aplicar: setEventos },
+      { nome: "checklist", carregar: db.tarefas.all, aplicar: setTarefas },
       { nome: "vendas", carregar: db.vendas.all, aplicar: setVendas },
     ] as const;
 
@@ -385,15 +391,18 @@ export const AppProvider: React.FC<{
   }, [reload]);
 
   const saveCliente = async (c: Cliente) => {
-    await db.clientes.save(c);
+    // `gravado` e não `c`: o banco preenche colunas que a tela não tem
+    // como saber (o segredo do rastreio é uma), e guardar o objeto que
+    // subiu deixaria a tela sem elas até o próximo F5.
+    const gravado = await db.clientes.save(c);
     setClientes((prev) => {
-      const i = prev.findIndex((x) => x.id === c.id);
+      const i = prev.findIndex((x) => x.id === gravado.id);
       if (i >= 0) {
         const n = [...prev];
-        n[i] = c;
+        n[i] = gravado;
         return n;
       }
-      return [...prev, c];
+      return [...prev, gravado];
     });
   };
   const removeCliente = async (id: string) => {
@@ -402,15 +411,18 @@ export const AppProvider: React.FC<{
   };
 
   const saveOrdem = async (o: OrdemServico) => {
-    await db.ordens.save(o);
+    // `gravado` e não `o`: o banco preenche colunas que a tela não tem
+    // como saber (o segredo do rastreio é uma), e guardar o objeto que
+    // subiu deixaria a tela sem elas até o próximo F5.
+    const gravado = await db.ordens.save(o);
     setOrdens((prev) => {
-      const i = prev.findIndex((x) => x.id === o.id);
+      const i = prev.findIndex((x) => x.id === gravado.id);
       if (i >= 0) {
         const n = [...prev];
-        n[i] = o;
+        n[i] = gravado;
         return n;
       }
-      return [...prev, o];
+      return [...prev, gravado];
     });
   };
   const removeOrdem = async (id: string) => {
@@ -419,15 +431,18 @@ export const AppProvider: React.FC<{
   };
 
   const saveProduto = async (p: Produto) => {
-    await db.produtos.save(p);
+    // `gravado` e não `p`: o banco preenche colunas que a tela não tem
+    // como saber (o segredo do rastreio é uma), e guardar o objeto que
+    // subiu deixaria a tela sem elas até o próximo F5.
+    const gravado = await db.produtos.save(p);
     setProdutos((prev) => {
-      const i = prev.findIndex((x) => x.id === p.id);
+      const i = prev.findIndex((x) => x.id === gravado.id);
       if (i >= 0) {
         const n = [...prev];
-        n[i] = p;
+        n[i] = gravado;
         return n;
       }
-      return [...prev, p];
+      return [...prev, gravado];
     });
   };
   const removeProduto = async (id: string) => {
@@ -436,15 +451,18 @@ export const AppProvider: React.FC<{
   };
 
   const saveMovimento = async (m: MovimentoCaixa) => {
-    await db.movimentos.save(m);
+    // `gravado` e não `m`: o banco preenche colunas que a tela não tem
+    // como saber (o segredo do rastreio é uma), e guardar o objeto que
+    // subiu deixaria a tela sem elas até o próximo F5.
+    const gravado = await db.movimentos.save(m);
     setMovimentos((prev) => {
-      const i = prev.findIndex((x) => x.id === m.id);
+      const i = prev.findIndex((x) => x.id === gravado.id);
       if (i >= 0) {
         const n = [...prev];
-        n[i] = m;
+        n[i] = gravado;
         return n;
       }
-      return [...prev, m];
+      return [...prev, gravado];
     });
   };
   const removeMovimento = async (id: string) => {
@@ -453,28 +471,34 @@ export const AppProvider: React.FC<{
   };
 
   const saveSessao = async (s: SessaoCaixa) => {
-    await db.sessoes.save(s);
+    // `gravado` e não `s`: o banco preenche colunas que a tela não tem
+    // como saber (o segredo do rastreio é uma), e guardar o objeto que
+    // subiu deixaria a tela sem elas até o próximo F5.
+    const gravado = await db.sessoes.save(s);
     setSessoes((prev) => {
-      const i = prev.findIndex((x) => x.id === s.id);
+      const i = prev.findIndex((x) => x.id === gravado.id);
       if (i >= 0) {
         const n = [...prev];
-        n[i] = s;
+        n[i] = gravado;
         return n;
       }
-      return [...prev, s];
+      return [...prev, gravado];
     });
   };
 
   const saveFiado = async (f: Fiado) => {
-    await db.fiados.save(f);
+    // `gravado` e não `f`: o banco preenche colunas que a tela não tem
+    // como saber (o segredo do rastreio é uma), e guardar o objeto que
+    // subiu deixaria a tela sem elas até o próximo F5.
+    const gravado = await db.fiados.save(f);
     setFiados((prev) => {
-      const i = prev.findIndex((x) => x.id === f.id);
+      const i = prev.findIndex((x) => x.id === gravado.id);
       if (i >= 0) {
         const n = [...prev];
-        n[i] = f;
+        n[i] = gravado;
         return n;
       }
-      return [...prev, f];
+      return [...prev, gravado];
     });
   };
   const removeFiado = async (id: string) => {
@@ -483,15 +507,18 @@ export const AppProvider: React.FC<{
   };
 
   const saveCategoria = async (c: Categoria) => {
-    await db.categorias.save(c);
+    // `gravado` e não `c`: o banco preenche colunas que a tela não tem
+    // como saber (o segredo do rastreio é uma), e guardar o objeto que
+    // subiu deixaria a tela sem elas até o próximo F5.
+    const gravado = await db.categorias.save(c);
     setCategorias((prev) => {
-      const i = prev.findIndex((x) => x.id === c.id);
+      const i = prev.findIndex((x) => x.id === gravado.id);
       if (i >= 0) {
         const n = [...prev];
-        n[i] = c;
+        n[i] = gravado;
         return n;
       }
-      return [...prev, c];
+      return [...prev, gravado];
     });
   };
   const removeCategoria = async (id: string) => {
@@ -503,15 +530,18 @@ export const AppProvider: React.FC<{
   };
 
   const saveFornecedor = async (f: Fornecedor) => {
-    await db.fornecedores.save(f);
+    // `gravado` e não `f`: o banco preenche colunas que a tela não tem
+    // como saber (o segredo do rastreio é uma), e guardar o objeto que
+    // subiu deixaria a tela sem elas até o próximo F5.
+    const gravado = await db.fornecedores.save(f);
     setFornecedores((prev) => {
-      const i = prev.findIndex((x) => x.id === f.id);
+      const i = prev.findIndex((x) => x.id === gravado.id);
       if (i >= 0) {
         const n = [...prev];
-        n[i] = f;
+        n[i] = gravado;
         return n;
       }
-      return [...prev, f];
+      return [...prev, gravado];
     });
   };
   const removeFornecedor = async (id: string) => {
@@ -520,15 +550,18 @@ export const AppProvider: React.FC<{
   };
 
   const saveCotacao = async (c: Cotacao) => {
-    await db.cotacoes.save(c);
+    // `gravado` e não `c`: o banco preenche colunas que a tela não tem
+    // como saber (o segredo do rastreio é uma), e guardar o objeto que
+    // subiu deixaria a tela sem elas até o próximo F5.
+    const gravado = await db.cotacoes.save(c);
     setCotacoes((prev) => {
-      const i = prev.findIndex((x) => x.id === c.id);
+      const i = prev.findIndex((x) => x.id === gravado.id);
       if (i >= 0) {
         const n = [...prev];
-        n[i] = c;
+        n[i] = gravado;
         return n;
       }
-      return [...prev, c];
+      return [...prev, gravado];
     });
   };
   const removeCotacao = async (id: string) => {
@@ -536,20 +569,23 @@ export const AppProvider: React.FC<{
     setCotacoes((prev) => prev.filter((x) => x.id !== id));
   };
   const savePreco = async (p: PrecoFornecedor) => {
-    await db.precos.save(p);
-    setPrecos((prev) => [...prev.filter((x) => x.id !== p.id), p]);
+    const gravado = await db.precos.save(p);
+    setPrecos((prev) => [...prev.filter((x) => x.id !== gravado.id), gravado]);
   };
 
   const saveConta = async (c: ContaPagar) => {
-    await db.contas.save(c);
+    // `gravado` e não `c`: o banco preenche colunas que a tela não tem
+    // como saber (o segredo do rastreio é uma), e guardar o objeto que
+    // subiu deixaria a tela sem elas até o próximo F5.
+    const gravado = await db.contas.save(c);
     setContas((prev) => {
-      const i = prev.findIndex((x) => x.id === c.id);
+      const i = prev.findIndex((x) => x.id === gravado.id);
       if (i >= 0) {
         const n = [...prev];
-        n[i] = c;
+        n[i] = gravado;
         return n;
       }
-      return [...prev, c];
+      return [...prev, gravado];
     });
   };
   const removeConta = async (id: string) => {
@@ -557,20 +593,42 @@ export const AppProvider: React.FC<{
     setContas((prev) => prev.filter((x) => x.id !== id));
   };
   const saveEvento = async (e: Evento) => {
-    await db.eventos.save(e);
+    // `gravado` e não `e`: o banco preenche colunas que a tela não tem
+    // como saber (o segredo do rastreio é uma), e guardar o objeto que
+    // subiu deixaria a tela sem elas até o próximo F5.
+    const gravado = await db.eventos.save(e);
     setEventos((prev) => {
-      const i = prev.findIndex((x) => x.id === e.id);
+      const i = prev.findIndex((x) => x.id === gravado.id);
       if (i >= 0) {
         const n = [...prev];
-        n[i] = e;
+        n[i] = gravado;
         return n;
       }
-      return [...prev, e];
+      return [...prev, gravado];
     });
   };
   const removeEvento = async (id: string) => {
     await db.eventos.remove(id);
     setEventos((prev) => prev.filter((x) => x.id !== id));
+  };
+  const saveTarefa = async (t: TarefaDiaria) => {
+    // `gravado` e não `t`: o banco preenche colunas que a tela não tem
+    // como saber (o segredo do rastreio é uma), e guardar o objeto que
+    // subiu deixaria a tela sem elas até o próximo F5.
+    const gravado = await db.tarefas.save(t);
+    setTarefas((prev) => {
+      const i = prev.findIndex((x) => x.id === gravado.id);
+      if (i >= 0) {
+        const n = [...prev];
+        n[i] = gravado;
+        return n;
+      }
+      return [...prev, gravado];
+    });
+  };
+  const removeTarefa = async (id: string) => {
+    await db.tarefas.remove(id);
+    setTarefas((prev) => prev.filter((x) => x.id !== id));
   };
   const trocarRamoAparelho = (r: Ramo | null) => {
     definirRamoAparelho(r);
@@ -578,27 +636,33 @@ export const AppProvider: React.FC<{
   };
 
   const saveVenda = async (v: Venda) => {
-    await db.vendas.save(v);
+    // `gravado` e não `v`: o banco preenche colunas que a tela não tem
+    // como saber (o segredo do rastreio é uma), e guardar o objeto que
+    // subiu deixaria a tela sem elas até o próximo F5.
+    const gravado = await db.vendas.save(v);
     setVendas((prev) => {
-      const i = prev.findIndex((x) => x.id === v.id);
+      const i = prev.findIndex((x) => x.id === gravado.id);
       if (i >= 0) {
         const n = [...prev];
-        n[i] = v;
+        n[i] = gravado;
         return n;
       }
-      return [...prev, v];
+      return [...prev, gravado];
     });
   };
   const saveMeta = async (m: Meta) => {
-    await db.metas.save(m);
+    // `gravado` e não `m`: o banco preenche colunas que a tela não tem
+    // como saber (o segredo do rastreio é uma), e guardar o objeto que
+    // subiu deixaria a tela sem elas até o próximo F5.
+    const gravado = await db.metas.save(m);
     setMetas((prev) => {
-      const i = prev.findIndex((x) => x.id === m.id);
+      const i = prev.findIndex((x) => x.id === gravado.id);
       if (i >= 0) {
         const n = [...prev];
-        n[i] = m;
+        n[i] = gravado;
         return n;
       }
-      return [...prev, m];
+      return [...prev, gravado];
     });
   };
   const removeMeta = async (id: string) => {
@@ -651,7 +715,10 @@ export const AppProvider: React.FC<{
     // Nada a enviar é sucesso: a nuvem já está com este conteúdo.
     if (ultimoEnviado.current && !precisaGravarNaNuvem(ultimoEnviado.current, c)) return true;
     try {
-      await db.config.save(carga);
+      // A configuração não tem coluna com valor gerado pelo banco, e quem
+      // manda nela é o aparelho: foi justamente sobrescrever a tela com o
+      // que voltou da nuvem que apagou a loja inteira uma vez.
+      await db.config.save(carga); // retorno-do-banco-nao-importa
       ultimoEnviado.current = c;
       return true;
     } catch (e) {
@@ -683,6 +750,7 @@ export const AppProvider: React.FC<{
     contas,
     metas,
     eventos,
+    tarefas,
     vendas,
     config,
     erroCarga,
@@ -714,6 +782,8 @@ export const AppProvider: React.FC<{
     removeConta,
     saveEvento,
     removeEvento,
+    saveTarefa,
+    removeTarefa,
     saveVenda,
     saveMeta,
     removeMeta,

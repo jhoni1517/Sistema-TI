@@ -24,6 +24,7 @@ import {
   RefreshCw,
   CloudOff,
   AlertTriangle,
+  ListChecks,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { MarcaDaLoja } from "./MarcaDaLoja";
@@ -46,6 +47,9 @@ const nav: Array<{
   { to: "/ordens", label: "Ordens de Serviço", icon: Wrench, recurso: "os", modulo: "os" },
   { to: "/pdv", label: "Frente de caixa", icon: ShoppingCart, recurso: "caixa", modulo: "pdv" },
   { to: "/agenda", label: "Agenda", icon: CalendarDays, recurso: "*" },
+  // Sem `modulo`: rotina do dia serve a qualquer loja, e o próprio
+  // ramos.ts diz que módulo que todo mundo usa não precisa de interruptor.
+  { to: "/checklist", label: "Checklist diário", icon: ListChecks, recurso: "*" },
   { to: "/clientes", label: "Clientes", icon: Users, recurso: "clientes" },
   { to: "/estoque", label: "Estoque", icon: Package, recurso: "estoque" },
   { to: "/caixa", label: "Caixa", icon: Wallet, recurso: "caixa" },

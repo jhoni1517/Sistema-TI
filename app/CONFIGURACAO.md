@@ -140,7 +140,38 @@ https://supabase.com/dashboard/project/nviagibefxqtognowqwe/sql/new:
 13. `supabase-migracao-catalogo.sql`
 14. `supabase-migracao-ramo-email.sql`
 15. `supabase-migracao-rastreio-token.sql`
-16. `supabase-corrigir-colunas.sql`
+16. `supabase-migracao-checklist.sql`
+17. `supabase-corrigir-colunas.sql`
+
+O de número 16 cria o Checklist diário — a rotina que se repete sem data
+(beber água, conferir a bancada, passar no fornecedor às duas). Sem ele a
+tela abre dizendo que a tabela `tarefas` não existe, e o resto do sistema
+continua funcionando normalmente.
+
+**Lembrete no horário certo.** A tarefa com "avisar" marcado chega no
+Telegram, no celular, com o sistema fechado — mas quem dispara é o robô
+diário, e ele roda uma vez por dia (`0 12 * * *` em `vercel.json`, nove da
+manhã no Brasil). Ou seja: só as tarefas marcadas para antes das nove
+recebem o recado.
+
+Como o robô roda uma vez só, ele manda de manhã um recado com DUAS partes:
+o que já venceu ("AGORA") e o que ainda vai vencer hoje, com o horário de
+cada uma ("MAIS TARDE HOJE"). Sem isso a tarefa das 14h nunca receberia
+recado nenhum — às nove ela ainda não venceu, e o disparo seguinte já é
+amanhã.
+
+Para o lembrete cair na hora marcada, em vez do resumo de manhã:
+
+1. Troque o `schedule` do cron em `vercel.json` para `0 * * * *`
+2. Crie a variável `CHECKLIST_RESUMO_DIARIO` com o valor `0` no painel da
+   Vercel (Settings → Environment Variables)
+
+**Isso exige o plano Pro da Vercel** — no plano gratuito o cron só pode
+rodar uma vez por dia, e o deploy é recusado com qualquer outro horário.
+Sem o passo 2, o resumo repetiria a cada hora.
+
+Com o sistema ABERTO no celular ou instalado como aplicativo, a notificação
+do navegador já toca na hora certa em qualquer plano.
 
 O de número 15 fecha o rastreio público. A consulta pedia só a loja e o
 número da OS, e o número é sequencial: quem recebia um link de rastreio
