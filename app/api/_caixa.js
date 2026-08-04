@@ -24,12 +24,57 @@ const headers = () => ({
 });
 
 /**
+ * Acha a forma de pagamento dentro da mensagem e a retira do texto.
+ *
+ * O robô lançava TUDO como dinheiro — era uma linha fixa. Uma venda no Pix
+ * anunciada por aqui entrava no caixa como espécie, e aí o fechamento do
+ * dia pedia na gaveta um dinheiro que nunca passou por ela: falta todo dia,
+ * sem origem. É o mesmo erro que já tinha sido consertado do lado das
+ * entradas do PDV, entrando de novo pela porta do robô.
+ *
+ * A palavra sai da descrição: senão o caixa fica cheio de "venda de
+ * película pix" e a busca por descrição passa a achar o que não é.
+ *
+ * A tabela mora DENTRO da função de propósito — o teste lê esta função do
+ * arquivo e a executa isolada, então tudo de que ela precisa tem que estar
+ * aqui. Reconstruir o array custa nada: é uma mensagem por vez.
+ */
+export function formaDaMensagem(textoOriginal) {
+  const texto = String(textoOriginal || "");
+  // Ordem importa: "cartão de débito" tem que casar antes de "cartão".
+  const TABELA = [
+    [/\bcart[aã]o\s+(?:de\s+)?d[eé]bito\b/i, "debito"],
+    [/\bcart[aã]o\s+(?:de\s+)?cr[eé]dito\b/i, "credito"],
+    [/\bd[eé]bito\b/i, "debito"],
+    [/\bcr[eé]dito\b/i, "credito"],
+    /*
+     * "cartão" solto cai em DÉBITO, que é o que mais passa no balcão.
+     * Chutar aqui é aceitável porque a resposta do robô diz qual foi: o
+     * erro aparece na hora e se corrige com um clique na tela, em vez de
+     * só na conferência do mês.
+     */
+    [/\b(?:cart[aã]o|maquininha)\b/i, "debito"],
+    [/\bpix\b/i, "pix"],
+    [/\b(?:dinheiro|esp[eé]cie)\b/i, "dinheiro"],
+  ];
+
+  for (const [re, forma] of TABELA) {
+    const m = texto.match(re);
+    if (m) {
+      return { forma, texto: texto.replace(m[0], " ").replace(/\s+/g, " ").trim() };
+    }
+  }
+  return { forma: "", texto: texto.trim() };
+}
+
+/**
  * Interpreta a mensagem do usuário.
  * Exemplos:
- *   "café 5"                  -> despesa de R$ 5,00
- *   "luz 230 conta de energia"-> despesa de R$ 230,00
- *   "+100 venda avulsa"       -> entrada de R$ 100,00
- *   "sangria 200"             -> sangria de R$ 200,00
+ *   "café 5"                    -> despesa de R$ 5,00, em dinheiro
+ *   "luz 230 conta de energia"  -> despesa de R$ 230,00
+ *   "+100 venda de película pix"-> entrada de R$ 100,00, no Pix
+ *   "+50 cartão"                -> entrada de R$ 50,00, no débito
+ *   "sangria 200"               -> sangria de R$ 200,00
  */
 export function parseMensagem(textoOriginal) {
   let texto = (textoOriginal || "").trim();
@@ -48,6 +93,23 @@ export function parseMensagem(textoOriginal) {
     texto = texto.replace(/^-/, "").replace(/^(despesa|saida|saída)/i, "").trim();
   }
 
+  /*
+   * A forma sai antes do número: "cartão de débito" não tem dígito, mas
+   * tirá-la primeiro deixa a descrição limpa sem depender da ordem em que a
+   * pessoa escreveu.
+   *
+   * Quem não disser nada continua caindo em dinheiro — é o caso mais comum
+   * no balcão, e ninguém vai começar a digitar uma palavra a mais por isso.
+   */
+  const achado = formaDaMensagem(texto);
+  texto = achado.texto;
+  /*
+   * Sangria é, por definição, papel saindo da gaveta para o cofre ou para o
+   * banco. Aceitar "sangria 200 pix" gravaria uma retirada que não tira
+   * nada da gaveta, e o fechamento passaria a acusar sobra.
+   */
+  const forma = tipo === "sangria" ? "dinheiro" : achado.forma || "dinheiro";
+
   // primeiro número da mensagem = valor (aceita 5, 5.50 ou 5,50)
   const m = texto.match(/(\d+(?:[.,]\d{1,2})?)/);
   if (!m) return null;
@@ -62,7 +124,7 @@ export function parseMensagem(textoOriginal) {
 
   const categoria =
     tipo === "entrada" ? "Venda" : tipo === "sangria" ? "Sangria" : "Despesa";
-  return { tipo, valor, descricao, categoria };
+  return { tipo, valor, descricao, categoria, forma };
 }
 
 /**
@@ -170,7 +232,8 @@ export async function registrarMovimento(mov, origem = "") {
         categoria: mov.categoria,
         descricao: origem ? `${mov.descricao} (${origem})` : mov.descricao,
         valor: mov.valor,
-        formaPagamento: "dinheiro",
+        // Era fixo em "dinheiro". Ver formaDaMensagem.
+        formaPagamento: mov.forma || "dinheiro",
         data: new Date().toISOString(),
         sessaoId,
       },
@@ -212,12 +275,26 @@ export async function resumoCaixa() {
   };
 }
 
+/** Como a forma aparece na resposta do robô */
+export const ROTULO_FORMA = {
+  dinheiro: "dinheiro",
+  pix: "Pix",
+  debito: "débito",
+  credito: "crédito",
+  transferencia: "transferência",
+  outro: "outro",
+};
+
 export const AJUDA =
   "Como usar:\n\n" +
   "• café 5 — registra despesa de R$ 5,00\n" +
   "• luz 230 conta de energia — despesa com descrição\n" +
   "• +100 venda de película — registra entrada\n" +
   "• sangria 200 — registra retirada\n\n" +
+  "Forma de pagamento (sem dizer nada, vai como dinheiro):\n" +
+  "• +100 venda pix — no Pix\n" +
+  "• +100 venda cartão — no débito\n" +
+  "• +100 venda crédito — no crédito\n\n" +
   "Comandos:\n" +
   "/saldo — resumo do caixa de hoje\n" +
   "/ajuda — mostra esta mensagem";

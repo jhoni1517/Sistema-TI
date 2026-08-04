@@ -14,6 +14,7 @@ import {
   resumoCaixa,
   brl,
   AJUDA,
+  ROTULO_FORMA,
 } from "./_caixa.js";
 
 const TOKEN = process.env.TELEGRAM_TOKEN;
@@ -169,7 +170,8 @@ export default async function handler(req, res) {
       parsed.tipo === "entrada" ? "Entrada" : parsed.tipo === "sangria" ? "Sangria" : "Despesa";
     await responder(
       chatId,
-      `${rotulo} registrada!\n${parsed.descricao} — ${brl(parsed.valor)}`
+      `${rotulo} registrada!\n${parsed.descricao} — ${brl(parsed.valor)}` +
+      `\nForma: ${ROTULO_FORMA[parsed.forma] || parsed.forma}`
     );
 
     return res.status(200).json({ ok: true });
