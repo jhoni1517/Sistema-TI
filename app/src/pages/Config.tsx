@@ -188,6 +188,20 @@ export const Config: React.FC = () => {
           <Field label="Endereço" className="sm:col-span-2">
             <input className="input" value={form.enderecoLoja} onChange={(e) => mudar({ enderecoLoja: e.target.value })} />
           </Field>
+          {/* Sai na mensagem de aparelho pronto, junto do endereço e do
+              telefone. Antes o cliente lia "dentro do nosso horário de
+              atendimento" e tinha que ligar para descobrir qual era. */}
+          <Field label="Horário de atendimento" className="sm:col-span-2">
+            <input
+              className="input"
+              placeholder="Seg a Sex, 9h as 18h. Sab, 9h as 13h"
+              value={form.horarioAtendimento || ""}
+              onChange={(e) => mudar({ horarioAtendimento: e.target.value })}
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              Sai na mensagem de aparelho pronto, junto do endereço e do telefone.
+            </p>
+          </Field>
 
           {/* A logo entra no recibo impresso e na página que o cliente abre.
               É o que faz o papel parecer da loja e não de um sistema. */}

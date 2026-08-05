@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { mensagemCliente } from "./mensagens";
 import { comOpcao } from "./orcamento";
-import { brl } from "./format";
+import { brl, negrito } from "./format";
+import { OS_STATUS_META } from "./types";
 import type { OrdemServico, PecaOS, Cliente, Config } from "./types";
 
 const peca = (p: Partial<PecaOS>): PecaOS => ({
@@ -56,8 +57,8 @@ describe("mensagem do cliente", () => {
 
   it("cada opção vira um bloco com as peças dela e o total do serviço", () => {
     const texto = mensagemCliente(doisCaminhos(), cliente, config);
-    expect(texto).toContain("*OPÇÃO 1*");
-    expect(texto).toContain("*OPÇÃO 2*");
+    expect(texto).toContain("*Opção 1*");
+    expect(texto).toContain("*Opção 2*");
     expect(texto).toContain("- SSD 1TB");
     // O total do serviço INTEIRO, que é sobre o que o cliente decide
     expect(texto).toContain(`Total do serviço: *${brl(979)}*`);
@@ -66,7 +67,7 @@ describe("mensagem do cliente", () => {
 
   it("separa o que entra em qualquer opção do que é escolha", () => {
     const texto = mensagemCliente(doisCaminhos(), cliente, config);
-    expect(texto).toContain("*JÁ INCLUSO EM QUALQUER OPÇÃO*");
+    expect(texto).toContain("*Já incluso em qualquer opção*");
     expect(texto).toContain(`- Pasta térmica — ${brl(30)}`);
     expect(texto).toContain(`- Mão de obra — ${brl(50)}`);
   });
@@ -94,17 +95,17 @@ describe("mensagem do cliente", () => {
       peca({ descricao: "Fonte 200W", precoUnit: 149.9, opcao: "Essencial" }),
     ]);
     const texto = mensagemCliente(o, cliente, config);
-    expect(texto).toContain("*OPÇÃO 1 - COMPLETO*");
-    expect(texto).toContain("*OPÇÃO 2 - ESSENCIAL*");
-    expect(texto).not.toContain("OPÇÃO 1 - OPÇÃO 1");
+    expect(texto).toContain("*Opção 1 - Completo*");
+    expect(texto).toContain("*Opção 2 - Essencial*");
+    expect(texto).not.toContain("Opção 1 - Opção 1");
   });
 
   it("OS sem opção mantém o orçamento simples de sempre", () => {
     const o = os([peca({ descricao: "Fonte 500W", precoUnit: 399 })]);
     const texto = mensagemCliente(o, cliente, config);
-    expect(texto).toContain("*ORÇAMENTO*");
-    expect(texto).toContain(`*TOTAL: ${brl(449)}*`);
-    expect(texto).not.toContain("OPÇÃO");
+    expect(texto).toContain("*Orçamento*");
+    expect(texto).toContain(`*Total: ${brl(449)}*`);
+    expect(texto).not.toContain("Opção");
     expect(texto).toContain("responda *SIM*");
   });
 
@@ -114,7 +115,7 @@ describe("mensagem do cliente", () => {
     const o = os([peca({ descricao: "Fonte 500W", precoUnit: 399, opcao: "Opção 1" })]);
     const texto = mensagemCliente(o, cliente, config);
     expect(texto).toContain("- Fonte 500W");
-    expect(texto).toContain(`*TOTAL: ${brl(449)}*`);
+    expect(texto).toContain(`*Total: ${brl(449)}*`);
     expect(texto).not.toContain("Total do serviço:");
   });
 
@@ -145,8 +146,64 @@ describe("mensagem do cliente", () => {
     // rótulo em vez do estado — a informação que o cliente abriu a mensagem
     // para ver era a menos visível de todas.
     const texto = mensagemCliente(os([], { status: "pronta" }), cliente, config);
-    expect(texto.split("\n\n")).toContain("*PRONTA PARA RETIRADA*");
+    // O aparelho vem logo embaixo, sem rótulo: sob um título que diz o
+    // estado, ninguém precisa explicar que "PC Preto" é o aparelho.
+    expect(texto.split("\n\n")).toContain("*PRONTA PARA RETIRADA*\nPC Preto");
     expect(texto).not.toContain("*Situação:*");
+    expect(texto).not.toContain("*Aparelho:*");
+  });
+
+  it("caixa alta é só da situação — ênfase que se repete deixa de ser ênfase", () => {
+    // A mensagem tinha ORÇAMENTO, O QUE ENCONTRAMOS, PROBLEMA RELATADO e
+    // ACOMPANHE POR AQUI todos gritando junto com a situação. Com cinco
+    // tarjas em caixa alta, a que importa parou de saltar.
+    for (const status of ["aguardando_aprovacao", "pronta", "entregue"] as const) {
+      const texto = mensagemCliente(
+        comOpcao(os(doisCaminhos().pecas, { status, observacoes: "Sem a fonte antiga" }), "Opção 2"),
+        cliente,
+        { ...config, enderecoLoja: "Rua Um, 1" } as Config,
+        "https://loja/os/5"
+      );
+      // Fora a primeira linha, que é o nome da loja: aquilo é o timbre de
+      // quem está falando, sempre no mesmo lugar, e não disputa atenção com
+      // um título de seção no meio do texto.
+      const corpo = texto.split("\n").slice(1).join("\n");
+      const gritos = (corpo.match(/\*[^*\n]+\*/g) || []).filter(
+        (t) => t === t.toUpperCase() && /\p{L}{2}/u.test(t)
+      );
+      expect(gritos).toEqual([negrito(OS_STATUS_META[status].destaque.toUpperCase())]);
+    }
+  });
+
+  it("aparelho pronto diz onde, que horas e para quem ligar", () => {
+    // "Pode retirar dentro do nosso horário de atendimento" não diz nada a
+    // quem vai atravessar a cidade. A loja tem os três dados cadastrados e
+    // nenhum saía na mensagem que existe para trazer a pessoa ao balcão.
+    const texto = mensagemCliente(os([], { status: "pronta" }), cliente, {
+      ...config,
+      enderecoLoja: "Rua das Flores, 123 - Centro",
+      horarioAtendimento: "Seg a Sex, 9h as 18h",
+      telefoneLoja: "(11) 99999-0000",
+    } as Config);
+    expect(texto).toContain(
+      "*Onde retirar*\nRua das Flores, 123 - Centro\nSeg a Sex, 9h as 18h\n(11) 99999-0000"
+    );
+    // Com o bloco na tela, repetir "dentro do horário" no fim é ruído
+    expect(texto).not.toContain("dentro do nosso horário");
+  });
+
+  it("sem endereço cadastrado não sobra bloco vazio, e a frase antiga volta", () => {
+    const texto = mensagemCliente(os([], { status: "pronta" }), cliente, config);
+    expect(texto).not.toContain("Onde retirar");
+    expect(texto).toContain("Pode retirar dentro do nosso horário de atendimento.");
+  });
+
+  it("onde retirar só aparece quando há o que retirar", () => {
+    const emReparo = mensagemCliente(os([], { status: "em_reparo" }), cliente, {
+      ...config,
+      enderecoLoja: "Rua das Flores, 123",
+    } as Config);
+    expect(emReparo).not.toContain("Onde retirar");
   });
 
   it("decidido, a mensagem não devolve a escolha que o cliente já fez", () => {
@@ -155,23 +212,23 @@ describe("mensagem do cliente", () => {
     // pagar no balcão ficava no meio de dois totais que não valiam mais.
     const o = comOpcao(os(doisCaminhos().pecas, { status: "pronta" }), "Opção 2");
     const texto = mensagemCliente(o, cliente, config);
-    expect(texto).not.toContain("OPÇÃO");
+    expect(texto).not.toContain("Opção");
     expect(texto).not.toContain("Nossa sugestão");
     expect(texto).not.toContain("Total do serviço");
     // O caminho recusado não pode reaparecer: ele não vai ser cobrado
     expect(texto).not.toContain("Fonte 500W PC nova");
-    expect(texto).toContain("*ORÇAMENTO*");
+    expect(texto).toContain("*Orçamento*");
     expect(texto).toContain(`- Fonte 200W PC nova — ${brl(149.9)}`);
-    expect(texto).toContain(`*TOTAL A PAGAR: ${brl(229.9)}*`);
+    expect(texto).toContain(`*Total a pagar: ${brl(229.9)}*`);
   });
 
   it("serviço acabado não devolve ao cliente a frase que ele mesmo falou", () => {
     const o = os(doisCaminhos().pecas, { status: "pronta", defeitoRelatado: "Não liga" });
     const texto = mensagemCliente(o, cliente, config);
-    expect(texto).not.toContain("PROBLEMA RELATADO");
+    expect(texto).not.toContain("Problema relatado");
     // Em aberto ela continua: é o que mostra que a loja anotou direito
     expect(mensagemCliente({ ...o, status: "em_reparo" }, cliente, config)).toContain(
-      "*PROBLEMA RELATADO*\nNão liga"
+      "*Problema relatado*\nNão liga"
     );
   });
 
@@ -181,8 +238,8 @@ describe("mensagem do cliente", () => {
       cliente,
       config
     );
-    expect(emReparo).toContain(`*TOTAL: ${brl(229.9)}*`);
-    expect(emReparo).not.toContain("TOTAL A PAGAR");
+    expect(emReparo).toContain(`*Total: ${brl(229.9)}*`);
+    expect(emReparo).not.toContain("Total a pagar");
   });
 
   it("o link só pede resposta onde existe pergunta", () => {
@@ -192,8 +249,8 @@ describe("mensagem do cliente", () => {
       config,
       "https://loja/os/5"
     );
-    expect(pronta).toContain("*ACOMPANHE POR AQUI*");
-    expect(pronta).not.toContain("RESPONDA");
+    expect(pronta).toContain("Acompanhe: https://loja/os/5");
+    expect(pronta).not.toContain("responda");
   });
 
   it("não sai emoji na mensagem", () => {
@@ -211,7 +268,7 @@ describe("mensagem do cliente", () => {
 
   it("com link, convida a escolher e aprovar por lá", () => {
     const texto = mensagemCliente(doisCaminhos(), cliente, config, "https://loja/os/5");
-    expect(texto).toContain("https://loja/os/5");
+    expect(texto).toContain("Acompanhe e responda: https://loja/os/5");
     expect(texto).toContain("escolha e aprove direto pelo link");
   });
 
@@ -221,7 +278,7 @@ describe("mensagem do cliente", () => {
       cliente,
       config
     );
-    expect(texto).not.toContain("OPÇÃO");
+    expect(texto).not.toContain("Opção");
     expect(texto).not.toContain("R$");
   });
 

@@ -760,6 +760,16 @@ export interface Config {
   ramo?: Ramo;
   telefoneLoja: string;
   enderecoLoja: string;
+  /**
+   * Horário de atendimento, texto livre: "Seg a Sex, 9h as 18h. Sab ate 13h".
+   *
+   * A mensagem de aparelho pronto mandava "pode retirar dentro do nosso
+   * horário de atendimento" sem nunca dizer qual é — e sem o endereço e sem o
+   * telefone, na mensagem que existe justamente para trazer o cliente até o
+   * balcão. Texto livre porque loja de bairro não tem grade: fecha para o
+   * almoço, abre sábado até uma hora, emenda feriado.
+   */
+  horarioAtendimento?: string;
   cnpj: string;
   senhaAcesso: string; // login único
   supabaseUrl?: string;
