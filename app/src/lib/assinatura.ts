@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { negrito } from "./format";
 
 /**
  * Assinatura das lojas.
@@ -142,6 +143,6 @@ export async function atualizarLoja(lojaId: string, campos: Partial<Loja>): Prom
 
 /** Mensagem que o lojista manda ao pagar, já identificando a loja */
 export const mensagemComprovante = (nomeLoja: string, valor?: number | null): string =>
-  `Olá! Sou da loja *${nomeLoja}* e acabei de pagar a mensalidade do sistema` +
+  `Olá! Sou da loja ${negrito(nomeLoja)} e acabei de pagar a mensalidade do sistema` +
   (valor ? ` (${valor.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })})` : "") +
   `. Segue o comprovante.`;

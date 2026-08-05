@@ -12,6 +12,8 @@
  * mais caro do que os R$ 79.
  */
 
+import { negrito } from "./format";
+
 export type TipoAviso = "vence_em_breve" | "vence_hoje" | "vencida" | "somente_leitura";
 
 export const AVISO_META: Record<TipoAviso, { label: string; cor: string }> = {
@@ -53,7 +55,7 @@ export function mensagemCobranca(
 
   // Identifica de qual loja é a assinatura logo na primeira linha:
   // quem tem duas lojas precisa saber qual delas está sendo cobrada.
-  partes.push(`Olá! Sobre a assinatura do sistema da *${nomeLoja}*:`);
+  partes.push(`Olá! Sobre a assinatura do sistema da ${negrito(nomeLoja)}:`);
 
   switch (tipo) {
     case "vence_em_breve":
