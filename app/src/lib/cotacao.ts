@@ -1,4 +1,4 @@
-import { brl, txt } from "./format";
+import { brl, negrito, txt } from "./format";
 import type {
   Cotacao,
   Fornecedor,
@@ -102,7 +102,7 @@ export function mensagemFornecedor(
   const partes: string[] = [];
   const nome = txt(fornecedor?.contato) || txt(fornecedor?.nome);
 
-  partes.push(`*${txt(nomeLoja) || "Assistência Técnica"}*`);
+  partes.push(negrito(txt(nomeLoja).trim() || "Assistência Técnica"));
   partes.push(
     `${nome ? `Olá, ${nome.split(/\s+/)[0]}!` : "Olá!"} Preciso de uma cotação, por favor.`
   );
@@ -115,7 +115,7 @@ export function mensagemFornecedor(
       const nota = ref
         ? `\n   _(${ref.comprado === false ? "cotado antes" : "última compra"}: ${brl(ref.preco)})_`
         : "";
-      return `${idx + 1}. ${txt(i.descricao)} — *${qtd} un.*${nota}`;
+      return `${idx + 1}. ${txt(i.descricao).trim()} — *${qtd} un.*${nota}`;
     });
 
   if (linhas.length > 0) {

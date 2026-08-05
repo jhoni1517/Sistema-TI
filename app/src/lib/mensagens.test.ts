@@ -118,6 +118,28 @@ describe("mensagem do cliente", () => {
     expect(texto).not.toContain("Total do serviço:");
   });
 
+  it("espaço sobrando no nome da loja não pode matar o negrito", () => {
+    // "*NOVA GERAÇÃO INFORMÁTICA *" chegou assim no celular do cliente, com
+    // os asteriscos à mostra: o WhatsApp cancela o negrito quando tem espaço
+    // encostado no asterisco. O espaço estava no cadastro, onde não se vê.
+    const texto = mensagemCliente(doisCaminhos(), cliente, {
+      nomeLoja: "  Nova Geração Informática ",
+    } as Config);
+    expect(texto.split("\n")[0]).toBe("*NOVA GERAÇÃO INFORMÁTICA*");
+    // Nenhum negrito da mensagem pode ter espaço encostado por dentro. Fora
+    // dos asteriscos pode: "*Aparelho:* PC Gamer" é negrito válido.
+    for (const trecho of texto.match(/\*[^*\n]+\*/g) || []) {
+      const dentro = trecho.slice(1, -1);
+      expect(dentro).toBe(dentro.trim());
+    }
+  });
+
+  it("descrição de peça com espaço sobrando não vira dois espaços na linha", () => {
+    const o = os([peca({ descricao: "Formatação Computador ", precoUnit: 150 })]);
+    const texto = mensagemCliente(o, cliente, config);
+    expect(texto).toContain(`- Formatação Computador — ${brl(150)}`);
+  });
+
   it("a situação vai sozinha no parágrafo, em caixa alta e falando com o cliente", () => {
     // Antes vinha "*Situação:* Pronta" colada no aparelho, com o negrito no
     // rótulo em vez do estado — a informação que o cliente abriu a mensagem

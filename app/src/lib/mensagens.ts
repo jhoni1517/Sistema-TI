@@ -1,4 +1,4 @@
-import { brl, codigoOS, txt } from "./format";
+import { brl, codigoOS, negrito, txt } from "./format";
 import { totalOS, totalPecas, totalComOpcao } from "./calc";
 import {
   nomesDasOpcoes,
@@ -50,7 +50,7 @@ const temDescricao = (p: PecaOS): boolean => !!txt(p.descricao).trim();
 /** Uma linha de item: "- Fonte 500W (2x) — R$ 798,00" */
 const linhaItem = (p: PecaOS): string => {
   const qtd = Number(p.quantidade) || 1;
-  return `- ${txt(p.descricao)}${qtd > 1 ? ` (${qtd}x)` : ""} — ${brl(subtotalPeca(p))}`;
+  return `- ${txt(p.descricao).trim()}${qtd > 1 ? ` (${qtd}x)` : ""} — ${brl(subtotalPeca(p))}`;
 };
 
 /**
@@ -61,8 +61,8 @@ const linhaItem = (p: PecaOS): string => {
  */
 const tituloOpcao = (nome: string, posicao: number): string =>
   /^op[çc][ãa]o\b/i.test(nome.trim())
-    ? `*${txt(nome).toUpperCase()}*`
-    : `*OPÇÃO ${posicao} - ${txt(nome).toUpperCase()}*`;
+    ? negrito(txt(nome).toUpperCase())
+    : negrito(`OPÇÃO ${posicao} - ${txt(nome).trim().toUpperCase()}`);
 
 /**
  * O cliente ainda tem uma escolha para fazer nesta etapa?
@@ -203,7 +203,7 @@ export function mensagemCliente(
   // Cabeçalho: quem está falando e sobre qual serviço, nas duas primeiras
   // linhas. É o que aparece na prévia da notificação do celular.
   partes.push(
-    `*${(txt(config.nomeLoja) || "Assistência Técnica").toUpperCase()}*\n` +
+    `${negrito((txt(config.nomeLoja).trim() || "Assistência Técnica").toUpperCase())}\n` +
       `Ordem de serviço ${codigoOS(o.numero)}`
   );
 
@@ -218,7 +218,7 @@ export function mensagemCliente(
   // do estado — a informação que o cliente abriu a mensagem para ver era a
   // menos visível de todas. O texto também é o de cliente, não o da lista da
   // loja: "Pronta" não diz o que ele faz agora, "PRONTA PARA RETIRADA" diz.
-  partes.push(`*${OS_STATUS_META[o.status].destaque.toUpperCase()}*`);
+  partes.push(negrito(OS_STATUS_META[o.status].destaque.toUpperCase()));
 
   const aparelho = aparelhoDe(o);
   if (aparelho) partes.push(`*Aparelho:* ${aparelho}`);

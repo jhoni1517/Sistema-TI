@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
-import { uid, nowISO, brl, formatDate, abrirWhatsapp, txt } from "../lib/format";
+import { uid, nowISO, brl, formatDate, abrirWhatsapp, negrito, txt } from "../lib/format";
 import { saldoFiado, pagoFiado } from "../lib/calc";
 import { travaAtendimento, travaFiado } from "../lib/clientes";
 import { hojeISO } from "../lib/contas";
@@ -198,7 +198,7 @@ export const AReceber: React.FC = () => {
     const tel = telCliente(f.clienteId);
     if (!tel) return aviso.alerta("Cliente sem telefone cadastrado.");
     const msg =
-      `*${config.nomeLoja}*\n\n` +
+      `${negrito(config.nomeLoja)}\n\n` +
       `Olá ${nomeCliente(f.clienteId)}! Passando para lembrar do seu débito:\n\n` +
       // Sem emoji: em alguns aparelhos chega como "?" e suja o recado.
       `${f.descricao}\n` +

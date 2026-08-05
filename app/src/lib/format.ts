@@ -8,6 +8,19 @@ export const uid = (): string =>
  */
 export const txt = (v?: string | null): string => (v ?? "").toString();
 
+/**
+ * Negrito do WhatsApp.
+ *
+ * Espaço encostado no asterisco CANCELA a formatação: "*NOVA GERAÇÃO *" chega
+ * no celular do cliente com os asteriscos à mostra e sem negrito nenhum. Um
+ * espaço sobrando no fim do nome da loja — que ninguém enxerga no campo de
+ * cadastro, porque espaço não se vê — estragava assim a primeira linha de
+ * toda mensagem que a loja mandava, na cobrança e na cotação também.
+ *
+ * Todo negrito que embrulha texto digitado por gente passa por aqui.
+ */
+export const negrito = (v?: string | null): string => `*${txt(v).trim()}*`;
+
 /** Número seguro (a nuvem pode devolver nulo ou texto) */
 export const num = (v?: number | string | null): number => {
   const n = typeof v === "string" ? parseFloat(v) : v;
