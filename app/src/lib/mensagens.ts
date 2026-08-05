@@ -61,8 +61,8 @@ const linhaItem = (p: PecaOS): string => {
  */
 const tituloOpcao = (nome: string, posicao: number): string =>
   /^op[çc][ãa]o\b/i.test(nome.trim())
-    ? negrito(txt(nome).toUpperCase())
-    : negrito(`OPÇÃO ${posicao} - ${txt(nome).trim().toUpperCase()}`);
+    ? negrito(nome)
+    : negrito(`Opção ${posicao} - ${txt(nome).trim()}`);
 
 /**
  * O cliente ainda tem uma escolha para fazer nesta etapa?
@@ -80,7 +80,7 @@ const escolhendo = (o: OrdemServico): boolean =>
 
 /** Na retirada o total deixa de ser informação e vira o que se cobra */
 const rotuloTotal = (o: OrdemServico): string =>
-  o.status === "pronta" ? "TOTAL A PAGAR" : "TOTAL";
+  o.status === "pronta" ? "Total a pagar" : "Total";
 
 /**
  * Orçamento discriminado: o cliente vê no que o dinheiro dele vai.
@@ -96,7 +96,9 @@ export function blocosOrcamento(o: OrdemServico): string[] {
 
   // Com mais de um orçamento na mesa, o cabeçalho precisa deixar claro que o
   // que vem antes vale em qualquer caso. Sem isso o cliente acha que soma.
-  const linhas: string[] = [decidir ? "*JÁ INCLUSO EM QUALQUER OPÇÃO*" : "*ORÇAMENTO*"];
+  const linhas: string[] = [
+    negrito(decidir ? "Já incluso em qualquer opção" : "Orçamento"),
+  ];
   for (const p of comuns) linhas.push(linhaItem(p));
 
   // Sem escolha em aberto vale uma lista só, na ordem em que se lê uma nota:
@@ -113,13 +115,17 @@ export function blocosOrcamento(o: OrdemServico): string[] {
   const desconto = Number(o.desconto) || 0;
   if (desconto > 0) linhas.push(`- Desconto — menos ${brl(desconto)}`);
 
-  if (linhas.length > 1) blocos.push(linhas.join("\n"));
-
   if (!decidir) {
+    // O total colado na lista que ele soma, não num parágrafo à parte: solto,
+    // o número perdia a ligação com os itens e ganhava um espaço em branco
+    // que o WhatsApp cobra em altura de tela.
     const total = totalOS(o);
-    if (total > 0) blocos.push(`*${rotuloTotal(o)}: ${brl(total)}*`);
+    if (total > 0) linhas.push(negrito(`${rotuloTotal(o)}: ${brl(total)}`));
+    if (linhas.length > 1) blocos.push(linhas.join("\n"));
     return blocos;
   }
+
+  if (linhas.length > 1) blocos.push(linhas.join("\n"));
 
   const escolhida = opcaoAtual(o);
   nomes.forEach((nome, i) => {
@@ -177,6 +183,29 @@ const chamada = (o: OrdemServico, temLink: boolean): string => {
 };
 
 /**
+ * Onde, quando e para quem ligar — só quando a pessoa precisa vir buscar.
+ *
+ * "Pode retirar dentro do nosso horário de atendimento" não diz nada a quem
+ * vai atravessar a cidade: não diz a rua, não diz que horas a loja abre e não
+ * diz para qual número ligar se chegar e estiver fechado. A loja tem os três
+ * cadastrados, e nenhum deles saía justamente na mensagem que existe para
+ * trazer o cliente até o balcão.
+ *
+ * Cada linha só aparece se estiver preenchida — bloco com "Endereço: " vazio
+ * é pior do que bloco nenhum.
+ */
+export function ondeRetirar(o: OrdemServico, config: Config): string {
+  if (o.status !== "pronta" && o.status !== "cancelada") return "";
+  const linhas = [
+    txt(config.enderecoLoja).trim(),
+    txt(config.horarioAtendimento).trim(),
+    txt(config.telefoneLoja).trim(),
+  ].filter(Boolean);
+  if (linhas.length === 0) return "";
+  return [negrito("Onde retirar"), ...linhas].join("\n");
+}
+
+/**
  * Convite para avaliar a loja.
  *
  * Sem emoji: em alguns aparelhos elas chegam como "?" e sujam justamente a
@@ -210,18 +239,15 @@ export function mensagemCliente(
   const nome = primeiroNome(cliente?.nome);
   partes.push(nome ? `Olá, ${nome}!` : "Olá!");
 
-  // A situação sozinha no parágrafo, em caixa alta.
-  //
-  // O WhatsApp não tem cor nem tamanho de letra: negrito, caixa alta e uma
-  // linha só para ela é toda a ênfase que existe lá. Antes ela vinha como
-  // "*Situação:* Pronta", colada no aparelho e com o rótulo em negrito em vez
-  // do estado — a informação que o cliente abriu a mensagem para ver era a
-  // menos visível de todas. O texto também é o de cliente, não o da lista da
-  // loja: "Pronta" não diz o que ele faz agora, "PRONTA PARA RETIRADA" diz.
-  partes.push(negrito(OS_STATUS_META[o.status].destaque.toUpperCase()));
-
+  // A situação, e o aparelho logo embaixo sem rótulo: sob um título que diz
+  // o estado, "PC Gamer Preto com leds" não precisa de ninguém explicando
+  // que aquilo é o aparelho. Um bloco a menos e uma etiqueta a menos.
   const aparelho = aparelhoDe(o);
-  if (aparelho) partes.push(`*Aparelho:* ${aparelho}`);
+  partes.push(
+    [negrito(OS_STATUS_META[o.status].destaque.toUpperCase()), aparelho]
+      .filter(Boolean)
+      .join("\n")
+  );
 
   // O que o cliente nos contou — mostra que foi anotado direito.
   //
@@ -231,11 +257,11 @@ export function mensagemCliente(
   // técnico encontrou fica, porque é ele que explica o preço.
   const servicoFeito = o.status === "pronta" || o.status === "entregue";
   const relatado = txt(o.defeitoRelatado).trim();
-  if (relatado && !servicoFeito) partes.push(`*PROBLEMA RELATADO*\n${relatado}`);
+  if (relatado && !servicoFeito) partes.push(`${negrito("Problema relatado")}\n${relatado}`);
 
   // O que o técnico encontrou — é isto que faltava na mensagem antiga
   const constatado = txt(o.defeitoConstatado).trim();
-  if (constatado) partes.push(`*O QUE ENCONTRAMOS*\n${constatado}`);
+  if (constatado) partes.push(`${negrito("O que encontramos")}\n${constatado}`);
 
   // Orçamento só nas etapas em que ele existe de fato
   const mostraValores =
@@ -246,20 +272,24 @@ export function mensagemCliente(
   if (mostraValores) partes.push(...blocosOrcamento(o));
 
   if (o.status === "pronta" && txt(o.observacoes).trim()) {
-    partes.push(`*OBSERVAÇÕES*\n${txt(o.observacoes).trim()}`);
+    partes.push(`${negrito("Observações")}\n${txt(o.observacoes).trim()}`);
   }
+
+  // Onde e quando buscar. Vem antes do link porque é o que a pessoa precisa
+  // para sair de casa; o link é para quem quiser conferir depois.
+  const retirada = ondeRetirar(o, config);
+  if (retirada) partes.push(retirada);
 
   if (linkRastreio) {
-    // "E RESPONDA" só onde existe uma pergunta. Numa OS pronta o link serve
-    // para acompanhar, e pedir resposta faz o cliente procurar o que responder.
-    const titulo =
-      o.status === "aguardando_aprovacao"
-        ? "*ACOMPANHE E RESPONDA POR AQUI*"
-        : "*ACOMPANHE POR AQUI*";
-    partes.push(`${titulo}\n${linkRastreio}`);
+    // Uma linha, sem título gritado. O link já se explica, e o rótulo em
+    // caixa alta competia com a situação sem acrescentar nada.
+    const rotulo = o.status === "aguardando_aprovacao" ? "Acompanhe e responda" : "Acompanhe";
+    partes.push(`${rotulo}: ${linkRastreio}`);
   }
 
-  partes.push(chamada(o, !!linkRastreio));
+  // Sem endereço cadastrado a frase genérica ainda é o que sobra; com o
+  // bloco de retirada na tela, repetir "dentro do horário" é ruído.
+  if (!retirada) partes.push(chamada(o, !!linkRastreio));
 
   // Pedido de avaliação só na entrega. Pedir estrela antes de o serviço
   // terminar é pedir no pior momento, e nota ruim colhida no meio do caminho

@@ -68,7 +68,9 @@ import {
   type PecaOS,
   type FormaPagamento,
   type Config,
+  type Produto,
 } from "../lib/types";
+import { produtosParaOS } from "../lib/busca";
 import { travaAtendimento, classificacaoDe, travaFiado } from "../lib/clientes";
 import { backupDe, avisoDeBackup, perguntaAntesDeConcluir } from "../lib/backup";
 import { saldosApos } from "../lib/estoque";
@@ -729,7 +731,13 @@ const OSForm: React.FC<{
   os: OrdemServico;
   setOs: (o: OrdemServico) => void;
   clientes: Cliente[];
-  produtos: { id: string; nome: string; preco: number; custo: number }[];
+  /**
+   * O produto inteiro, não só os quatro campos que a linha da peça copia.
+   * A busca precisa do SKU e do código de barras, e a lista suspensa mostra
+   * saldo e "serviço" — quem escolhe entre dois nomes parecidos decide por
+   * esses dois dados.
+   */
+  produtos: Produto[];
   onSave: () => void;
   onClose: () => void;
 }> = ({ os, setOs, clientes, produtos, onSave, onClose }) => {
@@ -835,16 +843,11 @@ const OSForm: React.FC<{
       </div>
       <div className="col-span-6 sm:col-span-3">
         <label className="label">Do estoque</label>
-        <select
-          className="input"
-          value={p.produtoId || ""}
-          onChange={(e) => vincularProduto(i, e.target.value)}
-        >
-          <option value="">Manual</option>
-          {produtos.map((pr) => (
-            <option key={pr.id} value={pr.id}>{pr.nome}</option>
-          ))}
-        </select>
+        <ProdutoSelect
+          produtos={produtos}
+          value={p.produtoId}
+          onChange={(id) => vincularProduto(i, id)}
+        />
       </div>
       <div className="col-span-3 sm:col-span-1">
         <label className="label">Qtd</label>
@@ -1662,6 +1665,86 @@ const ClienteSelect: React.FC<{
               {txt(c.telefone) && (
                 <span className="block text-xs text-slate-400">{txt(c.telefone)}</span>
               )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+/**
+ * Seletor de produto com busca, no lugar do `<select>` que listava o estoque
+ * inteiro na ordem em que o banco devolveu.
+ *
+ * Achar "Fonte 500W" no meio de trezentos itens virava rolar a roda do
+ * celular até dar sorte — e o atendente desistia e digitava a peça na mão. A
+ * OS perdia o vínculo com o estoque e a baixa nunca acontecia, que é o
+ * estrago de verdade: o item saiu da prateleira e o sistema não soube.
+ *
+ * Preço e saldo aparecem na linha porque é com eles que se escolhe entre dois
+ * produtos de nome parecido. Serviço não mostra saldo: serviço não tem
+ * estoque.
+ */
+const ProdutoSelect: React.FC<{
+  produtos: Produto[];
+  value?: string;
+  onChange: (id: string) => void;
+}> = ({ produtos, value, onChange }) => {
+  const escolhido = produtos.find((p) => p.id === value);
+  const [q, setQ] = useState(escolhido?.nome || "");
+  const [aberto, setAberto] = useState(false);
+
+  // Acompanha a escolha vinda de fora: o vínculo também muda quando a linha
+  // é preenchida por outro caminho, e o campo não pode ficar mostrando o
+  // produto anterior.
+  useEffect(() => {
+    setQ(produtos.find((p) => p.id === value)?.nome || "");
+  }, [value, produtos]);
+
+  const lista = produtosParaOS(produtos, aberto ? q : "");
+
+  return (
+    <div className="relative">
+      <input
+        className="input"
+        placeholder="Manual - ou busque no estoque"
+        value={q}
+        onChange={(e) => {
+          setQ(e.target.value);
+          setAberto(true);
+          // Apagar o campo desfaz o vínculo e a peça volta a ser manual.
+          if (!e.target.value) onChange("");
+        }}
+        onFocus={() => {
+          setQ("");
+          setAberto(true);
+        }}
+        onBlur={() => {
+          setAberto(false);
+          // Sem escolher nada, o campo volta a mostrar o que estava vinculado
+          // em vez de ficar com meia palavra digitada.
+          setQ(produtos.find((p) => p.id === value)?.nome || "");
+        }}
+      />
+      {aberto && lista.length > 0 && (
+        <div className="absolute z-20 mt-1 max-h-56 w-full overflow-auto rounded-lg bg-white shadow-lg ring-1 ring-slate-200">
+          {lista.map((pr) => (
+            <button
+              key={pr.id}
+              type="button"
+              className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+              onMouseDown={() => {
+                onChange(pr.id);
+                setQ(pr.nome);
+                setAberto(false);
+              }}
+            >
+              <span className="block truncate font-medium">{txt(pr.nome)}</span>
+              <span className="block text-xs text-slate-400">
+                {brl(pr.preco)}
+                {pr.servico ? " · serviço" : ` · ${pr.quantidade} em estoque`}
+              </span>
             </button>
           ))}
         </div>
