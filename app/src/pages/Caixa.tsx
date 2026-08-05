@@ -23,6 +23,7 @@ import { lerDetalhes, gravarDetalhes } from "../lib/preferencias";
 import { sangriaSugerida } from "../lib/desempenho";
 import { precoEfetivo } from "../lib/promocao";
 import { uid, nowISO, brl, formatDate, formatDateTime, txt } from "../lib/format";
+import { produtosParaOS } from "../lib/busca";
 import { aposBaixa } from "../lib/estoque";
 import { printHTML } from "../lib/print";
 import { reciboFechamento, reciboVenda, reciboMovimento } from "../lib/recibo";
@@ -679,13 +680,10 @@ const MovimentoModal: React.FC<{
     }
   };
 
-  const filtroProd = produtos
-    .filter(
-      (p) =>
-        txt(p.nome).toLowerCase().includes(buscaProd.toLowerCase()) ||
-        txt(p.sku).toLowerCase().includes(buscaProd.toLowerCase())
-    )
-    .slice(0, 8);
+  // A mesma busca da OS e do resto do sistema: sem acento ("agua" acha "Água
+  // mineral"), por código de barras e em ordem previsível. O filtro daqui era
+  // um `includes` cru, que exigia acentuar certo para achar o produto.
+  const filtroProd = produtosParaOS(produtos, buscaProd);
 
   const salvar = () => {
     if (valor <= 0) return aviso.alerta("Informe um valor válido.");

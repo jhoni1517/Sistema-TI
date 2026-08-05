@@ -146,3 +146,48 @@ export function buscarTudo(
     .sort((a, b) => b.peso - a.peso || a.titulo.localeCompare(b.titulo))
     .slice(0, limite);
 }
+
+/**
+ * Produtos para escolher dentro de uma OS, na ordem em que se escolhe.
+ *
+ * A tela de OS listava o estoque inteiro num `<select>` cru, na ordem em que
+ * as linhas voltaram do banco — que não é ordem nenhuma. Sem busca e sem
+ * ordem, achar "Fonte 500W" no meio de trezentos itens virava rolar a roda do
+ * celular até dar sorte, e o atendente desistia e digitava a peça na mão: a
+ * OS perdia o vínculo com o estoque, e a baixa nunca acontecia.
+ *
+ * A busca é a mesma do resto do sistema — sem acento, por nome, categoria,
+ * SKU e código de barras — porque quem digita rápido no balcão não acentua e
+ * porque o leitor do balcão dispara o código inteiro de uma vez.
+ *
+ * Sem nada digitado devolve a lista em ordem alfabética: abrir o campo tem
+ * que mostrar algo previsível, não a primeira linha que o banco devolveu.
+ */
+export function produtosParaOS(
+  produtos: Produto[],
+  termo: string,
+  limite = 8
+): Produto[] {
+  const t = normalizar(termo);
+  const alfabetica = (a: Produto, b: Produto) => txt(a.nome).localeCompare(txt(b.nome));
+
+  if (!t) return [...produtos].sort(alfabetica).slice(0, limite);
+
+  const pontos = (p: Produto): number => {
+    // Código lido no leitor é escolha exata, não palpite: vai na frente de
+    // qualquer nome parecido.
+    if (txt(p.codigoBarras).trim() === termo.trim() || normalizar(p.sku) === t) return 3;
+    // Nome que COMEÇA com o que foi digitado vem antes: quem digita "fon"
+    // quer a fonte, não o "cabo de força para fonte".
+    if (normalizar(p.nome).startsWith(t)) return 2;
+    if (contem(p.nome, t)) return 1;
+    return contem(p.categoria, t) ? 0 : -1;
+  };
+
+  return produtos
+    .map((p) => ({ p, peso: pontos(p) }))
+    .filter((x) => x.peso >= 0)
+    .sort((a, b) => b.peso - a.peso || alfabetica(a.p, b.p))
+    .map((x) => x.p)
+    .slice(0, limite);
+}
