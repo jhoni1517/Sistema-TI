@@ -118,6 +118,62 @@ describe("mensagem do cliente", () => {
     expect(texto).not.toContain("Total do serviço:");
   });
 
+  it("a situação vai sozinha no parágrafo, em caixa alta e falando com o cliente", () => {
+    // Antes vinha "*Situação:* Pronta" colada no aparelho, com o negrito no
+    // rótulo em vez do estado — a informação que o cliente abriu a mensagem
+    // para ver era a menos visível de todas.
+    const texto = mensagemCliente(os([], { status: "pronta" }), cliente, config);
+    expect(texto.split("\n\n")).toContain("*PRONTA PARA RETIRADA*");
+    expect(texto).not.toContain("*Situação:*");
+  });
+
+  it("decidido, a mensagem não devolve a escolha que o cliente já fez", () => {
+    // O print que gerou este teste: OS PRONTA mandando as duas opções, com o
+    // total de cada uma e "Nossa sugestão" no fim. O valor que a pessoa ia
+    // pagar no balcão ficava no meio de dois totais que não valiam mais.
+    const o = comOpcao(os(doisCaminhos().pecas, { status: "pronta" }), "Opção 2");
+    const texto = mensagemCliente(o, cliente, config);
+    expect(texto).not.toContain("OPÇÃO");
+    expect(texto).not.toContain("Nossa sugestão");
+    expect(texto).not.toContain("Total do serviço");
+    // O caminho recusado não pode reaparecer: ele não vai ser cobrado
+    expect(texto).not.toContain("Fonte 500W PC nova");
+    expect(texto).toContain("*ORÇAMENTO*");
+    expect(texto).toContain(`- Fonte 200W PC nova — ${brl(149.9)}`);
+    expect(texto).toContain(`*TOTAL A PAGAR: ${brl(229.9)}*`);
+  });
+
+  it("serviço acabado não devolve ao cliente a frase que ele mesmo falou", () => {
+    const o = os(doisCaminhos().pecas, { status: "pronta", defeitoRelatado: "Não liga" });
+    const texto = mensagemCliente(o, cliente, config);
+    expect(texto).not.toContain("PROBLEMA RELATADO");
+    // Em aberto ela continua: é o que mostra que a loja anotou direito
+    expect(mensagemCliente({ ...o, status: "em_reparo" }, cliente, config)).toContain(
+      "*PROBLEMA RELATADO*\nNão liga"
+    );
+  });
+
+  it("total vira 'a pagar' só na retirada", () => {
+    const emReparo = mensagemCliente(
+      comOpcao(os(doisCaminhos().pecas, { status: "em_reparo" }), "Opção 2"),
+      cliente,
+      config
+    );
+    expect(emReparo).toContain(`*TOTAL: ${brl(229.9)}*`);
+    expect(emReparo).not.toContain("TOTAL A PAGAR");
+  });
+
+  it("o link só pede resposta onde existe pergunta", () => {
+    const pronta = mensagemCliente(
+      os(doisCaminhos().pecas, { status: "pronta" }),
+      cliente,
+      config,
+      "https://loja/os/5"
+    );
+    expect(pronta).toContain("*ACOMPANHE POR AQUI*");
+    expect(pronta).not.toContain("RESPONDA");
+  });
+
   it("não sai emoji na mensagem", () => {
     // Em alguns aparelhos elas chegam como "?" e sujam o recado.
     const texto = mensagemCliente(doisCaminhos(), cliente, config, "https://x/y");

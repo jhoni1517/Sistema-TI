@@ -16,19 +16,36 @@ export type OSStatus =
   | "entregue"
   | "cancelada";
 
+/**
+ * Como cada etapa da OS se apresenta.
+ *
+ * São três textos e duas cores porque são três públicos diferentes:
+ *
+ * - `label` é o nome curto de dentro da loja, para caber em lista e filtro.
+ * - `destaque` é o mesmo estado dito para o CLIENTE, e é o que vai grande no
+ *   rastreio e sozinho no parágrafo do WhatsApp. "Pronta" não diz nada a quem
+ *   está do outro lado; "Pronta para retirada" diz o que ele faz agora.
+ * - `cliente` explica em uma frase, embaixo do destaque.
+ *
+ * `color` é o crachá pálido das listas — dez linhas de cor cheia viram um
+ * borrão e nada mais salta. `forte` é o oposto: cor cheia para quando a
+ * situação está sozinha na tela e é o que a pessoa foi ali ver. Os tons são
+ * 600 de propósito: branco por cima de 500 não tem contraste suficiente nem
+ * para letra grande.
+ */
 export const OS_STATUS_META: Record<
   OSStatus,
-  { label: string; color: string; cliente: string }
+  { label: string; destaque: string; color: string; forte: string; cliente: string }
 > = {
-  aberta: { label: "Aberta", color: "bg-slate-100 text-slate-700", cliente: "Recebemos seu aparelho e vamos analisá-lo." },
-  em_analise: { label: "Em análise", color: "bg-blue-100 text-blue-700", cliente: "Seu aparelho está em análise técnica." },
-  aguardando_aprovacao: { label: "Aguardando aprovação", color: "bg-amber-100 text-amber-700", cliente: "Temos um orçamento! Aguardamos sua aprovação." },
-  aprovada: { label: "Aprovada", color: "bg-indigo-100 text-indigo-700", cliente: "Orçamento aprovado. Vamos iniciar o reparo." },
-  em_reparo: { label: "Em reparo", color: "bg-purple-100 text-purple-700", cliente: "Seu aparelho está em reparo." },
-  aguardando_peca: { label: "Aguardando peça", color: "bg-orange-100 text-orange-700", cliente: "Aguardando a chegada de uma peça para continuar." },
-  pronta: { label: "Pronta", color: "bg-emerald-100 text-emerald-700", cliente: "Boa notícia! Seu aparelho está pronto para retirada." },
-  entregue: { label: "Entregue", color: "bg-teal-100 text-teal-700", cliente: "Aparelho entregue. Obrigado pela preferência!" },
-  cancelada: { label: "Cancelada", color: "bg-red-100 text-red-700", cliente: "Ordem de serviço cancelada." },
+  aberta: { label: "Aberta", destaque: "Aparelho recebido", color: "bg-slate-100 text-slate-700", forte: "bg-slate-600 text-white", cliente: "Recebemos seu aparelho e vamos analisá-lo." },
+  em_analise: { label: "Em análise", destaque: "Em análise", color: "bg-blue-100 text-blue-700", forte: "bg-blue-600 text-white", cliente: "Estamos avaliando o que o aparelho tem." },
+  aguardando_aprovacao: { label: "Aguardando aprovação", destaque: "Aguardando sua aprovação", color: "bg-amber-100 text-amber-700", forte: "bg-amber-600 text-white", cliente: "O orçamento está pronto. Precisamos do seu OK para começar." },
+  aprovada: { label: "Aprovada", destaque: "Orçamento aprovado", color: "bg-indigo-100 text-indigo-700", forte: "bg-indigo-600 text-white", cliente: "Orçamento aprovado. Vamos iniciar o reparo." },
+  em_reparo: { label: "Em reparo", destaque: "Em reparo", color: "bg-purple-100 text-purple-700", forte: "bg-purple-600 text-white", cliente: "Estamos trabalhando no seu aparelho." },
+  aguardando_peca: { label: "Aguardando peça", destaque: "Aguardando peça", color: "bg-orange-100 text-orange-700", forte: "bg-orange-600 text-white", cliente: "Aguardando a chegada de uma peça para continuar." },
+  pronta: { label: "Pronta", destaque: "Pronta para retirada", color: "bg-emerald-100 text-emerald-700", forte: "bg-emerald-600 text-white", cliente: "Pode vir buscar dentro do nosso horário de atendimento." },
+  entregue: { label: "Entregue", destaque: "Aparelho entregue", color: "bg-teal-100 text-teal-700", forte: "bg-teal-600 text-white", cliente: "Obrigado pela preferência!" },
+  cancelada: { label: "Cancelada", destaque: "Serviço cancelado", color: "bg-red-100 text-red-700", forte: "bg-red-600 text-white", cliente: "O aparelho está disponível para retirada." },
 };
 
 /**

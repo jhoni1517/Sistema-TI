@@ -1288,7 +1288,17 @@ const OSDetalhe: React.FC<{
         </div>
 
         <div className="flex items-center justify-between">
-          <span className={`badge ${OS_STATUS_META[os.status].color}`}>{OS_STATUS_META[os.status].label}</span>
+          {/*
+            Aqui a OS está sozinha na tela, então a situação vai em cor cheia
+            — o crachá pálido serve para a lista, onde dez cores fortes viram
+            um borrão. No papel volta a fundo branco: cor cheia sai como uma
+            tarja cinza com letra branca por cima, ilegível.
+          */}
+          <span
+            className={`badge text-sm print:border print:border-slate-300 print:bg-white print:text-black ${OS_STATUS_META[os.status].forte}`}
+          >
+            {OS_STATUS_META[os.status].label}
+          </span>
           <span className="text-sm text-slate-400">Aberta em {formatDateTime(os.criadoEm)}</span>
         </div>
 

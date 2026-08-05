@@ -202,9 +202,16 @@ export const Rastreio: React.FC = () => {
             </div>
 
             <div className="p-5">
-              <div className={`mb-5 rounded-xl p-4 text-center ${meta.color}`}>
-                <p className="text-lg font-bold">{meta.label}</p>
-                <p className="mt-1 text-sm opacity-90">{meta.cliente}</p>
+              {/*
+                A situação é o que a pessoa abriu esta página para ver, e ela
+                abre no celular, muitas vezes na rua. Cor cheia e letra grande:
+                o crachá pálido das listas some no meio do resto da tela.
+              */}
+              <div className={`mb-5 rounded-xl p-5 text-center shadow-md ${meta.forte}`}>
+                <p className="text-2xl font-black uppercase leading-tight tracking-wide">
+                  {meta.destaque}
+                </p>
+                <p className="mt-2 text-sm font-medium opacity-95">{meta.cliente}</p>
               </div>
 
               {/*
