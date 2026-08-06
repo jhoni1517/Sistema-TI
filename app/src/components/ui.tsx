@@ -1,4 +1,5 @@
 import React from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { paraNumero, paraTexto } from "../lib/format";
 
@@ -11,29 +12,59 @@ export const Modal: React.FC<{
   footer?: React.ReactNode;
 }> = ({ open, onClose, title, children, maxWidth = "max-w-2xl", footer }) => {
   if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-900/50 p-4 backdrop-blur-sm">
+  /*
+   * O modal cabe na tela, sempre.
+   *
+   * Antes o corpo tinha altura máxima de 70vh e o resto era margem, cabeçalho
+   * e rodapé por fora dessa conta. Num celular de 740px isso dava um modal de
+   * 788px: o rodapé com "Cancelar" e "Salvar" nascia 48px ABAIXO da borda,
+   * escondido atrás da barra de navegação do Android. Medido, não achismo.
+   *
+   * Duas correções, e as duas são necessárias:
+   *
+   * 1. `dvh` no lugar de `vh`. No celular, `vh` é a tela COM a barra do
+   *    navegador escondida — uma altura que nem sempre existe. `dvh` é a que
+   *    está valendo agora.
+   * 2. Coluna flexível: cabeçalho e rodapé fixos, e só o miolo rola. Com a
+   *    altura total travada na tela, o rodapé não tem para onde escapar.
+   *
+   * O `env(safe-area-inset-bottom)` afasta o rodapé da barrinha do iPhone.
+   *
+   * E vai para o <body> por portal, não para onde o React o renderizaria:
+   * `position: fixed` deixa de valer para a TELA assim que qualquer pai tem
+   * transform, filter ou contain — e um pai desses aparece sozinho, vindo de
+   * uma animação de entrada. Era exatamente isso que prendia o modal dentro
+   * do <main>, 64px abaixo do topo. Consertar a animação resolveu hoje; o
+   * portal resolve também a próxima animação que alguém acrescentar sem
+   * saber disto.
+   */
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:p-4">
       <div
-        className={`my-8 w-full ${maxWidth} rounded-2xl bg-white shadow-2xl`}
+        className={`flex max-h-[calc(100dvh-1.5rem)] w-full ${maxWidth} flex-col rounded-2xl bg-white shadow-2xl sm:max-h-[calc(100dvh-2rem)]`}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <h3 className="text-lg font-bold text-slate-800">{title}</h3>
+        <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 sm:px-6 sm:py-4">
+          {/* Trunca em vez de quebrar em duas linhas: "Ordem de Serviço
+              OS00013" comia uma linha inteira do modal no celular. */}
+          <h3 className="truncate text-base font-bold text-slate-800 sm:text-lg">{title}</h3>
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            aria-label="Fechar"
+            className="alvo-toque shrink-0 rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600"
           >
             <X size={20} />
           </button>
         </div>
-        <div className="max-h-[70vh] overflow-y-auto px-6 py-5">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">{children}</div>
         {footer && (
-          <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-4">
+          <div className="flex shrink-0 justify-end gap-3 border-t border-slate-200 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-4">
             {footer}
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

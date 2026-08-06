@@ -396,7 +396,7 @@ export const OrdensServico: React.FC = () => {
           <button
             key={f}
             onClick={() => setFiltro(f)}
-            className={`rounded-full px-3 py-1.5 text-xs font-semibold capitalize transition-colors ${
+            className={`chip text-xs capitalize ${
               filtro === f
                 ? "bg-brand-600 text-white"
                 : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
@@ -1069,7 +1069,7 @@ const OSForm: React.FC<{
             <button
               type="button"
               onClick={usarOrcamentoUnico}
-              className={`rounded-full px-3 py-1.5 font-semibold ${
+              className={`chip ${
                 varios ? "bg-white text-slate-600 ring-1 ring-slate-200" : "bg-brand-600 text-white"
               }`}
             >
@@ -1078,7 +1078,7 @@ const OSForm: React.FC<{
             <button
               type="button"
               onClick={varios ? undefined : usarVariosOrcamentos}
-              className={`rounded-full px-3 py-1.5 font-semibold ${
+              className={`chip ${
                 varios ? "bg-brand-600 text-white" : "bg-white text-slate-600 ring-1 ring-slate-200"
               }`}
             >

@@ -388,7 +388,7 @@ export const Caixa: React.FC = () => {
             <button
               key={f.k}
               onClick={() => setFiltroTipo(f.k)}
-              className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
+              className={`chip text-sm ${
                 filtroTipo === f.k
                   ? "bg-slate-800 text-white"
                   : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"

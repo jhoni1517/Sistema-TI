@@ -237,7 +237,8 @@ export const AReceber: React.FC = () => {
       </div>
 
       <label className="mb-4 flex w-fit items-center gap-2 text-sm text-slate-600">
-        <input type="checkbox" checked={mostrarQuitados} onChange={(e) => setMostrarQuitados(e.target.checked)} className="h-4 w-4" />
+        {/* 16px de caixa de marcar é alvo de ponteiro, não de dedo */}
+        <input type="checkbox" checked={mostrarQuitados} onChange={(e) => setMostrarQuitados(e.target.checked)} className="h-5 w-5 sm:h-4 sm:w-4" />
         Mostrar quitados
       </label>
 

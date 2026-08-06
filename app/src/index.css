@@ -56,8 +56,18 @@ body {
   100% { transform: translateX(100%); }
 }
 
-.animar-entrada { animation: entrada 0.18s ease-out both; }
-.animar-surgir  { animation: surgir 0.15s ease-out both; }
+/*
+ * `backwards` no lugar de `both`, e a diferença não é estética.
+ *
+ * Com `both` o elemento GUARDA o estado final da animação — e o estado final
+ * tem `transform`. Um transform, mesmo de identidade, faz o elemento virar a
+ * referência de posicionamento de todo `position: fixed` que estiver dentro
+ * dele. Era isso que prendia os modais dentro do <main>: eles nasciam 64px
+ * abaixo (a altura do cabeçalho) e o rodapé com "Salvar" sobrava para fora da
+ * tela do celular. `backwards` anima igual e não deixa nada gravado no fim.
+ */
+.animar-entrada { animation: entrada 0.18s ease-out backwards; }
+.animar-surgir  { animation: surgir 0.15s ease-out backwards; }
 
 /* ====== MARCA VIVA ======
    A tela de entrada era uma foto parada, e foto parada com o campo de senha
@@ -101,8 +111,25 @@ body {
 }
 
 @layer components {
+  /*
+   * Altura mínima de 44px no celular.
+   *
+   * Os botões tinham 36px de altura — abaixo do que um dedo acerta. No
+   * balcão, com a mão ocupada, errar o botão custa mais do que os 8px
+   * economizados. No computador o ponteiro é preciso e a densidade importa
+   * mais, então lá volta para 36.
+   */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97];
+    @apply inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97] sm:min-h-[2.25rem];
+  }
+  /*
+   * Botão só de ícone: quadrado de 44px no celular.
+   *
+   * Os do topo tinham 34x34. Um alvo desse tamanho ao lado de outro faz o
+   * dedo abrir a busca querendo atualizar os dados.
+   */
+  .alvo-toque {
+    @apply flex h-11 w-11 items-center justify-center sm:h-9 sm:w-9;
   }
   .btn-primary {
     @apply btn bg-brand-600 text-white hover:bg-brand-700 focus:ring-brand-500;
@@ -132,7 +159,7 @@ body {
    * 180ms é abaixo do que se percebe como espera.
    */
   .entra-pagina {
-    animation: entra-pagina 0.18s ease-out both;
+    animation: entra-pagina 0.18s ease-out backwards;
   }
 
   /*
@@ -143,7 +170,7 @@ body {
    * de cem produtos, a cascata viraria espera de verdade.
    */
   .entra-item {
-    animation: entra-item 0.22s ease-out both;
+    animation: entra-item 0.22s ease-out backwards;
     animation-delay: calc(var(--i, 0) * 35ms);
   }
 
@@ -151,8 +178,16 @@ body {
   .toca {
     @apply transition-transform duration-100 active:scale-[0.98];
   }
+  /*
+   * 16px de fonte no celular, 14px no computador.
+   *
+   * Abaixo de 16px o Safari do iPhone DÁ ZOOM sozinho ao focar o campo — a
+   * tela salta, o formulário sai do lugar e a pessoa perde de vista o que
+   * estava preenchendo. Não é preferência de tamanho, é o gatilho do zoom.
+   * Junto vem a altura de 44px, a mesma dos botões.
+   */
   .input {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30;
+    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-900 placeholder-slate-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 sm:py-2 sm:text-sm;
   }
   /* Espaço reservado enquanto os dados chegam da nuvem */
   .esqueleto {
@@ -171,6 +206,16 @@ body {
   }
   .label {
     @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500;
+  }
+  /*
+   * Pastilha de filtro (Em aberto, Pronta, Todas...).
+   *
+   * Tinham 28px de altura. É o controle mais tocado do sistema — a pessoa
+   * troca de filtro dezenas de vezes por dia — e ficava do tamanho de um
+   * texto, não de um botão. 36px no celular, 28px no computador.
+   */
+  .chip {
+    @apply inline-flex min-h-[2.25rem] shrink-0 items-center justify-center gap-1.5 rounded-full px-3 font-semibold transition-colors sm:min-h-[1.75rem];
   }
   .badge {
     @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;
