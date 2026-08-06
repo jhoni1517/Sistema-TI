@@ -9,7 +9,12 @@
          usa um retrato borrado da página. -->
     <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-title" content="Sistema TI" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      viewport-fit=cover libera env(safe-area-inset-*). Sem isso o rodapé dos
+      modais some atrás da barra de navegação do Android e da barrinha do
+      iPhone: o botão Salvar ficava pela metade, encostado na borda de baixo.
+    -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#ea580c" />
     <meta name="description" content="Sistema de Caixa e Ordens de Serviço para assistência técnica de informática e celulares" />
     <link rel="manifest" href="./manifest.webmanifest" />

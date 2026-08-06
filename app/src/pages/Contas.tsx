@@ -444,7 +444,7 @@ export const Contas: React.FC = () => {
               <button
                 key={o}
                 onClick={() => setOrdem(o)}
-                className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-semibold transition-colors ${
+                className={`chip text-sm ${
                   ordem === o
                     ? "bg-slate-800 text-white"
                     : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
@@ -674,7 +674,7 @@ export const Contas: React.FC = () => {
               <TrendingDown size={18} /> Onde o dinheiro foi
             </h3>
             <select
-              className="input !w-auto !py-1.5 text-sm"
+              className="input !w-auto !py-1.5 sm:text-sm"
               value={mesGasto}
               onChange={(e) => setMesGasto(e.target.value)}
             >

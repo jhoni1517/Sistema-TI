@@ -242,7 +242,8 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
         <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-slate-200 bg-white/80 px-4 backdrop-blur lg:hidden no-print">
           <button
             onClick={() => setOpen(true)}
-            className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"
+            aria-label="Abrir menu"
+            className="alvo-toque -ml-1.5 rounded-lg text-slate-600 hover:bg-slate-100"
           >
             <Menu size={22} />
           </button>
@@ -252,16 +253,18 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
           <span className="flex-1 truncate font-bold text-slate-800">{config.nomeLoja}</span>
           <button
             onClick={() => reload()}
-            className="rounded-lg p-2 text-slate-600 hover:bg-slate-100 disabled:opacity-40"
+            className="alvo-toque rounded-lg text-slate-600 hover:bg-slate-100 disabled:opacity-40"
             title="Atualizar dados"
+            aria-label="Atualizar dados"
             disabled={loading}
           >
             <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
           </button>
           <button
             onClick={() => setBusca(true)}
-            className="rounded-lg p-2 text-slate-600 hover:bg-slate-100"
+            className="alvo-toque -mr-1.5 rounded-lg text-slate-600 hover:bg-slate-100"
             title="Buscar"
+            aria-label="Buscar"
           >
             <Search size={20} />
           </button>
@@ -323,7 +326,11 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
         {/* A chave é a rota: sem ela o React reaproveita o nó e a animação
             não roda de novo, então só a primeira troca de tela teria
             transição. */}
-        <main key={local.pathname} className="entra-pagina flex-1 p-4 sm:p-6 lg:p-8">
+        <main
+          key={local.pathname}
+          /* A folga de baixo respeita a barra do sistema: sem ela, o último
+             botão da lista fica embaixo da barrinha do iPhone. */
+          className="entra-pagina flex-1 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-6 lg:p-8">
           <Outlet />
         </main>
       </div>
