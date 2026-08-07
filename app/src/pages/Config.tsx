@@ -4,6 +4,7 @@ import { ImagemUpload } from "../components/ImagemUpload";
 import { Store, KeyRound, Cloud, Download, Upload, Save, Database, Palette, Sun, Moon, Monitor, Percent, FileText, ShieldCheck } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { RAMO_META, temRecurso } from "../lib/ramos";
+import { REGRA_MEIO_A_MEIO_META, regraDe, type RegraMeioAMeio } from "../lib/pizza";
 import { Field, SectionTitle, InputNumero } from "../components/ui";
 import { ACCENTS, ACCENT_KEYS } from "../lib/themes";
 import { Equipe } from "../components/Equipe";
@@ -357,6 +358,45 @@ export const Config: React.FC = () => {
                 As duas formas existem. Se o peso lançado sair mil vezes maior ou
                 menor do que devia, é este ajuste que está trocado — a sequência
                 de dígitos é a mesma nos dois formatos.
+              </p>
+            </Field>
+          )}
+
+          {temRecurso(ramoContratado, "meioAMeio") && (
+            <Field label="Pizza de mais de um sabor: quanto cobrar?" className="sm:col-span-2">
+              <div className="grid max-w-md gap-2">
+                {(Object.keys(REGRA_MEIO_A_MEIO_META) as RegraMeioAMeio[]).map((k) => {
+                  const meta = REGRA_MEIO_A_MEIO_META[k];
+                  const ativa = regraDe(form.regraMeioAMeio) === k;
+                  return (
+                    <button
+                      key={k}
+                      type="button"
+                      onClick={() => mudar({ regraMeioAMeio: k })}
+                      className={`rounded-lg border px-3 py-2 text-left transition ${
+                        ativa
+                          ? "border-brand-500 bg-brand-50"
+                          : "border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <span
+                        className={`block text-sm font-semibold ${ativa ? "text-brand-700" : "text-slate-700"}`}
+                      >
+                        {meta.label}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-slate-500">
+                        {meta.explicacao}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Duas opções e não três: somar as metades dá exatamente a
+                  média, então oferecer as duas seria pedir para escolher
+                  entre coisas idênticas. Ver lib/pizza.ts. */}
+              <p className="mt-1 text-xs text-slate-400">
+                Vale no balcão, no delivery e na comanda. Mudar aqui não altera
+                pedido já fechado.
               </p>
             </Field>
           )}

@@ -147,6 +147,31 @@ describe("adicionar ao carrinho", () => {
     expect(totalItens(carrinho)).toBeCloseTo(0.75, 3);
   });
 
+  it("linha com recado nunca se junta: a cozinha erraria um dos dois", () => {
+    // "X-Burger sem cebola" e um X-Burger normal são o mesmo produtoId.
+    // Juntá-los daria quantidade 2 com o recado valendo para os dois: a
+    // cozinha faz os dois sem cebola e uma das pessoas recebe errado.
+    const semCebola: ItemVenda = { ...itemDoProduto(prod()), observacao: "sem cebola" };
+    const normal = itemDoProduto(prod());
+
+    const a = adicionar(adicionar([], semCebola), normal);
+    expect(a).toHaveLength(2);
+    expect(a[0].observacao).toBe("sem cebola");
+    expect(a[1].observacao).toBeUndefined();
+
+    // E na ordem contrária o recado não pode sobrescrever a linha limpa —
+    // aí seria a outra pessoa comendo cebola.
+    const b = adicionar(adicionar([], normal), semCebola);
+    expect(b).toHaveLength(2);
+    expect(b[0].quantidade).toBe(1);
+  });
+
+  it("recado em branco não impede a soma de sempre", () => {
+    // Campo tocado e apagado não pode virar uma linha nova por engano.
+    const vazio: ItemVenda = { ...itemDoProduto(prod()), observacao: "   " };
+    expect(adicionar([vazio], itemDoProduto(prod()))).toHaveLength(1);
+  });
+
   it("produtos diferentes ficam em linhas diferentes", () => {
     const carrinho = adicionar(
       adicionar([], itemDoProduto(prod({ id: "a" }))),
