@@ -1,5 +1,5 @@
 import { txt } from "./format";
-import type { Config, ItemVenda, Produto } from "./types";
+import type { Config, FormaPagamento, ItemVenda, Produto } from "./types";
 
 /**
  * O que a nota fiscal exige, e o que falta para emitir.
@@ -72,6 +72,83 @@ export const ORIGENS: { k: string; nome: string }[] = [
 const digitos = (v?: string | null): string => txt(v).replace(/\D/g, "");
 
 /**
+ * Como cada forma de pagamento se chama na nota.
+ *
+ * A SEFAZ não aceita a palavra "pix": ela quer o código 17. Sem esta
+ * tradução a nota é rejeitada inteira, e o motivo que volta é um número
+ * que não diz nada a quem está no balcão.
+ *
+ * Falta aqui o vale-refeição (11), que num restaurante é comum — mas o
+ * sistema ainda não tem essa forma de pagamento. Quando tiver, o código
+ * dela entra nesta tabela e em nenhum outro lugar.
+ */
+export const CODIGO_PAGAMENTO: Record<FormaPagamento, string> = {
+  dinheiro: "01",
+  credito: "03",
+  debito: "04",
+  transferencia: "16",
+  pix: "17",
+  outro: "99",
+};
+
+/**
+ * Em que pé está a nota de uma venda.
+ *
+ * `pendente` não é erro: é o estado normal enquanto a fila não rodou. A
+ * venda NUNCA espera a nota — SEFAZ fora do ar não pode travar o caixa de
+ * um restaurante numa sexta cheia.
+ */
+export type SituacaoNota = "pendente" | "autorizada" | "rejeitada" | "cancelada";
+
+export const SITUACAO_NOTA_META: Record<
+  SituacaoNota,
+  { label: string; cor: string; explicacao: string }
+> = {
+  pendente: {
+    label: "Aguardando envio",
+    cor: "bg-amber-100 text-amber-700",
+    explicacao: "A venda está registrada. A nota entra na fila e é enviada sozinha.",
+  },
+  autorizada: {
+    label: "Autorizada",
+    cor: "bg-emerald-100 text-emerald-700",
+    explicacao: "A SEFAZ aceitou. A nota tem valor fiscal e pode ser impressa.",
+  },
+  rejeitada: {
+    label: "Recusada pela SEFAZ",
+    cor: "bg-red-100 text-red-700",
+    explicacao: "Algum dado está errado. O motivo aparece na própria venda.",
+  },
+  cancelada: {
+    label: "Cancelada",
+    cor: "bg-slate-100 text-slate-600",
+    explicacao: "A nota foi cancelada dentro do prazo de 30 minutos.",
+  },
+};
+
+/**
+ * Cancelamento de NFC-e tem relógio: 30 minutos depois da autorização.
+ *
+ * Passou disso, não é mais cancelamento — é nota de devolução, que é outro
+ * documento e quem faz é o contador. A tela precisa mostrar o tempo que
+ * resta, senão a pessoa descobre que perdeu o prazo tentando.
+ *
+ * O prazo é decidido por estado; 30 minutos é o que vale no Paraná.
+ */
+export const MINUTOS_PARA_CANCELAR = 30;
+
+export function minutosRestantesParaCancelar(
+  emitidaEm?: string | null,
+  agora = new Date()
+): number {
+  if (!emitidaEm) return 0;
+  const t = new Date(emitidaEm).getTime();
+  if (!Number.isFinite(t)) return 0;
+  const passados = (agora.getTime() - t) / 60000;
+  return Math.max(0, Math.ceil(MINUTOS_PARA_CANCELAR - passados));
+}
+
+/**
  * O que vale para o item: o que está no produto, ou o padrão da loja.
  *
  * NCM é o único que não tem padrão: ele muda de produto para produto e
@@ -114,6 +191,24 @@ export function pendenciasDaLoja(config: Config): string[] {
   if (!usaCsosn(regime) && !digitos(config.cstPadrao)) {
     faltas.push("CST padrão — fora do Simples o item leva CST, não CSOSN");
   }
+  /*
+   * O endereço da nota é PARTIDO em campos, e não é frescura.
+   *
+   * `enderecoLoja` é uma linha só ("Rua das Flores, 123 - Centro"), boa para
+   * o recibo e inútil para a nota: a SEFAZ quer rua, número, bairro, CEP e
+   * o código IBGE do município em campos separados. Ninguém consegue partir
+   * essa linha com segurança depois — "Rua 15 de Novembro, 1500" tem número
+   * no nome da rua.
+   */
+  if (!txt(config.nfLogradouro).trim()) faltas.push("Endereço da nota: rua");
+  if (!txt(config.nfNumero).trim()) faltas.push("Endereço da nota: número");
+  if (!txt(config.nfBairro).trim()) faltas.push("Endereço da nota: bairro");
+  if (digitos(config.nfCep).length !== 8) faltas.push("Endereço da nota: CEP (8 dígitos)");
+  if (!txt(config.nfMunicipio).trim()) faltas.push("Endereço da nota: cidade");
+  if (digitos(config.nfCodigoIbge).length !== 7) {
+    faltas.push("Endereço da nota: código IBGE da cidade (7 dígitos)");
+  }
+  if (txt(config.nfUf).trim().length !== 2) faltas.push("Endereço da nota: estado (UF)");
   return faltas;
 }
 

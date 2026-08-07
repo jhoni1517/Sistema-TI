@@ -493,6 +493,101 @@ export const Config: React.FC = () => {
             </p>
           </Field>
 
+          <Field label="CNAE principal">
+            <input
+              className="input"
+              inputMode="numeric"
+              placeholder="5611201"
+              value={form.cnae || ""}
+              onChange={(e) => mudar({ cnae: e.target.value })}
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              Está no cartão do CNPJ. Restaurante costuma ser 5611-2/01.
+            </p>
+          </Field>
+
+          {/*
+            Endereço PARTIDO em campos, só para a nota.
+
+            O endereço lá de cima continua sendo a linha única que sai no
+            recibo e na mensagem do cliente. A nota precisa dos campos
+            separados, e partir a linha depois não é confiável: "Rua 15 de
+            Novembro, 1500" tem número no nome da rua.
+          */}
+          <div className="sm:col-span-2">
+            <p className="label">Endereço para a nota fiscal</p>
+            <p className="mb-2 text-xs text-slate-400">
+              A nota exige o endereço em campos separados. O endereço lá de cima
+              continua valendo para o recibo e para as mensagens.
+            </p>
+            <div className="grid gap-3 sm:grid-cols-6">
+              <div className="sm:col-span-4">
+                <input
+                  className="input"
+                  placeholder="Rua"
+                  value={form.nfLogradouro || ""}
+                  onChange={(e) => mudar({ nfLogradouro: e.target.value })}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <input
+                  className="input"
+                  placeholder="Número"
+                  value={form.nfNumero || ""}
+                  onChange={(e) => mudar({ nfNumero: e.target.value })}
+                />
+              </div>
+              <div className="sm:col-span-3">
+                <input
+                  className="input"
+                  placeholder="Bairro"
+                  value={form.nfBairro || ""}
+                  onChange={(e) => mudar({ nfBairro: e.target.value })}
+                />
+              </div>
+              <div className="sm:col-span-3">
+                <input
+                  className="input"
+                  inputMode="numeric"
+                  placeholder="CEP"
+                  value={form.nfCep || ""}
+                  onChange={(e) => mudar({ nfCep: e.target.value })}
+                />
+              </div>
+              <div className="sm:col-span-3">
+                <input
+                  className="input"
+                  placeholder="Cidade"
+                  value={form.nfMunicipio || ""}
+                  onChange={(e) => mudar({ nfMunicipio: e.target.value })}
+                />
+              </div>
+              <div className="sm:col-span-1">
+                <input
+                  className="input"
+                  placeholder="UF"
+                  maxLength={2}
+                  value={form.nfUf || ""}
+                  onChange={(e) => mudar({ nfUf: e.target.value.toUpperCase() })}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <input
+                  className="input"
+                  inputMode="numeric"
+                  placeholder="Código IBGE"
+                  value={form.nfCodigoIbge || ""}
+                  onChange={(e) => mudar({ nfCodigoIbge: e.target.value })}
+                />
+              </div>
+            </div>
+            <p className="mt-1 text-xs text-slate-400">
+              O código IBGE tem 7 dígitos e é da CIDADE, não da loja. São José
+              dos Pinhais é 4125506. Para outras cidades, procure em
+              cidades.ibge.gov.br.
+            </p>
+          </div>
+
           <Field label="Link para o cliente avaliar a loja" className="sm:col-span-2">
             <input
               className="input"
