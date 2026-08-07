@@ -876,4 +876,23 @@ export interface Config {
   cstPadrao?: string;
   /** Origem padrão da mercadoria. 0 = nacional. */
   origemPadrao?: string;
+  /** CNAE principal da loja, exigido no cadastro do emissor */
+  cnae?: string;
+  /*
+   * Endereço PARTIDO em campos, só para a nota.
+   *
+   * `enderecoLoja` continua sendo a linha única que sai no recibo e na
+   * mensagem do cliente. A nota precisa dos campos separados, e partir a
+   * linha depois não é confiável: "Rua 15 de Novembro, 1500" tem número no
+   * nome da rua. São dois usos diferentes, e por isso dois lugares.
+   */
+  nfLogradouro?: string;
+  nfNumero?: string;
+  nfComplemento?: string;
+  nfBairro?: string;
+  nfCep?: string;
+  nfMunicipio?: string;
+  /** Código IBGE do município, 7 dígitos. São José dos Pinhais é 4125506. */
+  nfCodigoIbge?: string;
+  nfUf?: string;
 }

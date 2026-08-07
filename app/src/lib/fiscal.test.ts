@@ -7,6 +7,8 @@ import {
   fiscalDoProduto,
   regimeDe,
   usaCsosn,
+  CODIGO_PAGAMENTO,
+  minutosRestantesParaCancelar,
 } from "./fiscal";
 import type { Config, ItemVenda, Produto } from "./types";
 
@@ -16,6 +18,13 @@ const loja = {
   cnpj: "12.345.678/0001-95",
   inscricaoEstadual: "9012345678",
   regimeTributario: "simples",
+  nfLogradouro: "Rua das Flores",
+  nfNumero: "123",
+  nfBairro: "Centro",
+  nfCep: "83005-000",
+  nfMunicipio: "São José dos Pinhais",
+  nfCodigoIbge: "4125506",
+  nfUf: "PR",
 } as Config;
 
 const produto = (p: Partial<Produto> = {}): Produto =>
@@ -51,6 +60,80 @@ describe("o que falta na loja", () => {
     const normal = { ...loja, regimeTributario: "normal" } as Config;
     expect(pendenciasDaLoja(normal).join(" ")).toContain("CST");
     expect(pendenciasDaLoja({ ...normal, cstPadrao: "00" } as Config)).toEqual([]);
+  });
+});
+
+describe("o endereço da nota", () => {
+  it("endereço em uma linha só não serve: a nota quer campos separados", () => {
+    // `enderecoLoja` é "Rua das Flores, 123 - Centro" e é ótimo no recibo.
+    // A SEFAZ quer rua, número, bairro, CEP, cidade, UF e código IBGE em
+    // campos próprios — e partir a linha depois não é confiável, porque
+    // "Rua 15 de Novembro, 1500" tem número no nome da rua.
+    const semEndereco = { ...loja, nfLogradouro: "", nfCodigoIbge: "" } as Config;
+    const faltas = pendenciasDaLoja(semEndereco).join(" | ");
+    expect(faltas).toContain("rua");
+    expect(faltas).toContain("código IBGE");
+  });
+
+  it("código IBGE é da cidade e tem 7 dígitos", () => {
+    // 4125506 é São José dos Pinhais. Com 6 dígitos é outra coisa.
+    expect(pendenciasDaLoja({ ...loja, nfCodigoIbge: "412550" } as Config).join(" ")).toContain(
+      "IBGE"
+    );
+    expect(pendenciasDaLoja({ ...loja, nfCodigoIbge: "4125506" } as Config)).toEqual([]);
+  });
+
+  it("CEP com pontuação vale; com menos de 8 dígitos, não", () => {
+    expect(pendenciasDaLoja({ ...loja, nfCep: "83005-000" } as Config)).toEqual([]);
+    expect(pendenciasDaLoja({ ...loja, nfCep: "8300" } as Config).join(" ")).toContain("CEP");
+  });
+
+  it("UF é a sigla de dois caracteres", () => {
+    expect(pendenciasDaLoja({ ...loja, nfUf: "Paraná" } as Config).join(" ")).toContain("estado");
+  });
+});
+
+describe("forma de pagamento vira código da SEFAZ", () => {
+  it("cada forma tem o código que a nota exige", () => {
+    // A SEFAZ não aceita a palavra "pix": quer 17. Sem a tradução a nota é
+    // rejeitada inteira e volta um número que não diz nada no balcão.
+    expect(CODIGO_PAGAMENTO.dinheiro).toBe("01");
+    expect(CODIGO_PAGAMENTO.credito).toBe("03");
+    expect(CODIGO_PAGAMENTO.debito).toBe("04");
+    expect(CODIGO_PAGAMENTO.pix).toBe("17");
+  });
+
+  it("toda forma de pagamento do sistema tem código, sem sobrar nenhuma", () => {
+    // Forma nova sem código aqui derruba a nota na hora do pagamento.
+    const formas = ["dinheiro", "pix", "debito", "credito", "transferencia", "outro"];
+    for (const f of formas) {
+      expect(CODIGO_PAGAMENTO[f as keyof typeof CODIGO_PAGAMENTO], f).toMatch(/^\d{2}$/);
+    }
+    expect(Object.keys(CODIGO_PAGAMENTO).sort()).toEqual([...formas].sort());
+  });
+});
+
+describe("prazo para cancelar a nota", () => {
+  const emitida = "2026-08-07T12:00:00.000Z";
+
+  it("acabou de emitir: 30 minutos inteiros", () => {
+    expect(minutosRestantesParaCancelar(emitida, new Date("2026-08-07T12:00:00.000Z"))).toBe(30);
+  });
+
+  it("no meio do prazo, mostra o que resta", () => {
+    expect(minutosRestantesParaCancelar(emitida, new Date("2026-08-07T12:18:00.000Z"))).toBe(12);
+  });
+
+  it("passou dos 30 minutos: zero, e aí não é mais cancelamento", () => {
+    // Depois do prazo o caminho é nota de devolução, que é outro documento
+    // e quem faz é o contador. A tela não pode oferecer o que não existe.
+    expect(minutosRestantesParaCancelar(emitida, new Date("2026-08-07T12:31:00.000Z"))).toBe(0);
+    expect(minutosRestantesParaCancelar(emitida, new Date("2026-08-08T09:00:00.000Z"))).toBe(0);
+  });
+
+  it("nota que nunca foi emitida não tem prazo nenhum", () => {
+    expect(minutosRestantesParaCancelar(undefined)).toBe(0);
+    expect(minutosRestantesParaCancelar("data podre")).toBe(0);
   });
 });
 
