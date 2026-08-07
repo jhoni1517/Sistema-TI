@@ -12,6 +12,7 @@ import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { CatalogoPublico } from "../components/CatalogoPublico";
 import { temRecurso } from "../lib/ramos";
+import { pendenciasDoProduto } from "../lib/fiscal";
 import { situacaoValidade, produtosVencendo, VALIDADE_META } from "../lib/pdv";
 import {
   promocaoValendo,
@@ -417,6 +418,28 @@ export const Estoque: React.FC = () => {
                 </p>
               </Field>
             )}
+
+            {/*
+              Nota fiscal. Só o NCM fica aqui: ele muda de mercadoria para
+              mercadoria e não tem padrão possível. CFOP, CSOSN e origem são
+              quase sempre iguais na loja inteira e ficam em Configurações —
+              obrigar a digitar os quatro em duzentos produtos é o caminho
+              para ninguém preencher nenhum. Ver lib/fiscal.ts.
+            */}
+            <Field label="NCM (nota fiscal)">
+              <input
+                className="input"
+                inputMode="numeric"
+                placeholder="8 dígitos, ex.: 19059090"
+                value={editando.ncm || ""}
+                onChange={(e) => setEditando({ ...editando, ncm: e.target.value })}
+              />
+              <p className="mt-1 text-xs text-slate-400">
+                {pendenciasDoProduto(editando, config).length > 0
+                  ? "Sem ele este produto não entra em nota fiscal. O contador da loja informa o código."
+                  : "Pronto para nota fiscal. O resto vem do padrão da loja, em Configurações."}
+              </p>
+            </Field>
 
             {temRecurso(ramo, "peso") && editando.porPeso && (
               <Field label="Código na balança">

@@ -5,6 +5,13 @@ import { Store, KeyRound, Cloud, Download, Upload, Save, Database, Palette, Sun,
 import { useApp } from "../store/AppStore";
 import { RAMO_META, temRecurso } from "../lib/ramos";
 import { REGRA_MEIO_A_MEIO_META, regraDe, type RegraMeioAMeio } from "../lib/pizza";
+import {
+  REGIME_META,
+  regimeDe,
+  usaCsosn,
+  pendenciasDaLoja,
+  type RegimeTributario,
+} from "../lib/fiscal";
 import { Field, SectionTitle, InputNumero } from "../components/ui";
 import { ACCENTS, ACCENT_KEYS } from "../lib/themes";
 import { Equipe } from "../components/Equipe";
@@ -400,6 +407,91 @@ export const Config: React.FC = () => {
               </p>
             </Field>
           )}
+
+          {/*
+            Dados fiscais da loja.
+            NENHUMA CREDENCIAL AQUI. O CSC da SEFAZ e o token do emissor são
+            segredos, e esta tela sobe para a nuvem, entra no backup e sai no
+            arquivo de exportação — que circula por WhatsApp e e-mail. Um
+            token aqui é um token queimado. Ver lib/fiscal.ts.
+          */}
+          <Field label="Inscrição Estadual" className="sm:col-span-2">
+            <input
+              className="input"
+              inputMode="numeric"
+              placeholder="Só números"
+              value={form.inscricaoEstadual || ""}
+              onChange={(e) => mudar({ inscricaoEstadual: e.target.value })}
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              {pendenciasDaLoja(form).length === 0
+                ? "Dados fiscais da loja completos."
+                : `Falta para emitir nota: ${pendenciasDaLoja(form).join("; ")}.`}
+            </p>
+          </Field>
+
+          <Field label="Regime tributário" className="sm:col-span-2">
+            <div className="grid max-w-md gap-2">
+              {(Object.keys(REGIME_META) as RegimeTributario[]).map((k) => {
+                const meta = REGIME_META[k];
+                const ativo = regimeDe(form.regimeTributario) === k;
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => mudar({ regimeTributario: k })}
+                    className={`rounded-lg border px-3 py-2 text-left transition ${
+                      ativo ? "border-brand-500 bg-brand-50" : "border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    <span
+                      className={`block text-sm font-semibold ${ativo ? "text-brand-700" : "text-slate-700"}`}
+                    >
+                      {meta.label}
+                    </span>
+                    <span className="mt-0.5 block text-xs text-slate-500">{meta.descricao}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+
+          {/* Padrões que valem para o produto que não tem o dele. Ficam aqui
+              porque são quase sempre iguais na loja inteira — obrigar a
+              digitar os quatro em duzentos produtos é o caminho para ninguém
+              preencher nenhum. */}
+          <Field label={usaCsosn(regimeDe(form.regimeTributario)) ? "CSOSN padrão" : "CST padrão"}>
+            <input
+              className="input"
+              inputMode="numeric"
+              placeholder={usaCsosn(regimeDe(form.regimeTributario)) ? "102" : "00"}
+              value={
+                (usaCsosn(regimeDe(form.regimeTributario))
+                  ? form.csosnPadrao
+                  : form.cstPadrao) || ""
+              }
+              onChange={(e) =>
+                mudar(
+                  usaCsosn(regimeDe(form.regimeTributario))
+                    ? { csosnPadrao: e.target.value }
+                    : { cstPadrao: e.target.value }
+                )
+              }
+            />
+          </Field>
+
+          <Field label="CFOP padrão">
+            <input
+              className="input"
+              inputMode="numeric"
+              placeholder="5102"
+              value={form.cfopPadrao || ""}
+              onChange={(e) => mudar({ cfopPadrao: e.target.value })}
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              Nota de consumidor é sempre dentro do estado, então começa em 5.
+            </p>
+          </Field>
 
           <Field label="Link para o cliente avaliar a loja" className="sm:col-span-2">
             <input

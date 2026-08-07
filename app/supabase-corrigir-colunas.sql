@@ -78,6 +78,16 @@ alter table produtos add column if not exists "codigoBalanca" text;
 -- Foto do produto. Só o endereço: o arquivo mora no depósito de imagens,
 -- porque "produtos" é lido inteiro em toda carga.
 alter table produtos add column if not exists "imagemUrl" text;
+-- Nota fiscal: sem estes campos nenhum emissor emite. Só o NCM é por
+-- produto de verdade; os outros caem no padrão da loja quando vazios.
+-- Ver lib/fiscal.ts.
+alter table produtos add column if not exists ncm text;
+alter table produtos add column if not exists cfop text;
+alter table produtos add column if not exists csosn text;
+alter table produtos add column if not exists cst text;
+alter table produtos add column if not exists origem text;
+alter table produtos add column if not exists "unidadeTributavel" text;
+alter table produtos add column if not exists cest text;
 -- Promoção com prazo. O preço cheio fica em "preco" e volta sozinho quando o
 -- prazo acaba: promover editando o preço na mão dava certo até a hora de
 -- destrocar, que ninguém lembrava.

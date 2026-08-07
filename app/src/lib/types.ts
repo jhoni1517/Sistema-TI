@@ -1,6 +1,7 @@
 import type { Ramo } from "./ramos";
 import type { FormatoBalanca } from "./balanca";
 import type { RegraMeioAMeio } from "./pizza";
+import type { RegimeTributario } from "./fiscal";
 
 // ==== Tipos de domínio do Sistema TI ====
 
@@ -283,6 +284,30 @@ export interface Produto {
   servico?: boolean;
   /** Código de barras — é por ele que o leitor do balcão acha o produto */
   codigoBarras?: string;
+  /*
+   * ---------- Nota fiscal ----------
+   *
+   * Sem estes campos nenhum emissor do mundo emite: eles são o que a SEFAZ
+   * exige de cada item. Só o NCM é por produto de verdade — ele muda de
+   * mercadoria para mercadoria e não tem padrão possível. Os outros três
+   * caem no padrão da loja quando vazios (ver lib/fiscal.ts), porque
+   * obrigar a digitar CFOP em duzentos produtos é o caminho para ninguém
+   * preencher nenhum.
+   */
+  /** NCM, 8 dígitos. É ele que diz à Receita o que a mercadoria é. */
+  ncm?: string;
+  /** CFOP. Vazio = o padrão da loja. NFC-e é sempre 5xxx (dentro do estado). */
+  cfop?: string;
+  /** CSOSN (3 dígitos), usado quando a loja é do Simples Nacional */
+  csosn?: string;
+  /** CST (2 dígitos), usado fora do Simples */
+  cst?: string;
+  /** Origem da mercadoria, 0 a 8. Vazio = o padrão da loja (0, nacional). */
+  origem?: string;
+  /** Unidade que vai na nota: UN, KG, CX. Vazio = KG por peso, UN no resto. */
+  unidadeTributavel?: string;
+  /** CEST, só para mercadoria com substituição tributária */
+  cest?: string;
   /**
    * Endereço da foto do produto no depósito de imagens.
    *
@@ -831,4 +856,24 @@ export interface Config {
    * Ver lib/pizza.ts.
    */
   regraMeioAMeio?: RegraMeioAMeio;
+  /*
+   * ---------- Nota fiscal ----------
+   *
+   * NENHUMA CREDENCIAL AQUI. O CSC da SEFAZ e o token do intermediário são
+   * segredos, e `configuracoes` sobe para a nuvem, entra no backup e sai no
+   * arquivo de exportação — que circula por WhatsApp e e-mail. Um token
+   * aqui é um token queimado. Ver o cabeçalho de lib/fiscal.ts.
+   */
+  /** Inscrição Estadual da loja. Sem ela não sai nota. */
+  inscricaoEstadual?: string;
+  /** Simples, Simples com excesso de sublimite, ou regime normal */
+  regimeTributario?: RegimeTributario;
+  /** CFOP que vale para o produto que não tem o dele. 5102 na maioria. */
+  cfopPadrao?: string;
+  /** CSOSN padrão (Simples). 102 na maioria. */
+  csosnPadrao?: string;
+  /** CST padrão (fora do Simples) */
+  cstPadrao?: string;
+  /** Origem padrão da mercadoria. 0 = nacional. */
+  origemPadrao?: string;
 }
