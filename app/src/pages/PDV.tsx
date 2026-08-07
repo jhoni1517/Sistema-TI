@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   X,
+  Pizza,
 } from "lucide-react";
 import { aviso } from "../components/Aviso";
 import { useApp } from "../store/AppStore";
@@ -54,6 +55,8 @@ import {
   type Parcela,
 } from "../lib/pagamento";
 import { Devolucao } from "../components/Devolucao";
+import { MontarPizza } from "../components/MontarPizza";
+import { temRecurso } from "../lib/ramos";
 import type {
   FormaPagamento,
   ItemVenda,
@@ -80,8 +83,13 @@ const FORMAS: { k: FormaPagamento; nome: string }[] = [
  * um pão é o caminho mais curto para o sistema não ser usado.
  */
 export const PDV: React.FC = () => {
-  const { produtos, clientes, sessoes, vendas, config, fontesComFalha, saveVenda, saveMovimento, saveProduto } =
+  const { produtos, clientes, sessoes, vendas, config, ramo, fontesComFalha, saveVenda, saveMovimento, saveProduto } =
     useApp();
+
+  /* Recursos do ramo: numa mercearia não existe pizza nem "sem cebola" */
+  const usaMeioAMeio = temRecurso(ramo, "meioAMeio");
+  const usaObservacao = temRecurso(ramo, "observacaoItem");
+  const [montandoPizza, setMontandoPizza] = useState(false);
 
   const [itens, setItens] = useState<ItemVenda[]>([]);
   const [termo, setTermo] = useState("");
@@ -497,6 +505,22 @@ export const PDV: React.FC = () => {
         }
       />
 
+      {montandoPizza && (
+        <MontarPizza
+          produtos={produtos}
+          regra={config.regraMeioAMeio}
+          onFechar={() => setMontandoPizza(false)}
+          onMontou={(item) => {
+            /* Vai como linha nova, nunca somada a outra igual: duas pizzas de
+               dois sabores podem ter recados diferentes, e juntá-las faria a
+               cozinha ver uma só. */
+            setItens((prev) => [...prev, item]);
+            setMontandoPizza(false);
+            focarBusca();
+          }}
+        />
+      )}
+
       {devolvendo && <Devolucao onClose={() => setDevolvendo(false)} />}
 
       {/* Vendas guardadas ficam à vista: guardada e esquecida é mercadoria
@@ -613,6 +637,12 @@ export const PDV: React.FC = () => {
             )}
           </div>
 
+          {usaMeioAMeio && (
+            <button className="btn-secondary mb-3 w-full" onClick={() => setMontandoPizza(true)}>
+              <Pizza size={16} /> Montar pizza de mais de um sabor
+            </button>
+          )}
+
           {itens.length === 0 ? (
             <EmptyState
               icon={<ShoppingCart size={48} />}
@@ -643,6 +673,21 @@ export const PDV: React.FC = () => {
                       <p className="text-xs text-slate-400">
                         {brl(item.precoUnit)} {item.porPeso ? "por kg" : "cada"}
                       </p>
+                      {/*
+                        O recado é POR ITEM, não por pedido: numa mesa de
+                        quatro, o "sem cebola" é de uma pessoa só, e um
+                        recado no pedido inteiro faz a cozinha errar as
+                        outras três. Fica na linha, aberto, porque escondido
+                        atrás de um botão ninguém usa com a fila andando.
+                      */}
+                      {usaObservacao && (
+                        <input
+                          className="input mt-1 !py-1 text-xs"
+                          placeholder="Sem cebola, bem passado, ponto da carne..."
+                          value={item.observacao || ""}
+                          onChange={(e) => mudarItem(i, { observacao: e.target.value })}
+                        />
+                      )}
                     </div>
 
                     {/* Quantidade: no peso, campo livre; no resto, mais e menos */}

@@ -53,7 +53,9 @@ export type Recurso =
   | "garantia" // prazo de garantia impresso no comprovante
   | "peso" // produto vendido por quilo, com preço por kg
   | "validade" // data de vencimento no estoque, com alerta
-  | "idadeMinima"; // venda proibida para menores (bebida alcoólica)
+  | "idadeMinima" // venda proibida para menores (bebida alcoólica)
+  | "meioAMeio" // pizza com 2 a 4 sabores, e a regra de preço da casa
+  | "observacaoItem"; // "sem cebola", "bem passado": o recado vai para a cozinha
 
 /**
  * As palavras que a tela usa.
@@ -120,7 +122,7 @@ export const RAMO_META: Record<Ramo, RamoMeta> = {
       itemPlural: "Itens",
     },
     modulos: ["pdv", "delivery", "mesas", "producao"],
-    recursos: [],
+    recursos: ["meioAMeio", "observacaoItem"],
   },
   bebidas: {
     label: "Loja de bebidas / adega",

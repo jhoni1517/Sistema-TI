@@ -1,5 +1,6 @@
 import type { Ramo } from "./ramos";
 import type { FormatoBalanca } from "./balanca";
+import type { RegraMeioAMeio } from "./pizza";
 
 // ==== Tipos de domínio do Sistema TI ====
 
@@ -528,6 +529,26 @@ export interface MovimentoCaixa {
 export interface ItemVenda {
   produtoId?: ID;
   descricao: string;
+  /**
+   * Sabores de uma pizza montada, na ordem em que foram escolhidos.
+   *
+   * A ordem importa: é ela que diz de que lado cada sabor vai, e a cozinha
+   * monta por ela. O preço da linha já vem resolvido em `precoUnit` pela
+   * regra da loja (ver lib/pizza.ts) — guardar os sabores é para o cupom, a
+   * cozinha e a conferência depois.
+   *
+   * Mora dentro de `Venda.itens`, que é uma coluna JSON: campo aqui não
+   * pede coluna nova.
+   */
+  sabores?: { nome: string; preco: number }[];
+  /**
+   * Recado do cliente para quem prepara: "sem cebola", "bem passado".
+   *
+   * É por item e não por pedido: numa mesa de quatro, o "sem cebola" é de
+   * uma pessoa só, e um recado no pedido inteiro faz a cozinha errar as
+   * outras três.
+   */
+  observacao?: string;
   /** Unidades, ou quilos quando o produto é vendido por peso */
   quantidade: number;
   /** Preço da unidade, ou do quilo */
@@ -801,4 +822,13 @@ export interface Config {
    * — ler no formato errado não dá erro, dá um número plausível e errado.
    */
   formatoBalanca?: FormatoBalanca;
+  /**
+   * Como a casa cobra a pizza de mais de um sabor: "maior" ou "media".
+   *
+   * É escolha da loja porque é dinheiro, e cada casa faz de um jeito. Sem
+   * escolha vale o sabor mais caro, que é o mais usado no Brasil — um
+   * padrão que cobrasse menos tiraria dinheiro da loja em silêncio.
+   * Ver lib/pizza.ts.
+   */
+  regraMeioAMeio?: RegraMeioAMeio;
 }

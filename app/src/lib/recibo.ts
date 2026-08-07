@@ -279,7 +279,14 @@ export function reciboPDV(
   const linhas = (v.itens || [])
     .map(
       (i) => `<tr>
-        <td>${esc(i.descricao)}</td>
+        <td>${esc(i.descricao)}${
+          // O recado sai impresso porque o cupom é o que a cozinha e o
+          // entregador leem. Existindo só na tela do caixa, "sem cebola"
+          // morre no momento em que a venda fecha.
+          txt(i.observacao).trim()
+            ? `<br><span class="muted">${esc(txt(i.observacao).trim())}</span>`
+            : ""
+        }</td>
         <td class="center">${
           i.porPeso
             ? `${Number(i.quantidade).toFixed(3).replace(".", ",")} kg`

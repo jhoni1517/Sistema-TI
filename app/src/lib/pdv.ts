@@ -142,7 +142,21 @@ export function itemDoProduto(p: Produto, quantidade = 1, hoje = hojeISO()): Ite
  */
 export function adicionar(itens: ItemVenda[], novo: ItemVenda): ItemVenda[] {
   if (novo.porPeso || !novo.produtoId) return [...itens, novo];
-  const i = itens.findIndex((x) => x.produtoId === novo.produtoId && !x.porPeso);
+  /*
+   * Linha com recado nunca se junta a outra.
+   *
+   * Somar por produtoId é certo no balcão da mercearia: dois pães são dois
+   * pães. Numa lanchonete não é. "X-Burger sem cebola" e um X-Burger normal
+   * são o MESMO produtoId, e juntá-los daria quantidade 2 com o "sem cebola"
+   * valendo para os dois — a cozinha faz os dois sem cebola e uma das duas
+   * pessoas recebe o lanche errado. O contrário é igualmente ruim: o recado
+   * da segunda linha sobrescreveria o da primeira e alguém comeria cebola.
+   */
+  const temRecado = (x: ItemVenda) => !!(x.observacao || "").trim();
+  if (temRecado(novo)) return [...itens, novo];
+  const i = itens.findIndex(
+    (x) => x.produtoId === novo.produtoId && !x.porPeso && !temRecado(x)
+  );
   if (i < 0) return [...itens, novo];
   const copia = [...itens];
   copia[i] = { ...copia[i], quantidade: copia[i].quantidade + novo.quantidade };
