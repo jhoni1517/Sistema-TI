@@ -4,6 +4,7 @@ import { aviso } from "./Aviso";
 import { Modal, Field, InputNumero } from "./ui";
 import { useApp } from "../store/AppStore";
 import { uid, nowISO, brl, txt } from "../lib/format";
+import { normalizar } from "../lib/busca";
 import { sessaoAberta as achaSessaoAberta } from "../lib/caixa";
 import {
   totalMercadoria,
@@ -45,12 +46,12 @@ export const EntradaNota: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const avisos = useMemo(() => avisosDeMargem(entrada, produtos), [entrada, produtos]);
 
   const sugestoes = useMemo(() => {
-    const t = txt(busca).trim().toLowerCase();
+    const t = normalizar(busca);
     if (!t) return [];
     return produtos
       .filter((p) => !p.servico && !itens.some((i) => i.produtoId === p.id))
       .filter(
-        (p) => txt(p.nome).toLowerCase().includes(t) || txt(p.codigoBarras).includes(t)
+        (p) => normalizar(p.nome).includes(t) || txt(p.codigoBarras).includes(t)
       )
       .slice(0, 6);
   }, [produtos, busca, itens]);

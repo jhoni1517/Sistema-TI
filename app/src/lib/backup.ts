@@ -1,4 +1,4 @@
-import { txt } from "./format";
+import { txt, normalizar } from "./format";
 import { BACKUP_META, type BackupOS, type OrdemServico } from "./types";
 
 /**
@@ -36,7 +36,7 @@ const APAGA_DADOS = [
   "formata",
   "reinstala",
   "instala windows",
-  "instalação de windows",
+  "instalacao de windows",
   "troca de ssd",
   "troca de hd",
   "upgrade de ssd",
@@ -54,13 +54,17 @@ const APAGA_DADOS = [
  * clique, não perguntar custa os dados do cliente.
  */
 export function mexeNosDados(o: OrdemServico): boolean {
-  const alvo = [
-    txt(o.defeitoRelatado),
-    txt(o.defeitoConstatado),
-    ...(o.pecas || []).map((p) => txt(p.descricao)),
-  ]
-    .join(" ")
-    .toLowerCase();
+  // Sem acento dos dois lados, e por isso a lista acima e escrita sem acento.
+  // Quem digita o defeito no balcao escreve "instalacao de windows"; com a
+  // comparacao crua o aviso de backup nao aparecia justamente ali, e o
+  // conserto que apaga as fotos do cliente passava sem ninguem olhar.
+  const alvo = normalizar(
+    [
+      txt(o.defeitoRelatado),
+      txt(o.defeitoConstatado),
+      ...(o.pecas || []).map((p) => txt(p.descricao)),
+    ].join(" ")
+  );
   return APAGA_DADOS.some((t) => alvo.includes(t));
 }
 

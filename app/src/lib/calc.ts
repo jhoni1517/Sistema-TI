@@ -1,4 +1,5 @@
 import type { OrdemServico, MovimentoCaixa, Fiado } from "./types";
+import { normalizar } from "./format";
 import { ehPagamentoDeFatura } from "./cartao";
 import {
   pecasEfetivas,
@@ -63,8 +64,16 @@ export const lucroOS = (o: OrdemServico): number =>
 export const receitaBruta = (movs: MovimentoCaixa[]): number =>
   movs.filter((m) => m.tipo === "entrada").reduce((s, m) => s + n(m.valor), 0);
 
-/** Categorias que representam reposição de estoque, não despesa do mês */
-const CATEGORIAS_ESTOQUE = ["compra de peça", "compra de peca", "fornecedor"];
+/**
+ * Categorias que representam reposição de estoque, não despesa do mês.
+ *
+ * Escritas sem acento porque a comparação passa por `normalizar`. Antes a
+ * lista trazia "compra de peça" E "compra de peca", que é o remendo à mão do
+ * mesmo problema — e que só cobre as grafias que alguém lembrou de escrever:
+ * "Compra de Peças" no plural ficava de fora e virava despesa do mês, com o
+ * custo contado duas vezes e o lucro aparecendo negativo numa venda lucrativa.
+ */
+const CATEGORIAS_ESTOQUE = ["compra de peca", "compra de pecas", "fornecedor"];
 
 /**
  * A saída é compra de estoque?
@@ -75,7 +84,7 @@ export const ehCompraEstoque = (m: MovimentoCaixa): boolean =>
   m.tipo === "saida" &&
   (m.compraEstoque === true ||
     (m.compraEstoque === undefined &&
-      CATEGORIAS_ESTOQUE.includes((m.categoria || "").trim().toLowerCase())));
+      CATEGORIAS_ESTOQUE.includes(normalizar(m.categoria))));
 
 /** Despesas = todas as saídas. É o que realmente sai do caixa. */
 export const totalDespesas = (movs: MovimentoCaixa[]): number =>

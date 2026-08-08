@@ -1,4 +1,4 @@
-import { txt, codigoOS, brl } from "./format";
+import { txt, codigoOS, brl, normalizar } from "./format";
 import { totalOS } from "./calc";
 import { OS_STATUS_META, type Cliente, type OrdemServico, type Produto } from "./types";
 
@@ -34,13 +34,12 @@ export interface Resultado {
   peso: number;
 }
 
-/** Minúsculo, sem acento: é assim que os dois lados são comparados */
-export const normalizar = (v?: string | null): string =>
-  txt(v)
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .trim();
+/**
+ * `normalizar` mora em `format.ts` e é reexportada aqui de propósito: meia
+ * dúzia de telas a importa por este caminho, e mudar o arquivo de origem não
+ * pode obrigar a mexer em todas elas.
+ */
+export { normalizar };
 
 /** Só os dígitos — telefone e documento chegam de todo jeito */
 export const digitos = (v?: string | null): string => txt(v).replace(/\D/g, "");
@@ -176,11 +175,16 @@ export function produtosParaOS(
   const pontos = (p: Produto): number => {
     // Código lido no leitor é escolha exata, não palpite: vai na frente de
     // qualquer nome parecido.
-    if (txt(p.codigoBarras).trim() === termo.trim() || normalizar(p.sku) === t) return 3;
+    if (txt(p.codigoBarras).trim() === termo.trim() || normalizar(p.sku) === t) return 4;
     // Nome que COMEÇA com o que foi digitado vem antes: quem digita "fon"
     // quer a fonte, não o "cabo de força para fonte".
-    if (normalizar(p.nome).startsWith(t)) return 2;
-    if (contem(p.nome, t)) return 1;
+    if (normalizar(p.nome).startsWith(t)) return 3;
+    if (contem(p.nome, t)) return 2;
+    // Pedaço do SKU também acha, mas abaixo do nome: quem digita "fei" quer
+    // "Feijão preto" antes do item cujo código interno é FEIJAO-01. Loja que
+    // usa SKU falado ("MB-ASUS") depende deste caminho, e ele tinha sumido
+    // quando esta busca passou a valer também para o PDV.
+    if (contem(p.sku, t)) return 1;
     return contem(p.categoria, t) ? 0 : -1;
   };
 

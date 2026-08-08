@@ -40,7 +40,7 @@ export const ForaDoPlano: React.FC<{ modulo: Modulo }> = ({ modulo }) => {
       </h1>
 
       <p className="mt-2 text-sm text-slate-600">
-        Seu sistema é o de <b>{contratado.label}</b> — {contratado.descricao.toLowerCase()}.
+        Seu sistema é o de <b>{contratado.label}</b> — {contratado.descricao.toLowerCase() /* texto-cru-proposital: virar a frase em minúscula no meio do texto, não comparar nada */}.
         Esta tela pertence a outro tipo de loja.
       </p>
 

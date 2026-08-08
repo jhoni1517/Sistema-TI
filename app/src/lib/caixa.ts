@@ -80,7 +80,8 @@ export function resumoCaixa(
      */
     const f = ehEspecie(m.formaPagamento)
       ? "dinheiro"
-      : txt(m.formaPagamento).trim().toLowerCase();
+      : // texto-cru-proposital: forma de pagamento e valor interno, gravado pelo sistema
+        txt(m.formaPagamento).trim().toLowerCase();
     porForma[f] = (porForma[f] || 0) + (Number(m.valor) || 0);
   }
 
@@ -158,6 +159,7 @@ const arredonda = (v: number): number => Math.round(v * 100) / 100 + 0;
  * conservador, o contrário esconde falta de caixa.
  */
 const ehEspecie = (forma?: string): boolean => {
+  // texto-cru-proposital: forma de pagamento e valor interno, gravado pelo sistema
   const f = txt(forma).trim().toLowerCase();
   return f === "" || f === "dinheiro";
 };

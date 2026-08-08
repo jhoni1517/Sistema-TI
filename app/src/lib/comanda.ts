@@ -1,5 +1,5 @@
 import { centavos } from "./pdv";
-import { txt } from "./format";
+import { txt, normalizar } from "./format";
 import type { ItemComanda, Comanda, PreparoItem } from "./types";
 
 /**
@@ -161,7 +161,9 @@ export const comandasAbertas = (comandas: Comanda[]): Comanda[] =>
  */
 export const comandaDaMesa = (comandas: Comanda[], mesa: string): Comanda | undefined =>
   comandasAbertas(comandas).find(
-    (c) => txt(c.mesa).trim().toLowerCase() === txt(mesa).trim().toLowerCase()
+    // Sem acento: "Salão 1" e "salao 1" são a mesma mesa. Comparando cru,
+    // abre uma segunda comanda e a conta sai pela metade.
+    (c) => normalizar(c.mesa) === normalizar(mesa)
   );
 
 /**

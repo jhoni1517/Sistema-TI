@@ -213,7 +213,17 @@ describe("buscar produto", () => {
   });
 
   it("sugere por pedaço do nome para quem digita", () => {
-    expect(sugerirProdutos(lista, "fei").map((p) => p.id)).toEqual(["b", "c"]);
+    // "c" chama "Feijão preto"; "b" só tem FEIJAO no SKU. Os dois aparecem,
+    // e o nome vem primeiro — no balcão quem digita "fei" quer o feijão, não
+    // o item cujo código interno por acaso começa igual.
+    expect(sugerirProdutos(lista, "fei").map((p) => p.id)).toEqual(["c", "b"]);
+  });
+
+  it("acha sem acento, que é como se digita no balcão", () => {
+    // Foi a terceira vez que esta busca comparou texto cru. Quem digitava
+    // "feijao" concluía que o produto não estava cadastrado e chamava de
+    // avulso — a venda saía sem baixa de estoque.
+    expect(sugerirProdutos(lista, "feijao").map((p) => p.id)).toContain("c");
   });
 });
 

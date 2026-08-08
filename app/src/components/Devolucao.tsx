@@ -5,6 +5,7 @@ import { Modal, Field, InputNumero } from "./ui";
 import { useApp } from "../store/AppStore";
 import { saldosApos } from "../lib/estoque";
 import { uid, nowISO, brl, formatDateTime } from "../lib/format";
+import { normalizar } from "../lib/busca";
 import { sessaoAberta as achaSessaoAberta } from "../lib/caixa";
 import {
   calcularDevolucao,
@@ -39,14 +40,14 @@ export const Devolucao: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
   /** As últimas vendas que ainda têm o que devolver */
   const candidatas = useMemo(() => {
-    const t = busca.trim().toLowerCase();
+    const t = normalizar(busca);
     return [...vendas]
       .filter(podeDevolver)
       .filter((v) =>
         !t
           ? true
           : String(v.numero) === t ||
-            (v.itens || []).some((i) => (i.descricao || "").toLowerCase().includes(t))
+            (v.itens || []).some((i) => normalizar(i.descricao).includes(t))
       )
       .sort((a, b) => (b.criadoEm || "").localeCompare(a.criadoEm || ""))
       .slice(0, 12);

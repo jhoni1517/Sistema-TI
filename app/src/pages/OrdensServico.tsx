@@ -70,7 +70,7 @@ import {
   type Config,
   type Produto,
 } from "../lib/types";
-import { produtosParaOS } from "../lib/busca";
+import { produtosParaOS, normalizar } from "../lib/busca";
 import { travaAtendimento, classificacaoDe, travaFiado } from "../lib/clientes";
 import { backupDe, avisoDeBackup, perguntaAntesDeConcluir } from "../lib/backup";
 import { saldosApos } from "../lib/estoque";
@@ -145,8 +145,17 @@ export const OrdensServico: React.FC = () => {
 
   const proximoNumero = useMemo(() => proximoNum(ordens), [ordens]);
 
+  /**
+   * Mesmo aparelho? Serve para mostrar o historico de consertos daquele IMEI.
+   * IMEI vazio nunca casa com nada: senao TODA OS sem IMEI viraria historico
+   * de todas as outras.
+   */
+  const mesmoImei = (a?: string, b?: string): boolean =>
+    // texto-cru-proposital: IMEI e numero e letra, nao tem acento
+    !!a?.trim() && a.trim().toLowerCase() === (b || "").trim().toLowerCase();
+
   const lista = useMemo(() => {
-    const b = busca.toLowerCase();
+    const b = normalizar(busca);
     return [...ordens]
       .filter((o) => {
         if (filtro === "abertas") return !["entregue", "cancelada"].includes(o.status);
@@ -155,10 +164,11 @@ export const OrdensServico: React.FC = () => {
       })
       .filter((o) => {
         // busca em cliente, código, aparelho e IMEI (tolerante a campos vazios)
-        const alvo = [nomeCliente(o.clienteId), codigoOS(o.numero), o.marca, o.modelo, o.imeiSerial]
-          .map(txt)
-          .join(" ")
-          .toLowerCase();
+        const alvo = normalizar(
+          [nomeCliente(o.clienteId), codigoOS(o.numero), o.marca, o.modelo, o.imeiSerial]
+            .map(txt)
+            .join(" ")
+        );
         return alvo.includes(b);
       })
       .sort((a, b) => (b.numero || 0) - (a.numero || 0));
@@ -266,10 +276,13 @@ export const OrdensServico: React.FC = () => {
     // (uma digitada, outra escolhida da lista) descia uma vez só.
     const aBaixar: { produtoId: string; quantidade: number }[] = [];
     for (const p of pecasEfetivas(o)) {
-      const nome = txt(p.descricao).trim().toLowerCase();
+      // Sem acento dos dois lados: a peça digitada como "fonte 500w acucar"
+      // não pode deixar de casar com o cadastro só pela cedilha. Sem casar,
+      // ela cai em semVinculo e o estoque nunca desce.
+      const nome = normalizar(p.descricao);
       const prod =
         (p.produtoId && produtos.find((x) => x.id === p.produtoId)) ||
-        (nome ? produtos.find((x) => txt(x.nome).trim().toLowerCase() === nome) : undefined);
+        (nome ? produtos.find((x) => normalizar(x.nome) === nome) : undefined);
 
       if (!prod) {
         if (nome) semVinculo.push(txt(p.descricao));
@@ -536,9 +549,7 @@ export const OrdensServico: React.FC = () => {
           historicoAparelho={
             detalhe.imeiSerial?.trim()
               ? ordens.filter(
-                  (x) =>
-                    x.id !== detalhe.id &&
-                    x.imeiSerial?.trim().toLowerCase() === detalhe.imeiSerial?.trim().toLowerCase()
+                  (x) => x.id !== detalhe.id && mesmoImei(x.imeiSerial, detalhe.imeiSerial)
                 )
               : []
           }
@@ -1622,12 +1633,13 @@ const ClienteSelect: React.FC<{
   }, [value, clientes]);
   const filtro = clientes
     .filter((c) => {
-      const alvo = q.toLowerCase();
+      const alvo = normalizar(q);
       // Só compara número quando o usuário digitou número — senão o
       // "contém string vazia" daria positivo para a lista inteira.
       const digitos = q.replace(/\D/g, "");
       return (
-        txt(c.nome).toLowerCase().includes(alvo) ||
+        // Sem acento: "jose" tem que achar "José".
+        normalizar(c.nome).includes(alvo) ||
         (digitos.length > 0 &&
           (txt(c.telefone).replace(/\D/g, "").includes(digitos) ||
             txt(c.documento).replace(/\D/g, "").includes(digitos)))

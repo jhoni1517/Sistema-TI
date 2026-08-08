@@ -1,4 +1,5 @@
 import { txt } from "./format";
+import { produtosParaOS, normalizar } from "./busca";
 import { soData, hojeISO, diasAteVencer } from "./contas";
 import { precoEfetivo } from "./promocao";
 import type { ItemVenda, Produto, Venda } from "./types";
@@ -173,26 +174,33 @@ export function adicionar(itens: ItemVenda[], novo: ItemVenda): ItemVenda[] {
 export function buscarProduto(produtos: Produto[], termo: string): Produto | undefined {
   const t = txt(termo).trim();
   if (!t) return undefined;
+  // O código de barras é comparado cru: ele é dígito, e "normalizar" nele só
+  // gastaria trabalho. Nome e SKU passam por normalizar porque quem digita o
+  // nome e dá Enter no balcão não acentua — "feijao" tem que achar "Feijão".
+  const alvo = normalizar(t);
   const exato = produtos.find(
-    (p) => txt(p.codigoBarras).trim() === t || txt(p.sku).trim().toLowerCase() === t.toLowerCase()
+    (p) => txt(p.codigoBarras).trim() === t || normalizar(p.sku) === alvo
   );
   if (exato) return exato;
-  const alvo = t.toLowerCase();
-  return produtos.find((p) => txt(p.nome).toLowerCase() === alvo);
+  return produtos.find((p) => normalizar(p.nome) === alvo);
 }
 
 /** Sugestões para quem digita o nome em vez de ler o código */
 export function sugerirProdutos(produtos: Produto[], termo: string, limite = 8): Produto[] {
-  const t = txt(termo).trim().toLowerCase();
-  if (!t) return [];
-  return produtos
-    .filter(
-      (p) =>
-        txt(p.nome).toLowerCase().includes(t) ||
-        txt(p.sku).toLowerCase().includes(t) ||
-        txt(p.codigoBarras).includes(t)
-    )
-    .slice(0, limite);
+  /*
+   * Sem acento, e em ordem — a mesma regra do resto do sistema.
+   *
+   * Esta é a busca mais crítica que existe aqui: é o balcão, com fila. E
+   * era a que comparava texto cru. Quem digitava "acucar" não achava
+   * "Açúcar", "pao" não achava "Pão de queijo" e "agua" não achava "Água
+   * mineral" — e o operador concluía que o produto não estava cadastrado.
+   *
+   * Foi a terceira vez que este mesmo erro apareceu no sistema. Por isso
+   * agora existe busca-sem-acento.test.ts, que reprova texto cru em
+   * qualquer busca nova.
+   */
+  if (!txt(termo).trim()) return [];
+  return produtosParaOS(produtos, termo, limite);
 }
 
 /* ------------------------------------------------------------------ */

@@ -16,6 +16,7 @@ import {
 import { aviso } from "../components/Aviso";
 import { SectionTitle, Field, Modal, EmptyState, InputNumero } from "../components/ui";
 import { brl, formatDate, txt, abrirWhatsapp } from "../lib/format";
+import { normalizar } from "../lib/busca";
 import { gerarLinkDeSenha } from "../lib/auth";
 import { RAMOS, RAMO_META, ramoDe } from "../lib/ramos";
 import { mensagemCobranca, tipoDoAviso, AVISO_META } from "../lib/cobranca";
@@ -100,9 +101,9 @@ export const Lojas: React.FC = () => {
   const tolerancia = cfg.dias_tolerancia ?? 5;
 
   const lista = useMemo(() => {
-    const b = busca.toLowerCase();
+    const b = normalizar(busca);
     return lojas
-      .filter((l) => txt(l.nome).toLowerCase().includes(b))
+      .filter((l) => normalizar(l.nome).includes(b))
       .sort((a, b2) => (diasParaVencer(a.venceEm) ?? 0) - (diasParaVencer(b2.venceEm) ?? 0));
   }, [lojas, busca]);
 

@@ -1,3 +1,4 @@
+import { normalizar } from "./format";
 import { hojeISO, soData, diasAteVencer } from "./contas";
 import { saidasDeEstoque, type SaidaDeEstoque } from "./consumo";
 import type { Produto, Venda, OrdemServico } from "./types";
@@ -47,14 +48,19 @@ export interface GiroProduto {
   valorEmEstoque: number;
 }
 
-/** Casa a saída com o produto: por id, e pelo nome quando falta id */
+/**
+ * Casa a saída com o produto: por id, e pelo nome quando falta id.
+ *
+ * O nome vem dos dois lados sem acento. A descrição da saída foi digitada
+ * por gente ("acucar cristal") e o cadastro tem "Açúcar cristal": comparando
+ * cru, as vendas do item não somam no giro dele. O produto aparece parado há
+ * meses, entra na lista de encalhe e vira promoção — de uma coisa que estava
+ * vendendo bem.
+ */
 const chaveDaSaida = (i: SaidaDeEstoque): string =>
-  i.produtoId || `nome:${(i.descricao || "").trim().toLowerCase()}`;
+  i.produtoId || `nome:${normalizar(i.descricao)}`;
 
-const chaveDoProduto = (p: Produto): string[] => [
-  p.id,
-  `nome:${(p.nome || "").trim().toLowerCase()}`,
-];
+const chaveDoProduto = (p: Produto): string[] => [p.id, `nome:${normalizar(p.nome)}`];
 
 /**
  * Giro de cada produto no período.
