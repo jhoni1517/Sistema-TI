@@ -1,6 +1,6 @@
-import { centavos } from "./pdv";
+import { centavos, problemaNasLinhas } from "./pdv";
 import { txt, normalizar } from "./format";
-import type { ItemComanda, Comanda, PreparoItem } from "./types";
+import type { ItemComanda, ItemVenda, Comanda, PreparoItem } from "./types";
 
 /**
  * Comanda de mesa.
@@ -42,23 +42,81 @@ export const preparoDe = (p?: string | null): PreparoItem =>
 export const subtotalDoItem = (i: ItemComanda): number =>
   centavos((Number(i.quantidade) || 0) * (Number(i.precoUnit) || 0));
 
+/** As linhas que o cliente paga: o cancelado fica na comanda, mas não na conta */
+export const itensAtivos = (c: Comanda): ItemComanda[] =>
+  (c?.itens || []).filter((i) => !i.cancelado);
+
 /**
- * Quanto a mesa deve.
+ * O consumo da mesa, antes da taxa e do desconto.
  *
  * Item cancelado não entra: ele fica na comanda de propósito, para a
  * cozinha saber que aquilo foi pedido e desfeito, mas ninguém paga por
  * comida que não saiu.
  */
 export const totalComanda = (c: Comanda): number =>
-  centavos(
-    (c?.itens || [])
-      .filter((i) => !i.cancelado)
-      .reduce((s, i) => s + subtotalDoItem(i), 0)
-  );
+  centavos(itensAtivos(c).reduce((s, i) => s + subtotalDoItem(i), 0));
 
 /** Quantos itens contam para a conta */
-export const quantosItens = (c: Comanda): number =>
-  (c?.itens || []).filter((i) => !i.cancelado).length;
+export const quantosItens = (c: Comanda): number => itensAtivos(c).length;
+
+/**
+ * A taxa de serviço em dinheiro.
+ *
+ * É a gorjeta dos 10%, que praticamente toda casa cobra e que o cliente pode
+ * recusar — por isso ela é um valor à parte e não vem embutida no preço dos
+ * pratos. Calculada sobre o CONSUMO, nunca sobre o consumo já com desconto:
+ * cobrar serviço em cima da taxa é conta em cima de conta.
+ *
+ * Percentual fora de 0 a 100 é ignorado. Digitar 1000 por engano no campo
+ * transformaria uma conta de R$ 80 em R$ 880 com o cliente na frente.
+ */
+export function taxaDaComanda(c: Comanda, percentual?: number | null): number {
+  const p = Number(percentual ?? c?.taxaServico) || 0;
+  if (p <= 0 || p > 100) return 0;
+  return centavos((totalComanda(c) * p) / 100);
+}
+
+/**
+ * O que a mesa paga: consumo + taxa - desconto.
+ *
+ * Nunca negativo. Desconto maior que a conta devolveria dinheiro da gaveta
+ * por uma refeição que a casa serviu.
+ */
+export function totalAPagar(c: Comanda, percentual?: number | null): number {
+  const consumo = totalComanda(c);
+  const taxa = taxaDaComanda(c, percentual);
+  const desconto = Math.max(0, Number(c?.desconto) || 0);
+  return centavos(Math.max(0, consumo + taxa - desconto));
+}
+
+/**
+ * As linhas que vão para a venda, com a taxa virando um item.
+ *
+ * A taxa entra como LINHA e não como campo novo em `Venda` por dois
+ * motivos. Ela aparece no cupom com o nome dela, que é o que o cliente
+ * confere e o que ele tem direito de recusar. E, sem `produtoId`, ela não
+ * passa pelo estoque nem inventa custo: a gorjeta não é mercadoria.
+ *
+ * O desconto continua no campo `desconto` da venda, que já existe e já é
+ * abatido em todo lugar que soma venda.
+ */
+export function itensParaVenda(c: Comanda, percentual?: number | null): ItemVenda[] {
+  const linhas: ItemVenda[] = itensAtivos(c).map(
+    ({ id: _id, preparo: _p, pedidoEm: _pe, prontoEm: _pr, cancelado: _c, motivoCancelamento: _m, ...resto }) =>
+      resto
+  );
+  const taxa = taxaDaComanda(c, percentual);
+  if (taxa > 0) {
+    const p = Number(percentual ?? c?.taxaServico) || 0;
+    linhas.push({
+      descricao: `Taxa de servico ${p}%`,
+      quantidade: 1,
+      precoUnit: taxa,
+      custoUnit: 0,
+    });
+  }
+  return linhas;
+}
 
 /**
  * Há quantos minutos este item está esperando.
@@ -85,12 +143,37 @@ export function minutosEsperando(i: ItemComanda, agora = new Date()): number {
  * booleano porque quem está no salão precisa saber O QUE fazer para poder
  * fechar — "não pode fechar" sozinho manda a pessoa adivinhar.
  */
-export function problemaParaFechar(c: Comanda): string {
+export function problemaParaFechar(c: Comanda, percentual?: number | null): string {
   if (!c) return "Comanda não encontrada.";
   if (c.status === "fechada") return "Esta comanda já foi fechada.";
   if (c.status === "cancelada") return "Esta comanda foi cancelada.";
   if (quantosItens(c) === 0) {
     return "A comanda está vazia. Cancele em vez de fechar: comanda fechada com zero vira venda de R$ 0,00 no caixa.";
+  }
+  /*
+   * A mesma conferência do carrinho do balcão, e pelo mesmo motivo: fechar
+   * a comanda passa pelo `saldosApos` e pelo caixa, igualzinho a uma venda.
+   *
+   * Sem isto, uma linha de quantidade -2 fechava a mesa por R$ 0,00 e ainda
+   * CREDITAVA dois refrigerantes na geladeira. Nada sobrava para a
+   * conferência achar: o estoque não ficava negativo, o preço não era zero,
+   * e lucro inflado ninguém procura. A quantidade é campo livre na tela do
+   * garçom — tem que ser, ele corrige "2 cervejas" para "3" o tempo todo.
+   */
+  const linha = problemaNasLinhas(
+    itensAtivos(c),
+    "Para tirar um item da conta, use o botão de cancelar do próprio item."
+  );
+  if (linha) return linha;
+
+  // Desconto que come a conta inteira dá o mesmo resultado da comanda vazia:
+  // uma venda de R$ 0,00 no caixa, que ninguém sabe ler no fechamento do dia.
+  // Refeição por conta da casa se resolve cancelando a comanda.
+  if (totalAPagar(c, percentual) === 0) {
+    return (
+      "O desconto zerou a conta. Se a refeição foi por conta da casa, cancele " +
+      "a comanda: fechar por R$ 0,00 vira uma venda de zero no caixa."
+    );
   }
   /*
    * Item ainda na cozinha não impede fechar, e é de propósito.

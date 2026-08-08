@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { aviso } from "../components/Aviso";
-import { Plus, Trash2, Utensils, Receipt, Clock, Pizza, X } from "lucide-react";
+import { Plus, Trash2, Utensils, Receipt, Clock, Pizza, X, AlertTriangle } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { MontarPizza } from "../components/MontarPizza";
@@ -11,11 +11,24 @@ import { precoEfetivo } from "../lib/promocao";
 import { saldosApos } from "../lib/estoque";
 import { proximoNumero, problemaParaNumerar } from "../lib/numeracao";
 import { custoVenda } from "../lib/pdv";
+import { sessaoAberta as achaSessaoAberta } from "../lib/caixa";
+import {
+  consolidar,
+  formaPrincipal,
+  problemaNoPagamento,
+  faltaNoPagamento,
+  trocoDoPagamento,
+  type Parcela,
+} from "../lib/pagamento";
 import {
   totalComanda,
+  totalAPagar,
+  taxaDaComanda,
+  itensParaVenda,
   quantosItens,
   problemaParaFechar,
   cancelarItem,
+  comPreparo,
   comandasAbertas,
   comandaDaMesa,
   minutosEsperando,
@@ -28,6 +41,7 @@ import type {
   ItemComanda,
   ItemVenda,
   MovimentoCaixa,
+  PreparoItem,
   Produto,
   Venda,
   FormaPagamento,
@@ -66,17 +80,43 @@ export const Mesas: React.FC = () => {
     saveProduto,
   } = useApp();
 
-  const [aberta, setAberta] = useState<Comanda | null>(null);
+  const [abertaId, setAbertaId] = useState<string | null>(null);
   const [novaMesa, setNovaMesa] = useState("");
   const [abrindo, setAbrindo] = useState(false);
-  const [fechando, setFechando] = useState<Comanda | null>(null);
+  const [fechandoId, setFechandoId] = useState<string | null>(null);
   const [gravando, setGravando] = useState(false);
 
   const lista = useMemo(() => comandasAbertas(comandas), [comandas]);
   const usaMeioAMeio = temRecurso(ramo, "meioAMeio");
+  const sessao = achaSessaoAberta(sessoes);
 
-  /** A comanda que está na tela, sempre na versão mais nova do estado */
-  const atual = aberta ? comandas.find((c) => c.id === aberta.id) || aberta : null;
+  /**
+   * A comanda que está na tela vem sempre do estado, pelo id.
+   *
+   * Guardar o objeto inteiro fazia a tela segurar uma FOTO: o item lançado
+   * pelo outro celular do salão não aparecia, e a janela de fechar a conta
+   * mostrava o total de antes do último pedido — que é o valor que o cliente
+   * ia pagar.
+   */
+  const atual = abertaId ? comandas.find((c) => c.id === abertaId) || null : null;
+  const fechando = fechandoId ? comandas.find((c) => c.id === fechandoId) || null : null;
+
+  /**
+   * A versão que ACABOU de ser gravada, antes de a nuvem responder.
+   *
+   * O garçom toca em dois pratos seguidos. `saveComanda` leva o tempo do 4G
+   * para voltar, e até lá `comandas` ainda é a lista sem o primeiro item —
+   * então o segundo toque montava a comanda em cima da versão velha e o
+   * primeiro prato SUMIA. Ninguém percebe: só chega um prato na mesa.
+   *
+   * Se a comanda mudou por fora (o outro celular do salão), `atualizadoEm`
+   * da nuvem é mais novo e manda nela.
+   */
+  const recemGravada = useRef<Comanda | null>(null);
+  const base = (c: Comanda): Comanda => {
+    const r = recemGravada.current;
+    return r && r.id === c.id && txt(r.atualizadoEm) >= txt(c.atualizadoEm) ? r : c;
+  };
 
   const abrirMesa = async () => {
     const mesa = novaMesa.trim();
@@ -88,7 +128,7 @@ export const Mesas: React.FC = () => {
     if (jaTem) {
       setAbrindo(false);
       setNovaMesa("");
-      setAberta(jaTem);
+      setAbertaId(jaTem.id);
       return aviso.info(`A mesa ${jaTem.mesa} já tem uma comanda aberta. Abri ela para você.`);
     }
 
@@ -102,6 +142,10 @@ export const Mesas: React.FC = () => {
       mesa,
       itens: [],
       status: "aberta",
+      // Já nasce com a taxa que a casa cobra. O garçom tira quando o cliente
+      // recusa, que é o caminho raro — o contrário faria a casa esquecer de
+      // cobrar o serviço na correria.
+      taxaServico: Number(config.taxaServicoPadrao) || 0,
       abertaEm: nowISO(),
       atualizadoEm: nowISO(),
     };
@@ -109,24 +153,33 @@ export const Mesas: React.FC = () => {
       await saveComanda(nova);
       setAbrindo(false);
       setNovaMesa("");
-      setAberta(nova);
+      setAbertaId(nova.id);
     } catch (e) {
       aviso.erro("Não foi possível abrir a comanda:\n\n" + msg(e));
     }
   };
 
-  const gravar = async (c: Comanda) => {
+  /**
+   * Grava a comanda a partir da versão mais nova que existe.
+   *
+   * Recebe uma FUNÇÃO e não um objeto pronto de propósito: quem chama não
+   * tem como saber se o toque anterior já voltou da nuvem. Ver `base`.
+   */
+  const gravar = async (mudar: (c: Comanda) => Comanda) => {
+    if (!atual) return;
+    const nova = { ...mudar(base(atual)), atualizadoEm: nowISO() };
+    recemGravada.current = nova;
     try {
-      await saveComanda({ ...c, atualizadoEm: nowISO() });
+      await saveComanda(nova);
     } catch (e) {
       // A janela fechava como se tivesse dado certo e o pedido não chegava
       // na cozinha.
+      recemGravada.current = null;
       aviso.erro("Não foi possível gravar a comanda:\n\n" + msg(e));
     }
   };
 
   const addProduto = (p: Produto) => {
-    if (!atual) return;
     const item: ItemComanda = {
       id: uid(),
       produtoId: p.id,
@@ -137,15 +190,14 @@ export const Mesas: React.FC = () => {
       pedidoEm: nowISO(),
       preparo: "pendente",
     };
-    gravar({ ...atual, itens: [...(atual.itens || []), item] });
+    gravar((c) => ({ ...c, itens: [...(c.itens || []), item] }));
   };
 
   const mudarItem = (id: string, patch: Partial<ItemComanda>) => {
-    if (!atual) return;
-    gravar({
-      ...atual,
-      itens: (atual.itens || []).map((i) => (i.id === id ? { ...i, ...patch } : i)),
-    });
+    gravar((c) => ({
+      ...c,
+      itens: (c.itens || []).map((i) => (i.id === id ? { ...i, ...patch } : i)),
+    }));
   };
 
   const cancelar = (id: string) => {
@@ -161,7 +213,25 @@ export const Mesas: React.FC = () => {
     ) {
       return;
     }
-    gravar(cancelarItem(atual, id));
+    gravar((c) => cancelarItem(c, id));
+  };
+
+  /**
+   * Toque no selo do item anda com o preparo: na fila -> preparando ->
+   * pronto -> entregue.
+   *
+   * Sem isso TODO item ficava "na fila" para sempre, e o aviso "N itens
+   * ainda na cozinha" aparecia no fechamento de toda mesa, todo dia. Aviso
+   * que aparece sempre é aviso que a pessoa aprende a ignorar — e aí ele
+   * deixa de existir justamente no dia em que a sobremesa não saiu.
+   */
+  const andarPreparo = (id: string) => {
+    if (!atual) return;
+    const item = (atual.itens || []).find((i) => i.id === id);
+    if (!item) return;
+    const ordem: PreparoItem[] = ["pendente", "preparando", "pronto", "entregue"];
+    const proximo = ordem[(ordem.indexOf(preparoDe(item.preparo)) + 1) % ordem.length];
+    gravar((c) => comPreparo(c, id, proximo));
   };
 
   /**
@@ -171,48 +241,67 @@ export const Mesas: React.FC = () => {
    * lançamento sem baixa, que se conserta olhando o estoque; ao contrário
    * some a venda e ninguém procura por lucro inflado.
    */
-  const fecharComanda = async (c: Comanda, forma: FormaPagamento) => {
+  const fecharComanda = async (c: Comanda, parcelas: Parcela[]) => {
     const problema = problemaParaFechar(c);
     if (problema) return aviso.alerta(problema);
     if (gravando) return;
+
+    const total = totalAPagar(c);
+    const problemaPag = problemaNoPagamento(total, parcelas);
+    if (problemaPag) return aviso.alerta(problemaPag);
 
     const problemaNum = problemaParaNumerar(fontesComFalha, "vendas", "uma venda");
     if (problemaNum) return aviso.erro(problemaNum);
 
     setGravando(true);
-    const itens: ItemVenda[] = (c.itens || [])
-      .filter((i) => !i.cancelado)
-      .map(({ id: _id, preparo: _p, pedidoEm: _pe, prontoEm: _pr, ...resto }) => resto);
-    const total = totalComanda(c);
-    const sessao = sessoes.find((s) => !s.fechadoEm) || null;
+    // A taxa de serviço entra como LINHA da venda: é assim que ela aparece
+    // no cupom com o nome dela, e sem produtoId ela não passa pelo estoque.
+    const itens: ItemVenda[] = itensParaVenda(c);
+    const formas = consolidar(parcelas);
 
     const venda: Venda = {
       id: uid(),
       numero: proximoNumero(vendas),
       itens,
-      desconto: 0,
-      formaPagamento: forma,
+      desconto: Math.max(0, Number(c.desconto) || 0),
+      formaPagamento: formaPrincipal(formas),
+      pagamentos: formas.length > 1 ? formas : undefined,
       clienteId: c.clienteId,
       sessaoId: sessao?.id,
       criadoEm: nowISO(),
     } as Venda;
 
     try {
-      const movimento: MovimentoCaixa = {
-        id: uid(),
-        tipo: "entrada",
-        categoria: "Venda",
-        descricao: `Mesa ${c.mesa} - comanda ${c.numero} (${itens.length} item(ns))`,
-        valor: total,
-        formaPagamento: forma,
-        clienteId: c.clienteId,
-        custoRelacionado: custoVenda(itens),
-        data: nowISO(),
-        sessaoId: sessao?.id,
-      } as MovimentoCaixa;
+      /*
+       * Um lançamento POR FORMA, igual ao PDV. O fechamento do caixa separa
+       * o dinheiro da gaveta do que caiu na maquininha; um lançamento só,
+       * com a forma "principal", jogaria os R$ 20 em espécie da mesa dentro
+       * do cartão — e a gaveta acusaria falta todo dia.
+       */
+      const custo = custoVenda(itens);
+      let movimentoId = "";
+      for (const [i, f] of formas.entries()) {
+        const movimento: MovimentoCaixa = {
+          id: uid(),
+          tipo: "entrada",
+          categoria: "Venda",
+          descricao:
+            `Mesa ${c.mesa} - comanda ${c.numero} (${itens.length} item(ns))` +
+            (formas.length > 1 ? ` - ${f.forma}` : ""),
+          valor: f.valor,
+          formaPagamento: f.forma,
+          clienteId: c.clienteId,
+          // O custo vai INTEIRO no primeiro lançamento: dividir o CMV entre
+          // as formas de pagamento não significa nada.
+          custoRelacionado: i === 0 ? custo : 0,
+          data: nowISO(),
+          sessaoId: sessao?.id,
+        } as MovimentoCaixa;
+        await saveMovimento(movimento);
+        if (i === 0) movimentoId = movimento.id;
+      }
 
-      await saveMovimento(movimento);
-      await saveVenda({ ...venda, movimentoId: movimento.id });
+      await saveVenda({ ...venda, movimentoId });
 
       for (const { produto, quantidade } of saldosApos(itens, produtos)) {
         await saveProduto({ ...produto, quantidade });
@@ -226,9 +315,14 @@ export const Mesas: React.FC = () => {
         atualizadoEm: nowISO(),
       });
 
-      setFechando(null);
-      setAberta(null);
-      aviso.sucesso(`Mesa ${c.mesa} fechada: ${brl(total)}.`);
+      recemGravada.current = null;
+      setFechandoId(null);
+      setAbertaId(null);
+      const troco = trocoDoPagamento(total, formas);
+      aviso.sucesso(
+        `Mesa ${c.mesa} fechada: ${brl(total)}.` +
+          (troco > 0 ? ` Troco: ${brl(troco)}.` : "")
+      );
     } catch (e) {
       aviso.erro("Não foi possível fechar a comanda:\n\n" + msg(e));
     } finally {
@@ -248,6 +342,16 @@ export const Mesas: React.FC = () => {
         }
       />
 
+      {/* O mesmo aviso do PDV: sem caixa aberto o dinheiro entra, mas fica
+          fora do fechamento do dia — e ninguém confere o que não aparece. */}
+      {!sessao && (
+        <p className="mb-4 flex items-start gap-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          Nenhum caixa aberto. A mesa fecha assim mesmo, mas fica fora do
+          fechamento do dia. Abra o caixa em Caixa para conferir certo depois.
+        </p>
+      )}
+
       {lista.length === 0 ? (
         <EmptyState
           icon={<Utensils size={48} />}
@@ -263,7 +367,7 @@ export const Mesas: React.FC = () => {
             return (
               <button
                 key={c.id}
-                onClick={() => setAberta(c)}
+                onClick={() => setAbertaId(c.id)}
                 className="card toca text-left"
               >
                 <div className="flex items-start justify-between gap-2">
@@ -332,12 +436,13 @@ export const Mesas: React.FC = () => {
           produtos={produtos}
           usaMeioAMeio={usaMeioAMeio}
           regraMeioAMeio={config.regraMeioAMeio}
-          onFechar={() => setAberta(null)}
+          onFechar={() => setAbertaId(null)}
           onAddProduto={addProduto}
-          onAddItem={(item) => gravar({ ...atual, itens: [...(atual.itens || []), item] })}
+          onAddItem={(item) => gravar((c) => ({ ...c, itens: [...(c.itens || []), item] }))}
           onMudarItem={mudarItem}
           onCancelarItem={cancelar}
-          onPedirConta={() => setFechando(atual)}
+          onAndarPreparo={andarPreparo}
+          onPedirConta={() => setFechandoId(atual.id)}
         />
       )}
 
@@ -345,8 +450,9 @@ export const Mesas: React.FC = () => {
         <FecharComanda
           comanda={fechando}
           gravando={gravando}
-          onClose={() => setFechando(null)}
-          onConfirmar={(forma) => fecharComanda(fechando, forma)}
+          onClose={() => setFechandoId(null)}
+          onMudarConta={(patch) => gravar((c) => ({ ...c, ...patch }))}
+          onConfirmar={(parcelas) => fecharComanda(fechando, parcelas)}
         />
       )}
     </div>
@@ -369,6 +475,7 @@ const ComandaAberta: React.FC<{
   onAddItem: (i: ItemComanda) => void;
   onMudarItem: (id: string, patch: Partial<ItemComanda>) => void;
   onCancelarItem: (id: string) => void;
+  onAndarPreparo: (id: string) => void;
   onPedirConta: () => void;
 }> = ({
   comanda,
@@ -380,12 +487,13 @@ const ComandaAberta: React.FC<{
   onAddItem,
   onMudarItem,
   onCancelarItem,
+  onAndarPreparo,
   onPedirConta,
 }) => {
   const [termo, setTermo] = useState("");
   const [montandoPizza, setMontandoPizza] = useState(false);
   const sugestoes = useMemo(() => produtosParaOS(produtos, termo, 6), [produtos, termo]);
-  const total = totalComanda(comanda);
+  const total = totalAPagar(comanda);
 
   return (
     <Modal
@@ -456,72 +564,19 @@ const ComandaAberta: React.FC<{
           </p>
         ) : (
           <div className="space-y-2">
-            {(comanda.itens || []).map((i) => {
-              const p = preparoDe(i.preparo);
-              return (
-                <div
-                  key={i.id}
-                  className={`rounded-lg border p-3 ${
-                    i.cancelado ? "border-slate-200 bg-slate-50 opacity-60" : "border-slate-200"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className={`truncate font-semibold text-slate-800 ${i.cancelado ? "line-through" : ""}`}
-                      >
-                        {i.descricao}
-                      </p>
-                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                        {i.cancelado ? (
-                          <span className="badge bg-red-100 text-red-700">Cancelado</span>
-                        ) : (
-                          <>
-                            <span className={`badge ${PREPARO_META[p].cor}`}>
-                              {PREPARO_META[p].label}
-                            </span>
-                            {(p === "pendente" || p === "preparando") && (
-                              <span className="text-xs text-slate-400">
-                                {minutosEsperando(i)} min
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <span className="shrink-0 font-bold text-slate-800">
-                      {brl(subtotalDoItem(i))}
-                    </span>
-                  </div>
-
-                  {!i.cancelado && (
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <InputNumero
-                        className="input !w-20 !py-1.5 text-sm"
-                        min={1}
-                        value={i.quantidade}
-                        onChange={(v) => onMudarItem(i.id, { quantidade: v ?? 1 })}
-                      />
-                      <input
-                        className="input !py-1.5 flex-1 text-sm"
-                        placeholder="Sem cebola, bem passado..."
-                        value={i.observacao || ""}
-                        onChange={(e) => onMudarItem(i.id, { observacao: e.target.value })}
-                      />
-                      <button
-                        className="btn-ghost !p-2 text-red-500"
-                        title="Cancelar item"
-                        onClick={() => onCancelarItem(i.id)}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+            {(comanda.itens || []).map((i) => (
+              <LinhaItem
+                key={i.id}
+                item={i}
+                onMudar={(patch) => onMudarItem(i.id, patch)}
+                onCancelar={() => onCancelarItem(i.id)}
+                onAndarPreparo={() => onAndarPreparo(i.id)}
+              />
+            ))}
           </div>
         )}
+
+        <ResumoDaConta comanda={comanda} />
       </div>
 
       {montandoPizza && (
@@ -545,6 +600,140 @@ const ComandaAberta: React.FC<{
 };
 
 /* ------------------------------------------------------------------ */
+/* Uma linha da comanda                                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A linha do pedido, com o campo de recado em estado LOCAL.
+ *
+ * Ligar o `onChange` do recado direto na gravação mandava uma escrita para a
+ * nuvem POR TECLA: "sem cebola" eram onze idas ao Supabase no 4G do salão, e
+ * as respostas voltando fora de ordem apagavam letra. Aqui o texto é local
+ * enquanto se digita e sobe quando o campo perde o foco.
+ *
+ * Enquanto ninguém está digitando, o campo acompanha o que veio da nuvem —
+ * é a mesma regra da tela de Configurações, e pelo mesmo motivo: recarregar
+ * por cima de quem digita é o outro jeito de perder o que a pessoa escreveu.
+ */
+const LinhaItem: React.FC<{
+  item: ItemComanda;
+  onMudar: (patch: Partial<ItemComanda>) => void;
+  onCancelar: () => void;
+  onAndarPreparo: () => void;
+}> = ({ item, onMudar, onCancelar, onAndarPreparo }) => {
+  const [recado, setRecado] = useState(item.observacao || "");
+  const [digitando, setDigitando] = useState(false);
+  const p = preparoDe(item.preparo);
+
+  if (!digitando && (item.observacao || "") !== recado) setRecado(item.observacao || "");
+
+  return (
+    <div
+      className={`rounded-lg border p-3 ${
+        item.cancelado ? "border-slate-200 bg-slate-50 opacity-60" : "border-slate-200"
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <p
+            className={`truncate font-semibold text-slate-800 ${item.cancelado ? "line-through" : ""}`}
+          >
+            {item.descricao}
+          </p>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            {item.cancelado ? (
+              <span className="badge bg-red-100 text-red-700">Cancelado</span>
+            ) : (
+              <>
+                {/* Tocar anda com o preparo. Sem isto o item ficava "na fila"
+                    para sempre e o aviso da cozinha aparecia em toda mesa. */}
+                <button
+                  onClick={onAndarPreparo}
+                  className={`badge ${PREPARO_META[p].cor}`}
+                  title="Tocar para andar: na fila, preparando, pronto, entregue"
+                >
+                  {PREPARO_META[p].label}
+                </button>
+                {(p === "pendente" || p === "preparando") && (
+                  <span className="text-xs text-slate-400">{minutosEsperando(item)} min</span>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+        <span className="shrink-0 font-bold text-slate-800">{brl(subtotalDoItem(item))}</span>
+      </div>
+
+      {!item.cancelado && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <InputNumero
+            className="input !w-20 !py-1.5 text-sm"
+            min={1}
+            value={item.quantidade}
+            onChange={(v) => onMudar({ quantidade: v ?? 1 })}
+          />
+          <input
+            className="input !py-1.5 flex-1 text-sm"
+            placeholder="Sem cebola, bem passado..."
+            value={recado}
+            onFocus={() => setDigitando(true)}
+            onChange={(e) => setRecado(e.target.value)}
+            onBlur={() => {
+              setDigitando(false);
+              if (recado !== (item.observacao || "")) onMudar({ observacao: recado });
+            }}
+          />
+          <button
+            className="btn-ghost !p-2 text-red-500"
+            title="Cancelar item"
+            onClick={onCancelar}
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ------------------------------------------------------------------ */
+/* O resumo da conta                                                   */
+/* ------------------------------------------------------------------ */
+
+/** Consumo, taxa e desconto separados: é o que o cliente confere na conta */
+const ResumoDaConta: React.FC<{ comanda: Comanda }> = ({ comanda }) => {
+  const consumo = totalComanda(comanda);
+  const taxa = taxaDaComanda(comanda);
+  const desconto = Math.max(0, Number(comanda.desconto) || 0);
+  if (consumo === 0) return null;
+
+  return (
+    <div className="rounded-lg bg-slate-50 p-3 text-sm">
+      <div className="flex justify-between text-slate-600">
+        <span>Consumo</span>
+        <span>{brl(consumo)}</span>
+      </div>
+      {taxa > 0 && (
+        <div className="flex justify-between text-slate-600">
+          <span>Serviço {Number(comanda.taxaServico) || 0}%</span>
+          <span>{brl(taxa)}</span>
+        </div>
+      )}
+      {desconto > 0 && (
+        <div className="flex justify-between text-slate-600">
+          <span>Desconto</span>
+          <span>- {brl(desconto)}</span>
+        </div>
+      )}
+      <div className="mt-1 flex justify-between border-t border-slate-200 pt-1 font-bold text-slate-800">
+        <span>Total</span>
+        <span>{brl(totalAPagar(comanda))}</span>
+      </div>
+    </div>
+  );
+};
+
+/* ------------------------------------------------------------------ */
 /* Fechar a conta                                                      */
 /* ------------------------------------------------------------------ */
 
@@ -552,10 +741,23 @@ const FecharComanda: React.FC<{
   comanda: Comanda;
   gravando: boolean;
   onClose: () => void;
-  onConfirmar: (forma: FormaPagamento) => void;
-}> = ({ comanda, gravando, onClose, onConfirmar }) => {
+  onMudarConta: (patch: Partial<Comanda>) => void;
+  onConfirmar: (parcelas: Parcela[]) => void;
+}> = ({ comanda, gravando, onClose, onMudarConta, onConfirmar }) => {
   const [forma, setForma] = useState<FormaPagamento>("dinheiro");
-  const total = totalComanda(comanda);
+  const [parcelas, setParcelas] = useState<Parcela[]>([]);
+  const [dividido, setDividido] = useState(false);
+  const [recebido, setRecebido] = useState<number | undefined>(undefined);
+
+  const consumo = totalComanda(comanda);
+  const taxa = taxaDaComanda(comanda);
+  const desconto = Math.max(0, Number(comanda.desconto) || 0);
+  const total = totalAPagar(comanda);
+  const temTaxa = (Number(comanda.taxaServico) || 0) > 0;
+
+  const falta = faltaNoPagamento(total, parcelas);
+  const parcelasFinais: Parcela[] = dividido ? parcelas : [{ forma, valor: total, recebido }];
+  const troco = trocoDoPagamento(total, parcelasFinais);
   const naCozinha = (comanda.itens || []).filter(
     (i) => !i.cancelado && ["pendente", "preparando"].includes(preparoDe(i.preparo))
   ).length;
@@ -574,7 +776,7 @@ const FecharComanda: React.FC<{
           <button
             className="btn-success"
             disabled={gravando}
-            onClick={() => onConfirmar(forma)}
+            onClick={() => onConfirmar(parcelasFinais)}
           >
             {gravando ? "Fechando..." : `Receber ${brl(total)}`}
           </button>
@@ -586,7 +788,9 @@ const FecharComanda: React.FC<{
           <p className="text-sm text-emerald-700">Total da mesa</p>
           <p className="text-3xl font-bold text-emerald-700">{brl(total)}</p>
           <p className="mt-1 text-xs text-emerald-700/80">
-            {quantosItens(comanda)} item(ns)
+            {quantosItens(comanda)} item(ns) · consumo {brl(consumo)}
+            {taxa > 0 && ` + serviço ${brl(taxa)}`}
+            {desconto > 0 && ` - desconto ${brl(desconto)}`}
           </p>
         </div>
 
@@ -595,29 +799,160 @@ const FecharComanda: React.FC<{
             que não é dele. */}
         {naCozinha > 0 && (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-            <X size={14} className="mr-1 inline" />
+            <AlertTriangle size={14} className="mr-1 inline" />
             {naCozinha} item(ns) ainda na cozinha. Dá para fechar, mas confira
             se tudo já foi entregue.
           </div>
         )}
 
-        <Field label="Forma de pagamento">
-          <div className="grid grid-cols-2 gap-2">
-            {FORMAS.map((f) => (
-              <button
-                key={f.k}
-                onClick={() => setForma(f.k)}
-                className={`chip justify-center text-sm ${
-                  forma === f.k
-                    ? "bg-brand-600 text-white"
-                    : "bg-white text-slate-600 ring-1 ring-slate-200"
-                }`}
-              >
-                {f.nome}
-              </button>
-            ))}
-          </div>
+        {/* A taxa de serviço é o único item da conta que o cliente pode
+            recusar por lei. Tirar precisa ser um toque, não uma discussão
+            com o sistema na frente dele. */}
+        {temTaxa && (
+          <button
+            className="chip w-full justify-center bg-white text-sm text-slate-600 ring-1 ring-slate-200"
+            onClick={() => onMudarConta({ taxaServico: 0 })}
+          >
+            <X size={14} /> Cliente recusou o serviço ({brl(taxa)})
+          </button>
+        )}
+
+        <Field label="Desconto na conta">
+          <InputNumero
+            className="input"
+            min={0}
+            value={comanda.desconto}
+            onChange={(v) => onMudarConta({ desconto: v ?? 0 })}
+          />
         </Field>
+
+        {!dividido ? (
+          <>
+            <Field label="Forma de pagamento">
+              <div className="grid grid-cols-2 gap-2">
+                {FORMAS.map((f) => (
+                  <button
+                    key={f.k}
+                    onClick={() => setForma(f.k)}
+                    className={`chip justify-center text-sm ${
+                      forma === f.k
+                        ? "bg-brand-600 text-white"
+                        : "bg-white text-slate-600 ring-1 ring-slate-200"
+                    }`}
+                  >
+                    {f.nome}
+                  </button>
+                ))}
+              </div>
+            </Field>
+
+            {forma === "dinheiro" && (
+              <Field label="Dinheiro entregue (para o troco)">
+                <InputNumero
+                  className="input"
+                  min={0}
+                  value={recebido}
+                  onChange={setRecebido}
+                />
+                {troco > 0 && (
+                  <p className="mt-1 text-sm font-bold text-emerald-700">
+                    Troco: {brl(troco)}
+                  </p>
+                )}
+              </Field>
+            )}
+
+            {/* Mesa de quatro pagando metade no cartão e metade em dinheiro é
+                a regra, não a exceção. Lançar tudo numa forma só faz a gaveta
+                acusar falta e a maquininha acusar sobra, todo dia. */}
+            <button
+              className="btn-secondary w-full"
+              onClick={() => {
+                setDividido(true);
+                setParcelas([{ forma, valor: total }]);
+              }}
+            >
+              Dividir entre formas de pagamento
+            </button>
+          </>
+        ) : (
+          <Field label="Como a mesa vai pagar">
+            <div className="space-y-2">
+              {parcelas.map((p, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <select
+                    className="input !py-1.5 flex-1 text-sm"
+                    value={p.forma}
+                    onChange={(e) =>
+                      setParcelas((v) =>
+                        v.map((x, n) =>
+                          n === i ? { ...x, forma: e.target.value as FormaPagamento } : x
+                        )
+                      )
+                    }
+                  >
+                    {FORMAS.map((f) => (
+                      <option key={f.k} value={f.k}>
+                        {f.nome}
+                      </option>
+                    ))}
+                  </select>
+                  <InputNumero
+                    className="input !w-28 !py-1.5 text-sm"
+                    min={0}
+                    value={p.valor}
+                    onChange={(v) =>
+                      setParcelas((x) => x.map((y, n) => (n === i ? { ...y, valor: v ?? 0 } : y)))
+                    }
+                  />
+                  <button
+                    className="btn-ghost !p-2 text-red-500"
+                    onClick={() => setParcelas((v) => v.filter((_, n) => n !== i))}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+
+              <div className="flex items-center justify-between gap-2 text-sm">
+                <span className={falta > 0 ? "font-bold text-amber-700" : "text-slate-500"}>
+                  {falta > 0 ? `Faltam ${brl(falta)}` : "Fechou certo"}
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    className="btn-ghost text-sm"
+                    onClick={() =>
+                      setParcelas((v) => [
+                        ...v,
+                        // A linha nova nasce numa forma que ainda não está na
+                        // lista. Nascendo sempre em "dinheiro", o toque não
+                        // servia para nada quando a primeira já era dinheiro:
+                        // `consolidar` juntava as duas e o caixa recebia um
+                        // lançamento só.
+                        {
+                          forma:
+                            FORMAS.find((f) => !v.some((x) => x.forma === f.k))?.k || "dinheiro",
+                          valor: falta,
+                        },
+                      ])
+                    }
+                  >
+                    <Plus size={14} /> Forma
+                  </button>
+                  <button
+                    className="btn-ghost text-sm"
+                    onClick={() => {
+                      setDividido(false);
+                      setParcelas([]);
+                    }}
+                  >
+                    Uma forma só
+                  </button>
+                </div>
+              </div>
+            </div>
+          </Field>
+        )}
       </div>
     </Modal>
   );

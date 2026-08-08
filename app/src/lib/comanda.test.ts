@@ -11,7 +11,11 @@ import {
   minutosEsperando,
   corDaEspera,
   preparoDe,
+  taxaDaComanda,
+  totalAPagar,
+  itensParaVenda,
 } from "./comanda";
+import { saldosApos } from "./estoque";
 import type { Comanda, ItemComanda } from "./types";
 
 const item = (i: Partial<ItemComanda> = {}): ItemComanda =>
@@ -213,5 +217,141 @@ describe("etapas do preparo", () => {
     expect(preparoDe(undefined)).toBe("pendente");
     expect(preparoDe("qualquer coisa")).toBe("pendente");
     expect(preparoDe("pronto")).toBe("pronto");
+  });
+});
+
+/**
+ * A comanda desemboca no MESMO lugar que a venda do balcão: `saldosApos` e
+ * um movimento no caixa. Ela nasceu sem a conferência que o carrinho já
+ * tinha, e a quantidade é campo livre na tela do garçom — tem que ser, ele
+ * corrige "2 cervejas" para "3" o tempo todo.
+ */
+describe("a mesa não fecha com linha que não é consumo", () => {
+  it("recusa quantidade negativa e diz qual é a saída", () => {
+    const c = comanda({
+      itens: [item(), item({ descricao: "Refrigerante", quantidade: -2, precoUnit: 8 })],
+    });
+    const p = problemaParaFechar(c);
+    expect(p).toContain("Refrigerante");
+    expect(p).toContain("negativa");
+    // Quem quer tirar item da conta tem um caminho próprio, que deixa
+    // rastro para a cozinha.
+    expect(p).toContain("cancelar");
+  });
+
+  it("recusa quantidade zero", () => {
+    const p = problemaParaFechar(comanda({ itens: [item({ descricao: "Pudim", quantidade: 0 })] }));
+    expect(p).toContain("Pudim");
+    expect(p).toContain("zero");
+  });
+
+  it("recusa item sem preço, dizendo qual", () => {
+    const p = problemaParaFechar(
+      comanda({ itens: [item(), item({ descricao: "Couvert", precoUnit: 0 })] })
+    );
+    expect(p).toContain("Couvert");
+    expect(p).toContain("preço");
+  });
+
+  it("item CANCELADO com quantidade estranha não impede fechar", () => {
+    // A linha cancelada fica na comanda de propósito, para a cozinha saber
+    // que aquilo foi pedido e desfeito. Ela não pode travar o caixa.
+    const c = comanda({
+      itens: [item(), item({ quantidade: -3, cancelado: true })],
+    });
+    expect(problemaParaFechar(c)).toBe("");
+  });
+
+  it("desconto que zera a conta manda cancelar em vez de fechar", () => {
+    // Fechar por R$ 0,00 vira uma venda de zero no caixa, que ninguém sabe
+    // ler no fechamento do dia — o mesmo motivo da comanda vazia.
+    const c = comanda({ itens: [item({ precoUnit: 50 })], desconto: 50 });
+    expect(problemaParaFechar(c)).toContain("cancele");
+  });
+
+  it("mostra o estrago: a linha negativa zerava a mesa e CREDITAVA a geladeira", () => {
+    // É este resultado que a recusa impede. Sem ela a mesa fechava por
+    // R$ 0,00 e dois refrigerantes entravam no estoque sem nota — e nada
+    // sobrava para a conferência achar.
+    const c = comanda({
+      itens: [
+        item({ produtoId: "a", descricao: "Pizza", quantidade: 1, precoUnit: 60 }),
+        item({ produtoId: "b", descricao: "Refrigerante", quantidade: -2, precoUnit: 30 }),
+      ],
+    });
+    expect(totalComanda(c)).toBe(0);
+    const saldos = saldosApos(itensParaVenda(c), [
+      { id: "b", nome: "Refrigerante", quantidade: 10, estoqueMinimo: 1, custo: 5, preco: 30, criadoEm: "" },
+    ]);
+    expect(saldos.find((s) => s.produto.id === "b")?.quantidade).toBe(12);
+  });
+});
+
+describe("taxa de serviço e desconto", () => {
+  const c = (p: Partial<Comanda> = {}) =>
+    comanda({ itens: [item({ precoUnit: 100, quantidade: 1 })], ...p });
+
+  it("os 10% saem do consumo", () => {
+    expect(taxaDaComanda(c({ taxaServico: 10 }))).toBe(10);
+    expect(totalAPagar(c({ taxaServico: 10 }))).toBe(110);
+  });
+
+  it("sem taxa marcada, a conta é o consumo", () => {
+    expect(taxaDaComanda(c())).toBe(0);
+    expect(totalAPagar(c())).toBe(100);
+  });
+
+  it("percentual absurdo é ignorado em vez de multiplicar a conta", () => {
+    // Digitar 1000 por engano transformaria uma conta de R$ 100 em R$ 1.100
+    // com o cliente na frente.
+    expect(taxaDaComanda(c({ taxaServico: 1000 }))).toBe(0);
+    expect(taxaDaComanda(c({ taxaServico: -10 }))).toBe(0);
+  });
+
+  it("a taxa é sobre o consumo, nunca sobre o consumo já com desconto", () => {
+    // Nem o contrário: serviço cobrado em cima do serviço é conta em cima
+    // de conta, e é o tipo de coisa que o cliente confere.
+    const x = c({ taxaServico: 10, desconto: 20 });
+    expect(taxaDaComanda(x)).toBe(10);
+    expect(totalAPagar(x)).toBe(90);
+  });
+
+  it("desconto maior que a conta não devolve dinheiro da gaveta", () => {
+    expect(totalAPagar(c({ desconto: 500 }))).toBe(0);
+  });
+
+  it("desconto negativo é ignorado em vez de aumentar a conta", () => {
+    expect(totalAPagar(c({ desconto: -50 }))).toBe(100);
+  });
+});
+
+describe("o que vai para a venda", () => {
+  it("a taxa vira LINHA, sem produtoId, para aparecer no cupom e não mexer no estoque", () => {
+    const c = comanda({
+      taxaServico: 10,
+      itens: [item({ produtoId: "p1", precoUnit: 100, quantidade: 1 })],
+    });
+    const linhas = itensParaVenda(c);
+    expect(linhas).toHaveLength(2);
+    const taxa = linhas[1];
+    expect(taxa.descricao).toContain("Taxa de servico");
+    expect(taxa.precoUnit).toBe(10);
+    // Sem produtoId a gorjeta não passa pelo estoque nem inventa custo.
+    expect(taxa.produtoId).toBeUndefined();
+    expect(taxa.custoUnit).toBe(0);
+  });
+
+  it("item cancelado não vai para a venda", () => {
+    const c = comanda({ itens: [item(), item({ cancelado: true })] });
+    expect(itensParaVenda(c)).toHaveLength(1);
+  });
+
+  it("os campos que só a cozinha usa não sobem para a venda", () => {
+    // `preparo`, `pedidoEm` e o id do item são da comanda. Levá-los junto
+    // encheria o jsonb da venda de coisa que ninguém lê ali.
+    const linha = itensParaVenda(comanda({ itens: [item()] }))[0] as unknown as Record<string, unknown>;
+    for (const campo of ["id", "preparo", "pedidoEm", "prontoEm", "cancelado"]) {
+      expect(linha[campo], `${campo} não devia ir para a venda`).toBeUndefined();
+    }
   });
 });

@@ -38,6 +38,11 @@ const TABELAS: Record<string, string> = {
   Evento: "eventos",
   Venda: "vendas",
   TarefaDiaria: "tarefas",
+  // Entrou tarde: `comandas` nasceu depois deste teste e ficou de fora da
+  // lista, que é exatamente o buraco que ele existe para tapar. Tabela nova
+  // sem linha aqui é campo novo gravando em silêncio contra coluna que não
+  // existe — e a gravação inteira da tabela cai junto.
+  Comanda: "comandas",
 };
 
 /** Colunas declaradas para uma tabela, no create table e nos alter */

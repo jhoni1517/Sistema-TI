@@ -650,6 +650,14 @@ export interface Comanda {
   /** Quem está atendendo a mesa */
   garcom?: string;
   observacoes?: string;
+  /**
+   * A gorjeta, em porcentagem do consumo. Fica na comanda e não só na
+   * configuração porque o cliente pode recusar, e a mesa que recusou tem
+   * que continuar recusando quando a tela recarregar.
+   */
+  taxaServico?: number;
+  /** Abatimento em reais, combinado no salão */
+  desconto?: number;
   atualizadoEm?: string;
 }
 
@@ -927,6 +935,14 @@ export interface Config {
    * Ver lib/pizza.ts.
    */
   regraMeioAMeio?: RegraMeioAMeio;
+  /**
+   * A taxa de serviço que já vem marcada ao abrir a conta, em porcentagem.
+   *
+   * Zero (ou vazio) significa que a casa não cobra. Fica em Configurações e
+   * não escrita no código porque nem toda casa cobra os 10%, e a que cobra
+   * não quer digitar isso em toda mesa. Ver lib/comanda.ts.
+   */
+  taxaServicoPadrao?: number;
   /*
    * ---------- Nota fiscal ----------
    *
