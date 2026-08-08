@@ -1,8 +1,9 @@
-import { txt, codigoOS } from "./format";
+import { txt, codigoOS, formatDate } from "./format";
 import { centavos } from "./pdv";
 import { totalOS } from "./calc";
 import { saldoFiado } from "./calc";
 import type {
+  Comanda,
   Cliente,
   Fiado,
   MovimentoCaixa,
@@ -50,6 +51,8 @@ export interface Dados {
   fiados: Fiado[];
   clientes: Cliente[];
   sessoes: SessaoCaixa[];
+  /** Comandas de mesa. Ausente nos ramos que não usam mesa. */
+  comandas?: Comanda[];
 }
 
 /**
@@ -221,6 +224,37 @@ function fiadosOrfaos(d: Dados): Achado[] {
 }
 
 /**
+ * Mesa aberta de ontem.
+ *
+ * Este é O vazamento do restaurante, e ele é invisível de propósito: a
+ * comida saiu da cozinha, o cliente comeu e foi embora, e a comanda ficou
+ * aberta porque o garçom esqueceu de fechar. Não falta nada no estoque
+ * para alguém estranhar, não sobra lançamento nenhum no caixa para alguém
+ * conferir — simplesmente não entrou dinheiro, e ninguém procura por
+ * dinheiro que nunca chegou.
+ *
+ * É o mesmo raciocínio de "lucro inflado é invisível": o erro que salta aos
+ * olhos custa cinco minutos, o que não salta custa o mês.
+ *
+ * A régua é a virada do dia e não um número de horas: restaurante fecha de
+ * madrugada, e uma mesa aberta às 23h não é problema à meia-noite e meia.
+ */
+function comandasEsquecidas(d: Dados, hoje = new Date()): Achado[] {
+  const hojeISO = hoje.toISOString().slice(0, 10);
+  return (d.comandas || [])
+    .filter((c) => c.status === "aberta" && txt(c.abertaEm).slice(0, 10) < hojeISO)
+    .map((c) => ({
+      gravidade: "erro" as const,
+      tipo: "comanda-esquecida",
+      titulo: `Mesa ${txt(c.mesa)} está aberta desde ${formatDate(c.abertaEm)}`,
+      saida:
+        "A comida saiu e o dinheiro não entrou: comanda aberta não lança nada " +
+        "no caixa. Feche em Comandas se a mesa pagou, ou cancele se foi engano.",
+      ref: { tela: "/mesas", id: c.id },
+    }));
+}
+
+/**
  * Caixa aberto há muito tempo.
  *
  * Sessão que atravessa dias faz o fechamento perder o sentido: ele deixa de
@@ -302,6 +336,7 @@ export function conferirTudo(d: Dados, hoje = new Date()): Achado[] {
     ...estoqueNegativo(d),
     ...fiadosOrfaos(d),
     ...caixaEsquecido(d, hoje),
+    ...comandasEsquecidas(d, hoje),
     ...vendasComItemZerado(d),
     ...ordensParadas(d, 30, hoje),
   ].sort(

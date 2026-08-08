@@ -24,6 +24,7 @@ import { sangriaSugerida } from "../lib/desempenho";
 import { precoEfetivo } from "../lib/promocao";
 import { uid, nowISO, brl, formatDate, formatDateTime, txt } from "../lib/format";
 import { produtosParaOS } from "../lib/busca";
+import { comandasAbertas } from "../lib/comanda";
 import { aposBaixa } from "../lib/estoque";
 import { printHTML } from "../lib/print";
 import { reciboFechamento, reciboVenda, reciboMovimento } from "../lib/recibo";
@@ -54,7 +55,7 @@ interface Extra {
 }
 
 export const Caixa: React.FC = () => {
-  const { movimentos, sessoes, produtos, clientes, config, saveMovimento, removeMovimento, saveSessao, saveProduto } = useApp();
+  const { movimentos, sessoes, produtos, clientes, comandas, config, saveMovimento, removeMovimento, saveSessao, saveProduto } = useApp();
   /** Lançamento de movimento em andamento: barra o segundo clique */
   const [lancandoMov, setLancandoMov] = useState(false);
   const [modal, setModal] = useState<TipoMovimento | null>(null);
@@ -573,6 +574,7 @@ export const Caixa: React.FC = () => {
           sangrias={sangrias}
           saldo={saldo}
           emEspecie={resumo.emEspecie}
+          mesasAbertas={comandasAbertas(comandas).length}
           movs={movsSessao}
           onImprimir={imprimirResumo}
           onClose={() => setFechando(false)}
@@ -831,11 +833,13 @@ const FecharCaixaModal: React.FC<{
   saldo: number;
   /** O que devia estar em PAPEL na gaveta. É contra isto que se confere. */
   emEspecie: number;
+  /** Mesas ainda abertas. O que elas pagarem NÃO entra neste fechamento. */
+  mesasAbertas: number;
   movs: MovimentoCaixa[];
   onImprimir: () => void;
   onClose: () => void;
   onConfirm: (contado?: number) => void;
-}> = ({ abertura, entradas, saidas, sangrias, saldo, emEspecie, movs, onImprimir, onClose, onConfirm }) => {
+}> = ({ abertura, entradas, saidas, sangrias, saldo, emEspecie, mesasAbertas, movs, onImprimir, onClose, onConfirm }) => {
   const formas = useMemo(() => {
     const map: Record<string, number> = {};
     movs.filter((m) => m.tipo === "entrada").forEach((m) => (map[m.formaPagamento] = (map[m.formaPagamento] || 0) + m.valor));
@@ -845,6 +849,16 @@ const FecharCaixaModal: React.FC<{
   // Texto, e não número, porque campo vazio precisa ser diferente de zero:
   // "não contei" e "contei e deu zero" são conclusões bem diferentes.
   const [contadoTxt, setContadoTxt] = useState("");
+  /*
+   * Mesa aberta na hora de fechar o caixa.
+   *
+   * O que essas mesas pagarem NÃO entra neste fechamento: o dinheiro entra
+   * quando a comanda fecha, e isso vai acontecer depois. Quem conta a
+   * gaveta agora precisa saber, senão procura uma diferença que não existe.
+   *
+   * Avisa e não trava: restaurante fecha o caixa com mesa comendo, e travar
+   * o fechamento por isso prenderia o caixa numa fila que não é dele.
+   */
   const contado = contadoTxt.trim() === "" ? undefined : Number(contadoTxt.replace(",", "."));
   const invalido = contado !== undefined && Number.isNaN(contado);
   /*
@@ -882,6 +896,18 @@ const FecharCaixaModal: React.FC<{
             <span>Esperado em papel na gaveta</span><span>{brl(emEspecie)}</span>
           </div>
         </div>
+
+        {mesasAbertas > 0 && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            <b>
+              {mesasAbertas} mesa{mesasAbertas > 1 ? "s" : ""} ainda aberta
+              {mesasAbertas > 1 ? "s" : ""}.
+            </b>{" "}
+            O que elas pagarem não entra neste fechamento — o dinheiro entra
+            quando a comanda fecha, e isso vai acontecer depois. Não procure
+            essa diferença na gaveta.
+          </div>
+        )}
 
         <div>
           <p className="label">Entradas por forma de pagamento</p>

@@ -19,12 +19,12 @@ import { conferirTudo, dinheiroEmRisco } from "../lib/integridade";
 import { Conferencia } from "../components/Conferencia";
 
 export const Dashboard: React.FC = () => {
-  const { ordens, clientes, produtos, movimentos, vendas, fiados, sessoes, config } = useApp();
+  const { ordens, clientes, produtos, movimentos, vendas, fiados, sessoes, comandas, config } = useApp();
   const navigate = useNavigate();
   const [conferindo, setConferindo] = useState(false);
 
   const achados = useMemo(
-    () => conferirTudo({ ordens, vendas, movimentos, produtos, fiados, clientes, sessoes }),
+    () => conferirTudo({ ordens, vendas, movimentos, produtos, fiados, clientes, sessoes, comandas }),
     [ordens, vendas, movimentos, produtos, fiados, clientes, sessoes]
   );
   const emRisco = dinheiroEmRisco(achados);
