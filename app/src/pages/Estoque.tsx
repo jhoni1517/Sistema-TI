@@ -7,12 +7,12 @@ import { Inventario } from "../components/Inventario";
 import { Reposicao } from "../components/Reposicao";
 import { minimoSugerido } from "../lib/reposicao";
 import { aoApagarProduto, textoDaConfirmacao } from "../lib/exclusao";
-import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck, FileQuestion, Wrench, CalendarX, Tag, ClipboardCheck, ShoppingBasket, Store } from "lucide-react";
+import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck, FileQuestion, Wrench, CalendarX, Tag, ClipboardCheck, ShoppingBasket, Store, FileText } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { CatalogoPublico } from "../components/CatalogoPublico";
 import { temRecurso } from "../lib/ramos";
-import { pendenciasDoProduto } from "../lib/fiscal";
+import { pendenciasDoProduto, produtosSemFiscal, pendenciasDaLoja } from "../lib/fiscal";
 import { situacaoValidade, produtosVencendo, VALIDADE_META } from "../lib/pdv";
 import {
   promocaoValendo,
@@ -107,6 +107,18 @@ export const Estoque: React.FC = () => {
   }, [produtos]);
 
   const vencendo = useMemo(() => produtosVencendo(produtos), [produtos]);
+
+  /*
+   * Produtos que ainda não entram em nota.
+   *
+   * Só conta depois que a loja começou a preencher os dados fiscais dela:
+   * numa loja que nem emite nota, esta lista seria o catálogo inteiro
+   * piscando para sempre.
+   */
+  const semFiscal = useMemo(
+    () => (pendenciasDaLoja(config).length > 0 ? [] : produtosSemFiscal(produtos, config)),
+    [produtos, config]
+  );
 
   const salvar = async () => {
     if (!editando) return;
@@ -208,6 +220,46 @@ export const Estoque: React.FC = () => {
           <p className="mt-2 text-xs text-amber-700">
             Avisamos com uma semana de folga: descobrir no dia do vencimento
             não deixa tempo de promover e vender.
+          </p>
+        </div>
+      )}
+
+      {/*
+        O que ainda não está pronto para nota fiscal.
+
+        Só aparece depois que a loja começou a preencher os dados fiscais —
+        antes disso seria um aviso permanente para quem nem emite nota, e
+        aviso que aparece sempre é aviso que a pessoa aprende a ignorar.
+
+        Sem esta lista, descobrir que falta NCM acontecia produto a produto,
+        no balcão, com o cliente esperando o cupom. Aqui é de uma vez, e
+        cada nome abre a ficha para preencher.
+      */}
+      {semFiscal.length > 0 && (
+        <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
+          <p className="flex items-center gap-2 text-sm font-bold text-blue-800">
+            <FileText size={16} /> {semFiscal.length} produto(s) ainda não entram em nota fiscal
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {semFiscal.slice(0, 8).map((p) => (
+              <button
+                key={p.id}
+                onClick={() => setEditando(p)}
+                className="badge bg-white text-blue-700 ring-1 ring-blue-200 hover:opacity-80"
+              >
+                {p.nome}
+              </button>
+            ))}
+            {semFiscal.length > 8 && (
+              <span className="badge bg-white text-blue-700 ring-1 ring-blue-200">
+                e mais {semFiscal.length - 8}
+              </span>
+            )}
+          </div>
+          <p className="mt-2 text-xs text-blue-700">
+            {pendenciasDoProduto(semFiscal[0], config)[0]}
+            {semFiscal.length > 1 ? ", entre outros." : "."} A venda acontece
+            normalmente; só a nota fica esperando.
           </p>
         </div>
       )}

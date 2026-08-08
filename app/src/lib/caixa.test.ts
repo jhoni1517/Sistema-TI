@@ -11,7 +11,7 @@ import {
   baseDaLista,
   rotuloDaLista,
 } from "./caixa";
-import type { MovimentoCaixa, SessaoCaixa } from "./types";
+import type { FormaPagamento, MovimentoCaixa, SessaoCaixa } from "./types";
 
 const mov = (m: Partial<MovimentoCaixa> = {}): MovimentoCaixa => ({
   id: Math.random().toString(36).slice(2),
@@ -177,6 +177,73 @@ describe("dinheiro em espécie na gaveta", () => {
   it("dia só de cartão deixa na gaveta apenas o troco de abertura", () => {
     const movs = [mov({ tipo: "entrada", valor: 900, formaPagamento: "pix" })];
     expect(resumoCaixa(sessao({ valorAbertura: 100 }), movs).emEspecie).toBe(100);
+  });
+
+  it("entrada SEM forma de pagamento é papel, igual à saída sem forma", () => {
+    /*
+     * A assimetria que gerou este teste: `ehEspecie` diz que vazio é
+     * dinheiro, e a SAÍDA sem forma já descontava da gaveta. A ENTRADA sem
+     * forma caía num balde "outro" e não entrava em `emEspecie`.
+     *
+     * Com abertura de 100 e uma entrada de 200 sem forma, a gaveta ficava
+     * valendo 100 em vez de 300: o sistema esperava R$ 200 A MENOS do que
+     * a gaveta tinha, e o fechamento acusava SOBRA todo dia. Sobra que
+     * aparece sempre é sobra que a pessoa aprende a ignorar — justamente
+     * para o dia em que sobra de verdade porque alguém não lançou a venda.
+     *
+     * Vazio acontece de verdade: é assim que volta da nuvem o lançamento
+     * gravado antes de a coluna de forma de pagamento existir.
+     */
+    const entrada = [mov({ tipo: "entrada", valor: 200, formaPagamento: undefined })];
+    expect(resumoCaixa(sessao({ valorAbertura: 100 }), entrada).emEspecie).toBe(300);
+
+    const saida = [mov({ tipo: "saida", valor: 30, formaPagamento: undefined })];
+    expect(resumoCaixa(sessao({ valorAbertura: 100 }), saida).emEspecie).toBe(70);
+
+    // Os dois no mesmo caixa têm que se encontrar: 100 + 200 - 30
+    const ambos = [...entrada, ...saida];
+    expect(resumoCaixa(sessao({ valorAbertura: 100 }), ambos).emEspecie).toBe(270);
+  });
+
+  it("forma escrita com maiúscula continua sendo a mesma forma", () => {
+    // "Dinheiro" virava um balde separado de "dinheiro" e sumia da gaveta.
+    //
+    // O tipo promete a lista fechada, mas a coluna no banco é texto: linha
+    // antiga, importação e a função da Vercel podem gravar qualquer coisa
+    // ali. A promessa vale na compilação, não em tempo de execução — por
+    // isso o `as`, que aqui representa o que chega de verdade da nuvem.
+    const movs = [
+      mov({ tipo: "entrada", valor: 50, formaPagamento: "Dinheiro" as FormaPagamento }),
+    ];
+    const r = resumoCaixa(sessao({ valorAbertura: 100 }), movs);
+    expect(r.emEspecie).toBe(150);
+    expect(r.porForma.dinheiro).toBe(50);
+  });
+
+  it("a busca acha sem acento: as categorias do sistema têm acento", () => {
+    // "Água", "Salário" e "Serviço" são categorias que o PRÓPRIO sistema
+    // oferece na tela de saída. Quem digita "agua" com a fila andando
+    // concluía que o lançamento tinha sumido.
+    const movs = [
+      mov({ id: "a", tipo: "saida", categoria: "Água", descricao: "conta do mês" }),
+      mov({ id: "b", tipo: "saida", categoria: "Salário", descricao: "ajudante" }),
+      mov({ id: "c", tipo: "entrada", categoria: "Serviço", descricao: "conserto" }),
+    ];
+    expect(filtrarMovimentos(movs, { termo: "agua" }).map((m) => m.id)).toEqual(["a"]);
+    expect(filtrarMovimentos(movs, { termo: "salario" }).map((m) => m.id)).toEqual(["b"]);
+    expect(filtrarMovimentos(movs, { termo: "servico" }).map((m) => m.id)).toEqual(["c"]);
+    // E continua achando com o acento certo
+    expect(filtrarMovimentos(movs, { termo: "Água" }).map((m) => m.id)).toEqual(["a"]);
+  });
+
+  it("o saldo não carrega sobra de casa decimal", () => {
+    // 0.1 + 0.2 em ponto flutuante dá 0.30000000000000004, e o número é
+    // comparado com o que a pessoa contou.
+    const movs = [
+      mov({ tipo: "entrada", valor: 0.1, formaPagamento: "dinheiro" }),
+      mov({ tipo: "entrada", valor: 0.2, formaPagamento: "dinheiro" }),
+    ];
+    expect(resumoCaixa(sessao({ valorAbertura: 0 }), movs).saldo).toBe(0.3);
   });
 });
 
