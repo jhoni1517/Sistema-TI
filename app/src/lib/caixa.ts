@@ -1,4 +1,5 @@
 import { isToday, txt } from "./format";
+import { normalizar } from "./busca";
 import { receitaBruta, totalDespesas, totalSangrias } from "./calc";
 import type { MovimentoCaixa, SessaoCaixa, TipoMovimento } from "./types";
 
@@ -54,12 +55,32 @@ export function resumoCaixa(
   const saidas = totalDespesas(movimentos);
   const sangrias = totalSangrias(movimentos);
   const abertura = Number(sessao?.valorAbertura) || 0;
-  const saldo = abertura + entradas - saidas - sangrias;
+  const saldo = arredonda(abertura + entradas - saidas - sangrias);
 
   const porForma: Record<string, number> = {};
   for (const m of movimentos) {
     if (m.tipo !== "entrada") continue;
-    const f = txt(m.formaPagamento) || "outro";
+    /*
+     * A ENTRADA sem forma de pagamento tem que cair no mesmo balde que a
+     * SAÍDA sem forma — e não caía.
+     *
+     * `ehEspecie` diz, com todas as letras, que vazio é dinheiro: é assim
+     * que volta da nuvem o lançamento gravado antes de a coluna existir.
+     * A saída seguia essa regra e descontava da gaveta. A entrada não:
+     * caía num balde "outro" e NÃO entrava em `emEspecie`.
+     *
+     * O resultado é a pior espécie de erro de caixa. O sistema esperava
+     * MENOS papel do que a gaveta tinha, e o fechamento acusava SOBRA
+     * todo santo dia — e sobra que aparece sempre é sobra que a pessoa
+     * aprende a ignorar, justamente para o dia em que sobra de verdade
+     * porque alguém não lançou uma venda.
+     *
+     * O `toLowerCase` é da mesma família: "Dinheiro" com maiúscula virava
+     * um balde separado de "dinheiro" e sumia da gaveta do mesmo jeito.
+     */
+    const f = ehEspecie(m.formaPagamento)
+      ? "dinheiro"
+      : txt(m.formaPagamento).trim().toLowerCase();
     porForma[f] = (porForma[f] || 0) + (Number(m.valor) || 0);
   }
 
@@ -195,7 +216,16 @@ export function filtrarMovimentos(
   movimentos: MovimentoCaixa[],
   filtro: FiltroMovimento = {}
 ): MovimentoCaixa[] {
-  const termo = txt(filtro.termo).trim().toLowerCase();
+  /*
+   * Sem acento dos dois lados, como no resto do sistema.
+   *
+   * A busca comparava o texto cru: quem digitava "agua" não achava "Água" e
+   * quem digitava "salario" não achava "Salário". E não é caso raro — são
+   * duas CATEGORIAS que o próprio sistema oferece na tela de saída, junto
+   * com "Serviço". Ninguém acentua com a fila andando, e a pessoa concluía
+   * que o lançamento tinha sumido.
+   */
+  const termo = normalizar(filtro.termo);
   const tipo = filtro.tipo || "";
   const dia = txt(filtro.dia).slice(0, 10);
 
@@ -205,7 +235,9 @@ export function filtrarMovimentos(
     if (!termo) return true;
     // Categoria e forma entram na busca porque é assim que a pessoa lembra:
     // "aquela do cartão", "as de energia".
-    const alvo = `${txt(m.descricao)} ${txt(m.categoria)} ${txt(m.formaPagamento)}`.toLowerCase();
+    const alvo = normalizar(
+      `${txt(m.descricao)} ${txt(m.categoria)} ${txt(m.formaPagamento)}`
+    );
     return alvo.includes(termo);
   });
 }
