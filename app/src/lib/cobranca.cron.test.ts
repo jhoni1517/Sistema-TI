@@ -98,3 +98,49 @@ describe("o cron não manda dado de loja para o chat do operador", () => {
     expect(corpo("conferirBackup")).toContain("lojaId=eq.");
   });
 });
+
+/**
+ * A régua do fiado sem prazo existe em DOIS lugares.
+ *
+ * A tela usa `DIAS_PARA_COBRAR_SEM_VENCIMENTO` de src/lib/fiado.ts; o robô
+ * de segunda-feira usa `DIAS_PARADO` de api/cobranca.js, porque função da
+ * Vercel não importa TypeScript. Divergindo, a tela diz que o cliente está
+ * parado há tempo demais e o robô fica calado — ou o contrário, e a loja
+ * recebe aviso de dívida que a tela mostra como em dia.
+ *
+ * O teste LÊ os dois arquivos do disco em vez de recopiar o número: cópia
+ * dentro de teste envelhece igual e os dois passam a mentir juntos.
+ */
+/** O código sem os comentários, para procurar literal sem cair no texto */
+const semComentarios = (t: string): string =>
+  t
+    .split("\n")
+    .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
+    .join("\n");
+
+describe("a régua do fiado é a mesma na tela e no robô", () => {
+  it("DIAS_PARADO do cron bate com DIAS_PARA_COBRAR_SEM_VENCIMENTO da lib", () => {
+    const doCron = fonte.match(/const DIAS_PARADO = (\d+);/)?.[1];
+    const daLib = readFileSync(resolve(__dirname, "fiado.ts"), "utf8").match(
+      /DIAS_PARA_COBRAR_SEM_VENCIMENTO = (\d+);/
+    )?.[1];
+    expect(doCron, "DIAS_PARADO sumiu de api/cobranca.js").toBeTruthy();
+    expect(daLib, "DIAS_PARA_COBRAR_SEM_VENCIMENTO sumiu de lib/fiado.ts").toBeTruthy();
+    expect(doCron).toBe(daLib);
+  });
+
+  it("o robô não filtra mais por vencimento preenchido", () => {
+    /*
+     * Este filtro deixava de fora justamente o fiado mais comum: o da OS
+     * entregue a prazo, que nasce sem vencimento nenhum. A dívida ficava
+     * para sempre no "Total a receber" sem nunca virar aviso.
+     */
+    // Sem os comentários: o próprio comentário que explica a remoção cita o
+    // filtro pelo nome, e ele reprovaria o código já consertado.
+    expect(semComentarios(corpo("avisarFiado"))).not.toContain("vencimento=not.is.null");
+  });
+
+  it("o robô lê a data de criação, que é o que mede a dívida sem prazo", () => {
+    expect(corpo("avisarFiado")).toContain('"criadoEm"');
+  });
+});

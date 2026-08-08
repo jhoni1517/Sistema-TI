@@ -1,7 +1,8 @@
-import { txt, codigoOS, formatDate } from "./format";
+import { txt, codigoOS, formatDate, brl } from "./format";
 import { centavos } from "./pdv";
 import { totalOS } from "./calc";
 import { saldoFiado } from "./calc";
+import { fiadosParaCobrar } from "./fiado";
 import type {
   Comanda,
   Cliente,
@@ -255,6 +256,50 @@ function comandasEsquecidas(d: Dados, hoje = new Date()): Achado[] {
 }
 
 /**
+ * Dívida parada há tempo demais.
+ *
+ * O outro vazamento invisível do balcão, irmão da mesa esquecida: o serviço
+ * saiu, o aparelho foi embora e o dinheiro nunca chegou. Não falta nada no
+ * estoque para estranhar, não sobra lançamento nenhum para conferir — só
+ * não entrou, e ninguém procura por dinheiro que nunca chegou.
+ *
+ * Entra aqui como ALERTA e não como erro: a dívida está registrada e o
+ * sistema está fazendo o que devia. O que falta é alguém mandar a mensagem.
+ *
+ * Um achado por CLIENTE, e não por dívida: três fiados do mesmo cara viram
+ * três linhas idênticas na tela e nenhuma delas é lida.
+ */
+function fiadosParados(d: Dados, hoje = new Date()): Achado[] {
+  const dia = hoje.toISOString().slice(0, 10);
+  const porCliente = new Map<string, { valor: number; dias: number; quantos: number }>();
+
+  for (const { fiado, estado } of fiadosParaCobrar(d.fiados || [], dia)) {
+    const id = txt(fiado.clienteId);
+    const atual = porCliente.get(id) || { valor: 0, dias: 0, quantos: 0 };
+    atual.valor += saldoFiado(fiado);
+    atual.dias = Math.max(atual.dias, estado.dias);
+    atual.quantos += 1;
+    porCliente.set(id, atual);
+  }
+
+  return [...porCliente.entries()].map(([id, x]) => {
+    const nome = d.clientes.find((c) => c.id === id)?.nome || "Cliente sem cadastro";
+    return {
+      gravidade: "alerta" as const,
+      tipo: "fiado-parado",
+      titulo:
+        `${nome} deve ${brl(x.valor)} há ${x.dias} dias` +
+        (x.quantos > 1 ? ` (${x.quantos} dívidas)` : ""),
+      saida:
+        "Mande um toque em A Receber, no botão do WhatsApp. Dívida velha é " +
+        "dívida que vira prejuízo — quanto mais tempo passa, mais difícil cobrar.",
+      valor: x.valor,
+      ref: { tela: "/receber", id },
+    };
+  });
+}
+
+/**
  * Caixa aberto há muito tempo.
  *
  * Sessão que atravessa dias faz o fechamento perder o sentido: ele deixa de
@@ -337,6 +382,7 @@ export function conferirTudo(d: Dados, hoje = new Date()): Achado[] {
     ...fiadosOrfaos(d),
     ...caixaEsquecido(d, hoje),
     ...comandasEsquecidas(d, hoje),
+    ...fiadosParados(d, hoje),
     ...vendasComItemZerado(d),
     ...ordensParadas(d, 30, hoje),
   ].sort(

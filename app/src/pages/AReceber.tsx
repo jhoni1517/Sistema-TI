@@ -13,8 +13,15 @@ import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { uid, nowISO, brl, formatDate, abrirWhatsapp, negrito, txt } from "../lib/format";
 import { saldoFiado, pagoFiado } from "../lib/calc";
+import { centavos } from "../lib/pdv";
 import { travaAtendimento, travaFiado } from "../lib/clientes";
-import { hojeISO } from "../lib/contas";
+import {
+  estadoFiado,
+  fiadosParaCobrar,
+  totalParaCobrar,
+  FIADO_META,
+  DIAS_PARA_COBRAR_SEM_VENCIMENTO,
+} from "../lib/fiado";
 import { aoApagarFiado, textoDaConfirmacao } from "../lib/exclusao";
 import { sessaoAberta as achaSessaoAberta } from "../lib/caixa";
 import type { Fiado, FormaPagamento } from "../lib/types";
@@ -48,13 +55,17 @@ export const AReceber: React.FC = () => {
     () => fiados.filter((f) => !f.quitado).reduce((s, f) => s + saldoFiado(f), 0),
     [fiados]
   );
-  const vencidos = useMemo(
-    () =>
-      fiados.filter(
-        (f) => !f.quitado && f.vencimento && f.vencimento < hojeISO()
-      ).length,
-    [fiados]
-  );
+  /*
+   * Atrasado é quem passou do prazo COMBINADO e também quem está parado há
+   * tempo demais sem prazo nenhum.
+   *
+   * Antes só contava `vencimento`, e o caminho mais usado para fiar — a OS
+   * entregue no fiado — nunca preenche esse campo. A dívida entrava no total
+   * a receber e ficava lá para sempre, sem nunca aparecer como atrasada.
+   * Ver lib/fiado.ts.
+   */
+  const atrasados = useMemo(() => fiadosParaCobrar(fiados), [fiados]);
+  const totalAtrasado = useMemo(() => totalParaCobrar(fiados), [fiados]);
 
   const novoVazio = (): Fiado => ({
     id: uid(),
@@ -117,7 +128,16 @@ export const AReceber: React.FC = () => {
 
   const registrarPagamento = async (f: Fiado, valor: number, forma: FormaPagamento) => {
     const saldo = saldoFiado(f);
-    const valorReal = Math.min(valor, saldo);
+    /*
+     * Centavo inteiro, sempre.
+     *
+     * O botão "Metade" de uma dívida de R$ 33,33 devolvia 16,665. A tela
+     * imprimia R$ 16,67 e o caixa recebia 16,665: dois recebimentos assim
+     * mostravam R$ 16,67 + R$ 16,67 na lista e somavam R$ 33,33 no total.
+     * É a mesma regra do carrinho — arredonda a LINHA antes de somar, senão
+     * o total discorda do que está escrito nela.
+     */
+    const valorReal = centavos(Math.min(valor, saldo));
     if (valorReal <= 0) return aviso.alerta("Informe o valor recebido.");
     if (recebendo) return; // clique duplo no balcão acontece o tempo todo
     setRecebendo(true);
@@ -231,8 +251,20 @@ export const AReceber: React.FC = () => {
           <p className="mt-1 text-2xl font-bold text-slate-800">{fiados.filter((f) => !f.quitado).length}</p>
         </div>
         <div className="card">
-          <p className="flex items-center gap-2 text-sm text-slate-500"><AlertCircle size={16} className={vencidos ? "text-red-500" : ""} /> Vencidos</p>
-          <p className={`mt-1 text-2xl font-bold ${vencidos ? "text-red-600" : "text-slate-800"}`}>{vencidos}</p>
+          <p className="flex items-center gap-2 text-sm text-slate-500">
+            <AlertCircle size={16} className={atrasados.length ? "text-red-500" : ""} /> Para cobrar
+          </p>
+          <p className={`mt-1 text-2xl font-bold ${atrasados.length ? "text-red-600" : "text-slate-800"}`}>
+            {atrasados.length}
+          </p>
+          {/* O valor junto do número: "3 atrasados" não move ninguém,
+              "R$ 1.240 atrasados" move. */}
+          {atrasados.length > 0 && (
+            <p className="text-xs text-slate-400">
+              {brl(totalAtrasado)} · vencidos ou parados há mais de{" "}
+              {DIAS_PARA_COBRAR_SEM_VENCIMENTO} dias
+            </p>
+          )}
         </div>
       </div>
 
@@ -248,24 +280,26 @@ export const AReceber: React.FC = () => {
         <div className="space-y-3">
           {lista.map((f) => {
             const saldo = saldoFiado(f);
-            const vencido = !f.quitado && f.vencimento && f.vencimento < hojeISO();
+            const est = estadoFiado(f);
+            const cobravel = est.cobravel;
             return (
-              <div key={f.id} className={`card flex flex-wrap items-center gap-4 ${vencido ? "ring-2 ring-red-200" : ""}`}>
+              <div key={f.id} className={`card flex flex-wrap items-center gap-4 ${cobravel ? "ring-2 ring-red-200" : ""}`}>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="font-bold text-slate-800">{nomeCliente(f.clienteId)}</p>
-                    {f.quitado ? (
-                      <span className="badge bg-emerald-100 text-emerald-700"><CheckCircle2 size={12} /> Quitado</span>
-                    ) : vencido ? (
-                      <span className="badge bg-red-100 text-red-700">Vencido</span>
-                    ) : (
-                      <span className="badge bg-amber-100 text-amber-700">Em aberto</span>
-                    )}
+                    <span className={`badge ${FIADO_META[est.situacao].cor}`}>
+                      {est.situacao === "quitado" && <CheckCircle2 size={12} />}
+                      {FIADO_META[est.situacao].label}
+                      {/* Diz HÁ QUANTO TEMPO: "vencido" sozinho não separa o
+                          de ontem do de oito meses, e é o de oito meses que
+                          vira prejuízo. */}
+                      {cobravel && ` há ${est.dias} dia${est.dias === 1 ? "" : "s"}`}
+                    </span>
                   </div>
                   <p className="truncate text-sm text-slate-500">{f.descricao}</p>
                   <p className="text-xs text-slate-400">
                     {formatDate(f.criadoEm)}
-                    {f.vencimento ? ` · vence ${formatDate(f.vencimento)}` : ""}
+                    {f.vencimento ? ` · vence ${formatDate(f.vencimento)}` : " · sem prazo combinado"}
                     {pagoFiado(f) > 0 ? ` · pago ${brl(pagoFiado(f))}` : ""}
                   </p>
                 </div>
@@ -363,7 +397,7 @@ const ReceberModal: React.FC<{
       footer={
         <>
           <button className="btn-secondary" onClick={onClose}>Cancelar</button>
-          <button className="btn-success" onClick={() => onConfirm(valor, forma)}>Registrar {brl(Math.min(valor, saldo))}</button>
+          <button className="btn-success" onClick={() => onConfirm(valor, forma)}>Registrar {brl(centavos(Math.min(valor, saldo)))}</button>
         </>
       }
     >
@@ -387,7 +421,7 @@ const ReceberModal: React.FC<{
         </div>
         <div className="flex gap-2">
           <button className="btn-secondary !py-1.5 text-xs" onClick={() => setValor(saldo)}>Valor total</button>
-          <button className="btn-secondary !py-1.5 text-xs" onClick={() => setValor(saldo / 2)}>Metade</button>
+          <button className="btn-secondary !py-1.5 text-xs" onClick={() => setValor(centavos(saldo / 2))}>Metade</button>
         </div>
       </div>
     </Modal>

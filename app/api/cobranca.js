@@ -504,6 +504,13 @@ async function aniversariosProximos(hoje, chats) {
  * Semanal, não diário, de propósito. Cobrança de bairro que aparece todo dia
  * vira ruído e a pessoa para de ler o aviso inteiro.
  */
+/**
+ * A partir de quantos dias uma dívida SEM vencimento passa a ser cobrada.
+ * Tem que bater com DIAS_PARA_COBRAR_SEM_VENCIMENTO de src/lib/fiado.ts —
+ * cobranca.cron.test.ts lê os dois arquivos do disco e reprova se divergir.
+ */
+const DIAS_PARADO = 30;
+
 async function avisarFiado(chats) {
   // Segunda-feira. Em outro dia nem consulta o banco.
   if (new Date().getUTCDay() !== 1) return "fora do dia (só segunda)";
@@ -512,9 +519,20 @@ async function avisarFiado(chats) {
   const ids = [...chats.keys()];
   let fiados;
   try {
+    /*
+     * SEM o filtro `vencimento=not.is.null`.
+     *
+     * Ele estava aqui e deixava de fora justamente o fiado mais comum: o da
+     * OS entregue a prazo, que nasce sem vencimento nenhum. A dívida ficava
+     * para sempre no "Total a receber" sem nunca virar aviso, e ninguém
+     * procura por dinheiro que nunca chegou.
+     *
+     * `criadoEm` vem junto porque é ele que mede a dívida sem prazo. Ver
+     * DIAS_PARADO logo abaixo e src/lib/fiado.ts.
+     */
     fiados = await sb(
-      'fiados?select=id,"clienteId",descricao,valor,pagamentos,quitado,vencimento,"lojaId"' +
-        `&quitado=is.false&vencimento=not.is.null&lojaId=in.(${ids.join(",")})`
+      'fiados?select=id,"clienteId",descricao,valor,pagamentos,quitado,vencimento,"criadoEm","lojaId"' +
+        `&quitado=is.false&lojaId=in.(${ids.join(",")})`
     );
   } catch {
     return "tabela de fiados ainda não existe";
@@ -523,11 +541,41 @@ async function avisarFiado(chats) {
   const hoje = new Date().toISOString().slice(0, 10);
   const porLojaId = new Map();
 
+  const dias = (de) =>
+    Math.round((Date.parse(hoje + "T00:00:00Z") - Date.parse(de + "T00:00:00Z")) / 86400000);
+
   for (const f of fiados || []) {
     const lojaId = String(f.lojaId || "");
     if (!chats.has(lojaId)) continue;
+
+    /*
+     * Duas réguas, e a diferença importa.
+     *
+     * Com vencimento: atrasado é ter passado do prazo COMBINADO.
+     * Sem vencimento: nenhum prazo foi quebrado — o que dá para afirmar é
+     * que a dívida está parada há DIAS_PARADO. Inventar um vencimento aqui
+     * faria o robô cobrar, em nome da loja, um acordo que não existiu.
+     *
+     * Esta régua é a mesma de `estadoFiado` em src/lib/fiado.ts, e a
+     * paridade entre as duas é cobrada por cobranca.cron.test.ts.
+     */
     const venc = String(f.vencimento || "").slice(0, 10);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(venc) || venc >= hoje) continue;
+    const temVenc = /^\d{4}-\d{2}-\d{2}$/.test(venc);
+    const nasceu = String(f.criadoEm || "").slice(0, 10);
+    const temNasceu = /^\d{4}-\d{2}-\d{2}$/.test(nasceu);
+
+    let atraso;
+    let parado = false;
+    if (temVenc) {
+      atraso = dias(venc);
+      if (atraso <= 0) continue;
+    } else {
+      if (!temNasceu) continue;
+      atraso = dias(nasceu);
+      if (atraso < DIAS_PARADO) continue;
+      parado = true;
+    }
+
     const pago = (f.pagamentos || []).reduce((s, p) => s + (Number(p.valor) || 0), 0);
     const saldo = (Number(f.valor) || 0) - pago;
     if (saldo <= 0) continue;
@@ -536,9 +584,8 @@ async function avisarFiado(chats) {
       clienteId: f.clienteId,
       descricao: f.descricao || "fiado",
       saldo,
-      dias: Math.round(
-        (Date.parse(hoje + "T00:00:00Z") - Date.parse(venc + "T00:00:00Z")) / 86400000
-      ),
+      dias: atraso,
+      parado,
     });
   }
 
@@ -569,12 +616,18 @@ async function avisarFiado(chats) {
     const total = atrasados.reduce((s, a) => s + a.saldo, 0);
     const linhas = atrasados
       .slice(0, 15)
-      .map((a) => `• ${nomes[a.clienteId] || "sem cliente"} — ${dinheiro(a.saldo)} (${a.dias}d)`);
+      .map(
+        (a) =>
+          `• ${nomes[a.clienteId] || "sem cliente"} — ${dinheiro(a.saldo)} ` +
+          // "parado" separa quem quebrou um prazo de quem nunca combinou
+          // um: a loja não cobra os dois do mesmo jeito.
+          (a.parado ? `(sem prazo, ${a.dias}d)` : `(${a.dias}d)`)
+      );
     if (atrasados.length > 15) linhas.push(`• e mais ${atrasados.length - 15}`);
 
     const enviou = await enviarPara(
       chats.get(lojaId),
-      `*Fiado vencido*\n${linhas.join("\n")}\n\nTotal: *${dinheiro(total)}*`
+      `*Fiado a cobrar*\n${linhas.join("\n")}\n\nTotal: *${dinheiro(total)}*`
     );
     if (!enviou) continue;
     lojasAvisadas++;
