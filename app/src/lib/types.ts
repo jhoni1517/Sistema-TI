@@ -594,6 +594,65 @@ export interface ItemVenda {
   porPeso?: boolean;
 }
 
+/**
+ * Em que pé está o preparo de um item da comanda.
+ *
+ * "entregue" é diferente de "pronto": pronto é a cozinha dizendo que
+ * terminou, entregue é o salão dizendo que levou. Juntar os dois esconde a
+ * comida esfriando no balcão de passagem, que é onde ela esfria de verdade.
+ */
+export type PreparoItem = "pendente" | "preparando" | "pronto" | "entregue";
+
+/**
+ * Um item dentro da comanda.
+ *
+ * É o item da venda mais o que a cozinha precisa: um id próprio (a fila
+ * trabalha item a item, não por linha de carrinho), a etapa de preparo e a
+ * hora do pedido, que é o relógio do atraso.
+ */
+export interface ItemComanda extends ItemVenda {
+  id: ID;
+  preparo?: PreparoItem;
+  /** Quando o item foi pedido. É daqui que sai o tempo de espera. */
+  pedidoEm: string;
+  prontoEm?: string;
+  /**
+   * Cancelado NÃO é apagado. A linha fica para a cozinha saber que aquilo
+   * chegou a ser pedido — e, se ela já tinha começado, que o prato volta.
+   */
+  cancelado?: boolean;
+  motivoCancelamento?: string;
+}
+
+/**
+ * Comanda de mesa: um pedido que fica aberto recebendo itens.
+ *
+ * Não é dinheiro enquanto está aberta. Fechar é que gera a venda e o
+ * movimento no caixa — lançar a cada item faria o fechamento do dia contar
+ * a mesa 5 seis vezes. Ver lib/comanda.ts.
+ */
+export interface Comanda {
+  id: ID;
+  numero: number;
+  /**
+   * Texto livre: "5", "Balcão", "Viagem". Restaurante de bairro não tem
+   * mesa numerada em cadastro, e obrigar um cadastro de mesas seria uma
+   * tela a mais que ninguém preenche.
+   */
+  mesa: string;
+  itens: ItemComanda[];
+  status: "aberta" | "fechada" | "cancelada";
+  abertaEm: string;
+  fechadaEm?: string;
+  /** A venda gerada no fechamento. É por ela que se chega ao caixa. */
+  vendaId?: ID;
+  clienteId?: ID;
+  /** Quem está atendendo a mesa */
+  garcom?: string;
+  observacoes?: string;
+  atualizadoEm?: string;
+}
+
 export interface Venda {
   id: ID;
   numero: number;
