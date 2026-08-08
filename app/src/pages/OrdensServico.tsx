@@ -41,6 +41,7 @@ import {
   lucroOS,
   diasEmPosse,
   taxaArmazenamento,
+  totalDaEntrega,
   faixaOS,
   totalComOpcao,
   custoComOpcao,
@@ -336,6 +337,32 @@ export const OrdensServico: React.FC = () => {
     );
   };
 
+  /**
+   * Quanto cobrar nesta entrega, e a decisão sobre a taxa de guarda.
+   *
+   * A taxa aparecia em vermelho na lista e no detalhe, e o recibo assinado
+   * prometia que ela seria cobrada — mas a cobrança usava só `totalOS`. O
+   * aparelho abandonado por seis meses saía de graça com o aviso vermelho na
+   * tela do dono.
+   *
+   * Pergunta em vez de somar sozinho: perdoar a guarda para não perder o
+   * cliente é comum, e o cliente está na frente. Devolve `null` quando a
+   * pessoa fechou a pergunta para pensar.
+   */
+  const guardaDaEntrega = (o: OrdemServico): number => {
+    const t = taxaArmazenamento(o, config.taxaArmazenamentoDia || 0, config.diasAbandono || 90);
+    if (!(t.valor > 0)) return 0;
+    return confirm(
+      `Cobrar a taxa de guarda de ${brl(t.valor)}?\n\n` +
+        `${t.diasExcedidos} dia(s) além do prazo de ${config.diasAbandono || 90} dias, ` +
+        `a ${brl(config.taxaArmazenamentoDia || 0)} por dia.\n\n` +
+        `OK = cobra ${brl(totalOS(o) + t.valor)} no total.\n` +
+        `Cancelar = cobra só o serviço, ${brl(totalOS(o))}.`
+    )
+      ? t.valor
+      : 0;
+  };
+
   const avisarCliente = (o: OrdemServico) => {
     const c = cliente(o.clienteId);
     if (!txt(c?.telefone)) return aviso.alerta("Cliente sem telefone cadastrado.");
@@ -586,7 +613,8 @@ export const OrdensServico: React.FC = () => {
           }}
           onReceber={async (forma) => {
             if (escolhaPendente(detalhe)) return;
-            const valor = totalOS(detalhe);
+            const guarda = guardaDaEntrega(detalhe);
+            const valor = totalDaEntrega(detalhe, guarda);
             if (!(valor > 0)) {
               return aviso.alerta(
                 "Esta OS está com valor zero. Informe a mão de obra ou as peças antes de receber."
@@ -632,7 +660,11 @@ export const OrdensServico: React.FC = () => {
                 id: uid(),
                 tipo: "entrada" as const,
                 categoria: "OS",
-                descricao: `${codigoOS(detalhe.numero)} - ${nomeCliente(detalhe.clienteId)}`,
+                descricao:
+                  `${codigoOS(detalhe.numero)} - ${nomeCliente(detalhe.clienteId)}` +
+                  // A guarda vai NOMEADA no lançamento: no fechamento do mês
+                  // ninguém lembra por que aquela OS entrou mais cara.
+                  (guarda > 0 ? ` (inclui guarda ${brl(guarda)})` : ""),
                 valor,
                 formaPagamento: forma,
                 osId: detalhe.id,
@@ -675,10 +707,12 @@ export const OrdensServico: React.FC = () => {
           }}
           onFiado={async () => {
             if (escolhaPendente(detalhe)) return;
+            const guarda = guardaDaEntrega(detalhe);
+            const aDever = totalDaEntrega(detalhe, guarda);
             // O teto do fiado é decisão do dono, tomada uma vez. Aqui ela só
             // é lembrada — quem está no balcão ainda pode autorizar, porque
             // sistema que não deixa fazer nada é contornado por fora.
-            const teto = travaFiado(cliente(detalhe.clienteId), fiados, totalOS(detalhe));
+            const teto = travaFiado(cliente(detalhe.clienteId), fiados, aDever);
             if (
               teto.estoura &&
               !confirm(`${teto.motivo}\n\nLançar em A Receber mesmo assim?`)
@@ -700,9 +734,11 @@ export const OrdensServico: React.FC = () => {
               await saveFiado({
                 id: uid(),
                 clienteId: detalhe.clienteId,
-                descricao: `${codigoOS(detalhe.numero)} · ${detalhe.marca} ${detalhe.modelo}`,
+                descricao:
+                  `${codigoOS(detalhe.numero)} · ${detalhe.marca} ${detalhe.modelo}` +
+                  (guarda > 0 ? ` (inclui guarda ${brl(guarda)})` : ""),
                 osId: detalhe.id,
-                valor: totalOS(detalhe),
+                valor: aDever,
                 pagamentos: [],
                 quitado: false,
                 criadoEm: nowISO(),
@@ -1245,6 +1281,20 @@ const OSDetalhe: React.FC<{
   registrando: boolean;
 }> = ({ os, clienteNome, cliente, config, onClose, onStatus, onAvisar, onEditar, onExcluir, onReceber, onFiado, pagamentoRegistrado, historicoAparelho, registrando }) => {
   const [forma, setForma] = useState<FormaPagamento>("dinheiro");
+  /*
+   * A guarda acumulada, no mesmo lugar em que o alerta vermelho a calcula.
+   *
+   * Os botões diziam `Receber ${totalOS}` enquanto o alerta logo acima
+   * mostrava a guarda em vermelho — dois números para a mesma entrega, e o
+   * cobrado era o menor. Tela que diz um valor e caixa que cobra outro é
+   * exatamente o que a regra do preço único proíbe.
+   */
+  const guarda = taxaArmazenamento(
+    os,
+    config.taxaArmazenamentoDia || 0,
+    config.diasAbandono || 90
+  ).valor;
+  const aCobrar = totalDaEntrega(os, guarda);
   const [incluirCliente, setIncluirCliente] = useState(true);
 
   // o link leva a loja: a consulta pública só devolve dados desta loja
@@ -1496,9 +1546,10 @@ const OSDetalhe: React.FC<{
           <Linha label="Peças" value={brl(totalPecas(os))} />
           <Linha label="Mão de obra" value={brl(os.maoDeObra)} />
           {os.desconto > 0 && <Linha label="Desconto" value={`- ${brl(os.desconto)}`} />}
+          {guarda > 0 && <Linha label="Taxa de guarda" value={brl(guarda)} />}
           <div className="flex justify-between border-t pt-1 text-base font-bold">
             <span>Total</span>
-            <span>{brl(totalOS(os))}</span>
+            <span>{brl(aCobrar)}</span>
           </div>
         </div>
 
@@ -1527,7 +1578,7 @@ const OSDetalhe: React.FC<{
                 <option value="transferencia">Transferência</option>
               </select>
               <button className="btn-success !py-1.5 text-sm" disabled={registrando} onClick={() => onReceber(forma)}>
-                {registrando ? "Registrando..." : `Registrar ${brl(totalOS(os))} no caixa`}
+                {registrando ? "Registrando..." : `Registrar ${brl(aCobrar)} no caixa`}
               </button>
               <button className="btn-secondary !py-1.5 text-sm" disabled={registrando} onClick={onFiado}>
                 <HandCoins size={15} /> Lançar como fiado
@@ -1549,7 +1600,7 @@ const OSDetalhe: React.FC<{
               <option value="transferencia">Transferência</option>
             </select>
             <button className="btn-success !py-1.5 text-sm" disabled={registrando} onClick={() => onReceber(forma)}>
-              {registrando ? "Registrando..." : `Receber ${brl(totalOS(os))}`}
+              {registrando ? "Registrando..." : `Receber ${brl(aCobrar)}`}
             </button>
             <button className="btn-secondary !py-1.5 text-sm" disabled={registrando} onClick={onFiado} title="Entregar e deixar para pagar depois">
               <HandCoins size={15} /> Fiado
