@@ -161,6 +161,25 @@ export const taxaArmazenamento = (
   return { diasParado, diasExcedidos, valor: diasExcedidos * taxaDia };
 };
 
+/**
+ * O que a entrega cobra: o serviço mais a taxa de guarda, quando cobrada.
+ *
+ * A taxa era CALCULADA, aparecia em vermelho na lista e no detalhe da OS, e
+ * o recibo que o cliente assina prometia com todas as letras que ela seria
+ * cobrada. Só que a cobrança usava `totalOS`, que não a inclui — o aparelho
+ * abandonado por seis meses saía de graça, com o dono olhando o aviso
+ * vermelho na tela.
+ *
+ * Aviso que não vira número é pior do que aviso nenhum: ele faz a loja
+ * acreditar que o sistema está cuidando disso.
+ *
+ * Cobrar ou não é decisão de quem está no balcão — perdoar a guarda para
+ * não perder o cliente é comum. Por isso a guarda entra por fora e nunca
+ * sozinha: quem chama decide, e o cliente está na frente.
+ */
+export const totalDaEntrega = (o: OrdemServico, guarda = 0): number =>
+  Math.max(0, totalOS(o) + Math.max(0, n(guarda)));
+
 /** Saldo em caixa considerando abertura */
 export const saldoCaixa = (
   movs: MovimentoCaixa[],

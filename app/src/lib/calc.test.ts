@@ -16,6 +16,7 @@ import {
   pagoFiado,
   saldoFiado,
   taxaArmazenamento,
+  totalDaEntrega,
 } from "./calc";
 import type { MovimentoCaixa, OrdemServico } from "./types";
 
@@ -179,5 +180,41 @@ describe("taxa de armazenamento", () => {
 
   it("não cobra OS que ainda não ficou pronta", () => {
     expect(taxaArmazenamento(base({ status: "em_reparo" }), 5, 7).valor).toBe(0);
+  });
+});
+
+/**
+ * A taxa de guarda era CALCULADA e nunca COBRADA.
+ *
+ * Ela aparecia em vermelho na lista e no detalhe da OS, e o recibo que o
+ * cliente assina prometia com todas as letras que seria cobrada. Mas a
+ * cobrança usava `totalOS`, que não a inclui: o aparelho abandonado por seis
+ * meses saía de graça, com o dono olhando o aviso vermelho na tela.
+ *
+ * Aviso que não vira número é pior do que aviso nenhum — ele faz a loja
+ * acreditar que o sistema está cuidando disso.
+ */
+describe("a guarda entra na cobrança", () => {
+  const os = (o: Partial<OrdemServico> = {}): OrdemServico =>
+    ({ status: "pronta", pecas: [], maoDeObra: 200, desconto: 0, ...o }) as OrdemServico;
+
+  it("soma a guarda ao serviço", () => {
+    expect(totalOS(os())).toBe(200);
+    expect(totalDaEntrega(os(), 45)).toBe(245);
+  });
+
+  it("sem guarda, cobra exatamente o que sempre cobrou", () => {
+    // O caminho normal é este: a esmagadora maioria das OS sai dentro do
+    // prazo, e nada pode mudar para elas.
+    expect(totalDaEntrega(os())).toBe(totalOS(os()));
+    expect(totalDaEntrega(os(), 0)).toBe(200);
+  });
+
+  it("guarda negativa não abate o serviço", () => {
+    expect(totalDaEntrega(os(), -50)).toBe(200);
+  });
+
+  it("nunca devolve dinheiro: desconto maior que a conta para em zero", () => {
+    expect(totalDaEntrega(os({ maoDeObra: 100, desconto: 500 }), 20)).toBe(0);
   });
 });

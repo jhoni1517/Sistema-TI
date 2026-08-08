@@ -1,7 +1,7 @@
 import type { OrdemServico, Config, MovimentoCaixa, SessaoCaixa, Venda } from "./types";
 import { OS_STATUS_META } from "./types";
 import { brl, formatDate, formatDateTime, codigoOS, txt } from "./format";
-import { totalPecas, totalOS } from "./calc";
+import { totalPecas, totalDaEntrega, taxaArmazenamento } from "./calc";
 import { opcaoDaPeca, opcaoAtual, subtotalPeca } from "./orcamento";
 import { resumoCaixa, conferencia, CONFERENCIA_META } from "./caixa";
 import { subtotalItem, subtotalVenda, totalVenda, trocoDe } from "./pdv";
@@ -53,6 +53,8 @@ export function reciboOS(
   const incluirCliente = opts?.incluirCliente !== false && !!cliente?.nome;
   const dias = config.diasAbandono || 90;
   const taxa = config.taxaArmazenamentoDia || 0;
+  const guardaInfo = taxaArmazenamento(os, taxa, dias);
+  const guarda = guardaInfo.valor;
   const termoGuarda =
     `Prazo de retirada: o equipamento deve ser retirado em até ${dias} dias após a comunicação de conclusão do serviço.` +
     (taxa > 0
@@ -136,7 +138,20 @@ export function reciboOS(
         : ""
     }
     ${os.desconto ? `<div class="line"><span>Desconto</span><span>- ${brl(os.desconto)}</span></div>` : ""}
-    <div class="line grand"><span>Total</span><span>${brl(totalOS(os))}</span></div>
+    ${
+      /*
+       * A guarda entra no papel que o cliente confere.
+       *
+       * O termo logo abaixo promete, com todas as letras, que ela será
+       * cobrada — e o total imprimia só o serviço. O cliente assinava um
+       * documento onde a conta não fecha com o que ele vai pagar, e discutir
+       * isso no balcão é pior do que não ter cobrado.
+       */
+      guarda > 0
+        ? `<div class="line"><span>Taxa de guarda (${guardaInfo.diasExcedidos} dia(s))</span><span>${brl(guarda)}</span></div>`
+        : ""
+    }
+    <div class="line grand"><span>Total</span><span>${brl(totalDaEntrega(os, guarda))}</span></div>
   </div>
 
   ${os.tecnico ? `<div class="muted" style="margin-top:10px">Técnico responsável: ${esc(os.tecnico)}</div>` : ""}
