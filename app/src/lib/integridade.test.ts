@@ -422,3 +422,65 @@ describe("OS cobrada duas vezes", () => {
     expect(dinheiroEmRisco(achados)).toBeGreaterThanOrEqual(200);
   });
 });
+
+/**
+ * Mesa aberta de ontem é O vazamento do restaurante.
+ *
+ * A comida saiu da cozinha, o cliente comeu e foi embora, e a comanda ficou
+ * aberta porque o garçom esqueceu de fechar. Não falta nada no estoque para
+ * alguém estranhar, não sobra lançamento no caixa para alguém conferir —
+ * simplesmente não entrou dinheiro, e ninguém procura por dinheiro que
+ * nunca chegou.
+ */
+describe("mesa esquecida aberta", () => {
+  const hoje = new Date("2026-08-09T10:00:00.000Z");
+  const comanda = (c: Record<string, unknown>) =>
+    ({ id: "c1", numero: 1, mesa: "5", itens: [], status: "aberta", ...c }) as never;
+
+  const base = {
+    ordens: [],
+    vendas: [],
+    movimentos: [],
+    produtos: [],
+    fiados: [],
+    clientes: [],
+    sessoes: [],
+  };
+
+  it("acusa a mesa que atravessou o dia", () => {
+    const achados = conferirTudo(
+      { ...base, comandas: [comanda({ abertaEm: "2026-08-08T21:00:00.000Z", mesa: "7" })] },
+      hoje
+    );
+    const m = achados.find((a) => a.tipo === "comanda-esquecida");
+    expect(m?.titulo).toContain("Mesa 7");
+    expect(m?.gravidade).toBe("erro");
+  });
+
+  it("mesa aberta HOJE não é problema, mesmo que seja de madrugada", () => {
+    // Restaurante fecha de madrugada. Uma mesa aberta às 23h não pode virar
+    // alarme à meia-noite e meia — alarme que dispara sem motivo é alarme
+    // que a pessoa aprende a ignorar.
+    const achados = conferirTudo(
+      { ...base, comandas: [comanda({ abertaEm: "2026-08-09T01:00:00.000Z" })] },
+      hoje
+    );
+    expect(achados.some((a) => a.tipo === "comanda-esquecida")).toBe(false);
+  });
+
+  it("comanda já fechada não acusa nada", () => {
+    const achados = conferirTudo(
+      {
+        ...base,
+        comandas: [comanda({ abertaEm: "2026-08-01T21:00:00.000Z", status: "fechada" })],
+      },
+      hoje
+    );
+    expect(achados.some((a) => a.tipo === "comanda-esquecida")).toBe(false);
+  });
+
+  it("ramo sem mesa não quebra a conferência", () => {
+    // Assistência técnica não tem comandas: o campo nem vem.
+    expect(() => conferirTudo(base, hoje)).not.toThrow();
+  });
+});
