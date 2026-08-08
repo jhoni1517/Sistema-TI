@@ -4,6 +4,7 @@ import { Plus, Search, Pencil, Trash2, Users, Phone, MessageCircle, Wrench, User
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { uid, nowISO, whatsappLink, formatDate, brl, txt, mascaraDocumento, soDigitos, documentoValido } from "../lib/format";
+import { normalizar } from "../lib/busca";
 import { avaliarCliente, classificacaoDe, travaFiado, devendo } from "../lib/clientes";
 import { garantiasDoCliente } from "../lib/garantia";
 import { aoApagarCliente, textoDaConfirmacao } from "../lib/exclusao";
@@ -69,12 +70,14 @@ export const Clientes: React.FC = () => {
   const juridica = editando?.tipoPessoa === "juridica";
 
   const lista = useMemo(() => {
-    const b = busca.toLowerCase();
+    const b = normalizar(busca);
     return [...clientes]
       .filter(
         (c) =>
-          txt(c.nome).toLowerCase().includes(b) ||
-          txt(c.nomeFantasia).toLowerCase().includes(b) ||
+          // Sem acento: nome de gente é cheio deles — José, Conceição,
+          // Antônio, Inês. Quem digita "jose" tem que achar "José".
+          normalizar(c.nome).includes(b) ||
+          normalizar(c.nomeFantasia).includes(b) ||
           txt(c.telefone).includes(b) ||
           // compara só os dígitos: quem busca "52679" acha "52.679.376/0001-78"
           (soDigitos(b) !== "" && soDigitos(c.cpf).includes(soDigitos(b)))

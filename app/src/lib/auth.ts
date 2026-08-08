@@ -296,6 +296,7 @@ export async function recuperarSenha(email: string): Promise<void> {
  * desses tem uma saída diferente, e o texto precisa dizer qual é.
  */
 function traduzErro(msg: string): string {
+  // texto-cru-proposital: mensagem em ingles que o Supabase devolve
   const m = (msg || "").toLowerCase();
 
   // Chave anon inválida/rotacionada: nada a ver com a senha do usuário

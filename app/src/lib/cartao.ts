@@ -1,4 +1,4 @@
-import { txt } from "./format";
+import { txt, normalizar } from "./format";
 import { centavos } from "./pdv";
 import { soData } from "./contas";
 import type { MovimentoCaixa } from "./types";
@@ -27,8 +27,11 @@ import type { MovimentoCaixa } from "./types";
 
 const n = (v?: number | null): number => Number(v) || 0;
 
-/** Categorias que representam o pagamento da fatura, e não uma despesa nova */
-const CATEGORIAS_FATURA = ["fatura do cartão", "fatura do cartao", "fatura cartão", "fatura"];
+/**
+ * Categorias que representam o pagamento da fatura, e não uma despesa nova.
+ * Sem acento: a comparação passa por `normalizar`, igual em `calc.ts`.
+ */
+const CATEGORIAS_FATURA = ["fatura do cartao", "fatura cartao", "fatura"];
 
 /**
  * Esta saída é o pagamento da fatura do cartão?
@@ -41,7 +44,7 @@ export const ehPagamentoDeFatura = (m: MovimentoCaixa): boolean =>
   m.tipo === "saida" &&
   (m.faturaCartao === true ||
     (m.faturaCartao === undefined &&
-      CATEGORIAS_FATURA.includes(txt(m.categoria).trim().toLowerCase())));
+      CATEGORIAS_FATURA.includes(normalizar(m.categoria))));
 
 /**
  * Compra no crédito: a despesa de verdade.

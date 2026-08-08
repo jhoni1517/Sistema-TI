@@ -16,6 +16,7 @@ import { aviso } from "./Aviso";
 import { Modal, Field, EmptyState, InputNumero } from "./ui";
 import { useApp } from "../store/AppStore";
 import { uid, nowISO, brl, formatDate, txt, abrirWhatsapp } from "../lib/format";
+import { normalizar } from "../lib/busca";
 import {
   mensagemFornecedor,
   ultimoPreco,
@@ -253,7 +254,7 @@ export const Cotacoes: React.FC<{
         data: nowISO(),
       });
 
-      const chave = (nome: string) => txt(nome).trim().toLowerCase();
+      const chave = (nome: string) => normalizar(nome);
 
       /**
        * O estado de produtos só é atualizado depois que a função termina, então
@@ -489,9 +490,7 @@ export const Cotacoes: React.FC<{
                           onChange={(e) => {
                             const itens = [...editando.itens];
                             const achado = produtos.find(
-                              (p) =>
-                                txt(p.nome).toLowerCase() ===
-                                e.target.value.trim().toLowerCase()
+                              (p) => normalizar(p.nome) === normalizar(e.target.value)
                             );
                             itens[idx] = {
                               ...item,

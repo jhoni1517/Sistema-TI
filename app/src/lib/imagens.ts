@@ -72,7 +72,10 @@ export function problemaNoArquivo(arquivo: { type: string; size: number }): stri
  */
 export function caminhoDaImagem(lojaId: string, pasta: string, nome: string): string {
   const limpo = nome
-    .toLowerCase()
+    // Nao e comparacao: e a limpeza do nome do arquivo que vai para o
+    // Storage, porque acento em caminho de URL da problema.
+    .toLowerCase() // texto-cru-proposital
+
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "-")

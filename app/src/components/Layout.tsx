@@ -102,6 +102,7 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
   // Atalho Ctrl+K / Cmd+K abre a busca global
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // texto-cru-proposital: tecla do teclado, não texto digitado
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setBusca(true);

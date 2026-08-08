@@ -12,6 +12,7 @@ import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { CatalogoPublico } from "../components/CatalogoPublico";
 import { temRecurso } from "../lib/ramos";
+import { normalizar } from "../lib/busca";
 import { pendenciasDoProduto, produtosSemFiscal, pendenciasDaLoja } from "../lib/fiscal";
 import { situacaoValidade, produtosVencendo, VALIDADE_META } from "../lib/pdv";
 import {
@@ -70,9 +71,10 @@ export const Estoque: React.FC = () => {
     fornecedores.find((f) => f.id === p.fornecedorId)?.nome || p.fornecedor || "";
 
   const lista = useMemo(() => {
-    const b = busca.toLowerCase();
+    // Sem acento: "acucar" tem que achar "Açúcar". Ver lib/busca.ts.
+    const b = normalizar(busca);
     return [...produtos]
-      .filter((p) => [p.nome, p.sku, nomeCat(p), nomeForn(p)].map(txt).join(" ").toLowerCase().includes(b))
+      .filter((p) => normalizar([p.nome, p.sku, nomeCat(p), nomeForn(p)].map(txt).join(" ")).includes(b))
       .filter((p) => (soBaixo ? !p.servico && p.quantidade <= p.estoqueMinimo : true))
       .sort((a, b) => txt(a.nome).localeCompare(txt(b.nome)));
     // eslint-disable-next-line react-hooks/exhaustive-deps

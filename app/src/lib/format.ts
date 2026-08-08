@@ -9,6 +9,25 @@ export const uid = (): string =>
 export const txt = (v?: string | null): string => (v ?? "").toString();
 
 /**
+ * Minúsculo, sem acento: é assim que os dois lados são comparados.
+ *
+ * Mora aqui, no arquivo que não importa ninguém, porque quase todo lugar do
+ * sistema precisa dela — inclusive `calc.ts`, que a busca já importa. Se
+ * ficasse em `busca.ts`, o caminho de volta viraria import circular.
+ *
+ * Quem atende digita "acucar", "pao", "agua", "feijao"; o cadastro tem
+ * "Açúcar", "Pão", "Água", "Feijão". Comparar com `.toLowerCase()` resolve a
+ * maiúscula e deixa o acento — e o operador conclui que o produto não está
+ * cadastrado. Ver `busca-sem-acento.test.ts`.
+ */
+export const normalizar = (v?: string | null): string =>
+  txt(v)
+    .toLowerCase() // texto-cru-proposital: é ESTA a função que normaliza
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+
+/**
  * Negrito do WhatsApp.
  *
  * Espaço encostado no asterisco CANCELA a formatação: "*NOVA GERAÇÃO *" chega

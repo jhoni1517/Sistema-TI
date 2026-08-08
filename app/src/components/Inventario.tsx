@@ -4,6 +4,7 @@ import { aviso } from "./Aviso";
 import { Modal, InputNumero } from "./ui";
 import { useApp } from "../store/AppStore";
 import { uid, nowISO, brl, txt } from "../lib/format";
+import { normalizar } from "../lib/busca";
 import { sessaoAberta as achaSessaoAberta } from "../lib/caixa";
 import {
   conferirInventario,
@@ -36,11 +37,12 @@ export const Inventario: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const divergentes = new Set(resumo.divergentes.map((d) => d.produtoId));
 
   const lista = useMemo(() => {
-    const t = txt(busca).trim().toLowerCase();
+    // Sem acento dos dois lados: quem conta a prateleira digita "acucar".
+    const t = normalizar(busca);
     return produtos
       .filter((p) => !p.servico)
       .filter((p) =>
-        !t ? true : txt(p.nome).toLowerCase().includes(t) || txt(p.codigoBarras).includes(t)
+        !t ? true : normalizar(p.nome).includes(t) || txt(p.codigoBarras).includes(t)
       )
       .filter((p) => (soDivergentes ? divergentes.has(p.id) : true))
       .sort((a, b) => txt(a.nome).localeCompare(txt(b.nome)))

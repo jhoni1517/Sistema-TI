@@ -223,6 +223,7 @@ interface ContaLembrada {
   ramo: Ramo;
 }
 
+// texto-cru-proposital: e-mail nao tem acento, e tirar um mudaria o endereco
 const chaveEmail = (email: string): string => email.trim().toLowerCase();
 
 const lerContas = (): ContaLembrada[] => {

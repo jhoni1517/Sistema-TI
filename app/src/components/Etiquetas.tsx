@@ -6,6 +6,7 @@ import { useApp } from "../store/AppStore";
 import { printHTML } from "../lib/print";
 import { folhaDeEtiquetas } from "../lib/recibo";
 import { brl, txt } from "../lib/format";
+import { normalizar } from "../lib/busca";
 import { etiquetasDe, proximoCodigoInterno, ehCodigoInterno } from "../lib/etiqueta";
 import { precoEfetivo, promocaoValendo } from "../lib/promocao";
 import type { Produto } from "../lib/types";
@@ -28,10 +29,10 @@ export const Etiquetas: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [gerando, setGerando] = useState(false);
 
   const lista = useMemo(() => {
-    const t = txt(busca).trim().toLowerCase();
+    const t = normalizar(busca);
     return produtos
       .filter((p) => !p.servico)
-      .filter((p) => (!t ? true : txt(p.nome).toLowerCase().includes(t)))
+      .filter((p) => (!t ? true : normalizar(p.nome).includes(t)))
       .sort((a, b) => txt(a.nome).localeCompare(txt(b.nome)))
       .slice(0, 60);
   }, [produtos, busca]);

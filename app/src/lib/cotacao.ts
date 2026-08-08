@@ -1,4 +1,4 @@
-import { brl, negrito, txt } from "./format";
+import { brl, negrito, txt, normalizar } from "./format";
 import type {
   Cotacao,
   Fornecedor,
@@ -23,7 +23,10 @@ const mesmoItem = (
 ): boolean =>
   item.produtoId && p.produtoId
     ? p.produtoId === item.produtoId
-    : txt(p.descricao).trim().toLowerCase() === txt(item.descricao).trim().toLowerCase();
+    : // Sem acento: o preço anterior foi gravado com o nome digitado naquele
+      // dia, e hoje se digita de outro jeito. Não casando, o histórico do
+      // fornecedor some e a cotação parece a primeira.
+      normalizar(p.descricao) === normalizar(item.descricao);
 
 const maisRecentePrimeiro = (a: PrecoFornecedor, b: PrecoFornecedor) =>
   txt(b.data).localeCompare(txt(a.data));

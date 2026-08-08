@@ -1,4 +1,5 @@
 import { txt } from "./format";
+import { normalizar } from "./busca";
 import {
   RECORRENCIA_META,
   type ContaPagar,
@@ -219,7 +220,7 @@ export function filtrarContas(
   filtro: FiltroContas = {},
   hoje = hojeISO()
 ): ContaPagar[] {
-  const termo = txt(filtro.termo).trim().toLowerCase();
+  const termo = normalizar(filtro.termo);
   const ordem = filtro.ordem || "vencimento";
 
   const filtradas = contas.filter((c) => {
@@ -228,7 +229,9 @@ export function filtrarContas(
     if (!termo) return true;
     // Categoria e observação entram na busca porque é assim que a pessoa
     // lembra: "aquela do contador", "as de energia".
-    const alvo = `${txt(c.descricao)} ${txt(c.categoria)} ${txt(c.observacoes)}`.toLowerCase();
+    const alvo = normalizar(
+      `${txt(c.descricao)} ${txt(c.categoria)} ${txt(c.observacoes)}`
+    );
     return alvo.includes(termo);
   });
 
