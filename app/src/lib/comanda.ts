@@ -113,6 +113,9 @@ export function itensParaVenda(c: Comanda, percentual?: number | null): ItemVend
       quantidade: 1,
       precoUnit: taxa,
       custoUnit: 0,
+      // Marcada para a conferência da nota não confundir gorjeta com
+      // mercadoria sem cadastro. Ver `pendenciasParaEmitir` em lib/fiscal.ts.
+      taxaServico: true,
     });
   }
   return linhas;

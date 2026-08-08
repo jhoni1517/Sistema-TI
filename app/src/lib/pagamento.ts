@@ -13,6 +13,34 @@ import type { FormaPagamento } from "./types";
  * A conta mora aqui porque é ela que decide se o caixa fecha.
  */
 
+/**
+ * As formas de pagamento que a tela oferece, numa lista só.
+ *
+ * Estava copiada no PDV e na comanda, e as telas de COMPRA nem perguntavam:
+ * a entrada de mercadoria gravava "dinheiro" fixo e a cotação gravava "pix"
+ * fixo. Ver o comentário de `FORMAS_DE_COMPRA`, logo abaixo — o estrago é
+ * na gaveta.
+ */
+export const FORMAS_META: { k: FormaPagamento; nome: string }[] = [
+  { k: "dinheiro", nome: "Dinheiro" },
+  { k: "pix", nome: "Pix" },
+  { k: "debito", nome: "Débito" },
+  { k: "credito", nome: "Crédito" },
+];
+
+/**
+ * O mesmo, mais o que só aparece quando a loja PAGA.
+ *
+ * "Transferência" é o boleto e o TED do fornecedor, que ninguém usa para
+ * receber no balcão; "Outro" é a troca, o acerto informal, o que não coube.
+ * Nenhum dos dois tira nota da gaveta — e é exatamente esse o ponto.
+ */
+export const FORMAS_DE_COMPRA: { k: FormaPagamento; nome: string }[] = [
+  ...FORMAS_META,
+  { k: "transferencia", nome: "Transferência / boleto" },
+  { k: "outro", nome: "Outro" },
+];
+
 export interface Parcela {
   forma: FormaPagamento;
   valor: number;

@@ -356,6 +356,15 @@ export function pendenciasParaEmitir(
   const jaVistos = new Set<string>();
 
   for (const item of itens || []) {
+    /*
+     * A taxa de serviço da mesa não é mercadoria.
+     *
+     * Ela é uma linha sem produtoId, e a regra do item avulso a apontava
+     * como "cadastre o produto" — conselho errado: gorjeta não tem NCM e
+     * nunca vai ter. Quem sabe declarar taxa de serviço é o emissor, e ele
+     * a trata como despesa acessória, não como item do estoque.
+     */
+    if (item.taxaServico) continue;
     if (!item.produtoId) {
       const nome = txt(item.descricao).trim() || "item sem descrição";
       faltas.push(`${nome}: item avulso não tem cadastro, e nota exige NCM`);

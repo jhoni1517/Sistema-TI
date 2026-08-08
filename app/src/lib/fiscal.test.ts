@@ -349,3 +349,54 @@ describe("regime tributário", () => {
     expect(usaCsosn("normal")).toBe(false);
   });
 });
+
+/**
+ * A taxa de serviço da mesa é uma linha da venda sem produtoId — e a regra
+ * do item avulso mandava "cadastre o produto". Conselho errado: gorjeta não
+ * tem NCM e nunca vai ter. Quem sabe declarar taxa de serviço é o emissor.
+ */
+describe("a gorjeta não é mercadoria", () => {
+  const lojaOk: Config = {
+    ...({} as Config),
+    cnpj: "11222333000181",
+    inscricaoEstadual: "1234567890",
+    regimeTributario: "simples",
+    nfLogradouro: "Rua das Flores",
+    nfNumero: "123",
+    nfBairro: "Centro",
+    nfCep: "83010000",
+    nfMunicipio: "São José dos Pinhais",
+    nfCodigoIbge: "4125506",
+    nfUf: "PR",
+  };
+  const pizza: Produto = {
+    id: "p1",
+    nome: "Pizza",
+    quantidade: 10,
+    estoqueMinimo: 1,
+    custo: 15,
+    preco: 60,
+    criadoEm: "",
+    ncm: "19059090",
+    cfop: "5102",
+    csosn: "102",
+    origem: "0",
+  };
+
+  it("a linha da taxa não vira pendência de NCM", () => {
+    const itens: ItemVenda[] = [
+      { produtoId: "p1", descricao: "Pizza", quantidade: 1, precoUnit: 60, custoUnit: 15 },
+      { descricao: "Taxa de servico 10%", quantidade: 1, precoUnit: 6, custoUnit: 0, taxaServico: true },
+    ];
+    expect(pendenciasParaEmitir(itens, [pizza], lojaOk)).toEqual([]);
+  });
+
+  it("item avulso de verdade continua sendo apontado", () => {
+    // A marca é só para a taxa. Peça digitada na mão continua impedindo a
+    // nota, porque ali a saída é cadastrar o produto mesmo.
+    const itens: ItemVenda[] = [
+      { descricao: "Cabo avulso", quantidade: 1, precoUnit: 10, custoUnit: 4 },
+    ];
+    expect(pendenciasParaEmitir(itens, [pizza], lojaOk).join(" ")).toContain("Cabo avulso");
+  });
+});

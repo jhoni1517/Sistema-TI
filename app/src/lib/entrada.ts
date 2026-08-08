@@ -1,4 +1,5 @@
 import { centavos } from "./pdv";
+import { grama } from "./estoque";
 import { txt } from "./format";
 import type { Produto } from "./types";
 
@@ -105,7 +106,10 @@ export function aplicarEntrada(
 ): Produto {
   return {
     ...produto,
-    quantidade: centavos(n(produto.quantidade) + n(quantidade)),
+    // A mesma casa decimal da SAÍDA. A baixa guarda três (é grama), e a
+    // entrada guardava duas: comprar 0,315 kg virava 0,32 na prateleira, e a
+    // cada nota o estoque ganhava alguns gramas que ninguém comprou.
+    quantidade: grama(n(produto.quantidade) + n(quantidade)),
     custo: custoMedio(produto.quantidade, produto.custo, quantidade, custoUnitFinal),
   };
 }

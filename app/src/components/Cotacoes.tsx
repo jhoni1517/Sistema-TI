@@ -25,9 +25,11 @@ import {
   totalCotacao,
   aplicarCompra,
 } from "../lib/cotacao";
+import { FORMAS_DE_COMPRA } from "../lib/pagamento";
 import {
   COTACAO_STATUS_META,
   type Cotacao,
+  type FormaPagamento,
   type ItemCotacao,
   type Produto,
 } from "../lib/types";
@@ -89,6 +91,7 @@ export const Cotacoes: React.FC<{
   const [respondendo, setRespondendo] = useState<Cotacao | null>(null);
   const [comprando, setComprando] = useState<Cotacao | null>(null);
   const [escolhidos, setEscolhidos] = useState<Set<number>>(new Set());
+  const [formaCompra, setFormaCompra] = useState<FormaPagamento>("pix");
   const [processando, setProcessando] = useState(false);
 
   const proximoNumero = useMemo(
@@ -244,7 +247,12 @@ export const Cotacoes: React.FC<{
         valor: total,
         descricao: `Compra de peças — ${nomeForn(c.fornecedorId)}`,
         categoria: "Compra de peça",
-        formaPagamento: "pix",
+        /*
+         * Escolhida, não chutada. Aqui era "pix" fixo — e a compra paga em
+         * papel não descontava da gaveta, fazendo o fechamento do dia acusar
+         * FALTA do valor da compra. Ver `emEspecie` em lib/caixa.ts.
+         */
+        formaPagamento: formaCompra,
         sessaoId: sessaoAberta?.id,
         // Reposição de estoque: sai do caixa, mas não é despesa do resultado
         compraEstoque: true,
@@ -652,8 +660,29 @@ export const Cotacoes: React.FC<{
               </span>
             </div>
 
+            <div className="mt-4">
+              <label className="label">Pago em</label>
+              <div className="flex flex-wrap gap-2">
+                {FORMAS_DE_COMPRA.map((f) => (
+                  <button
+                    key={f.k}
+                    type="button"
+                    onClick={() => setFormaCompra(f.k)}
+                    className={`chip text-sm ${
+                      formaCompra === f.k
+                        ? "bg-brand-600 text-white"
+                        : "bg-white text-slate-600 ring-1 ring-slate-200"
+                    }`}
+                  >
+                    {f.nome}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <p className="mt-3 text-xs text-slate-400">
-              O valor selecionado entra como saída no caixa aberto.
+              O valor selecionado entra como saída no caixa aberto. Só "Dinheiro"
+              desconta da gaveta na conferência.
             </p>
           </div>
         )}
