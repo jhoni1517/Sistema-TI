@@ -180,3 +180,36 @@ export const paraNumero = (texto: string): number | undefined => {
 /** Número -> texto do campo. Undefined e NaN viram campo vazio, não "0". */
 export const paraTexto = (v?: number | null): string =>
   v === undefined || v === null || Number.isNaN(v) ? "" : String(v);
+
+/**
+ * O que fica no campo depois de a pessoa digitar.
+ *
+ * O campo de quantidade nasce mostrando "0". Digitar 5 no fim dele deixa
+ * "05" — e o "05" FICAVA na tela, porque o campo só se reescreve quando o
+ * NÚMERO muda, e 05 e 5 são o mesmo número. A pessoa tinha que digitar o
+ * valor e voltar para apagar o zero, item por item, com a fila andando.
+ *
+ * O zero só cai quando vem outro dígito atrás dele. "0" sozinho continua
+ * "0" — é um valor legítimo — e "0," continua, senão seria impossível
+ * digitar "0,50".
+ */
+export const textoDigitado = (bruto: string, anterior = ""): string => {
+  // Só o que pode fazer parte de um número: letra some antes de aparecer
+  const limpo = txt(bruto).replace(/[^\d.,-]/g, "");
+
+  /*
+   * Campo que valia exatamente "0": a PRIMEIRA tecla substitui o zero,
+   * esteja o cursor antes ou depois dele.
+   *
+   * Tirar zero à esquerda resolve quem digita no fim ("05" -> "5"), mas não
+   * quem toca no começo: ali "7" virava "70", que é setenta. No celular o
+   * dedo cai onde cai, e os dois casos têm que dar no mesmo lugar.
+   *
+   * Vale só quando o campo valia "0" — ou seja, na primeira tecla. Quem
+   * quer setenta digita 7 e depois 0: na segunda tecla o campo já vale "7"
+   * e esta regra não se aplica.
+   */
+  if (anterior === "0" && /^(0\d|\d0)$/.test(limpo)) return limpo.replace("0", "");
+
+  return limpo.replace(/^(-?)0+(\d)/, "$1$2");
+};
