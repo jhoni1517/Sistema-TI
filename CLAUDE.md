@@ -361,6 +361,34 @@ para um processo.
 - Migração de banco é sempre repetível: `if not exists`, `create or
   replace`, `drop policy if exists` antes de criar.
 
+### Depois de mesclar, não empurre o merge de volta para a branch
+
+A Vercel não constrói o mesmo commit duas vezes. Ela decide pelo SHA, e a
+primeira referência que chega leva o build.
+
+Mesclando o PR, o GitHub avisa a Vercel duas vezes: uma pelo `main` (essa é
+a que vira **produção**) e outra pela branch, se a branch também apontar
+para o mesmo commit. Sincronizar a branch logo depois do merge —
+`git reset --hard origin/main && git push` — faz a segunda chegar primeiro.
+A Vercel constrói, marca `target: null`, e quando o aviso do `main` chega
+ela responde que aquele commit já foi construído. **O deploy fica verde e a
+produção continua na versão anterior.**
+
+Aconteceu, e o sintoma engana: o build aparece como READY na Vercel, o
+commit está no `main`, e o site serve o pacote velho. Confere-se pelo
+`target` da implantação — `production` ou `null`.
+
+Então: mesclou, espera a produção subir e SÓ DEPOIS sincroniza a branch. E
+conferir se subiu é olhar o pacote no ar, não a tela da Vercel:
+
+```bash
+b=$(curl -s https://sistema-ti-caixa.vercel.app/ | grep -o 'assets/index-[^"]*\.js')
+curl -s "https://sistema-ti-caixa.vercel.app/$b" | grep -c "algum texto novo"
+```
+
+Não tem como promover uma implantação pela API que o agente enxerga. Se o
+build de produção foi deduplicado, o jeito é um commit novo no `main`.
+
 ### Falar com o dono do sistema
 
 Ele atende no balcão e lê no celular. Seja direto e sem enfeite. Diga o que
