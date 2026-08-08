@@ -484,3 +484,73 @@ describe("mesa esquecida aberta", () => {
     expect(() => conferirTudo(base, hoje)).not.toThrow();
   });
 });
+
+/**
+ * O irmão da mesa esquecida: o serviço saiu, o aparelho foi embora e o
+ * dinheiro nunca chegou. Não falta nada no estoque para estranhar, não
+ * sobra lançamento nenhum para conferir — só não entrou.
+ */
+describe("dívida parada aparece na conferência", () => {
+  const hoje = new Date("2026-08-08T12:00:00Z");
+  const fiado = (x: Record<string, unknown>) =>
+    ({
+      id: "f1",
+      clienteId: "c1",
+      descricao: "Troca de tela",
+      valor: 300,
+      pagamentos: [],
+      quitado: false,
+      criadoEm: "2026-01-10T10:00:00.000Z",
+      ...x,
+    }) as never;
+
+  const base = {
+    ordens: [],
+    vendas: [],
+    movimentos: [],
+    produtos: [],
+    clientes: [{ id: "c1", nome: "João", criadoEm: "" }],
+    sessoes: [],
+  } as never;
+
+  it("acusa a dívida parada, com nome, valor e há quanto tempo", () => {
+    const r = conferirTudo({ ...(base as object), fiados: [fiado({})] } as never, hoje);
+    const achado = r.find((a) => a.tipo === "fiado-parado");
+    expect(achado?.titulo).toContain("João");
+    // brl() usa espaço não-quebrável entre "R$" e o número
+    expect(achado?.titulo).toMatch(/R\$\s*300,00/);
+    expect(achado?.gravidade).toBe("alerta");
+  });
+
+  it("junta as dívidas do mesmo cliente numa linha só", () => {
+    // Três fiados do mesmo cara viram três linhas idênticas na tela, e
+    // nenhuma delas é lida.
+    const r = conferirTudo(
+      {
+        ...(base as object),
+        fiados: [fiado({ id: "a" }), fiado({ id: "b", valor: 100 })],
+      } as never,
+      hoje
+    );
+    const achados = r.filter((a) => a.tipo === "fiado-parado");
+    expect(achados).toHaveLength(1);
+    expect(achados[0].titulo).toMatch(/R\$\s*400,00/);
+    expect(achados[0].titulo).toContain("2 dívidas");
+  });
+
+  it("dívida nova não vira alarme", () => {
+    const r = conferirTudo(
+      { ...(base as object), fiados: [fiado({ criadoEm: "2026-08-05T10:00:00.000Z" })] } as never,
+      hoje
+    );
+    expect(r.some((a) => a.tipo === "fiado-parado")).toBe(false);
+  });
+
+  it("quem pagou some da lista", () => {
+    const r = conferirTudo(
+      { ...(base as object), fiados: [fiado({ quitado: true })] } as never,
+      hoje
+    );
+    expect(r.some((a) => a.tipo === "fiado-parado")).toBe(false);
+  });
+});
