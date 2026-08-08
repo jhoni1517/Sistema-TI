@@ -3,7 +3,7 @@ import { aviso } from "../components/Aviso";
 import { ImagemUpload } from "../components/ImagemUpload";
 import { Store, KeyRound, Cloud, Download, Upload, Save, Database, Palette, Sun, Moon, Monitor, Percent, FileText, ShieldCheck } from "lucide-react";
 import { useApp } from "../store/AppStore";
-import { RAMO_META, temRecurso } from "../lib/ramos";
+import { RAMO_META, temRecurso, temModulo } from "../lib/ramos";
 import { REGRA_MEIO_A_MEIO_META, regraDe, type RegraMeioAMeio } from "../lib/pizza";
 import {
   REGIME_META,
@@ -404,6 +404,25 @@ export const Config: React.FC = () => {
               <p className="mt-1 text-xs text-slate-400">
                 Vale no balcão, no delivery e na comanda. Mudar aqui não altera
                 pedido já fechado.
+              </p>
+            </Field>
+          )}
+
+          {temModulo(ramoContratado, "mesas") && (
+            <Field label="Taxa de serviço (%)" className="sm:col-span-2">
+              <InputNumero
+                className="input max-w-xs"
+                min={0}
+                max={100}
+                value={form.taxaServicoPadrao}
+                onChange={(v) => mudar({ taxaServicoPadrao: v ?? 0 })}
+              />
+              {/* Toda mesa nasce com esta taxa marcada. O contrário — o
+                  garçom marcar a cada conta — faz a casa esquecer de cobrar
+                  o serviço na correria do sábado. */}
+              <p className="mt-1 text-xs text-slate-400">
+                Vem marcada em toda mesa nova. Deixe 0 se a casa não cobra. O
+                cliente pode recusar na hora de fechar a conta.
               </p>
             </Field>
           )}

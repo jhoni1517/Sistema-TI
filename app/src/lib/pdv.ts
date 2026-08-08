@@ -89,7 +89,25 @@ export const faltaPara = (total: number, recebido?: number): number => {
  */
 export function problemaNoCarrinho(itens: ItemVenda[]): string {
   if (itens.length === 0) return "Carrinho vazio.";
+  return problemaNasLinhas(
+    itens,
+    "Se o cliente está devolvendo alguma coisa, feche esta venda e use Devolução."
+  );
+}
 
+/**
+ * A mesma conferência, item a item, para qualquer lista que vire venda.
+ *
+ * Existe separada porque a comanda de mesa desemboca EXATAMENTE no mesmo
+ * lugar — `saldosApos` e um movimento no caixa — e nasceu sem esta trava. Com
+ * uma linha de quantidade -2 a mesa fechava por R$ 0,00 e dois refrigerantes
+ * ENTRAVAM na geladeira sem nota. Regra escrita em dois lugares envelhece em
+ * um deles; aqui ela é uma só.
+ *
+ * `saida` é a frase que diz o caminho certo para quem quer tirar item, porque
+ * ele é diferente no balcão (Devolução) e na mesa (cancelar o item).
+ */
+export function problemaNasLinhas(itens: ItemVenda[], saida: string): string {
   for (const i of itens) {
     const nome = txt(i.descricao).trim() || "Item";
     const q = Number(i.quantidade) || 0;
@@ -97,8 +115,7 @@ export function problemaNoCarrinho(itens: ItemVenda[]): string {
     if (q < 0) {
       return (
         `"${nome}" está com quantidade negativa. Isso desconta do total e ` +
-        `DEVOLVE mercadoria ao estoque. Se o cliente está devolvendo alguma ` +
-        `coisa, feche esta venda e use Devolução.`
+        `DEVOLVE mercadoria ao estoque. ${saida}`
       );
     }
     if (q === 0) {

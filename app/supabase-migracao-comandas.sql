@@ -41,10 +41,21 @@ create table if not exists comandas (
   "clienteId" text,
   garcom text,
   observacoes text,
+  -- A gorjeta em porcentagem do consumo, e o abatimento em reais combinado
+  -- no salão. Ficam na comanda e não só na configuração porque o cliente
+  -- pode recusar a taxa, e a mesa que recusou tem que continuar recusando
+  -- quando a tela recarregar.
+  "taxaServico" numeric,
+  desconto numeric,
   "criadoEm" text,
   "atualizadoEm" text,
   "lojaId" uuid
 );
+
+-- Para quem já rodou a versão anterior desta migração: a tabela existe e o
+-- `create table if not exists` acima não acrescenta coluna nenhuma.
+alter table comandas add column if not exists "taxaServico" numeric;
+alter table comandas add column if not exists desconto numeric;
 
 create index if not exists comandas_loja_idx on comandas ("lojaId");
 -- A tela do salão e a da cozinha só querem as ABERTAS. Sem este índice as
