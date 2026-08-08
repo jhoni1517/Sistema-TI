@@ -430,6 +430,21 @@ export const Config: React.FC = () => {
             </p>
           </Field>
 
+          <Field label="Inscrição Municipal" className="sm:col-span-2">
+            <input
+              className="input"
+              inputMode="numeric"
+              placeholder="Só quem cobra serviço precisa"
+              value={form.inscricaoMunicipal || ""}
+              onChange={(e) => mudar({ inscricaoMunicipal: e.target.value })}
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              É o registro na PREFEITURA, e vale para a nota de serviço (NFS-e).
+              A Estadual, logo acima, vale para a nota de mercadoria. Uma
+              assistência técnica precisa das duas: vende peça e cobra mão de obra.
+            </p>
+          </Field>
+
           <Field label="Regime tributário" className="sm:col-span-2">
             <div className="grid max-w-md gap-2">
               {(Object.keys(REGIME_META) as RegimeTributario[]).map((k) => {

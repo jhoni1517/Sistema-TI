@@ -426,20 +426,42 @@ export const Estoque: React.FC = () => {
               obrigar a digitar os quatro em duzentos produtos é o caminho
               para ninguém preencher nenhum. Ver lib/fiscal.ts.
             */}
-            <Field label="NCM (nota fiscal)">
-              <input
-                className="input"
-                inputMode="numeric"
-                placeholder="8 dígitos, ex.: 19059090"
-                value={editando.ncm || ""}
-                onChange={(e) => setEditando({ ...editando, ncm: e.target.value })}
-              />
-              <p className="mt-1 text-xs text-slate-400">
-                {pendenciasDoProduto(editando, config).length > 0
-                  ? "Sem ele este produto não entra em nota fiscal. O contador da loja informa o código."
-                  : "Pronto para nota fiscal. O resto vem do padrão da loja, em Configurações."}
-              </p>
-            </Field>
+            {/*
+              Serviço e mercadoria são documentos diferentes, e os campos
+              não se misturam: mercadoria leva NCM (nota estadual, ICMS),
+              serviço leva código da lista de serviços (nota municipal,
+              ISS). Mostrar o campo errado manda a pessoa procurar um
+              número que não existe para aquele item.
+            */}
+            {editando.servico ? (
+              <Field label="Código do serviço (nota fiscal)">
+                <input
+                  className="input"
+                  placeholder="Ex.: 14.01"
+                  value={editando.codigoServico || ""}
+                  onChange={(e) => setEditando({ ...editando, codigoServico: e.target.value })}
+                />
+                <p className="mt-1 text-xs text-slate-400">
+                  Serviço sai em nota MUNICIPAL (NFS-e), não na estadual. Não
+                  tem NCM. O contador informa o código da lista de serviços.
+                </p>
+              </Field>
+            ) : (
+              <Field label="NCM (nota fiscal)">
+                <input
+                  className="input"
+                  inputMode="numeric"
+                  placeholder="8 dígitos, ex.: 19059090"
+                  value={editando.ncm || ""}
+                  onChange={(e) => setEditando({ ...editando, ncm: e.target.value })}
+                />
+                <p className="mt-1 text-xs text-slate-400">
+                  {pendenciasDoProduto(editando, config).length > 0
+                    ? "Sem ele este produto não entra em nota fiscal. O contador da loja informa o código."
+                    : "Pronto para nota fiscal. O resto vem do padrão da loja, em Configurações."}
+                </p>
+              </Field>
+            )}
 
             {temRecurso(ramo, "peso") && editando.porPeso && (
               <Field label="Código na balança">

@@ -308,6 +308,18 @@ export interface Produto {
   unidadeTributavel?: string;
   /** CEST, só para mercadoria com substituição tributária */
   cest?: string;
+  /*
+   * ---------- Nota de SERVIÇO (NFS-e) ----------
+   *
+   * Valem só para produto marcado como `servico`. São outro documento e
+   * outro imposto: NFS-e é municipal (ISS), NFC-e é estadual (ICMS). Um
+   * serviço não tem NCM nem CFOP — cobrar isso dele trava a emissão para
+   * sempre, porque o número não existe.
+   */
+  /** Código da lista de serviços (LC 116). Quem informa é o contador. */
+  codigoServico?: string;
+  /** Alíquota de ISS em %. No Simples costuma ir zerada. */
+  aliquotaIss?: number;
   /**
    * Endereço da foto do produto no depósito de imagens.
    *
@@ -878,6 +890,14 @@ export interface Config {
   origemPadrao?: string;
   /** CNAE principal da loja, exigido no cadastro do emissor */
   cnae?: string;
+  /**
+   * Inscrição Municipal — o registro da loja na PREFEITURA.
+   *
+   * É outra coisa que a Inscrição Estadual: a estadual serve para a nota de
+   * mercadoria (ICMS), esta serve para a de serviço (ISS). Uma assistência
+   * técnica precisa das duas, porque vende peça e cobra mão de obra.
+   */
+  inscricaoMunicipal?: string;
   /*
    * Endereço PARTIDO em campos, só para a nota.
    *

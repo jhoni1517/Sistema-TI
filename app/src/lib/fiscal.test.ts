@@ -9,6 +9,7 @@ import {
   usaCsosn,
   CODIGO_PAGAMENTO,
   minutosRestantesParaCancelar,
+  documentoDoProduto,
 } from "./fiscal";
 import type { Config, ItemVenda, Produto } from "./types";
 
@@ -172,6 +173,82 @@ describe("o que falta no produto", () => {
     expect(pendenciasDoProduto(produto({ csosn: "10" }), loja).join(" ")).toContain("CSOSN");
     expect(pendenciasDoProduto(produto({ cst: "000" }), normal).join(" ")).toContain("CST");
     expect(pendenciasDoProduto(produto({ cst: "00" }), normal)).toEqual([]);
+  });
+});
+
+describe("serviço e mercadoria são documentos diferentes", () => {
+  const maoDeObra = produto({
+    id: "srv",
+    nome: "Mão de obra do conserto",
+    servico: true,
+    ncm: undefined,
+    codigoServico: "14.01",
+  });
+  const comMunicipal = { ...loja, inscricaoMunicipal: "123456" } as Config;
+
+  it("serviço nunca é cobrado por NCM — esse número não existe para ele", () => {
+    // A primeira versão desta conferência exigia NCM de TODO produto. Um
+    // serviço não tem NCM, nunca vai ter, e a pessoa ficaria procurando
+    // para sempre um número que não existe.
+    const faltas = pendenciasDoProduto(maoDeObra, comMunicipal);
+    expect(faltas.join(" ")).not.toContain("NCM");
+    expect(faltas.join(" ")).not.toContain("CFOP");
+    expect(faltas).toEqual([]);
+  });
+
+  it("serviço é cobrado pelo código da lista de serviços", () => {
+    const semCodigo = { ...maoDeObra, codigoServico: "" } as Produto;
+    const faltas = pendenciasDoProduto(semCodigo, comMunicipal);
+    expect(faltas.join(" ")).toContain("código do serviço");
+    expect(faltas[0]).toContain("Mão de obra do conserto");
+  });
+
+  it("cada produto sabe qual documento ele vira", () => {
+    expect(documentoDoProduto(maoDeObra)).toBe("nfse");
+    expect(documentoDoProduto(produto())).toBe("nfce");
+    expect(documentoDoProduto(undefined)).toBe("nfce");
+  });
+
+  it("quem só vende serviço não é cobrado por Inscrição Estadual", () => {
+    // Mandar um lava-rápido atrás de inscrição estadual é mandar atrás de
+    // papel que ele não vai usar.
+    const soServico = { ...loja, inscricaoEstadual: "", inscricaoMunicipal: "123456" } as Config;
+    expect(pendenciasDaLoja(soServico, ["nfse"])).toEqual([]);
+    expect(pendenciasDaLoja(soServico, ["nfce"]).join(" ")).toContain("Inscrição Estadual");
+  });
+
+  it("quem só vende mercadoria não é cobrado por Inscrição Municipal", () => {
+    expect(pendenciasDaLoja(loja, ["nfce"])).toEqual([]);
+    expect(pendenciasDaLoja(loja, ["nfse"]).join(" ")).toContain("Inscrição Municipal");
+  });
+
+  it("a assistência técnica precisa das duas, porque vende peça E mão de obra", () => {
+    // Este é o caso real: uma OS com peça e serviço gera dois documentos.
+    const faltam = pendenciasDaLoja({ ...loja, inscricaoMunicipal: "" } as Config, [
+      "nfce",
+      "nfse",
+    ]);
+    expect(faltam.join(" ")).toContain("Inscrição Municipal");
+    expect(pendenciasDaLoja(comMunicipal, ["nfce", "nfse"])).toEqual([]);
+  });
+
+  it("venda com peça e serviço junto cobra o que falta dos dois", () => {
+    const itens = [
+      { produtoId: "p1", descricao: "Fonte", quantidade: 1, precoUnit: 150, custoUnit: 90 },
+      { produtoId: "srv", descricao: "Mão de obra", quantidade: 1, precoUnit: 80, custoUnit: 0 },
+    ] as ItemVenda[];
+    // A loja não tem inscrição municipal: a venda tem serviço, então cobra.
+    const faltas = pendenciasParaEmitir(itens, [produto(), maoDeObra], loja);
+    expect(faltas.join(" ")).toContain("Inscrição Municipal");
+    // Com ela, a mesma venda passa: a peça tem NCM e o serviço tem código.
+    expect(pendenciasParaEmitir(itens, [produto(), maoDeObra], comMunicipal)).toEqual([]);
+  });
+
+  it("venda só de mercadoria não cobra nada de serviço", () => {
+    const itens = [
+      { produtoId: "p1", descricao: "Fonte", quantidade: 1, precoUnit: 150, custoUnit: 90 },
+    ] as ItemVenda[];
+    expect(pendenciasParaEmitir(itens, [produto()], loja)).toEqual([]);
   });
 });
 
