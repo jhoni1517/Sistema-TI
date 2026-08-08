@@ -1,0 +1,7 @@
+# Dependências e caches de ferramenta nunca entram no repositório.
+#
+# Existe porque um arquivo de cache do vitest (node_modules/.vite/...)
+# estava rastreado: toda rodada de teste sujava o `git status` e acabava
+# entrando de carona num commit de verdade.
+node_modules/
+.vite/

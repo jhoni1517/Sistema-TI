@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { whatsappLink, paraNumero, paraTexto } from "./format";
+import { whatsappLink, paraNumero, paraTexto, textoDigitado } from "./format";
 
 describe("whatsappLink", () => {
   it("acrescenta o 55 quando o número vem sem código do país", () => {
@@ -65,5 +65,77 @@ describe("paraTexto", () => {
 
   it("zero de verdade aparece como 0", () => {
     expect(paraTexto(0)).toBe("0");
+  });
+});
+
+/**
+ * O zero que não saía do campo.
+ *
+ * O campo de quantidade nasce em "0". Digitar 5 no fim dele deixa "05", e o
+ * "05" FICAVA: o campo só se reescreve quando o número muda, e 05 e 5 são o
+ * mesmo número. A pessoa digitava o valor e voltava para apagar o zero,
+ * item por item, com a fila andando.
+ */
+describe("zero à esquerda no campo de número", () => {
+  it("some quando vem outro dígito atrás", () => {
+    expect(textoDigitado("05")).toBe("5");
+    expect(textoDigitado("012")).toBe("12");
+    expect(textoDigitado("007")).toBe("7");
+    expect(textoDigitado("000")).toBe("0");
+  });
+
+  it("zero sozinho fica: é um valor de verdade", () => {
+    expect(textoDigitado("0")).toBe("0");
+  });
+
+  it("no campo que valia 0, a primeira tecla substitui — dos dois lados", () => {
+    // Tocar no COMEÇO do campo e digitar 7 dava "70", que é setenta. No
+    // celular o dedo cai onde cai, e os dois casos têm que dar em 7.
+    expect(textoDigitado("70", "0")).toBe("7");
+    expect(textoDigitado("07", "0")).toBe("7");
+    expect(textoDigitado("00", "0")).toBe("0");
+  });
+
+  it("quem quer setenta consegue digitar setenta", () => {
+    // Primeira tecla: o campo valia "0", e o 7 substitui.
+    expect(textoDigitado("70", "0")).toBe("7");
+    // Segunda tecla: o campo já vale "7", então o 0 entra normalmente.
+    expect(textoDigitado("70", "7")).toBe("70");
+  });
+
+  it("a primeira tecla sendo vírgula não apaga o zero", () => {
+    // Senão seria impossível digitar cinquenta centavos.
+    expect(textoDigitado("0,", "0")).toBe("0,");
+  });
+
+  it("não estraga o que começa com zero de propósito", () => {
+    // Sem isto seria impossível digitar cinquenta centavos.
+    expect(textoDigitado("0,")).toBe("0,");
+    expect(textoDigitado("0,50")).toBe("0,50");
+    expect(textoDigitado("0.5")).toBe("0.5");
+  });
+
+  it("vale também para negativo", () => {
+    expect(textoDigitado("-05")).toBe("-5");
+    expect(textoDigitado("-0,5")).toBe("-0,5");
+  });
+
+  it("número normal passa intacto", () => {
+    expect(textoDigitado("10")).toBe("10");
+    expect(textoDigitado("1234,56")).toBe("1234,56");
+    expect(textoDigitado("")).toBe("");
+  });
+
+  it("letra não entra no campo", () => {
+    // Aceitar e depois "esquecer" o que a pessoa digitou é pior do que
+    // não aceitar.
+    expect(textoDigitado("12abc")).toBe("12");
+    expect(textoDigitado("R$ 5")).toBe("5");
+  });
+
+  it("o que sai daqui continua virando o número certo", () => {
+    expect(paraNumero(textoDigitado("05"))).toBe(5);
+    expect(paraNumero(textoDigitado("0,50"))).toBe(0.5);
+    expect(paraNumero(textoDigitado("0"))).toBe(0);
   });
 });

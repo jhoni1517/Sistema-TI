@@ -1,7 +1,7 @@
 import React from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
-import { paraNumero, paraTexto } from "../lib/format";
+import { paraNumero, paraTexto, textoDigitado } from "../lib/format";
 
 export const Modal: React.FC<{
   open: boolean;
@@ -144,9 +144,10 @@ export const InputNumero: React.FC<{
   }, [value]);
 
   const digitou = (bruto: string) => {
-    // Deixa passar só o que pode fazer parte de um número, para o campo não
-    // aceitar letra e depois "esquecer" o que a pessoa digitou.
-    const limpo = bruto.replace(/[^\d.,-]/g, "");
+    // Tira a letra e o zero à esquerda. Ver textoDigitado em lib/format.ts:
+    // "05" ficava na tela porque o campo só se reescreve quando o NÚMERO
+    // muda, e 05 e 5 são o mesmo número.
+    const limpo = textoDigitado(bruto, texto);
     setTexto(limpo);
     const n = paraNumero(limpo);
     if (n === undefined) return onChange(undefined);
@@ -165,6 +166,20 @@ export const InputNumero: React.FC<{
       disabled={disabled}
       value={texto}
       onChange={(e) => digitou(e.target.value)}
+      /*
+       * Campo zerado abre com o conteúdo selecionado.
+       *
+       * Tirar o zero à esquerda resolve quem digita no FIM do campo. Quem
+       * toca no começo digitaria "50" quando quis 5 — e no celular o dedo
+       * cai onde cai. Com o "0" selecionado, a primeira tecla substitui e
+       * os dois casos acabam no mesmo lugar.
+       *
+       * Só quando está zerado: selecionar um valor já digitado faria a
+       * pessoa perdê-lo inteiro ao tocar para corrigir um dígito.
+       */
+      onFocus={(e) => {
+        if (paraNumero(texto) === 0) e.currentTarget.select();
+      }}
       onBlur={() => {
         // Ao sair do campo, normaliza a exibição: "5," vira "5", e o que
         // ficou fora do limite aparece já corrigido.
