@@ -11,9 +11,69 @@ Leia uma vez inteiro antes do primeiro atendimento. Depois use só o
 
 ## Em uma frase
 
-O restaurante vende, o sistema registra a venda, e **outra empresa emite a
-nota** por nós. Essa empresa é o "intermediário". Nós mandamos os dados da
-venda, ela conversa com a Receita e devolve a nota pronta.
+A loja vende, o sistema registra a venda, e **outra empresa emite a nota**
+por nós. Essa empresa é o "intermediário". Nós mandamos os dados da venda,
+ela conversa com a Receita e devolve a nota pronta.
+
+---
+
+## São DUAS notas diferentes, não duas versões da mesma
+
+Esta é a primeira coisa a entender, e resolve metade das dúvidas.
+
+| | **NFC-e** | **NFS-e** |
+|---|---|---|
+| É de | mercadoria | serviço |
+| Imposto | ICMS, **estadual** | ISS, **municipal** |
+| Quem autoriza | SEFAZ do estado | prefeitura ou padrão nacional |
+| A loja precisa de | Inscrição **Estadual** | Inscrição **Municipal** |
+| O item leva | **NCM**, CFOP, CSOSN | **código do serviço**, ISS |
+
+**Um serviço não tem NCM.** Nunca vai ter. Se o sistema pedir NCM de mão de
+obra, o sistema está errado — e essa é justamente a diferença entre as duas
+telas de cadastro.
+
+### Quem emite o quê
+
+- **Pizzaria, mercado, adega** → só NFC-e. Tudo que vendem é mercadoria.
+- **Lava-rápido, salão, consultoria** → só NFS-e. Tudo é serviço.
+- **Assistência técnica** → **as duas.** A peça é mercadoria, a mão de obra
+  é serviço. Uma OS com fonte trocada e mão de obra gera dois documentos.
+
+No sistema, quem decide é o cadastro do produto: marcado como **serviço**,
+vira NFS-e; senão, NFC-e. Não existe interruptor de loja para isso, porque
+a mesma loja emite um, outro ou os dois dependendo do que vendeu.
+
+---
+
+## O certificado: a confusão mais comum
+
+**"Nota de serviço não precisa de certificado"** — isso é meia verdade, e a
+metade que falta custa caro.
+
+É verdade **para emissão MANUAL**: o MEI e a empresa pequena emitem NFS-e
+entrando no portal ou no aplicativo com login **gov.br** (nível Prata ou
+Ouro), sem certificado nenhum.
+
+**Não é verdade para emissão pelo sistema.** Quando quem emite é um
+programa, por integração (que é o nosso caso), o certificado digital é
+exigido para assinar o arquivo — nas duas notas, serviço e mercadoria. O
+login gov.br não serve para integração.
+
+Ou seja: **se o cliente quiser que o sistema emita sozinho, precisa de
+certificado nos dois casos.** Se ele aceitar digitar cada nota na mão no
+portal da prefeitura, aí sim não precisa — mas também não é o sistema
+emitindo.
+
+### O prazo que está chegando
+
+A NFS-e de **padrão nacional** passa a ser obrigatória para as
+microempresas e empresas de pequeno porte do Simples Nacional a partir de
+**1º de setembro de 2026** (Resolução CGSN nº 189/2026). Quem emite hoje
+pelo sistema antigo da prefeitura vai ter que migrar.
+
+Vale avisar seus clientes de assistência técnica com antecedência: é o tipo
+de prazo que chega sem avisar e para a emissão.
 
 ---
 
@@ -22,21 +82,28 @@ venda, ela conversa com a Receita e devolve a nota pronta.
 Nada funciona sem isto, e **nada disso depende de nós**. Comece por aqui,
 porque leva dias.
 
-### 1. CNPJ com Inscrição Estadual ativa
+### 1. CNPJ com a inscrição certa
 
-Nota fiscal de venda não sai no CPF. O restaurante precisa de CNPJ **e** de
-Inscrição Estadual (a "IE"), que é o registro dele na Receita do estado.
+Nota fiscal não sai no CPF. Além do CNPJ, a loja precisa da inscrição que
+corresponde ao que ela vende:
+
+- Vende **mercadoria** → Inscrição **Estadual** (a "IE")
+- Cobra **serviço** → Inscrição **Municipal** (a "IM")
+- Faz os dois (assistência técnica) → **as duas**
 
 Muita gente tem CNPJ e não tem IE — quem só prestava serviço, por exemplo.
 Se for o caso, o contador resolve.
 
-**O que perguntar:** *"Você tem Inscrição Estadual ativa? Está no cartão do
-CNPJ ou o contador te diz."*
+**O que perguntar:** *"Você tem Inscrição Estadual ativa? E Municipal? Está
+no cartão do CNPJ, ou o contador te diz."*
 
 ### 2. Certificado digital A1
 
+Necessário nas duas notas quando quem emite é o sistema. Ver a seção "O
+certificado: a confusão mais comum", acima.
+
 É um arquivo (`.pfx`) com senha. Funciona como a assinatura da empresa: quem
-tem o arquivo e a senha assina documento no nome do restaurante.
+tem o arquivo e a senha assina documento no nome da loja.
 
 - Custa por volta de **R$ 150 a R$ 250 por ano**
 - Vale **12 meses** e depois tem que renovar
@@ -47,7 +114,9 @@ tem o arquivo e a senha assina documento no nome do restaurante.
 **Atenção ao que vence.** Certificado vencido para de emitir nota do dia
 para a noite. Anote a data e avise o cliente com um mês de antecedência.
 
-### 3. Credenciamento na Receita do Paraná, e o CSC
+### 3. Credenciamento
+
+**Para mercadoria (NFC-e), no Paraná:**
 
 Duas coisas na mesma visita ao site do estado:
 
@@ -58,8 +127,11 @@ https://sped.fazenda.pr.gov.br
 Portal RECEITA/PR → Menu **DF-e / NFC-e / CSC / Controle**
 (precisa do código de acesso e da senha de representante legal)
 
-**O que perguntar:** *"Seu contador já fez o credenciamento de NFC-e e gerou
-o CSC?"* Se ele não souber o que é, mande este parágrafo para o contador.
+**Para serviço (NFS-e):** o credenciamento é na **prefeitura**, não no
+estado, e cada cidade tem o seu. Quem faz é o contador.
+
+**O que perguntar:** *"Seu contador já fez o credenciamento e gerou o CSC?"*
+Se ele não souber o que é, mande este parágrafo para o contador.
 
 ---
 
@@ -102,7 +174,8 @@ Em **Configurações → Dados da loja**:
 | campo | onde achar |
 |---|---|
 | CNPJ | cartão do CNPJ |
-| Inscrição Estadual | cartão do CNPJ ou com o contador |
+| Inscrição Estadual | cartão do CNPJ (só quem vende mercadoria) |
+| Inscrição Municipal | prefeitura (só quem cobra serviço) |
 | Regime tributário | com o contador (quase sempre Simples Nacional) |
 | CNAE principal | cartão do CNPJ (restaurante costuma ser 5611-2/01) |
 | CFOP padrão | deixe 5102, que serve para a maioria |
@@ -116,13 +189,18 @@ Outras cidades: procure em https://cidades.ibge.gov.br
 O sistema mostra, embaixo do campo de Inscrição Estadual, **a lista do que
 ainda falta**. Enquanto tiver item nessa lista, nota nenhuma sai.
 
-### Passo 4 — Preencher o NCM dos produtos
+### Passo 4 — Preencher os códigos dos produtos
 
-Em **Estoque**, cada produto tem um campo **NCM** (8 dígitos). É ele que diz
-à Receita o que a mercadoria é.
+Em **Estoque**, o campo que aparece **depende do tipo do item**:
 
-**Só o NCM é por produto.** O resto (CFOP, CSOSN, origem) vem do padrão da
-loja e você não precisa repetir em cada item.
+- Produto normal (mercadoria) → campo **NCM**, 8 dígitos
+- Produto marcado como **serviço** → campo **Código do serviço**
+
+O sistema troca o campo sozinho. Se você marcar "serviço" e o campo de NCM
+sumir, está certo: serviço não tem NCM.
+
+**Só esse código é por produto.** O resto (CFOP, CSOSN, origem) vem do
+padrão da loja e você não precisa repetir em cada item.
 
 Quem informa os NCMs é o **contador do restaurante**. Não invente: NCM
 errado é declaração errada à Receita.
@@ -225,6 +303,8 @@ Seja honesto com o cliente sobre isto:
   intermediário ainda não foi escrito. Falta escolher qual intermediário.
 - **Vale-refeição** como forma de pagamento. Num restaurante é comum, e o
   sistema ainda não tem. A nota exige o código 11 para ele.
+- **Alíquota de ISS por serviço.** O campo existe no tipo, mas a tela ainda
+  não pede — no Simples costuma ir zerada, então não trava.
 - **Comanda de mesa, fila da cozinha e delivery.** Não existem ainda.
 
 ---

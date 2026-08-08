@@ -88,6 +88,10 @@ alter table produtos add column if not exists cst text;
 alter table produtos add column if not exists origem text;
 alter table produtos add column if not exists "unidadeTributavel" text;
 alter table produtos add column if not exists cest text;
+-- Nota de SERVIÇO (NFS-e): outro documento, outro imposto. Serviço não tem
+-- NCM nem CFOP; leva código da lista de serviços e alíquota de ISS.
+alter table produtos add column if not exists "codigoServico" text;
+alter table produtos add column if not exists "aliquotaIss" numeric;
 -- Promoção com prazo. O preço cheio fica em "preco" e volta sozinho quando o
 -- prazo acaba: promover editando o preço na mão dava certo até a hora de
 -- destrocar, que ninguém lembrava.

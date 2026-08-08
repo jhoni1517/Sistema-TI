@@ -30,6 +30,48 @@ import type { Config, FormaPagamento, ItemVenda, Produto } from "./types";
  */
 
 /**
+ * São DOIS documentos diferentes, e não duas versões do mesmo.
+ *
+ * - **NFC-e** é de MERCADORIA: imposto estadual (ICMS), autorizada pela
+ *   SEFAZ do estado. Pizza, refrigerante, uma fonte de computador.
+ * - **NFS-e** é de SERVIÇO: imposto municipal (ISS), autorizada pela
+ *   prefeitura ou pelo padrão nacional. Mão de obra do conserto,
+ *   formatação, instalação.
+ *
+ * Os campos são incompatíveis: mercadoria leva NCM, CFOP e CSOSN; serviço
+ * leva código da lista de serviços e alíquota de ISS. Cobrar NCM de um
+ * serviço trava a emissão para sempre, porque esse número não existe — foi
+ * exatamente o que a primeira versão desta conferência fazia.
+ *
+ * Uma ordem de serviço de assistência técnica gera OS DOIS: NFC-e das
+ * peças e NFS-e da mão de obra. Por isso a decisão é por ITEM, nunca pela
+ * loja inteira.
+ */
+export type TipoDocumento = "nfce" | "nfse";
+
+export const DOCUMENTO_META: Record<
+  TipoDocumento,
+  { label: string; curto: string; imposto: string; autoriza: string }
+> = {
+  nfce: {
+    label: "Nota de consumidor (NFC-e)",
+    curto: "NFC-e",
+    imposto: "ICMS, estadual",
+    autoriza: "SEFAZ do estado",
+  },
+  nfse: {
+    label: "Nota de serviço (NFS-e)",
+    curto: "NFS-e",
+    imposto: "ISS, municipal",
+    autoriza: "prefeitura ou padrão nacional",
+  },
+};
+
+/** Este item vira nota de mercadoria ou de serviço? */
+export const documentoDoProduto = (p?: Produto): TipoDocumento =>
+  p?.servico ? "nfse" : "nfce";
+
+/**
  * Regime tributário da loja. Decide se o item leva CSOSN ou CST — são
  * campos diferentes, e mandar o errado a SEFAZ rejeita.
  */
@@ -178,17 +220,35 @@ export function fiscalDoProduto(
  * Estes três não têm padrão nem palpite possível: ou a loja informou, ou
  * nenhuma nota sai. Vale a pena conferir antes de o balcão tentar.
  */
-export function pendenciasDaLoja(config: Config): string[] {
+export function pendenciasDaLoja(
+  config: Config,
+  tipos: TipoDocumento[] = ["nfce"]
+): string[] {
   const faltas: string[] = [];
   const cnpj = digitos(config.cnpj);
   if (cnpj.length !== 14) {
     faltas.push("CNPJ da loja (14 dígitos) — nota fiscal não sai no CPF do dono");
   }
-  if (!txt(config.inscricaoEstadual).trim()) {
-    faltas.push("Inscrição Estadual da loja");
+
+  /*
+   * Cada documento cobra um registro diferente, e cobrar os dois de quem só
+   * precisa de um é mandar a pessoa atrás de papel que ela não vai usar.
+   *
+   * - Inscrição ESTADUAL é para mercadoria (ICMS)
+   * - Inscrição MUNICIPAL é para serviço (ISS)
+   *
+   * Uma assistência técnica precisa das duas, porque vende peça e cobra mão
+   * de obra. Uma pizzaria só da estadual. Um lava-rápido só da municipal.
+   */
+  if (tipos.includes("nfce") && !txt(config.inscricaoEstadual).trim()) {
+    faltas.push("Inscrição Estadual da loja — é ela que vale para nota de mercadoria");
   }
+  if (tipos.includes("nfse") && !txt(config.inscricaoMunicipal).trim()) {
+    faltas.push("Inscrição Municipal da loja — é ela que vale para nota de serviço");
+  }
+
   const regime = regimeDe(config.regimeTributario);
-  if (!usaCsosn(regime) && !digitos(config.cstPadrao)) {
+  if (tipos.includes("nfce") && !usaCsosn(regime) && !digitos(config.cstPadrao)) {
     faltas.push("CST padrão — fora do Simples o item leva CST, não CSOSN");
   }
   /*
@@ -221,6 +281,23 @@ export function pendenciasDaLoja(config: Config): string[] {
 export function pendenciasDoProduto(p: Produto, config: Config): string[] {
   const faltas: string[] = [];
   const nome = txt(p.nome).trim() || "produto sem nome";
+
+  /*
+   * Serviço tem outra régua, e cobrar a régua errada trava para sempre.
+   *
+   * A primeira versão desta função exigia NCM de TODO produto, inclusive
+   * dos marcados como serviço. NCM é código de mercadoria: mão de obra de
+   * conserto não tem, nunca vai ter, e a pessoa ficaria procurando um
+   * número que não existe. O que serviço leva é o código da lista de
+   * serviços (LC 116) e a alíquota de ISS.
+   */
+  if (documentoDoProduto(p) === "nfse") {
+    if (!txt(p.codigoServico).trim()) {
+      faltas.push(`${nome}: código do serviço (o contador informa)`);
+    }
+    return faltas;
+  }
+
   const f = fiscalDoProduto(p, config);
 
   if (f.ncm.length !== 8) {
@@ -262,7 +339,20 @@ export function pendenciasParaEmitir(
   produtos: Produto[],
   config: Config
 ): string[] {
-  const faltas = pendenciasDaLoja(config);
+  /*
+   * Quais documentos esta venda vai gerar.
+   *
+   * Uma OS com peça e mão de obra gera OS DOIS: NFC-e da peça e NFS-e do
+   * serviço. Por isso a lista sai dos ITENS, e não de um ajuste da loja —
+   * a mesma loja emite um, outro, ou os dois, dependendo do que vendeu.
+   */
+  const tipos = new Set<TipoDocumento>();
+  for (const item of itens || []) {
+    if (!item.produtoId) continue;
+    tipos.add(documentoDoProduto(produtos.find((x) => x.id === item.produtoId)));
+  }
+
+  const faltas = pendenciasDaLoja(config, [...tipos]);
   const jaVistos = new Set<string>();
 
   for (const item of itens || []) {
