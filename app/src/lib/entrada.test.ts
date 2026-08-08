@@ -9,6 +9,7 @@ import {
   avisosDeMargem,
   type Entrada,
 } from "./entrada";
+import { aposBaixa } from "./estoque";
 import type { Produto } from "./types";
 
 const prod = (p: Partial<Produto>): Produto =>
@@ -211,5 +212,27 @@ describe("aviso de margem quando o fornecedor sobe o preço", () => {
       ],
     });
     expect(avisosDeMargem(e, produtos, 10).map((x) => x.produtoId)).toEqual(["b", "a"]);
+  });
+});
+
+describe("entrada e saída guardam a MESMA casa decimal", () => {
+  it("comprar 0,315 kg não vira 0,32 na prateleira", () => {
+    // A baixa guarda três casas (é grama); a entrada guardava duas. A cada
+    // nota o estoque ganhava alguns gramas que ninguém comprou, e a contagem
+    // acusava sobra sem origem.
+    const p: Produto = {
+      id: "p1", nome: "Queijo", quantidade: 0, estoqueMinimo: 1,
+      custo: 40, preco: 60, porPeso: true, criadoEm: "",
+    };
+    expect(aplicarEntrada(p, 0.315, 40).quantidade).toBe(0.315);
+  });
+
+  it("entrar e sair a mesma fração fecha em zero", () => {
+    const p: Produto = {
+      id: "p1", nome: "Queijo", quantidade: 0, estoqueMinimo: 1,
+      custo: 40, preco: 60, porPeso: true, criadoEm: "",
+    };
+    const comEstoque = aplicarEntrada(p, 0.315, 40);
+    expect(aposBaixa(comEstoque, 0.315)).toBe(0);
   });
 });

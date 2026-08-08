@@ -28,7 +28,7 @@ const n = (v?: number | null): number => Number(v) || 0;
  * Sem arredondar, um estoque zerado vira 0.00000000000000004 e a tela
  * mostra "tem" onde não tem.
  */
-const grama = (v: number): number => Math.round(v * 1000) / 1000;
+export const grama = (v: number): number => Math.round(v * 1000) / 1000;
 
 /**
  * Quanto fica no estoque depois de sair `quantidade`.

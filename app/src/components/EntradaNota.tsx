@@ -15,7 +15,8 @@ import {
   avisosDeMargem,
   type ItemEntrada,
 } from "../lib/entrada";
-import type { MovimentoCaixa } from "../lib/types";
+import { FORMAS_DE_COMPRA } from "../lib/pagamento";
+import type { FormaPagamento, MovimentoCaixa } from "../lib/types";
 
 /**
  * Nota do fornecedor virando estoque.
@@ -36,6 +37,7 @@ export const EntradaNota: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [desconto, setDesconto] = useState(0);
   const [fornecedor, setFornecedor] = useState("");
   const [nota, setNota] = useState("");
+  const [forma, setForma] = useState<FormaPagamento>("dinheiro");
   const [gravando, setGravando] = useState(false);
 
   const sessao = useMemo(() => achaSessaoAberta(sessoes), [sessoes]);
@@ -79,7 +81,8 @@ export const EntradaNota: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     if (
       !confirm(
         `Lançar a entrada de ${itens.length} item(ns)?\n\n` +
-          `Total: ${brl(total)}\n\n` +
+          `Total: ${brl(total)}\n` +
+          `Pago em: ${FORMAS_DE_COMPRA.find((f) => f.k === forma)?.nome}\n\n` +
           "O estoque sobe, o custo vira a média ponderada e a compra sai do caixa."
       )
     ) {
@@ -110,7 +113,21 @@ export const EntradaNota: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             `Entrada de mercadoria${fornecedor ? ` - ${fornecedor}` : ""}` +
             `${nota ? ` (nota ${nota})` : ""}`,
           valor: total,
-          formaPagamento: "dinheiro",
+          /*
+           * A forma é ESCOLHIDA, não chutada.
+           *
+           * Aqui era "dinheiro" fixo. Só que quase nenhuma nota de
+           * fornecedor se paga em papel: é pix, boleto ou cartão. O
+           * fechamento do dia desconta da gaveta tudo que sai em espécie,
+           * então cada entrada lançada errada fazia o sistema esperar MENOS
+           * papel do que a gaveta tinha e acusar SOBRA — todo dia que
+           * chegava mercadoria.
+           *
+           * E diferença que aparece sempre é diferença que a pessoa aprende
+           * a ignorar, justamente para o dia em que falta dinheiro de
+           * verdade. Ver `emEspecie` em lib/caixa.ts.
+           */
+          formaPagamento: forma,
           compraEstoque: true,
           sessaoId: sessao?.id,
           data: nowISO(),
@@ -171,6 +188,30 @@ export const EntradaNota: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         </Field>
         <Field label="Número da nota">
           <input className="input" value={nota} onChange={(e) => setNota(e.target.value)} />
+        </Field>
+        <Field label="Pago em" className="sm:col-span-2">
+          <div className="flex flex-wrap gap-2">
+            {FORMAS_DE_COMPRA.map((f) => (
+              <button
+                key={f.k}
+                type="button"
+                onClick={() => setForma(f.k)}
+                className={`chip text-sm ${
+                  forma === f.k
+                    ? "bg-brand-600 text-white"
+                    : "bg-white text-slate-600 ring-1 ring-slate-200"
+                }`}
+              >
+                {f.nome}
+              </button>
+            ))}
+          </div>
+          {/* Só o que sai em espécie desconta da gaveta. Marcar pix como
+              dinheiro faz o fechamento acusar sobra todo dia. */}
+          <p className="mt-1 text-xs text-slate-400">
+            Só "Dinheiro" sai da gaveta. As outras não entram na conferência do
+            caixa.
+          </p>
         </Field>
       </div>
 

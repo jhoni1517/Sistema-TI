@@ -586,6 +586,19 @@ export interface ItemVenda {
    * outras três.
    */
   observacao?: string;
+  /**
+   * Esta linha é a taxa de serviço da mesa, não uma mercadoria.
+   *
+   * Existe por causa da conferência da nota: sem produtoId, a taxa era
+   * apontada como "item avulso não tem cadastro, e nota exige NCM" — e a
+   * saída sugerida era cadastrar um produto chamado "Taxa de servico", que é
+   * conselho errado. Gorjeta não é mercadoria, não tem NCM e não desce do
+   * estoque.
+   *
+   * Mora dentro de `Venda.itens`, que é uma coluna JSON: campo aqui não pede
+   * coluna nova.
+   */
+  taxaServico?: boolean;
   /** Unidades, ou quilos quando o produto é vendido por peso */
   quantidade: number;
   /** Preço da unidade, ou do quilo */
