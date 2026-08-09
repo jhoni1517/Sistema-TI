@@ -26,6 +26,7 @@ import {
   AlertTriangle,
   ListChecks,
   Utensils,
+  ChefHat,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { MarcaDaLoja } from "./MarcaDaLoja";
@@ -48,6 +49,7 @@ const nav: Array<{
   { to: "/ordens", label: "Ordens de Serviço", icon: Wrench, recurso: "os", modulo: "os" },
   { to: "/pdv", label: "Frente de caixa", icon: ShoppingCart, recurso: "caixa", modulo: "pdv" },
   { to: "/mesas", label: "Comandas", icon: Utensils, recurso: "caixa", modulo: "mesas" },
+  { to: "/cozinha", label: "Cozinha", icon: ChefHat, recurso: "caixa", modulo: "producao" },
   { to: "/agenda", label: "Agenda", icon: CalendarDays, recurso: "*" },
   // Sem `modulo`: rotina do dia serve a qualquer loja, e o próprio
   // ramos.ts diz que módulo que todo mundo usa não precisa de interruptor.

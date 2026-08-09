@@ -44,7 +44,6 @@ const SEM_MENU: Record<string, string> = {
  * pode ser declarado sem tela. Foi assim que os três primeiros passaram.
  */
 const AINDA_NAO_FEITOS: Record<string, string> = {
-  producao: "fila da cozinha (bloco 2, parte 2)",
   delivery: "entrega, taxa e entregador (bloco 3)",
 };
 
