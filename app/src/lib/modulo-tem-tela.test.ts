@@ -43,10 +43,7 @@ const SEM_MENU: Record<string, string> = {
  * O teste continua valendo para o que importa mais: nenhum módulo NOVO
  * pode ser declarado sem tela. Foi assim que os três primeiros passaram.
  */
-const AINDA_NAO_FEITOS: Record<string, string> = {
-  producao: "fila da cozinha (bloco 2, parte 2)",
-  delivery: "entrega, taxa e entregador (bloco 3)",
-};
+const AINDA_NAO_FEITOS: Record<string, string> = {};
 
 /** Os módulos que o menu declara, lidos do arquivo do disco */
 function modulosComMenu(): Set<string> {

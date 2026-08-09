@@ -42,6 +42,19 @@ export const preparoDe = (p?: string | null): PreparoItem =>
 export const subtotalDoItem = (i: ItemComanda): number =>
   centavos((Number(i.quantidade) || 0) * (Number(i.precoUnit) || 0));
 
+/**
+ * A conferência item a item de uma conta aberta, mesa ou entrega.
+ *
+ * Exposta porque a entrega desemboca no MESMO lugar — `saldosApos` e um
+ * movimento no caixa — e precisa da mesma trava. Uma linha de quantidade -2
+ * fecharia o pedido por R$ 0,00 e CREDITARIA a geladeira.
+ */
+export const problemaNasLinhasDaComanda = (c: Comanda): string =>
+  problemaNasLinhas(
+    itensAtivos(c),
+    "Para tirar um item da conta, use o botão de cancelar do próprio item."
+  );
+
 /** As linhas que o cliente paga: o cancelado fica na comanda, mas não na conta */
 export const itensAtivos = (c: Comanda): ItemComanda[] =>
   (c?.itens || []).filter((i) => !i.cancelado);
@@ -163,10 +176,7 @@ export function problemaParaFechar(c: Comanda, percentual?: number | null): stri
    * e lucro inflado ninguém procura. A quantidade é campo livre na tela do
    * garçom — tem que ser, ele corrige "2 cervejas" para "3" o tempo todo.
    */
-  const linha = problemaNasLinhas(
-    itensAtivos(c),
-    "Para tirar um item da conta, use o botão de cancelar do próprio item."
-  );
+  const linha = problemaNasLinhasDaComanda(c);
   if (linha) return linha;
 
   // Desconto que come a conta inteira dá o mesmo resultado da comanda vazia:

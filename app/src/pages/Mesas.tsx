@@ -12,6 +12,7 @@ import { saldosApos } from "../lib/estoque";
 import { proximoNumero, problemaParaNumerar } from "../lib/numeracao";
 import { custoVenda } from "../lib/pdv";
 import { sessaoAberta as achaSessaoAberta } from "../lib/caixa";
+import { soMesas } from "../lib/entrega";
 import {
   consolidar,
   formaPrincipal,
@@ -86,7 +87,9 @@ export const Mesas: React.FC = () => {
   const [fechandoId, setFechandoId] = useState<string | null>(null);
   const [gravando, setGravando] = useState(false);
 
-  const lista = useMemo(() => comandasAbertas(comandas), [comandas]);
+  // Só as MESAS: o pedido de entrega mora na mesma tabela, com os mesmos
+  // campos por dentro, mas quem cuida dele é a tela da moto.
+  const lista = useMemo(() => comandasAbertas(soMesas(comandas)), [comandas]);
   const usaMeioAMeio = temRecurso(ramo, "meioAMeio");
   const sessao = achaSessaoAberta(sessoes);
 
@@ -124,7 +127,7 @@ export const Mesas: React.FC = () => {
 
     // Duas comandas na mesma mesa é o jeito mais fácil de a conta sair pela
     // metade: o garçom lança na que achou primeiro.
-    const jaTem = comandaDaMesa(comandas, mesa);
+    const jaTem = comandaDaMesa(soMesas(comandas), mesa);
     if (jaTem) {
       setAbrindo(false);
       setNovaMesa("");
@@ -140,6 +143,7 @@ export const Mesas: React.FC = () => {
       id: uid(),
       numero: proximoNumero(comandas),
       mesa,
+      tipo: "mesa",
       itens: [],
       status: "aberta",
       // Já nasce com a taxa que a casa cobra. O garçom tira quando o cliente

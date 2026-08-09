@@ -664,6 +664,48 @@ export interface Comanda {
   garcom?: string;
   observacoes?: string;
   /**
+   * Comanda de mesa ou pedido de entrega.
+   *
+   * São a MESMA coisa por dentro, e isso é decisão, não preguiça: uma conta
+   * aberta que recebe itens, manda para a cozinha e no fim vira venda,
+   * movimento no caixa e baixa de estoque. Escrever um `Pedido` separado
+   * duplicaria esse caminho inteiro — o mesmo caminho que já foi revisado e
+   * testado duas vezes — e as duas cópias envelheceriam em ritmos
+   * diferentes.
+   *
+   * O que a entrega tem a mais são CAMPOS: endereço, taxa, entregador,
+   * troco. Pela régua de ramos.ts, isso é recurso, não módulo novo por
+   * dentro. A tela é que é separada, porque a rotina do salão e a da moto
+   * não se parecem em nada.
+   *
+   * Vazio é "mesa": é assim que voltam as comandas gravadas antes de a
+   * entrega existir.
+   */
+  tipo?: "mesa" | "entrega";
+  /** Para onde vai. Texto livre, como a mesa — endereço de bairro não cabe em campo. */
+  endereco?: string;
+  /**
+   * O telefone de quem pediu.
+   *
+   * Não é opcional na prática: é para ele que o entregador liga quando não
+   * acha o portão, e é a única coisa que salva um pedido perdido.
+   */
+  telefone?: string;
+  /** Quanto a casa cobra para levar */
+  taxaEntrega?: number;
+  /** Quem levou. Texto livre: entregador de bairro não tem cadastro. */
+  entregador?: string;
+  /**
+   * "Tem troco para 50?" — a pergunta que define se o pedido dá certo.
+   *
+   * Sem ela o entregador sai com a bolsa cheia e sem trocado, e volta com o
+   * pedido ou com a conta errada. Guardar o valor é o que faz a pergunta
+   * existir na tela.
+   */
+  trocoPara?: number;
+  /** Quando saiu para a rua. É daqui que sai o relógio da entrega. */
+  saiuEm?: string;
+  /**
    * A gorjeta, em porcentagem do consumo. Fica na comanda e não só na
    * configuração porque o cliente pode recusar, e a mesa que recusou tem
    * que continuar recusando quando a tela recarregar.
@@ -956,6 +998,13 @@ export interface Config {
    * não quer digitar isso em toda mesa. Ver lib/comanda.ts.
    */
   taxaServicoPadrao?: number;
+  /**
+   * A taxa de entrega que já vem preenchida ao abrir um pedido.
+   *
+   * Uma casa de bairro cobra o mesmo para o bairro inteiro; quem cobra por
+   * distância corrige no próprio pedido. Zero significa entrega de graça.
+   */
+  taxaEntregaPadrao?: number;
   /*
    * ---------- Nota fiscal ----------
    *

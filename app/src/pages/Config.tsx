@@ -408,6 +408,23 @@ export const Config: React.FC = () => {
             </Field>
           )}
 
+          {temModulo(ramoContratado, "delivery") && (
+            <Field label="Taxa de entrega (R$)" className="sm:col-span-2">
+              <InputNumero
+                className="input max-w-xs"
+                min={0}
+                value={form.taxaEntregaPadrao}
+                onChange={(v) => mudar({ taxaEntregaPadrao: v ?? 0 })}
+              />
+              {/* Casa de bairro cobra o mesmo para o bairro inteiro; quem
+                  cobra por distância corrige no próprio pedido. */}
+              <p className="mt-1 text-xs text-slate-400">
+                Vem preenchida em todo pedido novo. Deixe 0 se a entrega é de
+                graça.
+              </p>
+            </Field>
+          )}
+
           {temModulo(ramoContratado, "mesas") && (
             <Field label="Taxa de serviço (%)" className="sm:col-span-2">
               <InputNumero
