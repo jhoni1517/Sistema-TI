@@ -17,6 +17,9 @@ import {
   Plus,
   Minus,
   XCircle,
+  RotateCcw,
+  Ticket,
+  Package,
 } from "lucide-react";
 import { aviso } from "../components/Aviso";
 import { SectionTitle, Field, Modal, EmptyState, InputNumero } from "../components/ui";
@@ -46,14 +49,23 @@ import {
   liberarTeste,
   ajustarTeste,
   encerrarTeste,
+  reabrirTeste,
+  anotarMotivoTeste,
+  resumoUsoLojas,
+  usouDeVerdade,
   emTeste,
   testeAcabou,
   diasDeTeste,
   podeLiberarTeste,
+  podeReabrirTeste,
+  MOTIVOS_TESTE,
+  nomeDoMotivo,
   SITUACAO_META,
   type Loja,
   type SistemaConfig,
+  type UsoDaLoja,
 } from "../lib/assinatura";
+import { criarConvite, linkConvite } from "../lib/auth";
 
 /**
  * Painel do administrador do sistema.
@@ -97,6 +109,13 @@ export const Lojas: React.FC = () => {
   const [senha, setSenha] = useState<{ email: string; link: string; gerando: boolean } | null>(
     null
   );
+  /** Contagem do que cada loja construiu, por id. Vazio = migração nova não rodou. */
+  const [uso, setUso] = useState<Record<string, UsoDaLoja>>({});
+  /** A loja cujo motivo estamos anotando, e se isso encerra o teste junto */
+  const [motivo, setMotivo] = useState<{ loja: Loja; encerrando: boolean } | null>(null);
+  const [convite, setConvite] = useState<{ nome: string; link: string; gerando: boolean } | null>(
+    null
+  );
 
   const carregar = useCallback(async () => {
     setCarregando(true);
@@ -105,6 +124,14 @@ export const Lojas: React.FC = () => {
       const [l, c] = await Promise.all([listarLojas(), carregarSistemaConfig()]);
       setLojas(l);
       if (c) setCfg(c);
+      /*
+       * O uso vem DEPOIS e por fora do try da lista.
+       *
+       * Ele depende de uma migração mais nova, e uma tabela com problema não
+       * pode zerar a tela: sem isto, quem não rodou o SQL novo abriria a tela
+       * de Lojas vazia e idêntica à de um sistema que perdeu os dados.
+       */
+      resumoUsoLojas().then(setUso).catch(() => setUso({}));
     } catch (e) {
       setErro(
         (e instanceof Error ? e.message : String(e)) +
@@ -161,7 +188,24 @@ export const Lojas: React.FC = () => {
       }
     }
     const deGraca = lojas.filter(semPrazo).length;
-    return { ativas, problema, receita, deGraca, testando, potencial };
+
+    /*
+     * Por que os testes não fecharam, contado.
+     *
+     * É a única saída deste sistema que responde "o que eu conserto primeiro".
+     * Cinco lojas em "Faltou algo no sistema" é uma tela para escrever; cinco
+     * em "Achou caro" é preço. Sem somar, cada motivo fica sendo uma lembrança
+     * solta do telefonema daquele dia.
+     */
+    const motivos = new Map<string, number>();
+    for (const l of lojas) {
+      const m = txt(l.motivoTeste);
+      if (!m) continue;
+      motivos.set(m, (motivos.get(m) || 0) + 1);
+    }
+    const porMotivo = [...motivos.entries()].sort((a, b) => b[1] - a[1]);
+
+    return { ativas, problema, receita, deGraca, testando, potencial, porMotivo };
   }, [lojas, tolerancia]);
 
   /**
@@ -276,22 +320,79 @@ export const Lojas: React.FC = () => {
     }
   };
 
-  const acabarTeste = async (l: Loja) => {
+  /*
+   * Encerrar abre o modal do motivo em vez de um confirm seco.
+   *
+   * O motivo é a única coisa que sobra depois: sem ele, "testou e não
+   * converteu" é um número sem história, e três meses disso não dizem se o
+   * que falta é preço ou é uma tela. Perguntar no momento em que a decisão
+   * acontece é a única hora em que a resposta existe.
+   */
+  const acabarTeste = (l: Loja) => setMotivo({ loja: l, encerrando: true });
+
+  /** Grava o motivo escolhido — encerrando o teste junto, ou não */
+  const gravarMotivo = async (chave: string) => {
+    if (!motivo) return;
+    const { loja: l, encerrando } = motivo;
+    try {
+      if (encerrando) {
+        await encerrarTeste(l.id, chave);
+        aviso.sucesso("Teste encerrado. A loja continua com tudo o que cadastrou.");
+      } else {
+        await anotarMotivoTeste(l.id, chave);
+        aviso.sucesso("Anotado.");
+      }
+      setMotivo(null);
+      carregar();
+    } catch (e) {
+      aviso.erro(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  /**
+   * Reabre o teste de quem já testou, com o prazo menor.
+   *
+   * Botão separado do "+7" de propósito: esticar é para o teste que corre,
+   * reabrir é para quem sumiu e voltou. O mesmo botão para os dois esconderia
+   * quantas vezes aquela loja já usou de graça.
+   */
+  const reabrir = async (l: Loja) => {
+    const dias = cfg.dias_reteste ?? 3;
+    const jaDeu = Number(l.testesDados) || 1;
     if (
       !confirm(
-        `Encerrar HOJE o teste de "${l.nome}"?\n\n` +
-          "Ela para de cadastrar coisa nova. Continua consultando, imprimindo " +
-          "e exportando tudo — nenhum dado é apagado.\n\n" +
-          "Para voltar atrás, use o +7 dias."
+        `Reabrir o teste de "${l.nome}" por ${dias} dias?\n\n` +
+          `Esta loja já testou ${jaDeu}x. Prazo menor de propósito: quem volta ` +
+          "já conhece o sistema.\n\n" +
+          "Muda em Ajustes do sistema."
       )
     ) {
       return;
     }
     try {
-      await encerrarTeste(l.id);
-      aviso.sucesso("Teste encerrado. A loja continua com tudo o que cadastrou.");
+      const novo = await reabrirTeste(l.id);
+      aviso.sucesso(`Teste reaberto até ${formatDate(novo)}.`);
       carregar();
     } catch (e) {
+      aviso.erro(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  /**
+   * Convite de loja nova, com o teste já correndo.
+   *
+   * Existe aqui, e não só em Configurações -> Equipe, porque é aqui que se
+   * pensa em cliente novo. E o link é o que permite vender enquanto você
+   * atende o balcão: a pessoa abre, cria a senha, e os dias já estão rodando.
+   */
+  const gerarConvite = async () => {
+    if (!convite) return;
+    setConvite({ ...convite, gerando: true, link: "" });
+    try {
+      const codigo = await criarConvite("dono", convite.nome || undefined, true);
+      setConvite({ nome: convite.nome, link: linkConvite(codigo), gerando: false });
+    } catch (e) {
+      setConvite({ ...convite, gerando: false });
       aviso.erro(e instanceof Error ? e.message : String(e));
     }
   };
@@ -387,6 +488,12 @@ export const Lojas: React.FC = () => {
         action={
           <div className="flex flex-wrap gap-2">
             <button
+              className="btn-primary"
+              onClick={() => setConvite({ nome: "", link: "", gerando: false })}
+            >
+              <Ticket size={18} /> Convidar loja nova
+            </button>
+            <button
               className="btn-secondary"
               onClick={() => setSenha({ email: "", link: "", gerando: false })}
             >
@@ -460,6 +567,30 @@ export const Lojas: React.FC = () => {
         </div>
       </div>
 
+      {/*
+        Por que os testes não fecharam, somado. É a única saída desta tela que
+        responde "o que eu conserto primeiro" — e ela só existe porque o motivo
+        vem de uma lista fechada. Texto livre não soma.
+      */}
+      {resumo.porMotivo.length > 0 && (
+        <div className="card mb-5">
+          <p className="mb-2 flex items-center gap-2 text-xs text-slate-500">
+            <XCircle size={14} /> Por que os testes não fecharam
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {resumo.porMotivo.map(([m, n]) => (
+              <span
+                key={m}
+                className="badge bg-slate-100 text-slate-600"
+                title={`${n} loja(s)`}
+              >
+                {nomeDoMotivo(m)} · <b className="ml-1">{n}</b>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="relative mb-4 max-w-md">
         <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
@@ -490,6 +621,8 @@ export const Lojas: React.FC = () => {
             const noTeste = emTeste(l);
             const acabou = testeAcabou(l);
             const diasTeste = diasDeTeste(l);
+            const u = uso[l.id];
+            const vezes = Number(l.testesDados) || 0;
             return (
               <div key={l.id} className="card flex flex-wrap items-center gap-4">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
@@ -544,6 +677,16 @@ export const Lojas: React.FC = () => {
                           : `Em teste · ${diasTeste === 0 ? "último dia" : `faltam ${diasTeste}d`}`}
                       </span>
                     )}
+                    {/* 2o, 3o teste: a primeira cortesia é venda, a terceira
+                        é outra conversa — e sem contar ninguém percebe. */}
+                    {noTeste && vezes > 1 && (
+                      <span className="badge bg-orange-100 text-orange-700">{vezes}o teste</span>
+                    )}
+                    {txt(l.motivoTeste) && (
+                      <span className="badge bg-slate-100 text-slate-600">
+                        {nomeDoMotivo(l.motivoTeste)}
+                      </span>
+                    )}
                     {l.isento ? (
                       <span className="badge bg-brand-100 text-brand-700">Sua loja · isenta</span>
                     ) : (
@@ -581,6 +724,27 @@ export const Lojas: React.FC = () => {
                     )}
                     {l.ultimoPagamento && ` · último pagamento ${formatDate(l.ultimoPagamento)}`}
                   </p>
+                  {/*
+                    O que a loja construiu lá dentro, só contagem.
+                    Quem cadastrou 200 produtos e sumiu esbarrou em alguma
+                    coisa concreta; quem cadastrou 3 nunca começou. São dois
+                    telefonemas diferentes, e antes disto os dois eram o mesmo.
+                  */}
+                  {u && !l.isento && (
+                    <p
+                      className={`mt-1 flex flex-wrap items-center gap-x-2 text-xs ${
+                        noTeste && !usouDeVerdade(u) ? "text-slate-400" : "text-slate-500"
+                      }`}
+                    >
+                      <Package size={12} className="shrink-0" />
+                      {u.produtos} produto{u.produtos === 1 ? "" : "s"} · {u.clientes} cliente
+                      {u.clientes === 1 ? "" : "s"} · {u.vendas} venda
+                      {u.vendas === 1 ? "" : "s"} · {u.ordens} OS
+                      {noTeste && !usouDeVerdade(u) && (
+                        <b className="text-slate-400">· mal começou</b>
+                      )}
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-1.5">
@@ -651,6 +815,26 @@ export const Lojas: React.FC = () => {
                       >
                         <Minus size={12} />3
                       </button>
+                      {/* Reabrir é outro botão, e não um "+3" a mais: esticar
+                          é para o teste que corre; reabrir é para quem sumiu e
+                          voltou, e conta como cortesia nova. */}
+                      {podeReabrirTeste(l) && (
+                        <button
+                          className="btn-ghost !px-1.5 !py-1 text-xs text-violet-700"
+                          title={`Reabrir por ${cfg.dias_reteste ?? 3} dias`}
+                          onClick={() => reabrir(l)}
+                        >
+                          <RotateCcw size={12} />
+                          {cfg.dias_reteste ?? 3}
+                        </button>
+                      )}
+                      <button
+                        className="btn-ghost !px-1.5 !py-1 text-xs text-slate-500"
+                        title="Anotar por que não fechou"
+                        onClick={() => setMotivo({ loja: l, encerrando: false })}
+                      >
+                        <MessageCircle size={12} />
+                      </button>
                       <button
                         className="btn-ghost !px-1.5 !py-1 text-xs text-red-500"
                         title="Encerrar o teste hoje"
@@ -693,6 +877,129 @@ export const Lojas: React.FC = () => {
           })}
         </div>
       )}
+
+      {/* ---------- Por que o teste não fechou ---------- */}
+      <Modal
+        open={!!motivo}
+        onClose={() => setMotivo(null)}
+        title={motivo?.encerrando ? "Encerrar o teste hoje" : "Por que não fechou?"}
+        footer={
+          <button className="btn-secondary" onClick={() => setMotivo(null)}>
+            Cancelar
+          </button>
+        }
+      >
+        <p className="mb-4 text-sm text-slate-500">
+          {motivo?.encerrando ? (
+            <>
+              <b>{txt(motivo?.loja.nome)}</b> para de cadastrar coisa nova.
+              Continua consultando, imprimindo e exportando tudo — nenhum dado é
+              apagado, e dá para voltar atrás com o +7.
+              <br />
+              <br />
+              Marque o motivo. É ele que, somado com os outros, diz se o que
+              falta é preço ou é uma tela.
+            </>
+          ) : (
+            <>
+              O motivo quase nunca aparece na hora em que o teste acaba: aparece
+              no telefonema, três dias depois. Anote aqui quando souber.
+            </>
+          )}
+        </p>
+        <div className="grid gap-2">
+          {MOTIVOS_TESTE.map((m) => (
+            <button
+              key={m.k}
+              className="btn-secondary justify-start !py-2.5 text-sm"
+              onClick={() => gravarMotivo(m.k)}
+            >
+              {m.nome}
+            </button>
+          ))}
+        </div>
+        {motivo?.encerrando && (
+          <button
+            className="btn-ghost mt-3 w-full text-xs text-slate-400"
+            onClick={() => gravarMotivo("")}
+          >
+            Encerrar sem dizer o motivo
+          </button>
+        )}
+      </Modal>
+
+      {/* ---------- Convidar uma loja nova ---------- */}
+      <Modal
+        open={!!convite}
+        onClose={() => setConvite(null)}
+        title="Convidar loja nova"
+        footer={
+          <>
+            <button className="btn-secondary" onClick={() => setConvite(null)}>
+              Fechar
+            </button>
+            <button className="btn-primary" onClick={gerarConvite} disabled={convite?.gerando}>
+              <Ticket size={16} /> {convite?.gerando ? "Gerando..." : "Gerar link"}
+            </button>
+          </>
+        }
+      >
+        <p className="mb-4 text-sm text-slate-500">
+          A pessoa abre o link, cria a senha dela e já entra com{" "}
+          <b>{cfg.dias_teste ?? 7} dias de teste</b> correndo. É o que permite
+          vender enquanto você atende o balcão.
+        </p>
+        <Field label="Nome da loja (opcional)">
+          <input
+            className="input"
+            autoFocus
+            placeholder="Mercearia da Ana"
+            value={convite?.nome || ""}
+            onChange={(e) => convite && setConvite({ ...convite, nome: e.target.value, link: "" })}
+            onKeyDown={(e) => e.key === "Enter" && gerarConvite()}
+          />
+        </Field>
+
+        {convite?.link && (
+          <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+            <p className="text-sm font-semibold text-emerald-800">Link pronto</p>
+            <p className="mt-1 break-all rounded bg-white p-2 text-xs text-slate-600">
+              {convite.link}
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                className="btn-secondary !py-1.5 text-xs"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(convite.link);
+                    aviso.sucesso("Link copiado.");
+                  } catch {
+                    aviso.alerta("Não consegui copiar. Selecione o texto e copie na mão.");
+                  }
+                }}
+              >
+                <Copy size={14} /> Copiar
+              </button>
+              <button
+                className="btn-success !py-1.5 text-xs"
+                onClick={() =>
+                  abrirWhatsapp(
+                    "",
+                    // Sem emoji: em alguns aparelhos chegam como "?" e sujam o recado.
+                    `Oi! Segue o acesso ao sistema${convite.nome ? ` da ${convite.nome}` : ""}:\n\n` +
+                      `${convite.link}\n\n` +
+                      `Voce abre, cria a sua senha e ja entra com ${cfg.dias_teste ?? 7} ` +
+                      "dias para testar, sem pagar nada e sem cadastrar cartao.\n\n" +
+                      "Qualquer duvida e so me chamar."
+                  )
+                }
+              >
+                <MessageCircle size={14} /> Enviar no WhatsApp
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* ---------- Liberar senha de uma loja ---------- */}
       <Modal
@@ -822,6 +1129,17 @@ export const Lojas: React.FC = () => {
               onChange={(v) => setCfg({ ...cfg, dias_teste: (v ?? 0) })}
             />
           </Field>
+          <Field label="Dias ao reabrir um teste">
+            <InputNumero
+              className="input"
+              value={cfg.dias_reteste ?? 3}
+              onChange={(v) => setCfg({ ...cfg, dias_reteste: (v ?? 0) })}
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              Para quem já testou e volta pedindo de novo. Menor de propósito:
+              quem volta já conhece o sistema.
+            </p>
+          </Field>
           <Field label="Dias de tolerância após vencer" className="sm:col-span-2">
             <InputNumero
               className="input"
@@ -831,6 +1149,41 @@ export const Lojas: React.FC = () => {
             <p className="mt-1 text-xs text-slate-400">
               Passado este prazo, a loja continua consultando e imprimindo, mas
               não cadastra nada novo até acertar.
+            </p>
+          </Field>
+          {/*
+            A tolerância existe para o cliente de dois anos que esqueceu o Pix.
+            Quem está em teste não tem essa história: 7 dias combinados mais 5
+            de tolerância viram 12 sem ninguém ter decidido isso.
+          */}
+          <Field label="A tolerância vale durante o teste?" className="sm:col-span-2">
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  [false, `Não — o teste acaba no dia (${cfg.dias_teste ?? 7} dias)`],
+                  [
+                    true,
+                    `Sim — teste ganha os ${cfg.dias_tolerancia ?? 5} dias a mais`,
+                  ],
+                ] as const
+              ).map(([v, nome]) => (
+                <button
+                  key={String(v)}
+                  type="button"
+                  onClick={() => setCfg({ ...cfg, tolerancia_no_teste: v })}
+                  className={`chip text-sm ${
+                    !!cfg.tolerancia_no_teste === v
+                      ? "bg-brand-600 text-white"
+                      : "bg-white text-slate-600 ring-1 ring-slate-200"
+                  }`}
+                >
+                  {nome}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-slate-400">
+              A trava vale no banco, não só aqui. Em qualquer um dos dois a
+              loja continua consultando, imprimindo e exportando tudo.
             </p>
           </Field>
         </div>

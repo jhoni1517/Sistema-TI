@@ -98,8 +98,18 @@ export const Equipe: React.FC<{
       await criarConvite(novaLoja ? "dono" : novoPapel, novoNome, novaLoja);
       setNovoNome("");
       await carregar();
+      aviso.sucesso("Convite criado. Copie o link abaixo e mande para a pessoa.");
     } catch (e) {
-      setMsg(e instanceof Error ? e.message : String(e));
+      /*
+       * O erro vai no AVISO, não num parágrafo no topo do card.
+       *
+       * `msg` é renderizado logo abaixo do título, e o botão "Liberar nova
+       * loja" fica no fim de um card comprido. No celular, clicar no botão
+       * escrevia o erro a duas telas de rolagem de distância: a pessoa via o
+       * botão piscar e nada acontecer, e concluía que estava quebrado. Erro
+       * que a pessoa não vê é erro engolido, mesmo estando na tela.
+       */
+      aviso.erro(e instanceof Error ? e.message : String(e));
     } finally {
       setGerando(false);
     }

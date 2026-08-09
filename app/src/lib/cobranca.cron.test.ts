@@ -62,8 +62,17 @@ describe("o cron não manda dado de loja para o chat do operador", () => {
     // Nome da loja e quanto ela deve são da relação comercial do operador
     // com ela — isso pode e deve chegar nele.
     const usos = fonte.split("enviarTelegram(").length - 1;
-    // Uma na definição da função e uma na chamada do resumo de mensalidade.
-    expect(usos).toBe(2);
+    /*
+     * Três: a definição da função, o resumo de mensalidade, e o aviso curto
+     * de "teste acaba hoje" — que também é assinatura, não conteúdo de loja.
+     *
+     * O número é conferido na unha de propósito. Ele não protege um estilo:
+     * protege a regra de que NADA de dentro de uma loja (cliente, dívida,
+     * agenda) escape para o chat de outra pessoa. Subir este número exige
+     * olhar a chamada nova e responder se o que ela manda é da relação
+     * comercial ou é dado do cliente da loja.
+     */
+    expect(usos).toBe(3);
   });
 
   it("o chat do operador aparece em um lugar só do código", () => {

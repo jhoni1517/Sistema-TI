@@ -10,6 +10,10 @@ import {
   testeAcabou,
   diasDeTeste,
   podeLiberarTeste,
+  podeReabrirTeste,
+  usouDeVerdade,
+  nomeDoMotivo,
+  MOTIVOS_TESTE,
   type Loja,
 } from "./assinatura";
 
@@ -199,5 +203,140 @@ describe("a coluna do teste existe na migração", () => {
     // dia a mais — e passar a receber cobrança de mensalidade.
     const gravacoes = sql.match(/set "venceEm" = [^;]*"testeAte" = [^;]*/g) || [];
     expect(gravacoes.length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+
+describe("reabrir o teste de quem já testou", () => {
+  it("teste que acabou pode ser reaberto", () => {
+    expect(podeReabrirTeste(loja({ venceEm: emDias(-30), testeAte: emDias(-30) }))).toBe(true);
+  });
+
+  it("teste que ainda corre, não: para esse o botão é esticar", () => {
+    /*
+     * Reabrir teste que está correndo daria dias de graça a quem já os tem, e
+     * ainda contaria como cortesia nova — a loja apareceria com "3o teste"
+     * tendo feito um só.
+     */
+    expect(podeReabrirTeste(loja({ venceEm: emDias(2), testeAte: emDias(2) }))).toBe(false);
+  });
+
+  it("loja que já pagou, nunca", () => {
+    expect(
+      podeReabrirTeste(
+        loja({ venceEm: emDias(-30), testeAte: emDias(-30), ultimoPagamento: emDias(-5) })
+      )
+    ).toBe(false);
+  });
+
+  it("loja que nunca testou, também não", () => {
+    // Para essa o caminho é `liberar_teste`, que conta como o primeiro.
+    expect(podeReabrirTeste(loja())).toBe(false);
+  });
+});
+
+/**
+ * O que a loja fez lá dentro separa dois telefonemas.
+ *
+ * Quem cadastrou 200 produtos e sumiu esbarrou em alguma coisa concreta; quem
+ * cadastrou 3 nunca começou. Antes disto os dois recebiam o mesmo recado.
+ */
+describe("a loja usou de verdade?", () => {
+  it("quem mal mexeu não usou", () => {
+    expect(usouDeVerdade({ loja: "1", produtos: 3, clientes: 1, ordens: 0, vendas: 0 })).toBe(
+      false
+    );
+  });
+
+  it("quem construiu alguma coisa, usou", () => {
+    expect(usouDeVerdade({ loja: "1", produtos: 40, clientes: 5, ordens: 0, vendas: 12 })).toBe(
+      true
+    );
+  });
+
+  it("sem dado nenhum não inventa que usou", () => {
+    // A migração nova pode não ter rodado: `resumoUsoLojas` devolve vazio, e
+    // vazio não pode virar "esta loja não usou" na tela.
+    expect(usouDeVerdade(null)).toBe(false);
+    expect(usouDeVerdade(undefined)).toBe(false);
+  });
+});
+
+describe("o motivo de não ter fechado", () => {
+  it("cada motivo da lista tem nome para a tela", () => {
+    for (const m of MOTIVOS_TESTE) {
+      expect(nomeDoMotivo(m.k), `motivo ${m.k} sem nome`).toBe(m.nome);
+    }
+  });
+
+  it("sem motivo não escreve nada", () => {
+    expect(nomeDoMotivo(null)).toBe("");
+    expect(nomeDoMotivo("")).toBe("");
+  });
+
+  it("motivo antigo que saiu da lista aparece cru, e não some", () => {
+    // Trocar a lista não pode apagar da tela o que já foi anotado: o dado
+    // continua no banco, e some da vista é o pior dos dois mundos.
+    expect(nomeDoMotivo("motivo_de_2025")).toBe("motivo_de_2025");
+  });
+});
+
+/**
+ * Campo novo no TypeScript exige coluna nova no banco — de novo.
+ *
+ * `esquema.test.ts` varre só as interfaces de types.ts, e `Loja` mora em
+ * assinatura.ts. Sem esta conferência, `motivoTeste` viraria mais um
+ * "Could not find the 'motivoTeste' column of 'lojas' in the schema cache".
+ */
+describe("as colunas do controle de teste existem na migração", () => {
+  const sql = readFileSync(
+    resolve(__dirname, "..", "..", "supabase-migracao-teste-controle.sql"),
+    "utf8"
+  );
+
+  it.each([["motivoTeste"], ["testesDados"]])('lojas ganha "%s"', (col) => {
+    expect(sql).toContain(`alter table lojas add column if not exists "${col}"`);
+  });
+
+  it.each([["dias_reteste"], ["tolerancia_no_teste"]])(
+    "sistema_config ganha %s",
+    (col) => {
+      expect(sql).toContain(`alter table sistema_config add column if not exists ${col}`);
+    }
+  );
+
+  it("a tela pede as colunas novas na leitura", () => {
+    const lib = readFileSync(resolve(__dirname, "assinatura.ts"), "utf8");
+    expect(lib).toContain('"motivoTeste", "testesDados"');
+  });
+
+  it("a assinatura antiga de encerrar_teste é removida antes da nova", () => {
+    /*
+     * Com as duas no banco, `encerrar_teste(id)` vira "function name is not
+     * unique" e o botão para de funcionar — sem erro na tela, porque quem
+     * chama é o Supabase e o recado vem em inglês.
+     */
+    expect(sql).toContain("drop function if exists encerrar_teste(uuid);");
+  });
+
+  it("a tolerância no teste é decidida no BANCO, não só na tela", () => {
+    // `situacao_loja()` é quem as políticas de escrita consultam. Esconder a
+    // regra só na tela deixaria a loja gravando por mais cinco dias enquanto
+    // o painel dizia que ela estava travada.
+    const situacao = sql.slice(sql.indexOf("create or replace function situacao_loja()"));
+    expect(situacao).toContain("tolerancia_no_teste");
+  });
+
+  it("o resumo de uso devolve contagem, e nunca conteúdo", () => {
+    /*
+     * Quantos produtos a loja cadastrou é da relação comercial. QUAIS
+     * produtos, o nome dos clientes e o valor das vendas não são — e a
+     * função do banco não pode abrir essa porta, porque ela roda como
+     * `security definer` e enxerga tudo.
+     */
+    const fn = sql.slice(sql.indexOf("create or replace function resumo_uso_lojas()"));
+    const ate = fn.slice(0, fn.indexOf("$$;") + 3);
+    expect(ate).toContain("select count(*)");
+    expect(ate).not.toMatch(/select\s+(nome|valor|descricao|total)\b/);
   });
 });
