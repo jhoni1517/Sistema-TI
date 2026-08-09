@@ -3,6 +3,21 @@
 //  Endpoint: /api/nota  (chamado pelo cron do Vercel e sob demanda)
 // ============================================================
 //
+// ------------------------------------------------------------
+// O CRON AQUI E DIARIO, E ISSO NAO E ESCOLHA
+//
+// O plano Hobby da Vercel so aceita cron com disparo uma vez por dia. Um
+// `*` ou `/` no minuto ou na hora do vercel.json faz a Vercel RECUSAR a
+// implantacao inteira, sem build vermelho e sem aviso — ela simplesmente
+// nao e criada. Ja custou quatro merges parados no main sem nunca chegar
+// ao ar. Ver src/lib/vercel.test.ts, que reprova o cron fino.
+//
+// Entao este cron nao e o caminho normal da nota: ele e a REDE. Passa uma
+// vez por dia recolhendo o que ficou para tras (SEFAZ fora do ar, token
+// trocado, internet do balcao caindo). A nota do dia a dia sai na hora,
+// disparada pela propria venda.
+// ------------------------------------------------------------
+//
 // A VENDA NUNCA ESPERA A NOTA. A tela grava a venda e põe uma nota
 // "pendente" na fila; quem manda é este robô, depois. SEFAZ fora do ar,
 // intermediário fora do ar, internet do balcão caindo — nada disso pode
