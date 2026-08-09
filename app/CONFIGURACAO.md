@@ -142,7 +142,15 @@ https://supabase.com/dashboard/project/nviagibefxqtognowqwe/sql/new:
 14. `supabase-migracao-ramo-email.sql`
 15. `supabase-migracao-rastreio-token.sql`
 16. `supabase-migracao-checklist.sql`
-17. `supabase-corrigir-colunas.sql`
+17. `supabase-migracao-comandas.sql`
+18. `supabase-migracao-notas.sql`
+19. `supabase-migracao-teste-gratis.sql`
+20. `supabase-migracao-teste-controle.sql`
+21. `supabase-corrigir-colunas.sql`
+
+`supabase-conta-teste.sql` fica de fora da ordem de propósito: ele cria uma
+loja de mentira para você mexer sem sujar dado de cliente. Rode só quando
+quiser isso, e nunca no banco de uma loja que já usa o sistema.
 
 O de número 16 cria o Checklist diário — a rotina que se repete sem data
 (beber água, conferir a bancada, passar no fornecedor às duas). Sem ele a
