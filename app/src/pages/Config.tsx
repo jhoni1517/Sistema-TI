@@ -20,6 +20,7 @@ import { carregarSessao, type Sessao } from "../lib/auth";
 import { importarTudo, type DumpLoja } from "../lib/db";
 import { problemaNoChatId } from "../lib/config";
 import { CatalogoPublico, TituloCatalogo } from "../components/CatalogoPublico";
+import { CredencialFiscal } from "../components/CredencialFiscal";
 import type { Config as ConfigType } from "../lib/types";
 
 export const Config: React.FC = () => {
@@ -451,6 +452,19 @@ export const Config: React.FC = () => {
             arquivo de exportação — que circula por WhatsApp e e-mail. Um
             token aqui é um token queimado. Ver lib/fiscal.ts.
           */}
+          <Field label="Natureza da operação" className="sm:col-span-2">
+            <input
+              className="input"
+              placeholder="Venda ao consumidor"
+              value={form.naturezaOperacao || ""}
+              onChange={(e) => mudar({ naturezaOperacao: e.target.value })}
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              Vazio vale "Venda ao consumidor", que é o certo para nota de
+              balcão.
+            </p>
+          </Field>
+
           <Field label="Inscrição Estadual" className="sm:col-span-2">
             <input
               className="input"
@@ -660,6 +674,11 @@ export const Config: React.FC = () => {
       </div>
 
       {/* Minha conta */}
+      {/* O token do emissor fica em bloco próprio, e não junto dos dados
+          fiscais: os dados sobem para a nuvem e o token NÃO. Misturar os
+          dois num card só faria parecer que seguem a mesma regra. */}
+      {pendenciasDaLoja(form).length === 0 && <CredencialFiscal />}
+
       {sessao && <MinhaConta sessao={sessao} />}
 
       {/* Equipe e permissões */}

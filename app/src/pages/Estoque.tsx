@@ -499,6 +499,30 @@ export const Estoque: React.FC = () => {
                   Serviço sai em nota MUNICIPAL (NFS-e), não na estadual. Não
                   tem NCM. O contador informa o código da lista de serviços.
                 </p>
+                {/*
+                  A alíquota fica JUNTO do código do serviço, e não numa aba
+                  de tributos: são as duas coisas que o contador informa na
+                  mesma frase, e separar faz a segunda ser esquecida.
+
+                  Vazia não trava a nota. No Simples o ISS costuma ir zerado,
+                  porque ele já está dentro da guia única — obrigar um número
+                  aqui faria a loja inventar um, e alíquota inventada é
+                  imposto pago a mais ou a menos.
+                */}
+                <div className="mt-3">
+                  <label className="label">Alíquota de ISS (%)</label>
+                  <InputNumero
+                    className="input max-w-[10rem]"
+                    min={0}
+                    max={100}
+                    value={editando.aliquotaIss}
+                    onChange={(v) => setEditando({ ...editando, aliquotaIss: v ?? 0 })}
+                  />
+                  <p className="mt-1 text-xs text-slate-400">
+                    Deixe 0 se a loja é do Simples — o ISS já está na guia
+                    única. Fora do Simples, o contador informa.
+                  </p>
+                </div>
               </Field>
             ) : (
               <Field label="NCM (nota fiscal)">
