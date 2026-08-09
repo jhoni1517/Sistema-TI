@@ -25,6 +25,7 @@ import { precoEfetivo } from "../lib/promocao";
 import { uid, nowISO, brl, formatDate, formatDateTime, txt } from "../lib/format";
 import { produtosParaOS } from "../lib/busca";
 import { comandasAbertas } from "../lib/comanda";
+import { TODAS_AS_FORMAS, nomeDaForma } from "../lib/pagamento";
 import { aposBaixa } from "../lib/estoque";
 import { printHTML } from "../lib/print";
 import { reciboFechamento, reciboVenda, reciboMovimento } from "../lib/recibo";
@@ -292,13 +293,19 @@ export const Caixa: React.FC = () => {
           quanto tem que estar em papel. */}
       {detalhes && Object.keys(resumo.porForma).length > 0 && (
         <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
-          {(["dinheiro", "pix", "debito", "credito", "outro"] as const)
+          {/*
+            Sai do que ENTROU de fato, não de uma lista escrita à mão.
+            A lista fixa não tinha vale nenhum: o dia inteiro de
+            vale-refeição de um restaurante simplesmente não aparecia nos
+            cartões, e quem confere a maquininha não tinha contra o que
+            conferir.
+          */}
+          {Object.keys(resumo.porForma)
             .filter((f) => resumo.porForma[f])
+            .sort((a, b) => resumo.porForma[b] - resumo.porForma[a])
             .map((f) => (
               <div key={f} className="rounded-xl bg-white p-3 shadow-sm ring-1 ring-slate-200">
-                <p className="text-xs capitalize text-slate-400">
-                  {f === "debito" ? "Débito" : f === "credito" ? "Crédito" : f}
-                </p>
+                <p className="text-xs text-slate-400">{nomeDaForma(f)}</p>
                 <p className="mt-0.5 text-lg font-bold text-slate-800">
                   {brl(resumo.porForma[f])}
                 </p>
@@ -450,7 +457,7 @@ export const Caixa: React.FC = () => {
                       <p className="truncate text-xs text-slate-400">
                         {m.categoria}
                         <span className="mx-1">·</span>
-                        <span className="capitalize">{m.formaPagamento}</span>
+                        <span>{nomeDaForma(m.formaPagamento)}</span>
                         <span className="mx-1">·</span>
                         {formatDateTime(m.data).slice(-5)}
                       </p>
@@ -787,13 +794,15 @@ const MovimentoModal: React.FC<{
 
         {tipo !== "sangria" && (
           <Field label="Forma de pagamento">
+            {/* O lançamento manual é entrada OU saída, então oferece as duas
+                listas juntas: aqui se registra tanto a venda que ficou de
+                fora quanto a conta paga no boleto. */}
             <select className="input" value={forma} onChange={(e) => setForma(e.target.value as FormaPagamento)}>
-              <option value="dinheiro">Dinheiro</option>
-              <option value="pix">Pix</option>
-              <option value="debito">Débito</option>
-              <option value="credito">Crédito</option>
-              <option value="transferencia">Transferência</option>
-              <option value="outro">Outro</option>
+              {TODAS_AS_FORMAS.map((f) => (
+                <option key={f.k} value={f.k}>
+                  {f.nome}
+                </option>
+              ))}
             </select>
           </Field>
         )}
@@ -917,7 +926,7 @@ const FecharCaixaModal: React.FC<{
             <div className="rounded-lg border border-slate-200 p-3">
               {formas.map(([f, v]) => (
                 <div key={f} className="flex justify-between py-0.5 text-sm">
-                  <span className="capitalize text-slate-600">{f}</span>
+                  <span className="text-slate-600">{nomeDaForma(f)}</span>
                   <span className="font-semibold text-slate-800">{brl(v)}</span>
                 </div>
               ))}
@@ -1125,7 +1134,7 @@ const DetalheFechamento: React.FC<{
             <div className="rounded-lg border border-slate-200 p-3">
               {Object.entries(r.porForma).map(([f, v]) => (
                 <div key={f} className="flex justify-between py-0.5 text-sm">
-                  <span className="capitalize text-slate-600">{f}</span>
+                  <span className="text-slate-600">{nomeDaForma(f)}</span>
                   <span className="font-semibold text-slate-800">{brl(v)}</span>
                 </div>
               ))}

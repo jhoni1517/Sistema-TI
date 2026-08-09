@@ -14,6 +14,7 @@ import { custoVenda } from "../lib/pdv";
 import { sessaoAberta as achaSessaoAberta } from "../lib/caixa";
 import { soMesas } from "../lib/entrega";
 import {
+  FORMAS_META,
   consolidar,
   formaPrincipal,
   problemaNoPagamento,
@@ -48,12 +49,8 @@ import type {
   FormaPagamento,
 } from "../lib/types";
 
-const FORMAS: { k: FormaPagamento; nome: string }[] = [
-  { k: "dinheiro", nome: "Dinheiro" },
-  { k: "pix", nome: "Pix" },
-  { k: "debito", nome: "Débito" },
-  { k: "credito", nome: "Crédito" },
-];
+/** A lista mora em lib/pagamento.ts: copiada aqui, ela divergia. */
+const FORMAS = FORMAS_META;
 
 /**
  * Comanda de mesa.

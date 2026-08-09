@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
+  nomeDaForma,
+  FORMAS_META,
   totalPago,
   faltaNoPagamento,
   trocoDoPagamento,
@@ -178,5 +180,39 @@ describe("centavos não escapam", () => {
     const parcelas = [p("pix", 33.33), p("credito", 33.33), p("dinheiro", 33.33)];
     expect(faltaNoPagamento(100, parcelas)).toBe(0.01);
     expect(problemaNoPagamento(100, parcelas)).toContain("0.01");
+  });
+});
+
+/**
+ * A tela imprimia a chave crua com `capitalize` do CSS, e funcionava por
+ * sorte: toda forma era uma palavra só. No dia em que nasceu o vale, o
+ * caixa, o recibo e o fechamento passaram a mostrar "Vale_refeicao".
+ */
+describe("o nome da forma para mostrar", () => {
+  it("traduz a chave gravada", () => {
+    expect(nomeDaForma("vale_refeicao")).toBe("Vale-refeição");
+    expect(nomeDaForma("vale_alimentacao")).toBe("Vale-alimentação");
+    expect(nomeDaForma("debito")).toBe("Débito");
+    expect(nomeDaForma("transferencia")).toBe("Transferência / boleto");
+  });
+
+  it("vazio é dinheiro, igual ao resto do sistema", () => {
+    // É assim que volta da nuvem o lançamento gravado antes de a coluna
+    // existir. Ver `ehEspecie` em lib/caixa.ts.
+    expect(nomeDaForma("")).toBe("Dinheiro");
+    expect(nomeDaForma(undefined)).toBe("Dinheiro");
+  });
+
+  it("chave desconhecida vira texto legível em vez de sumir", () => {
+    // Lançamento importado de outro sistema: o valor está lá, e quem
+    // confere precisa saber de onde ele veio.
+    expect(nomeDaForma("cartao_loja")).toBe("Cartao loja");
+  });
+
+  it("toda forma da lista de venda tem nome, e nenhum é a chave crua", () => {
+    for (const f of FORMAS_META) {
+      expect(nomeDaForma(f.k), f.k).toBe(f.nome);
+      expect(f.nome, f.k).not.toContain("_");
+    }
   });
 });

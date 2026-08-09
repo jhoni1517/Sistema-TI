@@ -26,20 +26,65 @@ export const FORMAS_META: { k: FormaPagamento; nome: string }[] = [
   { k: "pix", nome: "Pix" },
   { k: "debito", nome: "Débito" },
   { k: "credito", nome: "Crédito" },
+  // Vale entra aqui porque é forma de RECEBER, e num restaurante é diário.
+  // Sem ele, o operador lançava como débito ou "outro" — e aí a conferência
+  // da maquininha procura o dinheiro num lugar onde ele nunca esteve.
+  { k: "vale_refeicao", nome: "Vale-refeição" },
+  { k: "vale_alimentacao", nome: "Vale-alimentação" },
 ];
 
 /**
- * O mesmo, mais o que só aparece quando a loja PAGA.
+ * As formas de quando a loja PAGA. É uma lista à parte, não a de cima mais
+ * duas.
  *
  * "Transferência" é o boleto e o TED do fornecedor, que ninguém usa para
  * receber no balcão; "Outro" é a troca, o acerto informal, o que não coube.
  * Nenhum dos dois tira nota da gaveta — e é exatamente esse o ponto.
+ *
+ * E o VALE não entra: ninguém paga fornecedor com vale-refeição. Enquanto
+ * esta lista era "a de venda mais duas", acrescentar o vale nas vendas o
+ * fazia aparecer também na compra de mercadoria.
  */
 export const FORMAS_DE_COMPRA: { k: FormaPagamento; nome: string }[] = [
+  { k: "dinheiro", nome: "Dinheiro" },
+  { k: "pix", nome: "Pix" },
+  { k: "debito", nome: "Débito" },
+  { k: "credito", nome: "Crédito" },
+  { k: "transferencia", nome: "Transferência / boleto" },
+  { k: "outro", nome: "Outro" },
+];
+
+/**
+ * Todas as formas, para o lançamento manual do caixa.
+ *
+ * Ali se registra tanto a venda que ficou de fora quanto a conta paga no
+ * boleto, então as duas listas valem. É a única tela que precisa das duas.
+ */
+export const TODAS_AS_FORMAS: { k: FormaPagamento; nome: string }[] = [
   ...FORMAS_META,
   { k: "transferencia", nome: "Transferência / boleto" },
   { k: "outro", nome: "Outro" },
 ];
+
+/**
+ * O nome da forma para MOSTRAR, a partir da chave gravada.
+ *
+ * A tela imprimia a chave crua com `capitalize` do CSS, e funcionava por
+ * sorte: toda forma era uma palavra só. "vale_refeicao" virou
+ * "Vale_refeicao" no caixa, no recibo e no relatório no mesmo dia em que a
+ * forma nasceu.
+ *
+ * Chave desconhecida — lançamento antigo, importação — vira texto legível
+ * em vez de sumir: o valor está lá e a pessoa precisa saber de onde ele veio.
+ */
+export function nomeDaForma(k?: string | null): string {
+  const chave = String(k ?? "").trim();
+  if (!chave) return "Dinheiro"; // vazio é dinheiro, como em lib/caixa.ts
+  const achado = TODAS_AS_FORMAS.find((f) => f.k === chave);
+  if (achado) return achado.nome;
+  const legivel = chave.replace(/_/g, " ");
+  return legivel.charAt(0).toUpperCase() + legivel.slice(1);
+}
 
 export interface Parcela {
   forma: FormaPagamento;

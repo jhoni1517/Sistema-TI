@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   pendenciasDaLoja,
   pendenciasDoProduto,
@@ -105,12 +107,30 @@ describe("forma de pagamento vira código da SEFAZ", () => {
   });
 
   it("toda forma de pagamento do sistema tem código, sem sobrar nenhuma", () => {
-    // Forma nova sem código aqui derruba a nota na hora do pagamento.
-    const formas = ["dinheiro", "pix", "debito", "credito", "transferencia", "outro"];
+    /*
+     * A lista sai do TIPO, lida do disco, e não de uma cópia aqui dentro.
+     *
+     * Ela era copiada à mão, e cópia dentro de teste envelhece igual ao
+     * código: acrescentar uma forma nova em types.ts deixava os dois
+     * passando juntos e a nota era rejeitada no balcão, com um número de
+     * erro que não diz nada a quem está atendendo.
+     */
+    const tipos = readFileSync(resolve(__dirname, "types.ts"), "utf8");
+    const uniao = tipos.match(/export type FormaPagamento =([\s\S]*?);/)?.[1] || "";
+    const formas = [...uniao.matchAll(/"(\w+)"/g)].map((m) => m[1]);
+
+    expect(formas.length, "não consegui ler FormaPagamento de types.ts").toBeGreaterThan(3);
     for (const f of formas) {
       expect(CODIGO_PAGAMENTO[f as keyof typeof CODIGO_PAGAMENTO], f).toMatch(/^\d{2}$/);
     }
     expect(Object.keys(CODIGO_PAGAMENTO).sort()).toEqual([...formas].sort());
+  });
+
+  it("vale-refeição e vale-alimentação não podem trocar de código", () => {
+    // São 11 e 10 na tabela da SEFAZ. Mandar um pelo outro é erro fiscal
+    // numa nota que já saiu, e ninguém confere isso depois.
+    expect(CODIGO_PAGAMENTO.vale_refeicao).toBe("11");
+    expect(CODIGO_PAGAMENTO.vale_alimentacao).toBe("10");
   });
 });
 

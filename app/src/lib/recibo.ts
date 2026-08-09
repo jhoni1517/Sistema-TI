@@ -5,6 +5,7 @@ import { totalPecas, totalDaEntrega, taxaArmazenamento } from "./calc";
 import { opcaoDaPeca, opcaoAtual, subtotalPeca } from "./orcamento";
 import { resumoCaixa, conferencia, CONFERENCIA_META } from "./caixa";
 import { subtotalItem, subtotalVenda, totalVenda, trocoDe } from "./pdv";
+import { nomeDaForma } from "./pagamento";
 import { barrasEAN13, precoDaEtiqueta, type Etiqueta } from "./etiqueta";
 import { trocoDoPagamento } from "./pagamento";
 import { linhaDoRecibo } from "./backup";
@@ -259,7 +260,7 @@ export function reciboVenda(
   </table>
 
   <div class="tot">
-    <div class="line"><span>Forma de pagamento</span><span style="text-transform:capitalize">${esc(mov.formaPagamento)}</span></div>
+    <div class="line"><span>Forma de pagamento</span><span>${esc(nomeDaForma(mov.formaPagamento))}</span></div>
     <div class="line grand"><span>Total</span><span>${brl(valor)}</span></div>
   </div>
 
@@ -343,14 +344,10 @@ export function reciboPDV(
         ? (v.pagamentos || [])
             .map(
               (pg) =>
-                `<div class="line"><span style="text-transform:capitalize">${esc(
-                  pg.forma
-                )}</span><span>${brl(Number(pg.valor) || 0)}</span></div>`
+                `<div class="line"><span>${esc(nomeDaForma(pg.forma))}</span><span>${brl(Number(pg.valor) || 0)}</span></div>`
             )
             .join("")
-        : `<div class="line"><span>Pagamento</span><span style="text-transform:capitalize">${esc(
-            v.formaPagamento
-          )}</span></div>`
+        : `<div class="line"><span>Pagamento</span><span>${esc(nomeDaForma(v.formaPagamento))}</span></div>`
     }
     ${
       (v.pagamentos || []).length > 1
@@ -385,7 +382,7 @@ export function reciboFechamento(
   const conf = conferencia(r);
 
   const linhasFormas = Object.entries(r.porForma)
-    .map(([f, v]) => `<div class="line"><span style="text-transform:capitalize">${f}</span><span>${brl(v)}</span></div>`)
+    .map(([f, v]) => `<div class="line"><span>${esc(nomeDaForma(f))}</span><span>${brl(v)}</span></div>`)
     .join("");
 
   const linhasMov = [...movimentos]
@@ -529,9 +526,7 @@ export function reciboMovimento(mov: MovimentoCaixa, config: Config): string {
   </div>
 
   <div class="tot">
-    <div class="line"><span>Forma</span><span style="text-transform:capitalize">${esc(
-      mov.formaPagamento
-    )}</span></div>
+    <div class="line"><span>Forma</span><span>${esc(nomeDaForma(mov.formaPagamento))}</span></div>
     <div class="line grand"><span>Valor</span><span>${brl(Number(mov.valor) || 0)}</span></div>
   </div>
 
