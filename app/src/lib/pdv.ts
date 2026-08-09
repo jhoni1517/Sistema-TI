@@ -14,9 +14,27 @@ import type { ItemVenda, Produto, Venda } from "./types";
  * total diferente do que está escrito nos itens, e aí a fila discute.
  */
 
-/** Centavos, sem o -0 e sem a dízima do ponto flutuante */
-export const centavos = (v: number): number =>
-  Math.round((Number(v) || 0) * 100) / 100 + 0;
+/**
+ * Centavos, sem o -0 e sem a dízima do ponto flutuante.
+ *
+ * `Infinity` volta como 0, e isso é escolha, não descuido. O `Number(v) ||
+ * 0` já cobria NaN, texto e nulo, mas Infinity é verdadeiro e passava
+ * inteiro — e daí contamina tudo, porque toda conta de dinheiro do sistema
+ * passa por aqui. O total viraria "R$ Infinity" na tela e no cupom, e o
+ * campo iria assim para o banco.
+ *
+ * Chegar aqui é difícil (um campo numérico aceita "1e400", que o navegador
+ * converte para Infinity), e é justamente por ser difícil que ninguém ia
+ * procurar. Achado por teste de propriedade, não por relato.
+ *
+ * Zero é o menos ruim: some da conta em vez de estragá-la, e o item com
+ * preço zerado salta aos olhos na conferência.
+ */
+export const centavos = (v: number): number => {
+  const n = Number(v) || 0;
+  if (!Number.isFinite(n)) return 0;
+  return Math.round(n * 100) / 100 + 0;
+};
 
 /** Quanto custa esta linha do carrinho */
 export const subtotalItem = (i: ItemVenda): number =>
@@ -60,9 +78,22 @@ export const trocoDe = (total: number, recebido?: number): number => {
   return centavos(Math.max(0, recebido - total));
 };
 
-/** Falta dinheiro para fechar a venda? */
+/**
+ * Falta dinheiro para fechar a venda?
+ *
+ * O `Math.max(0, ...)` vale nos DOIS caminhos. Antes ele estava só no de
+ * baixo: sem nada digitado no campo, um total negativo saía como falta
+ * negativa, e a tela mostraria "Falta R$ -3,88".
+ *
+ * Hoje `totalVenda` trava em zero, então isso não acontece pela tela — o
+ * teste de propriedade achou chamando a função direto. Mas a trava era
+ * assimétrica dentro da mesma função, e assimetria assim é o que vira bug
+ * quando alguém reusa a conta noutro lugar. Consertar custa um `Math.max`.
+ */
 export const faltaPara = (total: number, recebido?: number): number => {
-  if (typeof recebido !== "number" || Number.isNaN(recebido)) return centavos(total);
+  if (typeof recebido !== "number" || Number.isNaN(recebido)) {
+    return centavos(Math.max(0, total));
+  }
   return centavos(Math.max(0, total - recebido));
 };
 
