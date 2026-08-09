@@ -300,12 +300,12 @@ Não. O certificado fica no intermediário. Sobe o novo lá e pronto.
 Seja honesto com o cliente sobre isto:
 
 - **A emissão em si.** Os campos e a conferência estão prontos; o envio ao
-  intermediário ainda não foi escrito. Falta escolher qual intermediário.
+  intermediário ainda não foi escrito. A escolha do intermediário está feita
+  e justificada em `NOTA-FISCAL-INTERMEDIARIO.md`.
 - **Vale-refeição** como forma de pagamento. Num restaurante é comum, e o
   sistema ainda não tem. A nota exige o código 11 para ele.
 - **Alíquota de ISS por serviço.** O campo existe no tipo, mas a tela ainda
   não pede — no Simples costuma ir zerada, então não trava.
-- **Comanda de mesa, fila da cozinha e delivery.** Não existem ainda.
 
 ---
 
