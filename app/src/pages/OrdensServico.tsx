@@ -72,6 +72,14 @@ import {
   type Produto,
 } from "../lib/types";
 import { produtosParaOS, normalizar } from "../lib/busca";
+import {
+  consolidar,
+  problemaNoPagamento,
+  faltaNoPagamento,
+  trocoDoPagamento,
+  FORMAS_DE_COMPRA,
+  type Parcela,
+} from "../lib/pagamento";
 import { travaAtendimento, classificacaoDe, travaFiado } from "../lib/clientes";
 import { backupDe, avisoDeBackup, perguntaAntesDeConcluir } from "../lib/backup";
 import { saldosApos } from "../lib/estoque";
@@ -96,6 +104,31 @@ const CHECKLIST_ITENS = [
 ];
 
 const STATUS_LIST = Object.keys(OS_STATUS_META) as OSStatus[];
+
+/**
+ * O seletor de forma de pagamento da OS.
+ *
+ * Aparece em três lugares desta tela — receber, registrar a entrega que
+ * ficou sem lançamento, e cada linha da divisão. A lista vinha escrita à mão
+ * nos dois primeiros; agora é a mesma de lib/pagamento.ts, que o PDV, a
+ * comanda e as telas de compra também usam.
+ */
+const SeletorDeForma: React.FC<{
+  forma: FormaPagamento;
+  onForma: (f: FormaPagamento) => void;
+}> = ({ forma, onForma }) => (
+  <select
+    className="input !w-auto !py-1.5 text-sm"
+    value={forma}
+    onChange={(e) => onForma(e.target.value as FormaPagamento)}
+  >
+    {FORMAS_DE_COMPRA.map((f) => (
+      <option key={f.k} value={f.k}>
+        {f.nome}
+      </option>
+    ))}
+  </select>
+);
 
 const novaOS = (numero: number): OrdemServico => ({
   id: uid(),
@@ -611,7 +644,7 @@ export const OrdensServico: React.FC = () => {
             }
             setDetalhe(null);
           }}
-          onReceber={async (forma) => {
+          onReceber={async (parcelas) => {
             if (escolhaPendente(detalhe)) return;
             const guarda = guardaDaEntrega(detalhe);
             const valor = totalDaEntrega(detalhe, guarda);
@@ -640,40 +673,66 @@ export const OrdensServico: React.FC = () => {
               );
               if (!ok) return;
             }
-            if (registrando) return; // clique duplo no balcão acontece o tempo todo
-            setRegistrando(true);
             /*
-             * Depois desta linha virar true, "nada foi alterado" é mentira.
+             * Depois de o dinheiro entrar, "nada foi alterado" é mentira.
              *
              * A mensagem de erro dizia sempre "Nada foi alterado. Tente de
              * novo." Só que a ordem é dinheiro primeiro: quando a falha
              * acontece na baixa do estoque, o lançamento no caixa JÁ entrou.
              * Quem lê "tente de novo" tenta — e lança a receita duas vezes.
              */
+            /*
+             * A soma das formas tem que fechar EXATO com a entrega.
+             *
+             * Sem esta conferência, "R$ 300 no cartão" numa OS de R$ 250
+             * lançaria R$ 300 no caixa por um serviço de R$ 250, e a sobra
+             * apareceria na gaveta dias depois sem origem.
+             */
+            const formas = consolidar(parcelas);
+            const problemaPag = problemaNoPagamento(valor, formas);
+            if (problemaPag) return aviso.alerta(problemaPag);
+
+            if (registrando) return; // clique duplo no balcão acontece o tempo todo
+            setRegistrando(true);
             let dinheiroEntrou = false;
             try {
               // O dinheiro ENTRA primeiro. Se a gravação falhar, o estoque não
               // é baixado — antes o erro sumia e sobrava aparelho entregue sem
               // lançamento nenhum no caixa.
               const sessaoAberta = sessoes.find((s) => !s.fechadoEm);
-              await saveMovimento({
-                id: uid(),
-                tipo: "entrada" as const,
-                categoria: "OS",
-                descricao:
-                  `${codigoOS(detalhe.numero)} - ${nomeCliente(detalhe.clienteId)}` +
-                  // A guarda vai NOMEADA no lançamento: no fechamento do mês
-                  // ninguém lembra por que aquela OS entrou mais cara.
-                  (guarda > 0 ? ` (inclui guarda ${brl(guarda)})` : ""),
-                valor,
-                formaPagamento: forma,
-                osId: detalhe.id,
-                custoRelacionado: custoPecas(detalhe),
-                // Sem isto, uma OS paga com o caixa aberto não entrava no
-                // fechamento daquela sessão e a conta do dia não batia.
-                sessaoId: sessaoAberta?.id,
-                data: nowISO(),
-              });
+              /*
+               * Um lançamento POR FORMA, igual ao PDV e à comanda.
+               *
+               * A OS era o último lugar do sistema que jogava tudo numa forma
+               * só. Um conserto de R$ 800 pago metade no cartão e metade em
+               * espécie virava R$ 800 no cartão: a gaveta acusava falta de
+               * R$ 400 e a maquininha, sobra de R$ 400 — todo dia que
+               * acontecesse, e sem origem rastreável.
+               */
+              const custo = custoPecas(detalhe);
+              for (const [i, f] of formas.entries()) {
+                await saveMovimento({
+                  id: uid(),
+                  tipo: "entrada" as const,
+                  categoria: "OS",
+                  descricao:
+                    `${codigoOS(detalhe.numero)} - ${nomeCliente(detalhe.clienteId)}` +
+                    // A guarda vai NOMEADA no lançamento: no fechamento do mês
+                    // ninguém lembra por que aquela OS entrou mais cara.
+                    (guarda > 0 ? ` (inclui guarda ${brl(guarda)})` : "") +
+                    (formas.length > 1 ? ` - ${f.forma}` : ""),
+                  valor: f.valor,
+                  formaPagamento: f.forma,
+                  osId: detalhe.id,
+                  // O custo vai INTEIRO no primeiro: dividir o CMV entre as
+                  // formas de pagamento não significa nada.
+                  custoRelacionado: i === 0 ? custo : 0,
+                  // Sem isto, uma OS paga com o caixa aberto não entrava no
+                  // fechamento daquela sessão e a conta do dia não batia.
+                  sessaoId: sessaoAberta?.id,
+                  data: nowISO(),
+                });
+              }
               dinheiroEntrou = true;
               if (detalhe.status === "entregue") {
                 // OS já entregue: não dá para saber se a baixa foi feita, e
@@ -689,7 +748,10 @@ export const OrdensServico: React.FC = () => {
                 await baixarEstoqueEEntregar(detalhe);
               }
               setDetalhe(null);
-              aviso.sucesso(`${brl(valor)} lançado no caixa.`);
+              const troco = trocoDoPagamento(valor, formas);
+              aviso.sucesso(
+                `${brl(valor)} lançado no caixa.` + (troco > 0 ? ` Troco: ${brl(troco)}.` : "")
+              );
             } catch (e) {
               aviso.erro(
                 "Não foi possível concluir a entrega:\n\n" +
@@ -1272,7 +1334,7 @@ const OSDetalhe: React.FC<{
   onAvisar: () => void;
   onEditar: () => void;
   onExcluir: () => void;
-  onReceber: (forma: FormaPagamento) => void;
+  onReceber: (parcelas: Parcela[]) => void;
   onFiado: () => void;
   /** Já existe lançamento no caixa ou fiado para esta OS? */
   pagamentoRegistrado: boolean;
@@ -1281,6 +1343,8 @@ const OSDetalhe: React.FC<{
   registrando: boolean;
 }> = ({ os, clienteNome, cliente, config, onClose, onStatus, onAvisar, onEditar, onExcluir, onReceber, onFiado, pagamentoRegistrado, historicoAparelho, registrando }) => {
   const [forma, setForma] = useState<FormaPagamento>("dinheiro");
+  const [parcelas, setParcelas] = useState<Parcela[]>([]);
+  const [dividido, setDividido] = useState(false);
   /*
    * A guarda acumulada, no mesmo lugar em que o alerta vermelho a calcula.
    *
@@ -1295,6 +1359,10 @@ const OSDetalhe: React.FC<{
     config.diasAbandono || 90
   ).valor;
   const aCobrar = totalDaEntrega(os, guarda);
+  const falta = faltaNoPagamento(aCobrar, parcelas);
+  // Sem divisão, a "lista de formas" é uma só, com o total inteiro. Assim o
+  // caminho de gravação é UM, e o comum não vira caso especial.
+  const parcelasFinais: Parcela[] = dividido ? parcelas : [{ forma, valor: aCobrar }];
   const [incluirCliente, setIncluirCliente] = useState(true);
 
   // o link leva a loja: a consulta pública só devolve dados desta loja
@@ -1566,18 +1634,8 @@ const OSDetalhe: React.FC<{
               agora para a conta ficar certa.
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              <select
-                className="input !w-auto !py-1.5 text-sm"
-                value={forma}
-                onChange={(e) => setForma(e.target.value as FormaPagamento)}
-              >
-                <option value="dinheiro">Dinheiro</option>
-                <option value="pix">Pix</option>
-                <option value="debito">Débito</option>
-                <option value="credito">Crédito</option>
-                <option value="transferencia">Transferência</option>
-              </select>
-              <button className="btn-success !py-1.5 text-sm" disabled={registrando} onClick={() => onReceber(forma)}>
+              <SeletorDeForma forma={forma} onForma={setForma} />
+              <button className="btn-success !py-1.5 text-sm" disabled={registrando} onClick={() => onReceber(parcelasFinais)}>
                 {registrando ? "Registrando..." : `Registrar ${brl(aCobrar)} no caixa`}
               </button>
               <button className="btn-secondary !py-1.5 text-sm" disabled={registrando} onClick={onFiado}>
@@ -1589,22 +1647,98 @@ const OSDetalhe: React.FC<{
 
         {/* Receber pagamento */}
         {os.status !== "entregue" && os.status !== "cancelada" && (
-          <div className="flex flex-wrap items-center gap-2 rounded-xl bg-emerald-50 p-3 no-print">
-            <DollarSign size={18} className="text-emerald-600" />
-            <span className="text-sm font-semibold text-emerald-800">Receber e entregar:</span>
-            <select className="input !w-auto !py-1.5 text-sm" value={forma} onChange={(e) => setForma(e.target.value as FormaPagamento)}>
-              <option value="dinheiro">Dinheiro</option>
-              <option value="pix">Pix</option>
-              <option value="debito">Débito</option>
-              <option value="credito">Crédito</option>
-              <option value="transferencia">Transferência</option>
-            </select>
-            <button className="btn-success !py-1.5 text-sm" disabled={registrando} onClick={() => onReceber(forma)}>
-              {registrando ? "Registrando..." : `Receber ${brl(aCobrar)}`}
-            </button>
-            <button className="btn-secondary !py-1.5 text-sm" disabled={registrando} onClick={onFiado} title="Entregar e deixar para pagar depois">
-              <HandCoins size={15} /> Fiado
-            </button>
+          <div className="rounded-xl bg-emerald-50 p-3 no-print">
+            <div className="flex flex-wrap items-center gap-2">
+              <DollarSign size={18} className="text-emerald-600" />
+              <span className="text-sm font-semibold text-emerald-800">Receber e entregar:</span>
+              {!dividido && <SeletorDeForma forma={forma} onForma={setForma} />}
+              <button className="btn-success !py-1.5 text-sm" disabled={registrando} onClick={() => onReceber(parcelasFinais)}>
+                {registrando ? "Registrando..." : `Receber ${brl(aCobrar)}`}
+              </button>
+              <button className="btn-secondary !py-1.5 text-sm" disabled={registrando} onClick={onFiado} title="Entregar e deixar para pagar depois">
+                <HandCoins size={15} /> Fiado
+              </button>
+            </div>
+
+            {/*
+              Conserto de R$ 800 pago metade no cartão e metade em espécie é
+              comum na bancada. Numa forma só, a gaveta acusava falta de
+              R$ 400 e a maquininha, sobra de R$ 400 — todo dia, sem origem.
+            */}
+            {!dividido ? (
+              <button
+                className="btn-ghost mt-2 !py-1 text-xs"
+                onClick={() => {
+                  setDividido(true);
+                  setParcelas([{ forma, valor: aCobrar }]);
+                }}
+              >
+                <Plus size={13} /> Dividir entre formas de pagamento
+              </button>
+            ) : (
+              <div className="mt-2 space-y-2">
+                {parcelas.map((pc, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <SeletorDeForma
+                      forma={pc.forma}
+                      onForma={(f) =>
+                        setParcelas((v) => v.map((x, n) => (n === i ? { ...x, forma: f } : x)))
+                      }
+                    />
+                    <InputNumero
+                      className="input !w-28 !py-1.5 text-sm"
+                      min={0}
+                      value={pc.valor}
+                      onChange={(v) =>
+                        setParcelas((x) => x.map((y, n) => (n === i ? { ...y, valor: v ?? 0 } : y)))
+                      }
+                    />
+                    <button
+                      className="btn-ghost !p-2 text-red-500"
+                      onClick={() => setParcelas((v) => v.filter((_, n) => n !== i))}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                ))}
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className={falta > 0 ? "font-bold text-amber-700" : "text-slate-500"}>
+                    {falta > 0 ? `Faltam ${brl(falta)}` : "Fechou certo"}
+                  </span>
+                  <div className="flex gap-2">
+                    <button
+                      className="btn-ghost !py-1 text-xs"
+                      onClick={() =>
+                        setParcelas((v) => [
+                          ...v,
+                          {
+                            // A linha nova nasce numa forma que ainda não está
+                            // na lista: nascendo sempre em dinheiro, o toque
+                            // não servia para nada e `consolidar` juntava as
+                            // duas de volta num lançamento só.
+                            forma:
+                              FORMAS_DE_COMPRA.find((x) => !v.some((y) => y.forma === x.k))?.k ||
+                              "dinheiro",
+                            valor: falta,
+                          },
+                        ])
+                      }
+                    >
+                      <Plus size={13} /> Forma
+                    </button>
+                    <button
+                      className="btn-ghost !py-1 text-xs"
+                      onClick={() => {
+                        setDividido(false);
+                        setParcelas([]);
+                      }}
+                    >
+                      Uma forma só
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
