@@ -13,6 +13,10 @@ import {
   KeyRound,
   Copy,
   Clock,
+  Hourglass,
+  Plus,
+  Minus,
+  XCircle,
 } from "lucide-react";
 import { aviso } from "../components/Aviso";
 import { SectionTitle, Field, Modal, EmptyState, InputNumero } from "../components/ui";
@@ -20,7 +24,14 @@ import { brl, formatDate, txt, abrirWhatsapp } from "../lib/format";
 import { normalizar } from "../lib/busca";
 import { gerarLinkDeSenha } from "../lib/auth";
 import { RAMOS, RAMO_META, ramoDe } from "../lib/ramos";
-import { mensagemCobranca, tipoDoAviso, AVISO_META } from "../lib/cobranca";
+import {
+  mensagemCobranca,
+  tipoDoAviso,
+  AVISO_META,
+  mensagemTeste,
+  tipoDoTeste,
+  TESTE_META,
+} from "../lib/cobranca";
 import {
   listarLojas,
   carregarSistemaConfig,
@@ -33,6 +44,12 @@ import {
   semPrazo,
   fimDoTeste,
   liberarTeste,
+  ajustarTeste,
+  encerrarTeste,
+  emTeste,
+  testeAcabou,
+  diasDeTeste,
+  podeLiberarTeste,
   SITUACAO_META,
   type Loja,
   type SistemaConfig,
@@ -115,8 +132,26 @@ export const Lojas: React.FC = () => {
     let ativas = 0;
     let problema = 0;
     let receita = 0;
+    let testando = 0;
+    let potencial = 0;
     for (const l of lojas) {
       if (l.isento) continue; // a sua própria loja não é receita
+      /*
+       * Loja em teste NÃO entra na receita.
+       *
+       * Ela tem valor_mensal preenchido (o padrão) e vencimento no futuro, e
+       * por isso somava como "ativa" — a Receita mensal contava dinheiro que
+       * ninguém pagou. Sete lojas em teste inflavam o número em quase R$ 600
+       * e o painel dizia que o mês estava melhor do que estava.
+       *
+       * Aqui ela vira o próprio número, que é outra coisa: não é receita, é
+       * o quanto ainda dá para fechar se você ligar.
+       */
+      if (emTeste(l)) {
+        testando++;
+        if (!testeAcabou(l)) potencial += Number(l.valor_mensal) || 0;
+        continue;
+      }
       const s = situacaoDe(l, tolerancia);
       if (s === "ativa" || s === "tolerancia") {
         ativas++;
@@ -126,7 +161,7 @@ export const Lojas: React.FC = () => {
       }
     }
     const deGraca = lojas.filter(semPrazo).length;
-    return { ativas, problema, receita, deGraca };
+    return { ativas, problema, receita, deGraca, testando, potencial };
   }, [lojas, tolerancia]);
 
   /**
@@ -136,23 +171,44 @@ export const Lojas: React.FC = () => {
    */
   const cobrar = (l: Loja) => {
     const dias = diasParaVencer(l.venceEm);
-    const tipo = tipoDoAviso(dias, tolerancia);
-    if (!tipo) return aviso.info("Esta loja está em dia — nada a cobrar.");
+    /*
+     * Loja em teste recebe outro texto, e essa diferença é o ponto.
+     *
+     * Ela caía na mesma régua e levava "sua mensalidade venceu há 2 dias" —
+     * de uma mensalidade que nunca contratou. O recado que era para fechar a
+     * venda chegava como cobrança de caloteiro.
+     */
+    const teste = emTeste(l);
+    const dados = {
+      nomeLoja: txt(l.nome),
+      valor: l.valor_mensal,
+      dias,
+      chavePix: cfg.chave_pix,
+      titularPix: cfg.titular_pix,
+    };
+    const texto = teste
+      ? (() => {
+          const t = tipoDoTeste(dias);
+          return t ? mensagemTeste(t, dados) : "";
+        })()
+      : (() => {
+          const t = tipoDoAviso(dias, tolerancia);
+          return t ? mensagemCobranca(t, dados) : "";
+        })();
+
+    if (!texto) {
+      return aviso.info(
+        teste
+          ? "O teste desta loja ainda tem folga — apressar quem está gostando estraga a venda."
+          : "Esta loja está em dia — nada a cobrar."
+      );
+    }
 
     const tel = txt(l.whatsapp).replace(/\D/g, "");
     if (tel.length < 10) {
-      return aviso.alerta("Preencha o WhatsApp desta loja para cobrar com um clique.");
+      return aviso.alerta("Preencha o WhatsApp desta loja para falar com um clique.");
     }
-    abrirWhatsapp(
-      tel,
-      mensagemCobranca(tipo, {
-        nomeLoja: txt(l.nome),
-        valor: l.valor_mensal,
-        dias,
-        chavePix: cfg.chave_pix,
-        titularPix: cfg.titular_pix,
-      })
-    );
+    abrirWhatsapp(tel, texto);
   };
 
   const pagar = async (l: Loja, meses: number) => {
@@ -179,8 +235,12 @@ export const Lojas: React.FC = () => {
     if (
       !confirm(
         `Liberar ${dias} dias de teste para "${l.nome}"?\n\n` +
-          `Hoje esta loja usa o sistema DE GRAÇA e sem data para acabar. ` +
-          `Depois disso ela passa a vencer em ${formatDate(fimDoTeste(dias).toISOString())}.`
+          (semPrazo(l)
+            ? "Hoje esta loja usa o sistema DE GRAÇA e sem data para acabar. "
+            : "Ela passa a contar como teste, e não como assinatura — o recado " +
+              "que sai para ela vira conversa de venda, não cobrança. ") +
+          `O prazo passa a acabar em ${formatDate(fimDoTeste(dias).toISOString())}, ` +
+          "e depois disso dá para esticar ou encurtar pelos botões da linha."
       )
     ) {
       return;
@@ -188,6 +248,48 @@ export const Lojas: React.FC = () => {
     try {
       const novo = await liberarTeste(l.id);
       aviso.sucesso(`Teste liberado. Vence em ${formatDate(novo)}.`);
+      carregar();
+    } catch (e) {
+      aviso.erro(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  /**
+   * Estica ou encurta o teste que já está correndo.
+   *
+   * A primeira versão disto só sabia LIGAR o teste. Depois de ligado não
+   * havia mais botão: a loja que pediu três dias a mais para testar com o
+   * movimento do fim de semana só podia ser atendida no SQL, e quem entrou
+   * por engano ficava sete dias ocupando a lista. Cortesia que não dá para
+   * ajustar vira ou favor no banco de dados ou "não dá".
+   */
+  const mexerNoTeste = async (l: Loja, dias: number) => {
+    try {
+      const novo = await ajustarTeste(l.id, dias);
+      aviso.sucesso(
+        (dias > 0 ? `Mais ${dias} dia(s) de teste. ` : `Teste encurtado em ${-dias} dia(s). `) +
+          `Agora acaba em ${formatDate(novo)}.`
+      );
+      carregar();
+    } catch (e) {
+      aviso.erro(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const acabarTeste = async (l: Loja) => {
+    if (
+      !confirm(
+        `Encerrar HOJE o teste de "${l.nome}"?\n\n` +
+          "Ela para de cadastrar coisa nova. Continua consultando, imprimindo " +
+          "e exportando tudo — nenhum dado é apagado.\n\n" +
+          "Para voltar atrás, use o +7 dias."
+      )
+    ) {
+      return;
+    }
+    try {
+      await encerrarTeste(l.id);
+      aviso.sucesso("Teste encerrado. A loja continua com tudo o que cadastrou.");
       carregar();
     } catch (e) {
       aviso.erro(e instanceof Error ? e.message : String(e));
@@ -319,10 +421,10 @@ export const Lojas: React.FC = () => {
         </p>
       )}
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-3">
+      <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <div className="card">
           <p className="flex items-center gap-2 text-xs text-slate-500">
-            <CheckCircle2 size={14} /> Lojas ativas
+            <CheckCircle2 size={14} /> Lojas pagantes
           </p>
           <p className="mt-1 text-2xl font-bold text-emerald-600">{resumo.ativas}</p>
         </div>
@@ -332,11 +434,29 @@ export const Lojas: React.FC = () => {
           </p>
           <p className="mt-1 text-2xl font-bold text-amber-600">{resumo.problema}</p>
         </div>
+        {/*
+          Em teste é um número separado, e não parte da receita.
+          Loja em teste tem valor mensal preenchido e vencimento no futuro:
+          somava como ativa, e a Receita mensal contava dinheiro que ninguém
+          pagou. O que está aqui não é receita — é o que ainda dá para fechar.
+        */}
+        <div className="card">
+          <p className="flex items-center gap-2 text-xs text-slate-500">
+            <Hourglass size={14} /> Em teste
+          </p>
+          <p className="mt-1 text-2xl font-bold text-violet-600">{resumo.testando}</p>
+          {resumo.potencial > 0 && (
+            <p className="mt-0.5 text-xs text-slate-400">
+              {brl(resumo.potencial)}/mês a fechar
+            </p>
+          )}
+        </div>
         <div className="card bg-gradient-to-br from-brand-600 to-brand-800 text-white ring-brand-700">
           <p className="flex items-center gap-2 text-xs text-brand-100">
             <Wallet size={14} /> Receita mensal
           </p>
           <p className="mt-1 text-2xl font-bold">{brl(resumo.receita)}</p>
+          <p className="mt-0.5 text-xs text-brand-100">só quem paga</p>
         </div>
       </div>
 
@@ -367,6 +487,9 @@ export const Lojas: React.FC = () => {
           {lista.map((l) => {
             const s = situacaoDe(l, tolerancia);
             const dias = diasParaVencer(l.venceEm);
+            const noTeste = emTeste(l);
+            const acabou = testeAcabou(l);
+            const diasTeste = diasDeTeste(l);
             return (
               <div key={l.id} className="card flex flex-wrap items-center gap-4">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
@@ -376,9 +499,19 @@ export const Lojas: React.FC = () => {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-semibold text-slate-800">{txt(l.nome)}</span>
-                    <span className={`badge ${SITUACAO_META[s].color}`}>
-                      {SITUACAO_META[s].label}
-                    </span>
+                    {/*
+                      Em teste, o crachá da assinatura SOME em vez de ficar do
+                      lado. Os dois juntos se contradiziam na mesma linha:
+                      "Vencida (tolerância)" ao lado de "Testou e não assinou",
+                      "Em dia" ao lado de "Em teste, último dia". Quem lê no
+                      celular decide pelo primeiro crachá, e o primeiro estava
+                      falando de uma mensalidade que a loja nunca contratou.
+                    */}
+                    {!noTeste && (
+                      <span className={`badge ${SITUACAO_META[s].color}`}>
+                        {SITUACAO_META[s].label}
+                      </span>
+                    )}
                     {/*
                       Sem prazo é o estado mais perigoso da lista e o que
                       menos parecia: o crachá dizia "Em dia" para uma loja
@@ -389,9 +522,32 @@ export const Lojas: React.FC = () => {
                         Sem prazo · nunca vence
                       </span>
                     )}
+                    {/*
+                      O crachá do teste vem antes de qualquer aviso de
+                      mensalidade: a loja em teste aparecia como "Vencida" —
+                      de uma mensalidade que ela nunca contratou.
+                    */}
+                    {noTeste && (
+                      <span
+                        className={`badge ${
+                          acabou
+                            ? TESTE_META.teste_acabou.cor
+                            : "bg-violet-100 text-violet-700"
+                        }`}
+                      >
+                        {acabou
+                          ? `Testou e não assinou · ${Math.abs(diasTeste ?? 0)}d` +
+                            // A loja que já passou da tolerância parou de
+                            // cadastrar. Sem dizer isso aqui, o crachá some com
+                            // a única informação que muda o telefonema.
+                            (s === "leitura" ? " · travada" : "")
+                          : `Em teste · ${diasTeste === 0 ? "último dia" : `faltam ${diasTeste}d`}`}
+                      </span>
+                    )}
                     {l.isento ? (
                       <span className="badge bg-brand-100 text-brand-700">Sua loja · isenta</span>
                     ) : (
+                      !noTeste &&
                       (() => {
                         const t = tipoDoAviso(dias, tolerancia);
                         return t && s === "ativa" ? (
@@ -403,6 +559,11 @@ export const Lojas: React.FC = () => {
                   <p className="mt-0.5 text-xs text-slate-500">
                     {l.isento ? (
                       "Sem cobrança"
+                    ) : noTeste ? (
+                      <>
+                        Teste {acabou ? "acabou" : "acaba"} {formatDate(txt(l.venceEm))}
+                        {" · nunca pagou"}
+                      </>
                     ) : l.venceEm ? (
                       <>
                         Vence {formatDate(l.venceEm)}
@@ -452,7 +613,7 @@ export const Lojas: React.FC = () => {
                 </div>
 
                 <div className={`flex flex-wrap gap-2 ${l.isento ? "hidden" : ""}`}>
-                  {semPrazo(l) && (
+                  {podeLiberarTeste(l) && (
                     <button
                       className="btn-primary !py-1.5 text-xs"
                       onClick={() => darTeste(l)}
@@ -460,11 +621,52 @@ export const Lojas: React.FC = () => {
                       <Clock size={14} /> Liberar {cfg.dias_teste ?? 7} dias de teste
                     </button>
                   )}
-                  {!l.isento && tipoDoAviso(dias, tolerancia) && (
-                    <button className="btn-secondary !py-1.5 text-xs" onClick={() => cobrar(l)}>
-                      <MessageCircle size={14} /> Cobrar
-                    </button>
+                  {/*
+                    Esticar e encurtar aparecem DURANTE o teste.
+                    Sem eles, ligar o teste era uma porta de mão única: quem
+                    pediu mais três dias para experimentar no fim de semana só
+                    podia ser atendido no SQL, e quem entrou por engano ficava
+                    a semana toda ocupando a lista.
+                  */}
+                  {noTeste && (
+                    <span className="flex items-center gap-1 rounded-lg bg-violet-50 px-1.5 py-1 ring-1 ring-violet-100">
+                      <span className="pl-1 text-[11px] font-semibold text-violet-700">
+                        Teste
+                      </span>
+                      {[3, 7, 15].map((d) => (
+                        <button
+                          key={d}
+                          className="btn-ghost !px-1.5 !py-1 text-xs text-violet-700"
+                          title={`Mais ${d} dias de teste`}
+                          onClick={() => mexerNoTeste(l, d)}
+                        >
+                          <Plus size={12} />
+                          {d}
+                        </button>
+                      ))}
+                      <button
+                        className="btn-ghost !px-1.5 !py-1 text-xs text-slate-500"
+                        title="Tirar 3 dias do teste"
+                        onClick={() => mexerNoTeste(l, -3)}
+                      >
+                        <Minus size={12} />3
+                      </button>
+                      <button
+                        className="btn-ghost !px-1.5 !py-1 text-xs text-red-500"
+                        title="Encerrar o teste hoje"
+                        onClick={() => acabarTeste(l)}
+                      >
+                        <XCircle size={12} />
+                      </button>
+                    </span>
                   )}
+                  {!l.isento &&
+                    (noTeste ? tipoDoTeste(dias) : tipoDoAviso(dias, tolerancia)) && (
+                      <button className="btn-secondary !py-1.5 text-xs" onClick={() => cobrar(l)}>
+                        <MessageCircle size={14} />{" "}
+                        {noTeste ? "Falar do teste" : "Cobrar"}
+                      </button>
+                    )}
                   <button className="btn-success !py-1.5 text-xs" onClick={() => pagar(l, 1)}>
                     <CheckCircle2 size={14} /> Pagou 1 mês
                   </button>

@@ -9,6 +9,8 @@ import {
   minhaLoja,
   diasParaVencer,
   situacaoDe,
+  emTeste,
+  testeAcabou,
   SITUACAO_META,
   mensagemComprovante,
   type Loja,
@@ -50,6 +52,15 @@ export const Assinatura: React.FC = () => {
 
   const situacao = loja ? situacaoDe(loja, cfg?.dias_tolerancia ?? 5) : "ativa";
   const dias = diasParaVencer(loja?.venceEm);
+  /*
+   * Esta tela dizia "Pago até 11/08" para quem nunca pagou nada.
+   *
+   * O lojista em teste lia aquilo e entendia que já tinha assinado — e
+   * quando o prazo acabava, o sistema travava sem nunca ter cobrado nada
+   * dele de forma que fizesse sentido. Teste tem outro nome e outro aviso.
+   */
+  const noTeste = !!loja && emTeste(loja);
+  const acabou = !!loja && testeAcabou(loja);
   const valor = Number(loja?.valor_mensal) || Number(cfg?.valor_padrao) || 0;
   const emDia = situacao === "ativa";
 
@@ -99,20 +110,52 @@ export const Assinatura: React.FC = () => {
         }`}
       >
         <div className="flex flex-wrap items-center gap-3">
-          <span className={`badge ${SITUACAO_META[situacao].color}`}>
-            {SITUACAO_META[situacao].label}
-          </span>
+          {/* Em teste o crachá não fala de mensalidade: "Vencida (tolerância)"
+              é o nome de uma dívida que esta loja nunca contraiu. */}
+          {noTeste ? (
+            <span className="badge bg-violet-100 text-violet-700">
+              {acabou ? "Teste terminado" : "Teste grátis"}
+            </span>
+          ) : (
+            <span className={`badge ${SITUACAO_META[situacao].color}`}>
+              {SITUACAO_META[situacao].label}
+            </span>
+          )}
           {loja?.venceEm && (
             <span className="flex items-center gap-1.5 text-sm text-slate-600">
               <CalendarClock size={15} />
-              {dias !== null && dias >= 0
-                ? `Pago até ${formatDate(loja.venceEm)} · faltam ${dias} dia${dias === 1 ? "" : "s"}`
-                : `Venceu em ${formatDate(loja.venceEm)}`}
+              {noTeste
+                ? dias !== null && dias >= 0
+                  ? `Teste grátis até ${formatDate(loja.venceEm)} · ` +
+                    (dias === 0 ? "último dia" : `faltam ${dias} dia${dias === 1 ? "" : "s"}`)
+                  : `Teste grátis terminou em ${formatDate(loja.venceEm)}`
+                : dias !== null && dias >= 0
+                  ? `Pago até ${formatDate(loja.venceEm)} · faltam ${dias} dia${dias === 1 ? "" : "s"}`
+                  : `Venceu em ${formatDate(loja.venceEm)}`}
             </span>
           )}
         </div>
 
-        {situacao === "tolerancia" && (
+        {/* Teste acabando: aviso antes de travar, e sem falar em atraso */}
+        {noTeste && !acabou && (
+          <p className="mt-3 rounded-lg bg-violet-50 p-3 text-sm text-violet-800">
+            Você está no <b>período de teste</b>, sem nenhuma cobrança até aqui.
+            Quando ele terminar você continua <b>consultando, imprimindo e
+            exportando</b> tudo que cadastrou — o que pausa é só o cadastro de
+            coisa nova.
+          </p>
+        )}
+
+        {noTeste && acabou && (
+          <p className="mt-3 rounded-lg bg-violet-50 p-3 text-sm text-violet-800">
+            Seu período de teste terminou. <b>Nada foi apagado</b>: seus
+            clientes, produtos e vendas continuam aqui, e você segue
+            consultando, imprimindo e exportando. Para voltar a cadastrar, é só
+            fazer a primeira mensalidade abaixo.
+          </p>
+        )}
+
+        {!noTeste && situacao === "tolerancia" && (
           <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
             Sua mensalidade venceu. O sistema segue funcionando normalmente por
             mais alguns dias — depois disso você continua <b>consultando e
@@ -120,7 +163,7 @@ export const Assinatura: React.FC = () => {
           </p>
         )}
 
-        {situacao === "leitura" && (
+        {!noTeste && situacao === "leitura" && (
           <p className="mt-3 flex items-start gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-800">
             <Lock size={16} className="mt-0.5 shrink-0" />
             <span>
@@ -141,7 +184,9 @@ export const Assinatura: React.FC = () => {
 
       {/* Pagamento */}
       <div className="card mb-5">
-        <h3 className="mb-1 font-bold text-slate-700">Pagar mensalidade</h3>
+        <h3 className="mb-1 font-bold text-slate-700">
+          {noTeste ? "Assinar o sistema" : "Pagar mensalidade"}
+        </h3>
         <p className="mb-4 text-sm text-slate-500">
           Faça o Pix e mande o comprovante — a liberação costuma sair no mesmo dia.
         </p>
