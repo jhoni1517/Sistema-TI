@@ -18,6 +18,7 @@ import type {
   Comanda,
   TarefaDiaria,
 } from "./types";
+import type { Nota } from "./nota";
 
 /**
  * Repositório de dados com backend duplo:
@@ -48,7 +49,8 @@ type TableName =
   | "eventos"
   | "vendas"
   | "tarefas"
-  | "comandas";
+  | "comandas"
+  | "notas";
 
 interface WithId {
   id: string;
@@ -303,6 +305,7 @@ export interface DumpLoja {
   vendas?: Venda[];
   tarefas?: TarefaDiaria[];
   comandas?: Comanda[];
+  notas?: Nota[];
 }
 
 const TABELA_DO_CAMPO: Record<keyof DumpLoja, TableName> = {
@@ -322,6 +325,7 @@ const TABELA_DO_CAMPO: Record<keyof DumpLoja, TableName> = {
   vendas: "vendas",
   tarefas: "tarefas",
   comandas: "comandas",
+  notas: "notas",
 };
 
 /**
@@ -436,6 +440,11 @@ export const db = {
     all: () => getAll<Comanda>("comandas"),
     save: (c: Comanda) => upsert("comandas", c),
     remove: (id: string) => remove("comandas", id),
+  },
+  notas: {
+    all: () => getAll<Nota>("notas"),
+    save: (x: Nota) => upsert("notas", x),
+    remove: (id: string) => remove("notas", id),
   },
 
   tarefas: {

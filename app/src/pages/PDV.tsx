@@ -7,6 +7,7 @@ import {
   Minus,
   Scale,
   Printer,
+  FileText,
   Undo2,
   PauseCircle,
   CheckCircle2,
@@ -58,6 +59,15 @@ import {
 import { Devolucao } from "../components/Devolucao";
 import { MontarPizza } from "../components/MontarPizza";
 import { temRecurso } from "../lib/ramos";
+import {
+  pedidoDaNota,
+  problemaParaEmitir,
+  notaPendente,
+  notaDaVenda,
+  precisaDeAtencao,
+  type Nota,
+} from "../lib/nota";
+import { SITUACAO_NOTA_META } from "../lib/fiscal";
 import type {
   FormaPagamento,
   ItemVenda,
@@ -79,8 +89,39 @@ const FORMAS = FORMAS_META;
  * Cliente é opcional de propósito. Parar a fila para cadastrar quem só quer
  * um pão é o caminho mais curto para o sistema não ser usado.
  */
+/**
+ * O botão da nota da última venda.
+ *
+ * Três estados e não dois, porque "pedida" não é "pronta": a nota entra numa
+ * fila e sai em alguns minutos. Dizer "emitida" na hora do clique seria
+ * mentir, e o cliente que confia nisso vai embora sem a nota.
+ */
+const BotaoNota: React.FC<{
+  venda: Venda;
+  nota?: Nota;
+  onPedir: (v: Venda) => void;
+}> = ({ venda, nota, onPedir }) => {
+  if (!nota) {
+    return (
+      <button className="btn-secondary" onClick={() => onPedir(venda)}>
+        <FileText size={18} /> Emitir nota
+      </button>
+    );
+  }
+  const meta = SITUACAO_NOTA_META[nota.situacao];
+  return (
+    <span
+      className={`badge ${precisaDeAtencao(nota) ? "bg-red-100 text-red-700" : meta.cor}`}
+      title={nota.erro || meta.explicacao}
+    >
+      Nota: {meta.label}
+    </span>
+  );
+};
+
+
 export const PDV: React.FC = () => {
-  const { produtos, clientes, sessoes, vendas, config, ramo, fontesComFalha, saveVenda, saveMovimento, saveProduto } =
+  const { produtos, clientes, sessoes, vendas, notas, config, ramo, fontesComFalha, saveVenda, saveMovimento, saveProduto, saveNota } =
     useApp();
 
   /* Recursos do ramo: numa mercearia não existe pizza nem "sem cebola" */
@@ -106,6 +147,7 @@ export const PDV: React.FC = () => {
   const [clienteId, setClienteId] = useState("");
   const [gravando, setGravando] = useState(false);
   const [ultima, setUltima] = useState<Venda | null>(null);
+  const [pedindoNota, setPedindoNota] = useState(false);
   const [devolvendo, setDevolvendo] = useState(false);
 
   const buscaRef = useRef<HTMLInputElement>(null);
@@ -463,6 +505,38 @@ export const PDV: React.FC = () => {
     }
   };
 
+  /**
+   * Põe a nota na fila. NÃO emite.
+   *
+   * Quem emite é o robô da Vercel, que roda a cada dez minutos e é o único
+   * lugar do sistema que enxerga o token do emissor. Aqui só se grava o
+   * pedido pronto — com os preços que o cliente ACABOU de pagar, e não os
+   * do cadastro, que podem mudar antes de o robô rodar.
+   */
+  const pedirNota = async (venda: Venda) => {
+    const problema = problemaParaEmitir(venda, produtos, config);
+    if (problema) return aviso.alerta(problema);
+    if (pedindoNota) return;
+    setPedindoNota(true);
+    try {
+      const cliente = clientes.find((c) => c.id === venda.clienteId);
+      await saveNota({
+        ...notaPendente(uid(), venda),
+        pedido: pedidoDaNota(venda, produtos, config, cliente),
+      } as never);
+      aviso.sucesso(
+        "Nota pedida. Ela é enviada sozinha em alguns minutos — a venda já " +
+          "está registrada e não depende disso."
+      );
+    } catch (e) {
+      aviso.erro(
+        "Não foi possível pedir a nota:\n\n" + (e instanceof Error ? e.message : String(e))
+      );
+    } finally {
+      setPedindoNota(false);
+    }
+  };
+
   finalizarRef.current = finalizar;
   limparRef.current = limpar;
   consultaRef.current = consultarPreco;
@@ -491,6 +565,15 @@ export const PDV: React.FC = () => {
               <button className="btn-secondary" onClick={() => imprimir(ultima)}>
                 <Printer size={18} /> Cupom da venda {ultima.numero}
               </button>
+            )}
+            {/*
+              A nota da ÚLTIMA venda, e só dela.
+              O cliente que pede nota pede na hora, com o cupom na mão. Uma
+              lista de vendas antigas com botão de emitir seria o caminho
+              mais curto para emitir a nota errada.
+            */}
+            {ultima && (
+              <BotaoNota venda={ultima} nota={notaDaVenda(notas, ultima.id)} onPedir={pedirNota} />
             )}
             <button className="btn-secondary" onClick={segurarVenda}>
               <PauseCircle size={18} /> Guardar venda

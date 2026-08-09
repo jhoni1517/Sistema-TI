@@ -12,6 +12,10 @@
     {
       "path": "/api/cobranca",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/nota",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

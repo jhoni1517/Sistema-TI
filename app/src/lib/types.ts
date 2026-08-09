@@ -1045,6 +1045,11 @@ export interface Config {
   /** CNAE principal da loja, exigido no cadastro do emissor */
   cnae?: string;
   /**
+   * A natureza da operação que sai na nota. Vazio = "Venda ao consumidor",
+   * que é o que vale para toda NFC-e de balcão.
+   */
+  naturezaOperacao?: string;
+  /**
    * Inscrição Municipal — o registro da loja na PREFEITURA.
    *
    * É outra coisa que a Inscrição Estadual: a estadual serve para a nota de

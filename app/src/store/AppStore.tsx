@@ -37,6 +37,7 @@ import type {
   Venda,
   Config,
 } from "../lib/types";
+import type { Nota } from "../lib/nota";
 
 const DEFAULT_CONFIG: Config = {
   nomeLoja: "Minha Assistência TI",
@@ -75,6 +76,7 @@ interface AppState {
   vendas: Venda[];
   tarefas: TarefaDiaria[];
   comandas: Comanda[];
+  notas: Nota[];
   config: Config;
   /**
    * O que falhou na última carga.
@@ -128,6 +130,7 @@ interface AppState {
   saveEvento: (e: Evento) => Promise<void>;
   removeEvento: (id: string) => Promise<void>;
   saveComanda: (c: Comanda) => Promise<void>;
+  saveNota: (x: Nota) => Promise<void>;
   removeComanda: (id: string) => Promise<void>;
   saveTarefa: (t: TarefaDiaria) => Promise<void>;
   removeTarefa: (id: string) => Promise<void>;
@@ -190,6 +193,7 @@ export const AppProvider: React.FC<{
   const [eventos, setEventos] = useState<Evento[]>([]);
   const [tarefas, setTarefas] = useState<TarefaDiaria[]>([]);
   const [comandas, setComandas] = useState<Comanda[]>([]);
+  const [notas, setNotas] = useState<Nota[]>([]);
   /** Mensagem do que não carregou. Vazio = carregou tudo. */
   const [erroCarga, setErroCarga] = useState("");
   const [fontesComFalha, setFontesComFalha] = useState<string[]>([]);
@@ -259,6 +263,7 @@ export const AppProvider: React.FC<{
       { nome: "agenda", carregar: db.eventos.all, aplicar: setEventos },
       { nome: "checklist", carregar: db.tarefas.all, aplicar: setTarefas },
       { nome: "comandas", carregar: db.comandas.all, aplicar: setComandas },
+      { nome: "notas", carregar: db.notas.all, aplicar: setNotas },
       { nome: "vendas", carregar: db.vendas.all, aplicar: setVendas },
     ] as const;
 
@@ -617,6 +622,26 @@ export const AppProvider: React.FC<{
     await db.eventos.remove(id);
     setEventos((prev) => prev.filter((x) => x.id !== id));
   };
+  /**
+   * Põe a nota na FILA. Não emite.
+   *
+   * A venda nunca espera a nota: quem manda é o robô da Vercel, depois. A
+   * tela só grava o pedido pronto e deixa pendente — SEFAZ fora do ar não
+   * pode travar o caixa numa sexta cheia.
+   */
+  const saveNota = async (x: Nota) => {
+    const gravado = await db.notas.save(x);
+    setNotas((prev) => {
+      const i = prev.findIndex((y) => y.id === gravado.id);
+      if (i >= 0) {
+        const n2 = [...prev];
+        n2[i] = gravado;
+        return n2;
+      }
+      return [...prev, gravado];
+    });
+  };
+
   const saveComanda = async (c: Comanda) => {
     const gravado = await db.comandas.save(c);
     setComandas((prev) => {
@@ -775,6 +800,7 @@ export const AppProvider: React.FC<{
     eventos,
     tarefas,
     comandas,
+    notas,
     vendas,
     config,
     erroCarga,
@@ -807,6 +833,7 @@ export const AppProvider: React.FC<{
     saveEvento,
     removeEvento,
     saveComanda,
+    saveNota,
     removeComanda,
     saveTarefa,
     removeTarefa,

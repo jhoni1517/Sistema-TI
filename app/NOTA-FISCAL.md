@@ -299,13 +299,15 @@ Não. O certificado fica no intermediário. Sobe o novo lá e pronto.
 
 Seja honesto com o cliente sobre isto:
 
-- **A emissão em si.** Os campos e a conferência estão prontos; o envio ao
-  intermediário ainda não foi escrito. A escolha do intermediário está feita
-  e justificada em `NOTA-FISCAL-INTERMEDIARIO.md`.
-- **Vale-refeição** como forma de pagamento. Num restaurante é comum, e o
-  sistema ainda não tem. A nota exige o código 11 para ele.
-- **Alíquota de ISS por serviço.** O campo existe no tipo, mas a tela ainda
-  não pede — no Simples costuma ir zerada, então não trava.
+- **A emissão foi escrita, mas nunca rodou de verdade.** O caminho inteiro
+  existe: a tela põe a nota na fila, o robô da Vercel manda para a Focus NFe
+  a cada dez minutos, e o resultado volta para a tela. O que NÃO foi testado
+  é a conversa com o emissor — para isso é preciso uma conta e um token, e a
+  primeira nota tem que ser em homologação.
+- **NFS-e (serviço).** A conferência já separa os dois documentos, mas o
+  robô só manda NFC-e. Uma OS de assistência técnica precisará das duas.
+- **Cancelamento pela tela.** O prazo de 30 minutos já é calculado e
+  mostrado; o botão que manda o cancelamento ao emissor ainda não existe.
 
 ---
 
