@@ -416,7 +416,14 @@ export const COTACAO_STATUS_META: Record<StatusCotacao, { label: string; color: 
 /* Contas a pagar e contas fixas                                       */
 /* ------------------------------------------------------------------ */
 
-export type Recorrencia = "unica" | "semanal" | "mensal" | "bimestral" | "trimestral" | "anual";
+export type Recorrencia =
+  | "unica"
+  | "semanal"
+  | "mensal"
+  | "bimestral"
+  | "trimestral"
+  | "semestral"
+  | "anual";
 
 export const RECORRENCIA_META: Record<Recorrencia, { label: string; meses: number; dias: number }> = {
   unica: { label: "Uma vez só", meses: 0, dias: 0 },
@@ -424,6 +431,10 @@ export const RECORRENCIA_META: Record<Recorrencia, { label: string; meses: numbe
   mensal: { label: "Todo mês", meses: 1, dias: 0 },
   bimestral: { label: "A cada 2 meses", meses: 2, dias: 0 },
   trimestral: { label: "A cada 3 meses", meses: 3, dias: 0 },
+  // IPTU, alvará e seguro costumam ser de seis em seis meses. Sem esta
+  // opção a conta era cadastrada como trimestral e cobrava o dobro de
+  // vezes, ou como anual e sumia por meio ano.
+  semestral: { label: "A cada 6 meses", meses: 6, dias: 0 },
   anual: { label: "Todo ano", meses: 12, dias: 0 },
 };
 
