@@ -57,6 +57,18 @@ create table if not exists comandas (
 alter table comandas add column if not exists "taxaServico" numeric;
 alter table comandas add column if not exists desconto numeric;
 
+-- Entrega. A mesma tabela guarda a comanda de mesa e o pedido de entrega:
+-- por dentro são a mesma coisa (uma conta aberta que vira venda, caixa e
+-- baixa de estoque), e o que muda são estes campos. Vazio em `tipo` é mesa,
+-- que é como voltam as linhas gravadas antes de a entrega existir.
+alter table comandas add column if not exists tipo text;
+alter table comandas add column if not exists endereco text;
+alter table comandas add column if not exists telefone text;
+alter table comandas add column if not exists "taxaEntrega" numeric;
+alter table comandas add column if not exists entregador text;
+alter table comandas add column if not exists "trocoPara" numeric;
+alter table comandas add column if not exists "saiuEm" text;
+
 create index if not exists comandas_loja_idx on comandas ("lojaId");
 -- A tela do salão e a da cozinha só querem as ABERTAS. Sem este índice as
 -- duas varrem o histórico inteiro da loja a cada atualização — e a tela da
