@@ -40,6 +40,7 @@
 //   SUPABASE_URL                -> mesma do VITE_SUPABASE_URL
 //   SUPABASE_SERVICE_ROLE_KEY   -> chave "service_role" (Settings -> API)
 //   CRON_SECRET                 -> protege a chamada manual
+//   VITE_SUPABASE_ANON_KEY      -> valida o token de sessao de quem vende
 //
 // O token de CADA LOJA não é variável de ambiente: ele mora no banco, por
 // loja, porque cada restaurante tem a conta dele no emissor.
@@ -47,6 +48,7 @@
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const CRON_SECRET = process.env.CRON_SECRET;
+const ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || SERVICE_KEY;
 
 /**
  * Quantas vezes tentar antes de desistir.
@@ -197,17 +199,70 @@ async function enviarNota(cred, nota, pedido) {
   };
 }
 
-export default async function handler(req, res) {
-  const doCron = !!req.headers["x-vercel-cron"];
-  const token = req.query?.token || (req.headers.authorization || "").replace("Bearer ", "");
-  if (!doCron && (!CRON_SECRET || token !== CRON_SECRET)) {
-    return res.status(401).json({ erro: "não autorizado" });
+/**
+ * Descobre QUEM está chamando e, principalmente, DE QUAL LOJA.
+ *
+ * São três portas, e a terceira é a que faz a nota sair na hora:
+ *
+ *  1. `x-vercel-cron`  -> a rede diária. Varre todas as lojas.
+ *  2. `?token=CRON_SECRET` -> chamada manual do dono do sistema, para
+ *     diagnóstico. Também varre tudo.
+ *  3. `Authorization: Bearer <token da sessão>` -> a VENDA que acabou de
+ *     acontecer. Varre SÓ a loja de quem chamou.
+ *
+ * A porta 3 existe porque o CRON_SECRET não pode ir para o navegador:
+ * segredo que chega no navegador é segredo queimado, e com ele qualquer um
+ * mandaria emitir nota de qualquer loja. O que o navegador já tem é o token
+ * da PRÓPRIA sessão — o mesmo que ele usa para falar com o banco. A partir
+ * dele o servidor descobre a loja no `perfis`, com a chave de serviço, e
+ * fecha o trabalho ali: a pessoa só empurra a fila da loja dela.
+ *
+ * Devolve a lista de lojas a processar, ou `null` para "todas".
+ */
+async function lojasDeQuemChama(req) {
+  if (req.headers["x-vercel-cron"]) return { ok: true, lojas: null };
+
+  const cabecalho = (req.headers.authorization || "").replace("Bearer ", "");
+  const token = req.query?.token || cabecalho;
+  if (CRON_SECRET && token === CRON_SECRET) return { ok: true, lojas: null };
+
+  if (!cabecalho) return { ok: false, erro: "não autorizado" };
+
+  const r = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+    headers: { apikey: ANON_KEY, Authorization: `Bearer ${cabecalho}` },
+  });
+  if (!r.ok) return { ok: false, erro: "sessão expirada" };
+  const usuario = await r.json();
+  if (!usuario?.id) return { ok: false, erro: "sessão expirada" };
+
+  const p = await fetch(
+    `${SUPABASE_URL}/rest/v1/perfis?select=loja_id,ativo&id=eq.${usuario.id}`,
+    { headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` } }
+  );
+  if (!p.ok) return { ok: false, erro: "não autorizado" };
+  const [perfil] = await p.json();
+
+  // Usuário desativado não emite documento fiscal em nome da loja.
+  if (!perfil?.loja_id || perfil.ativo === false) {
+    return { ok: false, erro: "não autorizado" };
   }
+  return { ok: true, lojas: [String(perfil.loja_id)] };
+}
+
+export default async function handler(req, res) {
   if (!SUPABASE_URL || !SERVICE_KEY) {
     return res.status(500).json({
       erro: "Faltam SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY no Vercel.",
     });
   }
+
+  let quem;
+  try {
+    quem = await lojasDeQuemChama(req);
+  } catch {
+    return res.status(401).json({ erro: "não autorizado" });
+  }
+  if (!quem.ok) return res.status(401).json({ erro: quem.erro });
 
   try {
     const creds = await credenciais();
@@ -215,7 +270,18 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, enviadas: 0, motivo: "nenhuma loja configurada" });
     }
 
-    const lojas = [...creds.keys()];
+    /*
+     * Quem chamou com o token da sessão só mexe na fila da própria loja.
+     * O corte é aqui, no servidor, contra a lista de credenciais — não
+     * adianta mandar outro lojaId no pedido.
+     */
+    const lojas = quem.lojas
+      ? [...creds.keys()].filter((id) => quem.lojas.includes(String(id)))
+      : [...creds.keys()];
+    if (lojas.length === 0) {
+      return res.status(200).json({ ok: true, enviadas: 0, motivo: "loja sem emissor configurado" });
+    }
+
     const pendentes = await sb(
       'notas?select=*&situacao=eq.pendente' +
         `&tentativas=lt.${MAXIMO_DE_TENTATIVAS}` +

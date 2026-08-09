@@ -66,6 +66,7 @@ Variables**. Marque **Production**, **Preview** e **Development** em todas.
 | `SUPABASE_URL` | Mesmo endereço, para as funções do servidor | Cron e "Liberar senha" não sobem |
 | `SUPABASE_SERVICE_ROLE_KEY` | Chave de serviço | Aviso diário de mensalidade e de contas não dispara; "Liberar senha" não funciona |
 | `CRON_SECRET` | Senha do robô diário | `/api/cobranca` fica aberto para qualquer um chamar |
+| `VITE_SUPABASE_ANON_KEY` (nas funções) | Valida o token de quem vende | A nota não sai na hora da venda; só na varredura diária |
 | `TELEGRAM_TOKEN` | Robô do Telegram | Nenhuma notificação chega no celular |
 | `TELEGRAM_CHAT_ID` | Seu chat, **só para a cobrança de mensalidade** | Você não recebe o resumo de quem está devendo |
 

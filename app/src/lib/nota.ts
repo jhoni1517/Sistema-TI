@@ -299,3 +299,46 @@ export const notasComProblema = (notas: Nota[]): Nota[] =>
   (notas || [])
     .filter(precisaDeAtencao)
     .sort((a, b) => txt(a.criadoEm).localeCompare(txt(b.criadoEm)));
+
+/**
+ * Empurra a fila logo depois da venda, para a nota sair AGORA.
+ *
+ * Por que existe: o cron da Vercel passa uma vez por dia (o plano Hobby não
+ * aceita mais que isso — ver src/lib/vercel.test.ts). Nota fiscal que sai no
+ * dia seguinte não serve: o cliente está no balcão esperando o cupom, e é na
+ * hora da compra que ele pede.
+ *
+ * Então o caminho normal é este empurrão, e o cron virou a rede que recolhe
+ * o que ficou para trás.
+ *
+ * ESTA FUNÇÃO NUNCA LANÇA, e isso é de propósito — é a única exceção à regra
+ * de "gravação sem tratamento de erro". Aqui não há gravação nenhuma: a nota
+ * JÁ ESTÁ na fila, gravada, antes de chegar aqui. Se o empurrão falhar, a
+ * rede diária pega. Deixar a exceção subir faria uma venda perfeitamente
+ * registrada parecer que deu errado — que é o oposto do que aconteceu.
+ *
+ * O motivo volta no retorno para a tela poder AVISAR sem alarmar.
+ *
+ * O token é o da própria sessão de quem vendeu, não o CRON_SECRET: segredo
+ * que chega no navegador é segredo queimado. Do lado de lá o servidor
+ * descobre a loja pelo token e mexe só na fila dela. Ver api/nota.js.
+ */
+export async function empurrarFilaDeNotas(
+  token: string | undefined,
+  buscar: typeof fetch = fetch
+): Promise<{ ok: boolean; motivo: string }> {
+  if (!token) return { ok: false, motivo: "Sessão expirada." };
+  try {
+    const r = await buscar("/api/nota", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!r.ok) {
+      const corpo = (await r.json().catch(() => ({}))) as { erro?: string };
+      return { ok: false, motivo: corpo?.erro || `O robô respondeu ${r.status}.` };
+    }
+    return { ok: true, motivo: "" };
+  } catch (e) {
+    return { ok: false, motivo: e instanceof Error ? e.message : String(e) };
+  }
+}

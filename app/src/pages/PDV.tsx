@@ -63,11 +63,13 @@ import {
   pedidoDaNota,
   problemaParaEmitir,
   notaPendente,
+  empurrarFilaDeNotas,
   notaDaVenda,
   precisaDeAtencao,
   type Nota,
 } from "../lib/nota";
 import { SITUACAO_NOTA_META } from "../lib/fiscal";
+import { supabase } from "../lib/supabase";
 import type {
   FormaPagamento,
   ItemVenda,
@@ -506,12 +508,20 @@ export const PDV: React.FC = () => {
   };
 
   /**
-   * Põe a nota na fila. NÃO emite.
+   * Põe a nota na fila e MANDA EMITIR na hora.
    *
-   * Quem emite é o robô da Vercel, que roda a cada dez minutos e é o único
-   * lugar do sistema que enxerga o token do emissor. Aqui só se grava o
-   * pedido pronto — com os preços que o cliente ACABOU de pagar, e não os
-   * do cadastro, que podem mudar antes de o robô rodar.
+   * A gravação vem primeiro e o empurrão depois, nessa ordem e nunca ao
+   * contrário: quem emite é o robô da Vercel, o único lugar do sistema que
+   * enxerga o token do emissor, e ele lê a fila do banco. Empurrar antes de
+   * gravar seria mandar o robô procurar uma nota que ainda não existe.
+   *
+   * O pedido vai gravado pronto, com os preços que o cliente ACABOU de
+   * pagar — não os do cadastro, que podem mudar antes de o robô rodar.
+   *
+   * Falha do empurrão NÃO é falha da nota: ela está na fila, e a rede
+   * diária recolhe. Por isso o aviso é diferente, e não é erro vermelho —
+   * dizer "não foi possível pedir a nota" para uma nota que está pedida faz
+   * a pessoa pedir de novo, e nota em duplicidade se cancela com o contador.
    */
   const pedirNota = async (venda: Venda) => {
     const problema = problemaParaEmitir(venda, produtos, config);
@@ -524,9 +534,16 @@ export const PDV: React.FC = () => {
         ...notaPendente(uid(), venda),
         pedido: pedidoDaNota(venda, produtos, config, cliente),
       } as never);
+
+      const { data } = (await supabase?.auth.getSession()) || { data: undefined };
+      const empurrao = await empurrarFilaDeNotas(data?.session?.access_token);
       aviso.sucesso(
-        "Nota pedida. Ela é enviada sozinha em alguns minutos — a venda já " +
-          "está registrada e não depende disso."
+        empurrao.ok
+          ? "Nota pedida e enviada. Acompanhe em Notas — a SEFAZ costuma " +
+              "responder em segundos."
+          : "Nota pedida e na fila. O envio imediato não respondeu (" +
+              empurrao.motivo +
+              "), mas ela sai sozinha. Não peça de novo."
       );
     } catch (e) {
       aviso.erro(
