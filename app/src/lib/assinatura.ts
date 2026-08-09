@@ -71,6 +71,53 @@ export function situacaoDe(loja: Loja, diasTolerancia = 5): Situacao {
   return "leitura";
 }
 
+/**
+ * Esta loja usa o sistema de graça e para sempre?
+ *
+ * `situacao_loja()` no banco diz `if v_vence is null then return 'ativa'`, e
+ * a lista do administrador mostra "Em dia" — que é verdade e é justamente o
+ * que engana. Loja sem prazo não é loja em dia: é loja que nunca vai vencer,
+ * e era assim que TODA loja nova nascia.
+ *
+ * A isenta fica de fora: é a de quem administra o sistema, e não faz sentido
+ * cobrar de si mesmo.
+ */
+export const semPrazo = (loja: Loja): boolean =>
+  !loja?.isento && !loja?.bloqueada && !loja?.venceEm;
+
+/**
+ * Quando o teste termina, contado de HOJE.
+ *
+ * De hoje e não do vencimento anterior: liberar teste para quem está vencido
+ * há três meses não pode virar três meses de crédito.
+ */
+export function fimDoTeste(dias: number, hoje = new Date()): Date {
+  const d = Math.max(0, Math.floor(Number(dias) || 0));
+  return new Date(hoje.getTime() + d * 86400000);
+}
+
+/**
+ * Libera o teste grátis de uma loja.
+ *
+ * Passa pela função do banco de propósito: quem pode mexer em prazo de
+ * assinatura é só quem administra o sistema, e essa trava não pode depender
+ * de a tela esconder o botão.
+ */
+export async function liberarTeste(lojaId: string, dias?: number): Promise<string> {
+  if (!supabase) throw new Error("Sem conexão com a nuvem.");
+  const { data, error } = await supabase.rpc("liberar_teste", {
+    p_loja: lojaId,
+    p_dias: dias ?? null,
+  });
+  if (error) {
+    throw new Error(
+      error.message +
+        "\n\nSe você ainda não rodou o supabase-migracao-teste-gratis.sql, é isso."
+    );
+  }
+  return String(data);
+}
+
 /** Situação da loja logada, direto do banco (é a resposta que vale) */
 export async function minhaSituacao(): Promise<Situacao> {
   if (!supabase) return "ativa";

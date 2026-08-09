@@ -12,6 +12,7 @@ import {
   MessageCircle,
   KeyRound,
   Copy,
+  Clock,
 } from "lucide-react";
 import { aviso } from "../components/Aviso";
 import { SectionTitle, Field, Modal, EmptyState, InputNumero } from "../components/ui";
@@ -29,6 +30,9 @@ import {
   atualizarLoja,
   situacaoDe,
   diasParaVencer,
+  semPrazo,
+  fimDoTeste,
+  liberarTeste,
   SITUACAO_META,
   type Loja,
   type SistemaConfig,
@@ -121,7 +125,8 @@ export const Lojas: React.FC = () => {
         problema++;
       }
     }
-    return { ativas, problema, receita };
+    const deGraca = lojas.filter(semPrazo).length;
+    return { ativas, problema, receita, deGraca };
   }, [lojas, tolerancia]);
 
   /**
@@ -155,6 +160,34 @@ export const Lojas: React.FC = () => {
     try {
       const novo = await registrarPagamento(l.id, meses);
       aviso.sucesso(`Renovado até ${formatDate(novo)}.`);
+      carregar();
+    } catch (e) {
+      aviso.erro(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  /**
+   * Põe prazo numa loja que hoje usa o sistema para sempre.
+   *
+   * Quem decide é quem administra — por isso é botão e não automático para
+   * as lojas que já existem. Pôr prazo em quem já paga e só não tem a data
+   * preenchida cortaria o acesso de cliente pagante, que é o erro mais caro
+   * que este sistema pode cometer.
+   */
+  const darTeste = async (l: Loja) => {
+    const dias = cfg.dias_teste ?? 7;
+    if (
+      !confirm(
+        `Liberar ${dias} dias de teste para "${l.nome}"?\n\n` +
+          `Hoje esta loja usa o sistema DE GRAÇA e sem data para acabar. ` +
+          `Depois disso ela passa a vencer em ${formatDate(fimDoTeste(dias).toISOString())}.`
+      )
+    ) {
+      return;
+    }
+    try {
+      const novo = await liberarTeste(l.id);
+      aviso.sucesso(`Teste liberado. Vence em ${formatDate(novo)}.`);
       carregar();
     } catch (e) {
       aviso.erro(e instanceof Error ? e.message : String(e));
@@ -266,6 +299,26 @@ export const Lojas: React.FC = () => {
 
       {erro && <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{erro}</p>}
 
+      {/*
+        Este aviso vem ANTES dos números, e é o único da tela que interrompe.
+        Loja sem prazo aparecia como "Em dia" na lista: verdade e engano ao
+        mesmo tempo. Enquanto ninguém olhar, ela usa o sistema de graça e
+        para sempre — e ninguém procura por dinheiro que nunca chegou.
+      */}
+      {resumo.deGraca > 0 && (
+        <p className="mb-4 flex items-start gap-2 rounded-lg bg-orange-50 p-3 text-sm text-orange-800">
+          <Clock size={16} className="mt-0.5 shrink-0" />
+          <span>
+            <b>
+              {resumo.deGraca} loja{resumo.deGraca === 1 ? "" : "s"} sem prazo de
+              vencimento
+            </b>{" "}
+            — usando o sistema de graça, sem data para acabar. Libere o teste no
+            botão de cada uma.
+          </span>
+        </p>
+      )}
+
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
         <div className="card">
           <p className="flex items-center gap-2 text-xs text-slate-500">
@@ -326,6 +379,16 @@ export const Lojas: React.FC = () => {
                     <span className={`badge ${SITUACAO_META[s].color}`}>
                       {SITUACAO_META[s].label}
                     </span>
+                    {/*
+                      Sem prazo é o estado mais perigoso da lista e o que
+                      menos parecia: o crachá dizia "Em dia" para uma loja
+                      que nunca vai vencer. Agora ele diz o que é.
+                    */}
+                    {semPrazo(l) && (
+                      <span className="badge bg-orange-100 text-orange-700">
+                        Sem prazo · nunca vence
+                      </span>
+                    )}
                     {l.isento ? (
                       <span className="badge bg-brand-100 text-brand-700">Sua loja · isenta</span>
                     ) : (
@@ -353,7 +416,7 @@ export const Lojas: React.FC = () => {
                         )}
                       </>
                     ) : (
-                      "sem vencimento definido"
+                      "usando de graça, sem data para acabar"
                     )}
                     {l.ultimoPagamento && ` · último pagamento ${formatDate(l.ultimoPagamento)}`}
                   </p>
@@ -389,6 +452,14 @@ export const Lojas: React.FC = () => {
                 </div>
 
                 <div className={`flex flex-wrap gap-2 ${l.isento ? "hidden" : ""}`}>
+                  {semPrazo(l) && (
+                    <button
+                      className="btn-primary !py-1.5 text-xs"
+                      onClick={() => darTeste(l)}
+                    >
+                      <Clock size={14} /> Liberar {cfg.dias_teste ?? 7} dias de teste
+                    </button>
+                  )}
                   {!l.isento && tipoDoAviso(dias, tolerancia) && (
                     <button className="btn-secondary !py-1.5 text-xs" onClick={() => cobrar(l)}>
                       <MessageCircle size={14} /> Cobrar
@@ -545,7 +616,7 @@ export const Lojas: React.FC = () => {
           <Field label="Dias de teste grátis">
             <InputNumero
               className="input"
-              value={cfg.dias_teste ?? 14}
+              value={cfg.dias_teste ?? 7}
               onChange={(v) => setCfg({ ...cfg, dias_teste: (v ?? 0) })}
             />
           </Field>
