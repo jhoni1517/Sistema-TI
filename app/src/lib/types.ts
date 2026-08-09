@@ -525,7 +525,24 @@ export interface Meta {
 }
 
 export type TipoMovimento = "entrada" | "saida" | "sangria";
-export type FormaPagamento = "dinheiro" | "pix" | "debito" | "credito" | "transferencia" | "outro";
+/**
+ * Como o dinheiro entrou ou saiu.
+ *
+ * Vale-refeição e vale-alimentação são DOIS de propósito, e não um "vale"
+ * só: na nota fiscal eles têm códigos diferentes (11 e 10), e mandar o
+ * errado é erro fiscal. Fora isso, um restaurante recebe VR e um mercado
+ * recebe VA — quem confunde os dois na hora de conferir a maquininha
+ * procura o dinheiro no lugar errado.
+ */
+export type FormaPagamento =
+  | "dinheiro"
+  | "pix"
+  | "debito"
+  | "credito"
+  | "vale_refeicao"
+  | "vale_alimentacao"
+  | "transferencia"
+  | "outro";
 
 export interface MovimentoCaixa {
   id: ID;

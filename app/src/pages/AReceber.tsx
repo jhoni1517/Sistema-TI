@@ -14,6 +14,7 @@ import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../componen
 import { uid, nowISO, brl, formatDate, abrirWhatsapp, negrito, txt } from "../lib/format";
 import { saldoFiado, pagoFiado } from "../lib/calc";
 import { centavos } from "../lib/pdv";
+import { FORMAS_META } from "../lib/pagamento";
 import { travaAtendimento, travaFiado } from "../lib/clientes";
 import {
   estadoFiado,
@@ -411,11 +412,11 @@ const ReceberModal: React.FC<{
           </Field>
           <Field label="Forma">
             <select className="input" value={forma} onChange={(e) => setForma(e.target.value as FormaPagamento)}>
-              <option value="dinheiro">Dinheiro</option>
-              <option value="pix">Pix</option>
-              <option value="debito">Débito</option>
-              <option value="credito">Crédito</option>
-              <option value="transferencia">Transferência</option>
+              {FORMAS_META.map((f) => (
+                <option key={f.k} value={f.k}>
+                  {f.nome}
+                </option>
+              ))}
             </select>
           </Field>
         </div>

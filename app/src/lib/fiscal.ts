@@ -120,14 +120,19 @@ const digitos = (v?: string | null): string => txt(v).replace(/\D/g, "");
  * tradução a nota é rejeitada inteira, e o motivo que volta é um número
  * que não diz nada a quem está no balcão.
  *
- * Falta aqui o vale-refeição (11), que num restaurante é comum — mas o
- * sistema ainda não tem essa forma de pagamento. Quando tiver, o código
- * dela entra nesta tabela e em nenhum outro lugar.
+ * Toda forma nova entra NESTA tabela e em nenhum outro lugar: o `Record`
+ * é exaustivo, então esquecer o código de uma forma nova quebra o build em
+ * vez de rejeitar uma nota no balcão.
  */
 export const CODIGO_PAGAMENTO: Record<FormaPagamento, string> = {
   dinheiro: "01",
   credito: "03",
   debito: "04",
+  // 10 é vale ALIMENTAÇÃO e 11 é vale REFEIÇÃO. São códigos diferentes na
+  // tabela da SEFAZ, e é por isso que o sistema guarda os dois separados:
+  // mandar um pelo outro é erro fiscal numa nota que já saiu.
+  vale_alimentacao: "10",
+  vale_refeicao: "11",
   transferencia: "16",
   pix: "17",
   outro: "99",

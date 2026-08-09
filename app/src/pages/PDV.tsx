@@ -47,6 +47,7 @@ import {
 } from "../lib/pdv";
 import { precoEfetivo, promocaoValendo } from "../lib/promocao";
 import {
+  FORMAS_META,
   trocoDoPagamento,
   faltaNoPagamento,
   problemaNoPagamento,
@@ -65,12 +66,8 @@ import type {
   Venda,
 } from "../lib/types";
 
-const FORMAS: { k: FormaPagamento; nome: string }[] = [
-  { k: "dinheiro", nome: "Dinheiro" },
-  { k: "pix", nome: "Pix" },
-  { k: "debito", nome: "Débito" },
-  { k: "credito", nome: "Crédito" },
-];
+/** A lista mora em lib/pagamento.ts: copiada aqui, ela divergia. */
+const FORMAS = FORMAS_META;
 
 /**
  * Frente de caixa da mercearia.
