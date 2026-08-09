@@ -30,6 +30,18 @@ export interface Loja {
   ramo?: string | null;
   ultimoPagamento?: string | null;
   criadoEm?: string | null;
+  /**
+   * Até quando o prazo desta loja é CORTESIA.
+   *
+   * `venceEm` sozinho não separa teste de assinatura paga — os dois são uma
+   * data no futuro. Sem essa separação o robô manda "sua mensalidade venceu"
+   * para quem nunca contratou nada, e o recado que deveria virar venda chega
+   * como carta de caloteiro.
+   *
+   * Ver `emTeste`: a conta é `venceEm <= testeAte`, e pagar desfaz isso
+   * sozinho porque `registrar_pagamento` empurra `venceEm` para além.
+   */
+  testeAte?: string | null;
 }
 
 export interface SistemaConfig {
@@ -97,6 +109,50 @@ export function fimDoTeste(dias: number, hoje = new Date()): Date {
 }
 
 /**
+ * Esta loja está usando um TESTE, e não uma assinatura paga?
+ *
+ * A conta é uma comparação, e não um campo que alguém precisa lembrar de
+ * apagar: enquanto o vencimento não passar do fim do teste, o prazo que ela
+ * tem é cortesia. `registrar_pagamento` empurra `venceEm` um mês para frente
+ * do maior entre o vencimento atual e hoje — no instante do pagamento a
+ * conta vira falsa sozinha, sem nenhuma tela precisar limpar nada.
+ *
+ * Por que isso importa mais do que parece: sem separar, a loja em teste cai
+ * na régua de mensalidade e recebe "sua mensalidade venceu há 2 dias". Ela
+ * nunca contratou mensalidade nenhuma. O recado que era para virar venda
+ * chega como cobrança, e quem estava gostando do sistema fecha a porta.
+ *
+ * Vale tanto para o teste correndo quanto para o que já acabou: ela continua
+ * sendo uma loja que testou e não pagou. Quem separa é `testeAcabou`.
+ */
+export const emTeste = (loja: Loja): boolean => {
+  if (!loja || loja.isento || !loja.testeAte || !loja.venceEm) return false;
+  const vence = new Date(loja.venceEm).getTime();
+  const teste = new Date(loja.testeAte).getTime();
+  if (Number.isNaN(vence) || Number.isNaN(teste)) return false;
+  return vence <= teste;
+};
+
+/** Teste que chegou ao fim sem virar pagamento */
+export const testeAcabou = (loja: Loja): boolean =>
+  emTeste(loja) && (diasParaVencer(loja.venceEm) ?? 0) < 0;
+
+/** Dias que ainda faltam de teste (negativo = acabou faz tempo) */
+export const diasDeTeste = (loja: Loja): number | null =>
+  emTeste(loja) ? diasParaVencer(loja.venceEm) : null;
+
+/**
+ * Dá para liberar teste para esta loja?
+ *
+ * Só para quem NUNCA pagou. `liberar_teste` conta a partir de hoje: chamada
+ * numa loja que pagou o ano inteiro, ela jogaria o vencimento de dezembro
+ * para a semana que vem. A mesma trava existe no banco — esta aqui é só para
+ * o botão não aparecer onde não deve.
+ */
+export const podeLiberarTeste = (loja: Loja): boolean =>
+  !!loja && !loja.isento && !loja.bloqueada && !loja.ultimoPagamento && !emTeste(loja);
+
+/**
  * Libera o teste grátis de uma loja.
  *
  * Passa pela função do banco de propósito: quem pode mexer em prazo de
@@ -113,6 +169,41 @@ export async function liberarTeste(lojaId: string, dias?: number): Promise<strin
     throw new Error(
       error.message +
         "\n\nSe você ainda não rodou o supabase-migracao-teste-gratis.sql, é isso."
+    );
+  }
+  return String(data);
+}
+
+/**
+ * Estica (positivo) ou encurta (negativo) o teste que já está correndo.
+ *
+ * Move as duas datas juntas — `venceEm` e `testeAte` — e é isso que mantém a
+ * loja como teste. Mexer só no vencimento faria ela virar "pagante" ao ganhar
+ * um dia a mais, e passar a receber cobrança de mensalidade.
+ */
+export async function ajustarTeste(lojaId: string, dias: number): Promise<string> {
+  if (!supabase) throw new Error("Sem conexão com a nuvem.");
+  const { data, error } = await supabase.rpc("ajustar_teste", {
+    p_loja: lojaId,
+    p_dias: Math.trunc(Number(dias) || 0),
+  });
+  if (error) {
+    throw new Error(
+      error.message +
+        "\n\nSe você ainda não rodou o supabase-migracao-teste-gratis.sql de novo, é isso."
+    );
+  }
+  return String(data);
+}
+
+/** Encerra o teste hoje. A loja continua consultando e imprimindo. */
+export async function encerrarTeste(lojaId: string): Promise<string> {
+  if (!supabase) throw new Error("Sem conexão com a nuvem.");
+  const { data, error } = await supabase.rpc("encerrar_teste", { p_loja: lojaId });
+  if (error) {
+    throw new Error(
+      error.message +
+        "\n\nSe você ainda não rodou o supabase-migracao-teste-gratis.sql de novo, é isso."
     );
   }
   return String(data);
@@ -143,7 +234,7 @@ export async function listarLojas(): Promise<Loja[]> {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("lojas")
-    .select('id, nome, "venceEm", valor_mensal, bloqueada, isento, ramo, observacoes, whatsapp, "ultimoPagamento", "criadoEm"')
+    .select('id, nome, "venceEm", "testeAte", valor_mensal, bloqueada, isento, ramo, observacoes, whatsapp, "ultimoPagamento", "criadoEm"')
     .order("criadoEm", { ascending: false });
   if (error) throw new Error(error.message);
   return (data as Loja[]) || [];
@@ -154,7 +245,7 @@ export async function minhaLoja(lojaId: string): Promise<Loja | null> {
   if (!supabase) return null;
   const { data } = await supabase
     .from("lojas")
-    .select('id, nome, "venceEm", valor_mensal, bloqueada, isento, "ultimoPagamento", "criadoEm"')
+    .select('id, nome, "venceEm", "testeAte", valor_mensal, bloqueada, isento, "ultimoPagamento", "criadoEm"')
     .eq("id", lojaId)
     .maybeSingle();
   return (data as Loja) || null;

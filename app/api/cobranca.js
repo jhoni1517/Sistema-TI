@@ -49,6 +49,37 @@ function tipoDoAviso(dias, tolerancia) {
   return "somente_leitura";
 }
 
+/**
+ * A régua do TESTE. Espelha tipoDoTeste() de src/lib/cobranca.ts, e
+ * cobranca.cron.test.ts extrai esta função do disco e compara dia a dia.
+ *
+ * Existe separada porque loja em teste não é loja em atraso: ela nunca
+ * contratou mensalidade nenhuma, e mandar "vencida" para ela é cobrar uma
+ * dívida que não existe.
+ */
+function tipoDoTeste(dias) {
+  if (dias === null) return null;
+  if (dias > 3) return null;
+  if (dias > 0) return "teste_acabando";
+  if (dias === 0) return "teste_ultimo_dia";
+  return "teste_acabou";
+}
+
+/**
+ * Este prazo é cortesia?
+ *
+ * Espelha `emTeste` de src/lib/assinatura.ts: enquanto o vencimento não
+ * passar do fim do teste, o que a loja tem é teste. Pagar empurra `venceEm`
+ * para além de `testeAte` e a conta vira falsa sozinha.
+ */
+function ehTeste(l) {
+  if (!l || l.isento || !l.testeAte || !l.venceEm) return false;
+  const vence = new Date(l.venceEm).getTime();
+  const teste = new Date(l.testeAte).getTime();
+  if (Number.isNaN(vence) || Number.isNaN(teste)) return false;
+  return vence <= teste;
+}
+
 async function sb(caminho, opcoes = {}) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${caminho}`, {
     ...opcoes,
@@ -133,7 +164,23 @@ const TITULO = {
   vencida: "VENCIDAS (ainda na tolerância)",
   vence_hoje: "VENCEM HOJE",
   vence_em_breve: "VENCEM EM BREVE",
+  // Teste é venda a fazer, não dívida a cobrar — e por isso vem primeiro no
+  // resumo: é o único bloco em que ainda dá para mudar o resultado.
+  teste_ultimo_dia: "TESTE ACABA HOJE (ligue para essas)",
+  teste_acabando: "TESTE ACABANDO",
+  teste_acabou: "TESTOU E NÃO ASSINOU",
 };
+
+/** A ordem do resumo: primeiro o que dá para resolver hoje */
+const ORDEM = [
+  "teste_ultimo_dia",
+  "teste_acabando",
+  "somente_leitura",
+  "vencida",
+  "vence_hoje",
+  "vence_em_breve",
+  "teste_acabou",
+];
 
 export default async function handler(req, res) {
   // Só o cron do Vercel ou quem tem o segredo. Um endpoint aberto que
@@ -155,7 +202,7 @@ export default async function handler(req, res) {
     const tolerancia = Number(cfgs?.[0]?.dias_tolerancia ?? 5);
 
     const lojas = await sb(
-      'lojas?select=id,nome,venceEm,valor_mensal,bloqueada,isento' +
+      'lojas?select=id,nome,venceEm,testeAte,valor_mensal,bloqueada,isento' +
         '&venceEm=not.is.null&isento=is.false'
     );
 
@@ -166,17 +213,21 @@ export default async function handler(req, res) {
     );
 
     const novos = [];
-    const grupos = {
-      somente_leitura: [],
-      vencida: [],
-      vence_hoje: [],
-      vence_em_breve: [],
-    };
+    const grupos = {};
+    for (const t of ORDEM) grupos[t] = [];
 
     for (const l of lojas || []) {
       if (l.bloqueada || l.isento) continue; // desligada de propósito, ou é a sua
       const dias = diasAte(l.venceEm);
-      const tipo = tipoDoAviso(dias, tolerancia);
+      /*
+       * Teste e mensalidade têm réguas separadas.
+       *
+       * Antes a loja em teste caía na régua da mensalidade e virava
+       * "VENCIDA" no resumo — de uma mensalidade que ela nunca contratou.
+       * O que era venda a fazer aparecia como dívida a cobrar, misturada com
+       * quem realmente devia.
+       */
+      const tipo = ehTeste(l) ? tipoDoTeste(dias) : tipoDoAviso(dias, tolerancia);
       if (!tipo) continue;
 
       const referencia = String(l.venceEm).slice(0, 10);
@@ -207,10 +258,20 @@ export default async function handler(req, res) {
     // Monta o resumo
     const partes = ["*Mensalidades — resumo do dia*"];
     let aReceber = 0;
-    for (const tipo of ["somente_leitura", "vencida", "vence_hoje", "vence_em_breve"]) {
+    let emTeste = 0;
+    for (const tipo of ORDEM) {
       const g = grupos[tipo];
       if (g.length === 0) continue;
       const itens = g.map((l) => {
+        if (tipo === "teste_acabando") {
+          emTeste += Number(l.valor) || 0;
+          return `• ${l.nome} — teste acaba em ${l.dias}d (${dinheiro(l.valor)}/mes)`;
+        }
+        if (tipo === "teste_ultimo_dia") {
+          emTeste += Number(l.valor) || 0;
+          return `• ${l.nome} — ultimo dia (${dinheiro(l.valor)}/mes)`;
+        }
+        if (tipo === "teste_acabou") return `• ${l.nome} — acabou ha ${Math.abs(l.dias)}d`;
         if (tipo === "vence_em_breve") return `• ${l.nome} — em ${l.dias}d`;
         if (tipo === "vence_hoje") return `• ${l.nome} — hoje`;
         aReceber += Number(l.valor) || 0;
@@ -218,7 +279,10 @@ export default async function handler(req, res) {
       });
       partes.push(`${TITULO[tipo]}\n${itens.join("\n")}`);
     }
+    // Duas linhas separadas de propósito: uma é dinheiro que já é seu e não
+    // chegou; a outra é dinheiro que só existe se você fizer a ligação.
     if (aReceber > 0) partes.push(`Total em atraso: *${dinheiro(aReceber)}*`);
+    if (emTeste > 0) partes.push(`Em teste, a fechar: *${dinheiro(emTeste)}/mes*`);
 
     const enviou = await enviarTelegram(partes.join("\n\n"));
 

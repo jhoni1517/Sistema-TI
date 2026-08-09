@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { tipoDoTeste } from "./cobranca";
 
 /**
  * Nada de dentro de uma loja pode sair no Telegram do operador do sistema.
@@ -142,5 +143,50 @@ describe("a régua do fiado é a mesma na tela e no robô", () => {
 
   it("o robô lê a data de criação, que é o que mede a dívida sem prazo", () => {
     expect(corpo("avisarFiado")).toContain('"criadoEm"');
+  });
+});
+
+/**
+ * Teste grátis não é mensalidade em atraso.
+ *
+ * A régua do teste também existe duas vezes: `tipoDoTeste` em
+ * src/lib/cobranca.ts e a cópia em api/cobranca.js. Divergindo, a tela
+ * mostra a loja como "teste acabando" e o robô manda "VENCIDA" para a mesma
+ * loja no mesmo dia — cobrando uma mensalidade que ela nunca contratou.
+ *
+ * O teste EXECUTA a função do robô, lida do disco, em vez de recopiar a
+ * régua: cópia dentro de teste envelhece igual e as duas passam a mentir
+ * juntas.
+ */
+describe("a régua do teste é a mesma na tela e no robô", () => {
+  const doRobo = new Function(
+    `${corpo("tipoDoTeste")}\nreturn tipoDoTeste;`
+  )() as (dias: number | null) => string | null;
+
+  it("responde igual em todos os dias que importam", () => {
+    for (let dias = -40; dias <= 40; dias++) {
+      expect(doRobo(dias), `divergiu em ${dias} dia(s)`).toBe(tipoDoTeste(dias));
+    }
+    expect(doRobo(null)).toBe(tipoDoTeste(null));
+  });
+
+  it("loja em teste não entra na régua da mensalidade", () => {
+    // O `ehTeste(l) ? ... : ...` é a bifurcação inteira. Sem ela o teste
+    // volta a virar "VENCIDA" no resumo do Telegram.
+    expect(semComentarios(fonte)).toContain("ehTeste(l) ? tipoDoTeste(dias)");
+  });
+
+  it("o robô lê a marca do teste do banco", () => {
+    // Sem `testeAte` na consulta, `ehTeste` devolve falso para todo mundo e
+    // a bifurcação acima nunca acontece — o defeito volta calado.
+    expect(fonte).toContain("lojas?select=id,nome,venceEm,testeAte");
+  });
+
+  it("a conta de 'está em teste' é a mesma dos dois lados", () => {
+    // `venceEm <= testeAte`. Pagar empurra o vencimento para além do fim do
+    // teste e a conta vira falsa sozinha, sem ninguém limpar campo nenhum.
+    expect(semComentarios(corpo("ehTeste"))).toContain("return vence <= teste;");
+    const daLib = readFileSync(resolve(__dirname, "assinatura.ts"), "utf8");
+    expect(semComentarios(daLib)).toContain("return vence <= teste;");
   });
 });
