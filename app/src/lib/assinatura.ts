@@ -42,6 +42,25 @@ export interface Loja {
    * sozinho porque `registrar_pagamento` empurra `venceEm` para além.
    */
   testeAte?: string | null;
+  /**
+   * Por que o teste não virou assinatura.
+   *
+   * Lista fechada (`MOTIVOS_TESTE`) e não campo livre: motivo escrito à mão
+   * vira depoimento que ninguém soma. Três meses de lista dizem se o problema
+   * é preço ou é uma tela faltando; três meses de texto livre não dizem nada.
+   */
+  motivoTeste?: string | null;
+  /** Quantas cortesias esta loja já levou. A primeira é venda; a terceira é outra conversa. */
+  testesDados?: number | null;
+}
+
+/** Quantos clientes, produtos, ordens e vendas uma loja tem. Só contagem. */
+export interface UsoDaLoja {
+  loja: string;
+  clientes: number;
+  produtos: number;
+  ordens: number;
+  vendas: number;
 }
 
 export interface SistemaConfig {
@@ -52,6 +71,10 @@ export interface SistemaConfig {
   dias_teste?: number | null;
   dias_tolerancia?: number | null;
   mensagem_vencimento?: string | null;
+  /** Dias ao REABRIR um teste para quem já testou. Menor que o primeiro. */
+  dias_reteste?: number | null;
+  /** A tolerância vale durante o teste? Nasce falsa — ver a migração. */
+  tolerancia_no_teste?: boolean | null;
 }
 
 export const SITUACAO_META: Record<Situacao, { label: string; color: string }> = {
@@ -103,6 +126,10 @@ export const semPrazo = (loja: Loja): boolean =>
  * De hoje e não do vencimento anterior: liberar teste para quem está vencido
  * há três meses não pode virar três meses de crédito.
  */
+/** O recado que aparece quando a função do banco ainda não existe */
+const AVISO_MIGRACAO =
+  "\n\nSe você ainda não rodou o supabase-migracao-teste-controle.sql, é isso.";
+
 export function fimDoTeste(dias: number, hoje = new Date()): Date {
   const d = Math.max(0, Math.floor(Number(dias) || 0));
   return new Date(hoje.getTime() + d * 86400000);
@@ -153,6 +180,38 @@ export const podeLiberarTeste = (loja: Loja): boolean =>
   !!loja && !loja.isento && !loja.bloqueada && !loja.ultimoPagamento && !emTeste(loja);
 
 /**
+ * Dá para REABRIR o teste desta loja?
+ *
+ * Só para quem já testou e o prazo acabou. Reabrir teste que ainda corre
+ * daria dias de graça a quem já os tem — para esse o caminho é o "+3/+7/+15".
+ */
+export const podeReabrirTeste = (loja: Loja): boolean =>
+  !!loja && !loja.ultimoPagamento && !loja.bloqueada && testeAcabou(loja);
+
+/**
+ * Por que o teste não virou assinatura.
+ *
+ * Lista fechada de propósito. Motivo escrito à mão vira depoimento que
+ * ninguém soma; lista fechada, em três meses, diz se o que falta é preço ou
+ * é uma tela. A ordem é a das respostas mais comuns primeiro, porque quem
+ * anota isso está com o telefone na orelha.
+ */
+export const MOTIVOS_TESTE = [
+  { k: "caro", nome: "Achou caro" },
+  { k: "faltou", nome: "Faltou algo no sistema" },
+  { k: "sumiu", nome: "Sumiu, não respondeu" },
+  { k: "outro_sistema", nome: "Já tem outro sistema" },
+  { k: "fechou", nome: "A loja fechou / desistiu" },
+  { k: "so_olhando", nome: "Só estava olhando" },
+] as const;
+
+export const nomeDoMotivo = (k?: string | null): string => {
+  const chave = String(k ?? "").trim();
+  if (!chave) return "";
+  return MOTIVOS_TESTE.find((m) => m.k === chave)?.nome ?? chave;
+};
+
+/**
  * Libera o teste grátis de uma loja.
  *
  * Passa pela função do banco de propósito: quem pode mexer em prazo de
@@ -167,8 +226,7 @@ export async function liberarTeste(lojaId: string, dias?: number): Promise<strin
   });
   if (error) {
     throw new Error(
-      error.message +
-        "\n\nSe você ainda não rodou o supabase-migracao-teste-gratis.sql, é isso."
+      error.message + AVISO_MIGRACAO
     );
   }
   return String(data);
@@ -189,25 +247,97 @@ export async function ajustarTeste(lojaId: string, dias: number): Promise<string
   });
   if (error) {
     throw new Error(
-      error.message +
-        "\n\nSe você ainda não rodou o supabase-migracao-teste-gratis.sql de novo, é isso."
+      error.message + AVISO_MIGRACAO
     );
   }
   return String(data);
 }
 
 /** Encerra o teste hoje. A loja continua consultando e imprimindo. */
-export async function encerrarTeste(lojaId: string): Promise<string> {
+export async function encerrarTeste(lojaId: string, motivo?: string): Promise<string> {
   if (!supabase) throw new Error("Sem conexão com a nuvem.");
-  const { data, error } = await supabase.rpc("encerrar_teste", { p_loja: lojaId });
+  const { data, error } = await supabase.rpc("encerrar_teste", {
+    p_loja: lojaId,
+    p_motivo: motivo || null,
+  });
   if (error) {
     throw new Error(
-      error.message +
-        "\n\nSe você ainda não rodou o supabase-migracao-teste-gratis.sql de novo, é isso."
+      error.message + AVISO_MIGRACAO
     );
   }
   return String(data);
 }
+
+/**
+ * Reabre o teste de quem já testou, com o prazo menor de `dias_reteste`.
+ *
+ * Separado de `ajustarTeste` porque é outra coisa: esticar é para o teste que
+ * está correndo; reabrir é para quem sumiu e voltou. O mesmo botão para os
+ * dois esconderia justamente o que interessa — quantas vezes aquela loja já
+ * usou de graça (`testesDados`).
+ */
+export async function reabrirTeste(lojaId: string, dias?: number): Promise<string> {
+  if (!supabase) throw new Error("Sem conexão com a nuvem.");
+  const { data, error } = await supabase.rpc("reabrir_teste", {
+    p_loja: lojaId,
+    p_dias: dias ?? null,
+  });
+  if (error) throw new Error(error.message + AVISO_MIGRACAO);
+  return String(data);
+}
+
+/**
+ * Anota o motivo sem encerrar nada.
+ *
+ * O motivo quase nunca aparece no momento em que o teste acaba: aparece três
+ * dias depois, no telefonema. Sem um jeito de anotar fora do encerramento, a
+ * informação se perde exatamente quando ela existe.
+ */
+export async function anotarMotivoTeste(lojaId: string, motivo: string): Promise<void> {
+  if (!supabase) throw new Error("Sem conexão com a nuvem.");
+  const { error } = await supabase.rpc("anotar_motivo_teste", {
+    p_loja: lojaId,
+    p_motivo: motivo,
+  });
+  if (error) throw new Error(error.message + AVISO_MIGRACAO);
+}
+
+/**
+ * O que cada loja construiu lá dentro. SÓ CONTAGEM.
+ *
+ * Quantos produtos a loja cadastrou é da sua relação comercial com ela;
+ * QUAIS produtos, o nome dos clientes e o valor das vendas não são, e não
+ * passam por aqui. A função do banco também não devolve isso.
+ *
+ * Falhar aqui não pode derrubar a lista de lojas: sem a migração nova, a
+ * tela continua inteira e só não mostra este pedaço.
+ */
+export async function resumoUsoLojas(): Promise<Record<string, UsoDaLoja>> {
+  if (!supabase) return {};
+  const { data, error } = await supabase.rpc("resumo_uso_lojas");
+  if (error || !Array.isArray(data)) return {};
+  const mapa: Record<string, UsoDaLoja> = {};
+  for (const l of data as UsoDaLoja[]) {
+    mapa[String(l.loja)] = {
+      loja: String(l.loja),
+      clientes: Number(l.clientes) || 0,
+      produtos: Number(l.produtos) || 0,
+      ordens: Number(l.ordens) || 0,
+      vendas: Number(l.vendas) || 0,
+    };
+  }
+  return mapa;
+}
+
+/**
+ * A loja mexeu no sistema durante o teste?
+ *
+ * Quem cadastrou 200 produtos e sumiu esbarrou em alguma coisa concreta; quem
+ * cadastrou 3 nunca começou. São dois telefonemas diferentes, e sem isto os
+ * dois recebem o mesmo.
+ */
+export const usouDeVerdade = (u?: UsoDaLoja | null): boolean =>
+  !!u && u.produtos + u.clientes + u.ordens + u.vendas >= 10;
 
 /** Situação da loja logada, direto do banco (é a resposta que vale) */
 export async function minhaSituacao(): Promise<Situacao> {
@@ -234,7 +364,7 @@ export async function listarLojas(): Promise<Loja[]> {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("lojas")
-    .select('id, nome, "venceEm", "testeAte", valor_mensal, bloqueada, isento, ramo, observacoes, whatsapp, "ultimoPagamento", "criadoEm"')
+    .select('id, nome, "venceEm", "testeAte", "motivoTeste", "testesDados", valor_mensal, bloqueada, isento, ramo, observacoes, whatsapp, "ultimoPagamento", "criadoEm"')
     .order("criadoEm", { ascending: false });
   if (error) throw new Error(error.message);
   return (data as Loja[]) || [];

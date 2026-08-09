@@ -284,6 +284,24 @@ export default async function handler(req, res) {
     if (aReceber > 0) partes.push(`Total em atraso: *${dinheiro(aReceber)}*`);
     if (emTeste > 0) partes.push(`Em teste, a fechar: *${dinheiro(emTeste)}/mes*`);
 
+    /*
+     * O "acaba hoje" sai em mensagem SEPARADA, antes do resumo.
+     *
+     * Dentro do digest ele virava a terceira linha de um bloco de sete, e o
+     * único dia em que ainda dá para mudar o resultado é justamente esse —
+     * amanhã a loja já travou e a conversa passa a ser outra. Mensagem curta
+     * e sozinha é a diferença entre ler no semáforo e ler à noite.
+     */
+    if (grupos.teste_ultimo_dia.length > 0) {
+      await enviarTelegram(
+        "*Teste acaba HOJE*\n" +
+          grupos.teste_ultimo_dia
+            .map((l) => `• ${l.nome} — ${dinheiro(l.valor)}/mes`)
+            .join("\n") +
+          "\n\nHoje e o dia de ligar. Amanha ela trava e a conversa muda."
+      );
+    }
+
     const enviou = await enviarTelegram(partes.join("\n\n"));
 
     // Só marca como avisado se a mensagem realmente saiu — se o Telegram
