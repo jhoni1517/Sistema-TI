@@ -351,3 +351,62 @@ export function movimentosPorSessao(
   }
   return mapa;
 }
+
+/**
+ * A data de um lançamento manual lançado fora do dia.
+ *
+ * Relatado do balcão: uma compra do dia 04 percebida no dia 10. Até aqui
+ * todo lançamento manual nascia com `nowISO()` — a data de hoje, sem
+ * escolha. Quem esquecia de lançar não tinha como corrigir na data certa, e
+ * o conserto caía no dia errado: o fechamento do dia 04 continuava errado
+ * e o do dia 10 passava a estar errado também. Dois dias furados no lugar
+ * de um.
+ *
+ * Devolve o carimbo completo a gravar. Duas regras:
+ *
+ * 1. HOJE fica com a HORA de agora. É o caso de 99% dos lançamentos, e a
+ *    hora é o que põe o movimento na ordem certa do dia.
+ * 2. Dia passado fica com meio-dia UTC. Não é enfeite: `soData` corta os dez
+ *    primeiros caracteres, e um horário de madrugada somado a fuso negativo
+ *    escorrega o lançamento para o dia anterior — o mesmo erro de data que
+ *    já custou uma tarde nesta base.
+ *
+ * Data no futuro é recusada por quem chama, não aqui: lançamento adiantado
+ * some do fechamento de hoje e aparece num dia que ainda não existe.
+ */
+/**
+ * A data EXISTE no calendário?
+ *
+ * O formato certo não basta, e isto não é preciosismo: "2026-13-01" e
+ * "2026-02-30" passam por qualquer regex de AAAA-MM-DD e não existem. O
+ * `new Date()` aceita as duas caladinho e escorrega para outro mês — e daí
+ * o lançamento vai parar num dia que ninguém procura.
+ *
+ * A conferência é a ida e volta: se o que sai não é igual ao que entrou, a
+ * data foi "consertada" pelo JavaScript, e não era para consertar.
+ */
+function diaQueExiste(iso: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+  const d = new Date(iso + "T00:00:00Z");
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === iso;
+}
+
+export function carimboDoLancamento(dia: string, agora = new Date()): string {
+  const hoje = agora.toISOString().slice(0, 10);
+  const escolhido = String(dia || "").slice(0, 10);
+  if (!diaQueExiste(escolhido) || escolhido === hoje) return agora.toISOString();
+  return `${escolhido}T12:00:00.000Z`;
+}
+
+/** Vazio = pode lançar. O futuro é o único recusado. */
+export function problemaNaDataDoLancamento(dia: string, agora = new Date()): string {
+  const escolhido = String(dia || "").slice(0, 10);
+  if (!diaQueExiste(escolhido)) return "Escolha uma data válida.";
+  if (escolhido > agora.toISOString().slice(0, 10)) {
+    return (
+      "A data está no futuro. O lançamento sumiria do fechamento de hoje e " +
+      "apareceria num dia que ainda não aconteceu."
+    );
+  }
+  return "";
+}

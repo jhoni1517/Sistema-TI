@@ -41,6 +41,8 @@ import {
   movimentosPorSessao,
   baseDaLista,
   rotuloDaLista,
+  carimboDoLancamento,
+  problemaNaDataDoLancamento,
   type EscopoCaixa,
 } from "../lib/caixa";
 import type { MovimentoCaixa, TipoMovimento, FormaPagamento, SessaoCaixa, Produto, Cliente } from "../lib/types";
@@ -647,6 +649,9 @@ const MovimentoModal: React.FC<{
   /* Antes do `if (!tipo) return null` de propósito: hook depois de um return
      condicional muda de ordem entre renderizações e o React quebra. */
   const [gravando, setGravando] = useState(false);
+  /* A data do lançamento. Nasce hoje — é o caso de quase todo lançamento —
+     e existe para o dia em que se percebe a compra da semana passada. */
+  const [dia, setDia] = useState(() => new Date().toISOString().slice(0, 10));
 
   React.useEffect(() => {
     if (tipo) {
@@ -661,6 +666,7 @@ const MovimentoModal: React.FC<{
       setBaixa(true);
       setBuscaProd("");
       setClienteId("");
+      setDia(new Date().toISOString().slice(0, 10));
       setGravando(false);
     }
   }, [tipo]);
@@ -696,6 +702,8 @@ const MovimentoModal: React.FC<{
 
   const salvar = () => {
     if (valor <= 0) return aviso.alerta("Informe um valor válido.");
+    const probData = problemaNaDataDoLancamento(dia);
+    if (probData) return aviso.alerta(probData);
     // Clique duplo no balcão acontece o tempo todo, e aqui ele vira dinheiro
     // lançado duas vezes.
     if (gravando) return;
@@ -715,7 +723,7 @@ const MovimentoModal: React.FC<{
         compraEstoque:
           tipo === "saida" &&
           ["Compra de peça", "Fornecedor"].includes(categoria),
-        data: nowISO(),
+        data: carimboDoLancamento(dia),
       },
       tipo === "entrada" && prodId ? { produtoId: prodId, quantidade, baixa, custo: prodCusto * quantidade } : undefined
     );
@@ -785,6 +793,27 @@ const MovimentoModal: React.FC<{
             </Field>
           )}
         </div>
+
+        {/*
+          A DATA, para o lançamento que se percebe depois.
+          Nasce hoje. Existe porque "comprei a fonte dia 04 e esqueci de
+          lançar" não tinha conserto: o acerto caía no dia de hoje e
+          estragava DOIS fechamentos em vez de arrumar um.
+        */}
+        <Field label="Data do lançamento">
+          <input
+            type="date"
+            className="input"
+            value={dia}
+            max={new Date().toISOString().slice(0, 10)}
+            onChange={(e) => setDia(e.target.value)}
+          />
+          {dia !== new Date().toISOString().slice(0, 10) && (
+            <p className="mt-1 text-xs text-amber-600">
+              Lançamento retroativo: entra no fechamento do dia {dia.split("-").reverse().join("/")}, não no de hoje.
+            </p>
+          )}
+        </Field>
 
         {tipo !== "sangria" && categoria === "Outro" && (
           <Field label="Qual categoria?">
