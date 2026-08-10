@@ -6,6 +6,7 @@ import { EntradaNota } from "../components/EntradaNota";
 import { Inventario } from "../components/Inventario";
 import { Reposicao } from "../components/Reposicao";
 import { minimoSugerido } from "../lib/reposicao";
+import { avisoDeEstoqueQueSubiu } from "../lib/estoque";
 import { aoApagarProduto, textoDaConfirmacao } from "../lib/exclusao";
 import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck, FileQuestion, Wrench, CalendarX, Tag, ClipboardCheck, ShoppingBasket, Store, FileText } from "lucide-react";
 import { useApp } from "../store/AppStore";
@@ -133,6 +134,25 @@ export const Estoque: React.FC = () => {
       return aviso.alerta(aviProm);
     }
     if (aviProm && !confirm(`${aviProm}\n\nSalvar assim mesmo?`)) return;
+
+    /*
+     * ESTOQUE QUE SOBE AQUI NÃO ENCOSTA NO CAIXA, E ISSO PRECISA SER DITO.
+     *
+     * Relatado do balcão: "comprei uma fonte, entrou no estoque, e não deu
+     * baixa no dinheiro". Foi exatamente este caminho. O cadastro grava a
+     * quantidade que está no campo — é o certo para corrigir contagem, e é
+     * o errado para registrar compra, e nada na tela diferenciava os dois.
+     *
+     * Perguntar é o único jeito, porque só quem digitou sabe qual dos dois
+     * era. Cancelar leva para "Entrada de nota", que é onde a compra tem
+     * caixa, custo médio e frete.
+     */
+    const aviEstoque = avisoDeEstoqueQueSubiu(
+      produtos.find((x) => x.id === editando.id),
+      editando
+    );
+    if (aviEstoque && !confirm(aviEstoque)) return;
+
     // grava os textos de categoria/fornecedor para exibição/compatibilidade
     const p = {
       ...editando,

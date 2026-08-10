@@ -1,4 +1,5 @@
 import type { Produto } from "./types";
+import { txt } from "./format";
 
 /**
  * A baixa de estoque, num lugar só.
@@ -126,5 +127,51 @@ export function avisoDeFalta(
       .join("\n") +
     "\n\nA venda pode fechar assim. Negativo quer dizer que falta lançar uma " +
     "entrada — acerte depois em Estoque > Contagem."
+  );
+}
+
+/**
+ * O estoque subiu no CADASTRO. De onde veio essa mercadoria?
+ *
+ * Relatado do balcão: "comprei uma fonte no dia 04, entrou no estoque, mas
+ * não deu baixa no dinheiro do caixa."
+ *
+ * Foi isso: abrir o produto e digitar a quantidade nova sobe o estoque e não
+ * encosta no caixa. Não é bug do salvamento — é o cadastro fazendo o que ele
+ * faz. O bug é ele fazer isso CALADO, porque as duas coisas que a pessoa
+ * quer dizer com esse gesto são opostas:
+ *
+ *   "comprei"          -> tem que sair dinheiro, e o custo médio muda
+ *   "contei e tinha 3" -> não sai dinheiro nenhum, é correção
+ *
+ * E o jeito errado é o silencioso: aparece mercadoria que ninguém pagou, o
+ * custo continua o de seis meses atrás, e o lucro do mês fica inflado. Como
+ * diz o CLAUDE.md, LUCRO INFLADO É INVISÍVEL — ninguém procura por ele. Uma
+ * saída de caixa sobrando salta aos olhos; esta não salta nada.
+ *
+ * Devolve o aviso a mostrar, ou vazio quando não há o que perguntar.
+ * Diminuir estoque não entra aqui: quebra e perda não tiram dinheiro do
+ * caixa, então não há decisão de dinheiro a tomar.
+ */
+export function avisoDeEstoqueQueSubiu(
+  antes: Produto | undefined,
+  depois: Produto
+): string {
+  if (depois.servico) return "";
+  const de = n(antes?.quantidade);
+  const para = n(depois.quantidade);
+  if (para <= de) return "";
+
+  const novo = !antes;
+  const quanto = grama(para - de);
+  const custo = n(depois.custo);
+  const gasto = custo > 0 ? ` (${quanto} x ${custo.toFixed(2)})` : "";
+
+  return (
+    `O estoque de "${txt(depois.nome) || "este produto"}" ` +
+    (novo ? `nasce com ${para}.` : `sobe de ${grama(de)} para ${grama(para)}, mais ${quanto}.`) +
+    `\n\nSE VOCE COMPROU${gasto}: cancele e use "Entrada de nota". ` +
+    `Ela soma o estoque, recalcula o custo médio e DESCONTA DO CAIXA.` +
+    `\n\nSE E CORRECAO DE CONTAGEM: confirme. O estoque sobe e nada sai do caixa.`
   );
 }
