@@ -39,6 +39,7 @@ import {
   diasAteVencer,
   pagarConta,
   ehReceber,
+  ehPagar,
   contasParaAvisar,
   totalAPagarNoMes,
   totalAtrasado,
@@ -68,8 +69,6 @@ import {
   type Meta,
   type Recorrencia,
   type TipoMeta,
-  TIPO_CONTA_META,
-  type TipoConta,
 } from "../lib/types";
 
 const novaConta = (): ContaPagar => ({
@@ -132,7 +131,7 @@ export const Contas: React.FC = () => {
 
   useEffect(() => setPermissao(permissaoAtual()), []);
 
-  const avisar = useMemo(() => contasParaAvisar(contas), [contas]);
+  const avisar = useMemo(() => contasParaAvisar(contas.filter(ehPagar)), [contas]);
 
   /**
    * Dispara a notificação do navegador uma vez por dia, por conta.
@@ -191,9 +190,22 @@ export const Contas: React.FC = () => {
   const [buscaConta, setBuscaConta] = useState("");
   const [ordem, setOrdem] = useState<OrdemContas>("vencimento");
 
+  /*
+   * A RENDA FIXA TEM TELA PRÓPRIA, E SÓ PODE APARECER LÁ.
+   *
+   * Salário e auxílio no meio de "Energia" e "Fornecedor" confunde de duas
+   * formas ao mesmo tempo: some no meio da lista de quem tem trinta contas,
+   * e parece dívida para quem só queria acompanhar o que recebe.
+   *
+   * O corte é aqui e não na tela de renda porque esta é a que já existia: a
+   * outra nasceu filtrando. Filtrar dos dois lados a partir da MESMA lista é
+   * o que mantém um só dado e uma só regra de vencimento.
+   */
+  const aPagar = useMemo(() => contas.filter(ehPagar), [contas]);
+
   const lista = useMemo(
-    () => filtrarContas(contas, { termo: buscaConta, ordem }),
-    [contas, buscaConta, ordem]
+    () => filtrarContas(aPagar, { termo: buscaConta, ordem }),
+    [aPagar, buscaConta, ordem]
   );
 
   const gastos = useMemo(() => gastosPorCategoria(movimentos, mesGasto), [movimentos, mesGasto]);
@@ -819,39 +831,15 @@ export const Contas: React.FC = () => {
             </Field>
 
             {/*
-              PRIMEIRO CAMPO DE PROPÓSITO: ele muda o significado de todos os
-              outros. "Valor" de uma conta a pagar é quanto sai; de uma
-              receita fixa é quanto entra. Descobrir isso no fim do
-              formulário faria a pessoa reler tudo.
-            */}
-            <Field label="Isto é dinheiro que..." className="sm:col-span-2">
-              <div className="grid grid-cols-2 gap-2">
-                {(Object.keys(TIPO_CONTA_META) as TipoConta[]).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setEditando({ ...editando, tipo: t })}
-                    className={`rounded-lg border-2 px-3 py-2.5 text-sm font-semibold transition-colors ${
-                      (editando.tipo || "pagar") === t
-                        ? t === "receber"
-                          ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                          : "border-red-400 bg-red-50 text-red-700"
-                        : "border-slate-200 text-slate-500"
-                    }`}
-                  >
-                    {t === "receber" ? "Entra (recebo)" : "Sai (pago)"}
-                  </button>
-                ))}
-              </div>
-              {(editando.tipo || "pagar") === "receber" && (
-                <p className="mt-1.5 text-xs text-slate-500">
-                  Salário, aposentadoria, aluguel que você recebe, mensalidade
-                  de cliente fixo. Ao marcar como recebido, entra no caixa.
-                </p>
-              )}
-            </Field>
+              O seletor "sai / entra" que existiu aqui foi removido quando a
+              Renda fixa ganhou tela própria. Ele virou uma armadilha: marcar
+              "entra" e salvar fazia a conta SUMIR desta tela no mesmo
+              instante, porque a lista daqui filtra por `ehPagar`. Some sem
+              erro e sem explicação é o pior jeito de uma tela responder.
 
-            <Field label={(editando.tipo || "pagar") === "receber" ? "Valor que entra (R$) *" : "Valor (R$) *"}>
+              Quem quer cadastrar o que entra vai em "Renda fixa", no menu.
+            */}
+            <Field label="Valor (R$) *">
               <InputNumero
                 className="input"
                 value={editando.valor}
@@ -859,7 +847,7 @@ export const Contas: React.FC = () => {
               />
             </Field>
 
-            <Field label={(editando.tipo || "pagar") === "receber" ? "Cai no dia" : "Vencimento"}>
+            <Field label="Vencimento">
               <input
                 type="date"
                 className="input"

@@ -521,6 +521,30 @@ export const CATEGORIAS_CONTA = [
   "Outro",
 ];
 
+/**
+ * De onde vem o dinheiro que ENTRA todo mês.
+ *
+ * Lista separada da de despesa de propósito: quem recebe salário e auxílio
+ * não tem nada a ver com "Energia" e "Fornecedor", e uma lista com trinta
+ * itens dos quais vinte não servem é uma lista que ninguém lê até o fim.
+ *
+ * "Auxílio / Benefício" cobre Bolsa Família, BPC, seguro-desemprego e o que
+ * mais aparecer. Não vale separar um a um: programa de governo troca de nome
+ * e de regra a cada governo, e uma lista fixa no código envelheceria — o
+ * campo de descrição diz qual é.
+ */
+export const CATEGORIAS_RENDA = [
+  "Salário",
+  "Auxílio / Benefício",
+  "Aposentadoria",
+  "Pensão",
+  "Aluguel recebido",
+  "Mensalidade de cliente",
+  "Freelance / Bico fixo",
+  "Rendimento de investimento",
+  "Outro",
+];
+
 /* ------------------------------------------------------------------ */
 /* Objetivos (metas)                                                   */
 /* ------------------------------------------------------------------ */
