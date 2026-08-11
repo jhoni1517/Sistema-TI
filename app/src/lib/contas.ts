@@ -446,3 +446,85 @@ export const CORES_META: Record<TipoMeta, string> = {
   os: "#8b5cf6",
   teto_gasto: "#f59e0b",
 };
+
+/* ------------------------------------------------------------------ */
+/* Renda fixa: a tela de quem VIVE do que entra todo mês               */
+/* ------------------------------------------------------------------ */
+
+export interface ResumoRenda {
+  /** Quanto entra por mês somando tudo que é recorrente e está ativo */
+  previstoMes: number;
+  /** Do mês corrente, o que já foi marcado como recebido */
+  recebidoMes: number;
+  /** Do mês corrente, o que ainda não caiu e não está atrasado */
+  aReceberMes: number;
+  /** O que era para ter caído e não caiu */
+  atrasado: number;
+  /** Quantas fontes de renda ativas */
+  fontes: number;
+}
+
+/**
+ * O retrato do mês para quem vive de renda fixa.
+ *
+ * A pergunta que esta tela responde não é "quanto eu ganho" — é "o que já
+ * caiu e o que ainda falta cair". Quem recebe três salários e dois auxílios
+ * em datas diferentes passa o mês fazendo essa conta de cabeça.
+ *
+ * `recebidoMes` sai dos PAGAMENTOS registrados, não do valor cadastrado: o
+ * auxílio que veio menor este mês tem que aparecer pelo que veio, senão a
+ * tela mente para o lado otimista — e é justamente quem depende do dinheiro
+ * que não pode ser enganado sobre ele.
+ */
+export function resumoRenda(contas: ContaPagar[], hoje = hojeISO()): ResumoRenda {
+  const mes = soData(hoje).slice(0, 7);
+  const minhas = (contas || []).filter((c) => ehReceber(c) && c.ativo);
+
+  const recebidoMes = minhas.reduce(
+    (s, c) =>
+      s +
+      (c.pagamentos || [])
+        .filter((p) => soData(p.data).slice(0, 7) === mes)
+        .reduce((t, p) => t + n(p.valor), 0),
+    0
+  );
+
+  let aReceberMes = 0;
+  let atrasado = 0;
+  for (const c of minhas) {
+    if (contaQuitada(c)) continue;
+    if (soData(c.vencimento).slice(0, 7) !== mes) continue;
+    if (situacaoConta(c, hoje) === "atrasada") atrasado += n(c.valor);
+    else aReceberMes += n(c.valor);
+  }
+
+  const arredonda = (v: number) => Math.round(v * 100) / 100;
+  return {
+    previstoMes: arredonda(receitaFixaMensal(contas)),
+    recebidoMes: arredonda(recebidoMes),
+    aReceberMes: arredonda(aReceberMes),
+    atrasado: arredonda(atrasado),
+    fontes: minhas.length,
+  };
+}
+
+/**
+ * As fontes de renda na ordem em que a pessoa pensa nelas: o que está
+ * atrasado primeiro, depois o que cai antes.
+ *
+ * Ordenar por valor seria o erro clássico: o auxílio de R$ 600 atrasado
+ * pesa mais na vida de quem depende dele do que o salário de R$ 3.000 que
+ * cai daqui a vinte dias.
+ */
+export function rendaOrdenada(contas: ContaPagar[], hoje = hojeISO()): ContaPagar[] {
+  return (contas || [])
+    .filter(ehReceber)
+    .sort((a, b) => {
+      const atrasoA = situacaoConta(a, hoje) === "atrasada" ? 0 : 1;
+      const atrasoB = situacaoConta(b, hoje) === "atrasada" ? 0 : 1;
+      if (atrasoA !== atrasoB) return atrasoA - atrasoB;
+      // Desligada vai para o fim: ela não faz parte da vida deste mês.
+      if (!!a.ativo !== !!b.ativo) return a.ativo ? -1 : 1;
+      return diasAteVencer(a.vencimento, hoje) - diasAteVencer(b.vencimento, hoje);
+    });
+}

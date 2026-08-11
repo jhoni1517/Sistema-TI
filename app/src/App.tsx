@@ -12,6 +12,7 @@ import { Estoque } from "./pages/Estoque";
 import { Caixa } from "./pages/Caixa";
 import { AReceber } from "./pages/AReceber";
 import { Contas } from "./pages/Contas";
+import { Renda } from "./pages/Renda";
 import { Agenda } from "./pages/Agenda";
 import { Checklist } from "./pages/Checklist";
 import { Mesas } from "./pages/Mesas";
@@ -134,6 +135,7 @@ const AreaProtegida: React.FC = () => {
           <Route path="caixa" element={<Protegida recurso="caixa" papel={papel}><Caixa /></Protegida>} />
           <Route path="a-receber" element={<Protegida recurso="fiado" papel={papel}><AReceber /></Protegida>} />
           <Route path="contas" element={<Protegida recurso="caixa" papel={papel}><Contas /></Protegida>} />
+          <Route path="renda" element={<Protegida recurso="caixa" papel={papel}><Renda /></Protegida>} />
           <Route path="agenda" element={<Agenda />} />
           <Route path="checklist" element={<Checklist />} />
           <Route path="mesas" element={<Protegida recurso="caixa" papel={papel}><DoPlano modulo="mesas"><Mesas /></DoPlano></Protegida>} />
