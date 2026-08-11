@@ -115,9 +115,28 @@ não quer ser o servidor de e-mail delas.
 
 4. Salve e teste com "esqueci minha senha" numa conta de verdade.
 
-Confira também **URL Configuration** → **Redirect URLs**: precisa conter
-`https://sistema-ti-caixa.vercel.app/**`, senão o link abre e volta para a
-home sem deixar trocar a senha.
+### Os dois endereços em Authentication → URL Configuration
+
+São dois campos e os dois importam, por motivos diferentes. Errar aqui não
+quebra nada para quem já usa o sistema — quebra só para quem está entrando
+pela primeira vez, que é justamente quem você não vê.
+
+| campo | o que põe | o que acontece se estiver errado |
+|---|---|---|
+| **Site URL** | `https://sistema-ti-caixa.vercel.app` | O link do e-mail de confirmação leva a pessoa para o endereço errado. Nasce valendo `http://localhost:3000`, que no celular de quem recebeu não existe: aparece "erro ao acessar o site" |
+| **Redirect URLs** | `https://sistema-ti-caixa.vercel.app/**` | O Supabase recusa o destino que o sistema pediu e volta para a Site URL. É o mesmo bug entrando pela porta dos fundos |
+
+Os dois asteriscos no fim das Redirect URLs não são enfeite: sem eles só o
+endereço exato passa, e todo link do sistema leva rota (`#/entrar?convite=...`).
+
+**Como testar sem depender de outra pessoa:** crie uma conta com um e-mail
+seu que você nunca usou aqui, e abra o link de confirmação no CELULAR. É o
+único jeito de ver o que o convidado vê — no seu computador, com sessão
+aberta, o erro não aparece.
+
+Se você usa prévia da Vercel ou `npm run dev`, acrescente
+`http://localhost:5173/**` e `https://*.vercel.app/**` às Redirect URLs. A
+Site URL continua sendo a de produção: ela é só o destino de reserva.
 
 ---
 
