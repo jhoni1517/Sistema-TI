@@ -353,6 +353,23 @@ export function movimentosPorSessao(
 }
 
 /**
+ * A data EXISTE no calendário?
+ *
+ * O formato certo não basta, e isto não é preciosismo: "2026-13-01" e
+ * "2026-02-30" passam por qualquer regex de AAAA-MM-DD e não existem. O
+ * `new Date()` aceita as duas caladinho e escorrega para outro mês — e daí
+ * o lançamento vai parar num dia que ninguém procura.
+ *
+ * A conferência é a ida e volta: se o que sai não é igual ao que entrou, a
+ * data foi "consertada" pelo JavaScript, e não era para consertar.
+ */
+function diaQueExiste(iso: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
+  const d = new Date(iso + "T00:00:00Z");
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === iso;
+}
+
+/**
  * A data de um lançamento manual lançado fora do dia.
  *
  * Relatado do balcão: uma compra do dia 04 percebida no dia 10. Até aqui
@@ -374,23 +391,6 @@ export function movimentosPorSessao(
  * Data no futuro é recusada por quem chama, não aqui: lançamento adiantado
  * some do fechamento de hoje e aparece num dia que ainda não existe.
  */
-/**
- * A data EXISTE no calendário?
- *
- * O formato certo não basta, e isto não é preciosismo: "2026-13-01" e
- * "2026-02-30" passam por qualquer regex de AAAA-MM-DD e não existem. O
- * `new Date()` aceita as duas caladinho e escorrega para outro mês — e daí
- * o lançamento vai parar num dia que ninguém procura.
- *
- * A conferência é a ida e volta: se o que sai não é igual ao que entrou, a
- * data foi "consertada" pelo JavaScript, e não era para consertar.
- */
-function diaQueExiste(iso: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
-  const d = new Date(iso + "T00:00:00Z");
-  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === iso;
-}
-
 export function carimboDoLancamento(dia: string, agora = new Date()): string {
   const hoje = agora.toISOString().slice(0, 10);
   const escolhido = String(dia || "").slice(0, 10);

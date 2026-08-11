@@ -160,10 +160,14 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
         localStorage.setItem(CONVITE_PENDENTE, convite.trim().toUpperCase());
         if (nome.trim()) localStorage.setItem("sistema-ti:nome-convite", nome.trim());
 
-        const { precisaConfirmar } = await criarConta(email, senha);
+        // O convite vai junto: o e-mail de confirmação costuma abrir noutro
+        // navegador, e lá o localStorage está vazio.
+        const { precisaConfirmar } = await criarConta(email, senha, convite);
         if (precisaConfirmar) {
           setAviso(
-            "Conta criada! Confirme o e-mail que enviamos e depois faça login — seu acesso já estará liberado."
+            "Conta criada! Confirme o e-mail que enviamos e depois faça login — " +
+              "seu acesso já estará liberado. Abra o link no mesmo aparelho, e se " +
+              "o e-mail não chegar em alguns minutos confira a caixa de spam."
           );
           setModo("entrar");
         } else {

@@ -18,11 +18,26 @@ export const SemPerfil: React.FC<{
   const [erro, setErro] = useState("");
   const [enviando, setEnviando] = useState(false);
 
-  // Recupera o convite digitado na criação da conta (o e-mail de confirmação
-  // traz a pessoa de volta numa aba nova, então o código fica guardado)
+  /*
+   * Recupera o convite. A URL PRIMEIRO, o aparelho depois.
+   *
+   * O código só morava no `localStorage`, e isso quebrava no caminho mais
+   * comum de todos: a pessoa cria a conta no navegador e abre o e-mail de
+   * confirmação pelo aplicativo do Gmail, que tem um navegador embutido com
+   * outro `localStorage`. Chegava aqui com o campo vazio e sem ter como
+   * adivinhar um código que ela mesma nunca escolheu.
+   *
+   * Agora o link de confirmação carrega o código, então a URL é a fonte boa
+   * — ela atravessa navegador e até aparelho. O guardado fica de reserva
+   * para quem confirma no mesmo lugar onde criou a conta.
+   */
   useEffect(() => {
+    const naUrl = new URLSearchParams(window.location.hash.split("?")[1] || "")
+      .get("convite")
+      ?.trim()
+      .toUpperCase();
     const guardado = localStorage.getItem(CONVITE_PENDENTE);
-    if (guardado) setCodigo(guardado);
+    if (naUrl || guardado) setCodigo(naUrl || guardado || "");
     const nomeGuardado = localStorage.getItem("sistema-ti:nome-convite");
     if (nomeGuardado) setNome(nomeGuardado);
   }, []);

@@ -115,18 +115,63 @@ export async function entrar(email: string, senha: string): Promise<void> {
   if (error) throw new Error(traduzErro(error.message));
 }
 
+/**
+ * Cria a conta e DIZ PARA ONDE O E-MAIL DE CONFIRMAÇÃO DEVE VOLTAR.
+ *
+ * Relatado: "gerei o link, ela recebeu o pedido de confirmar o e-mail, e ao
+ * confirmar dá erro ao acessar o site."
+ *
+ * Era isto. O `signUp` ia sem `emailRedirectTo`, e sem ele o Supabase usa a
+ * "Site URL" do projeto — que nasce valendo `http://localhost:3000`. O link
+ * do e-mail mandava a pessoa para o localhost DELA, que não existe. A conta
+ * era criada certinho; só a volta é que caía no vazio.
+ *
+ * E a inconsistência estava à vista: a recuperação de senha já mandava
+ * `redirectTo` desde sempre. Uma foi consertada e a outra ficou.
+ *
+ * O CÓDIGO DO CONVITE VAI JUNTO NA URL, e isso é o segundo conserto.
+ *
+ * Ele era guardado só no `localStorage`. Só que a pessoa cria a conta no
+ * navegador, e abre o e-mail no aplicativo do Gmail — que tem o navegador
+ * embutido dele, com outro `localStorage`. O código não estava lá, e ela
+ * caía na tela de "sem perfil" com o campo vazio, sem ter como adivinhar um
+ * código que ela nunca digitou.
+ *
+ * Levar na URL faz o convite sobreviver à troca de navegador e até à troca
+ * de aparelho. O `localStorage` continua como reserva, para quem confirma no
+ * mesmo lugar.
+ */
 export async function criarConta(
   email: string,
-  senha: string
+  senha: string,
+  convite?: string
 ): Promise<{ precisaConfirmar: boolean }> {
   if (!supabase) throw new Error("Nuvem não configurada.");
   const { data, error } = await supabase.auth.signUp({
     email: email.trim(),
     password: senha,
+    options: { emailRedirectTo: destinoDaConfirmacao(convite) },
   });
   if (error) throw new Error(traduzErro(error.message));
   return { precisaConfirmar: !data.session };
 }
+
+/**
+ * Para onde o link do e-mail traz a pessoa de volta.
+ *
+ * O endereço é montado a partir de ONDE O SISTEMA ESTÁ RODANDO agora, e não
+ * de uma constante: a mesma base atende produção, as prévias da Vercel e o
+ * `npm run dev`, e um endereço fixo no código quebraria as duas últimas.
+ *
+ * Precisa estar na lista de "Redirect URLs" do Supabase, senão ele recusa e
+ * cai na Site URL de novo — que é o bug original voltando pela porta dos
+ * fundos. Ver CONFIGURACAO.md.
+ */
+export const destinoDaConfirmacao = (convite?: string): string => {
+  const base = `${window.location.origin}${window.location.pathname}`;
+  const codigo = String(convite || "").trim().toUpperCase();
+  return codigo ? `${base}#/entrar?convite=${encodeURIComponent(codigo)}` : base;
+};
 
 /* ------------------------------------------------------------------ */
 /* Convites — criar conta só é possível com um código válido           */
