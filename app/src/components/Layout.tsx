@@ -130,17 +130,31 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
       <aside
         // overscroll-contain corta a rolagem em cadeia: chegando ao fim da
         // lista, o gesto morre aqui em vez de arrastar a página de trás.
-        className={`fixed inset-y-0 left-0 z-40 flex w-64 transform flex-col overflow-y-auto overscroll-contain bg-slate-900 text-slate-300 transition-transform lg:static lg:translate-x-0 ${
+        /*
+         * LETRA MAIOR NO CELULAR — relatado do balcão: "tem gente sofrendo
+         * para ver".
+         *
+         * O tamanho cresce só até o `lg`, que é onde a lateral deixa de ser
+         * gaveta e vira coluna fixa: no computador ela divide espaço com o
+         * conteúdo e engordar a fonte ali roubaria a tela de trabalho. No
+         * celular a gaveta cobre tudo enquanto está aberta, então o espaço é
+         * de graça.
+         *
+         * A largura acompanha a fonte. Só aumentar a letra faria "Ordens de
+         * Serviço" e "A Receber (Fiado)" quebrarem em duas linhas ou serem
+         * cortados pelo `truncate` — e nome cortado é pior que nome pequeno.
+         */
+        className={`fixed inset-y-0 left-0 z-40 flex w-72 transform flex-col overflow-y-auto overscroll-contain bg-slate-900 text-slate-300 transition-transform lg:w-64 lg:static lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         <div className="flex h-16 shrink-0 items-center gap-2 border-b border-slate-800 px-5">
           <MarcaDaLoja logoUrl={config.logoUrl} tamanho={36} />
           <div className="truncate">
-            <p className="truncate text-sm font-bold text-white">
+            <p className="truncate text-base font-bold text-white lg:text-sm">
               {config.nomeLoja}
             </p>
-            <p className="flex items-center gap-1 text-[11px] text-slate-400">
+            <p className="flex items-center gap-1 text-xs text-slate-400 lg:text-[11px]">
               {online ? (
                 <>
                   <Cloud size={11} /> Nuvem
@@ -157,9 +171,9 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
         <div className="shrink-0 px-3 pt-3">
           <button
             onClick={() => setBusca(true)}
-            className="flex w-full items-center gap-2 rounded-lg bg-slate-800 px-3 py-2 text-sm text-slate-400 hover:bg-slate-700 hover:text-slate-200"
+            className="flex w-full items-center gap-2 rounded-lg bg-slate-800 px-3 py-2.5 text-base text-slate-400 hover:bg-slate-700 hover:text-slate-200 lg:py-2 lg:text-sm"
           >
-            <Search size={16} />
+            <Search className="h-[18px] w-[18px] shrink-0 lg:h-4 lg:w-4" />
             <span className="flex-1 text-left">Buscar...</span>
             <span className="hidden rounded border border-slate-600 px-1.5 py-0.5 text-[10px] lg:inline">
               Ctrl K
@@ -192,14 +206,16 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
               end={item.end}
               onClick={() => setOpen(false)}
               className={({ isActive }) =>
-                `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+                `flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition-colors lg:py-2.5 lg:text-sm ${
                   isActive
                     ? "bg-brand-600 text-white"
                     : "text-slate-300 hover:bg-slate-800 hover:text-white"
                 }`
               }
             >
-              <item.icon size={18} />
+              {/* Altura e largura pelo CSS vencem o width/height que o ícone
+                  escreve como atributo, então ele cresce junto com a letra. */}
+              <item.icon className="h-5 w-5 shrink-0 lg:h-[18px] lg:w-[18px]" />
               {item.label}
             </NavLink>
           ))}
@@ -211,10 +227,10 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
         <div className="mt-auto shrink-0 border-t border-slate-800 p-3">
           {sessao && (
             <div className="mb-2 px-3">
-              <p className="truncate text-xs font-semibold text-slate-300">
+              <p className="truncate text-sm font-semibold text-slate-300 lg:text-xs">
                 {sessao.perfil?.nome || sessao.email}
               </p>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-xs text-slate-500 lg:text-[11px]">
                 {sessao.perfil ? NOME_PAPEL[sessao.perfil.papel] : "sem perfil"}
               </p>
             </div>
@@ -225,9 +241,9 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
           <button
             onClick={() => reload()}
             disabled={loading}
-            className="mb-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white disabled:opacity-40"
+            className="mb-1 flex w-full items-center gap-3 rounded-lg px-3 py-3 text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white disabled:opacity-40 lg:py-2.5 lg:text-sm"
           >
-            <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
+            <RefreshCw className={`h-5 w-5 shrink-0 lg:h-[18px] lg:w-[18px] ${loading ? "animate-spin" : ""}`} />
             {loading ? "Atualizando..." : "Atualizar dados"}
           </button>
           <button
@@ -235,9 +251,9 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
               onLogout();
               navigate("/");
             }}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-800 hover:text-white"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-base font-medium text-slate-300 hover:bg-slate-800 hover:text-white lg:py-2.5 lg:text-sm"
           >
-            <LogOut size={18} />
+            <LogOut className="h-5 w-5 shrink-0 lg:h-[18px] lg:w-[18px]" />
             Sair
           </button>
         </div>
