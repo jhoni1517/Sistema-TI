@@ -10,6 +10,8 @@ import {
   Users,
   ArrowRight,
   ShieldAlert,
+  ShoppingCart,
+  HandCoins,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { brl, isToday, codigoOS, formatDate, txt } from "../lib/format";
@@ -17,9 +19,11 @@ import { receitaBruta, totalOS, lucroLiquido } from "../lib/calc";
 import { OS_STATUS_META, type OSStatus } from "../lib/types";
 import { conferirTudo, dinheiroEmRisco } from "../lib/integridade";
 import { Conferencia } from "../components/Conferencia";
+import { temModulo, vocabulario } from "../lib/ramos";
+import { saldoFiado } from "../lib/calc";
 
 export const Dashboard: React.FC = () => {
-  const { ordens, clientes, produtos, movimentos, vendas, fiados, sessoes, comandas, config } = useApp();
+  const { ordens, clientes, produtos, movimentos, vendas, fiados, sessoes, comandas, config, ramo } = useApp();
   const navigate = useNavigate();
   const [conferindo, setConferindo] = useState(false);
 
@@ -38,11 +42,18 @@ export const Dashboard: React.FC = () => {
       .filter((o) => ["pronta", "aprovada", "em_reparo", "aguardando_peca"].includes(o.status))
       .reduce((s, o) => s + totalOS(o), 0);
     const estoqueBaixo = produtos.filter((p) => p.quantidade <= p.estoqueMinimo);
-    const lucroMes = lucroLiquido(
-      movimentos.filter((m) => txt(m.data).slice(0, 7) === new Date().toISOString().slice(0, 7))
+    const doMes = movimentos.filter(
+      (m) => txt(m.data).slice(0, 7) === new Date().toISOString().slice(0, 7)
     );
-    return { abertas, prontas, caixaHoje, aReceber, estoqueBaixo, lucroMes, movHoje };
-  }, [ordens, produtos, movimentos]);
+    const lucroMes = lucroLiquido(doMes);
+    // Para a loja sem OS, o que responde "como foi hoje" é a venda.
+    const vendasHoje = vendas.filter((v) => isToday(v.criadoEm)).length;
+    const fiadoAberto = fiados.reduce((s, f) => s + saldoFiado(f), 0);
+    return {
+      abertas, prontas, caixaHoje, aReceber, estoqueBaixo, lucroMes, movHoje,
+      vendasHoje, fiadoAberto, doMes,
+    };
+  }, [ordens, produtos, movimentos, vendas, fiados]);
 
   const recentes = useMemo(
     () => [...ordens].sort((a, b) => b.numero - a.numero).slice(0, 6),
@@ -50,6 +61,10 @@ export const Dashboard: React.FC = () => {
   );
 
   const nomeCliente = (id: string) => clientes.find((c) => c.id === id)?.nome || "—";
+
+  /* O ramo manda no Painel igual manda no menu. */
+  const temOS = temModulo(ramo, "os");
+  const palavras = vocabulario(ramo);
 
   return (
     <div>
@@ -60,17 +75,42 @@ export const Dashboard: React.FC = () => {
 
       {/* Cards principais */}
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card onClick={() => navigate("/ordens")} icon={<Wrench />} color="from-blue-500 to-blue-700" label="OS em aberto" value={String(stats.abertas.length)} />
-        <Card onClick={() => navigate("/ordens")} icon={<CheckCircle2 />} color="from-emerald-500 to-emerald-700" label="Prontas p/ entrega" value={String(stats.prontas.length)} />
+        {/*
+          MERCEARIA NÃO TEM ORDEM DE SERVIÇO.
+          
+          O menu já respeitava o ramo; o Painel não — e o Painel é a PRIMEIRA
+          tela. Quem contratou mercearia abria o sistema e via "OS em aberto:
+          0" e "Nenhuma ordem de serviço ainda. Crie a primeira em Ordens de
+          Serviço", apontando para um item de menu que não existe para ela.
+          Parece sistema quebrado, e o cliente pagante conclui que comprou a
+          coisa errada.
+        */}
+        {temOS ? (
+          <>
+            <Card onClick={() => navigate("/ordens")} icon={<Wrench />} color="from-blue-500 to-blue-700" label={`${palavras.ordemCurta} em aberto`} value={String(stats.abertas.length)} />
+            <Card onClick={() => navigate("/ordens")} icon={<CheckCircle2 />} color="from-emerald-500 to-emerald-700" label="Prontas p/ entrega" value={String(stats.prontas.length)} />
+          </>
+        ) : (
+          <>
+            <Card onClick={() => navigate("/pdv")} icon={<ShoppingCart />} color="from-blue-500 to-blue-700" label="Vendas hoje" value={String(stats.vendasHoje)} />
+            <Card onClick={() => navigate("/a-receber")} icon={<HandCoins />} color="from-emerald-500 to-emerald-700" label="Fiado em aberto" value={brl(stats.fiadoAberto)} />
+          </>
+        )}
         <Card onClick={() => navigate("/caixa")} icon={<Wallet />} color="from-violet-500 to-violet-700" label="Recebido hoje" value={brl(stats.caixaHoje)} />
         <Card onClick={() => navigate("/relatorios")} icon={<TrendingUp />} color="from-amber-500 to-orange-600" label="Lucro líquido (mês)" value={brl(stats.lucroMes)} />
       </div>
 
       {/* Alertas + a receber */}
       <div className="mb-6 grid gap-4 lg:grid-cols-3">
+        {/* "Em serviço" é aparelho no balcão esperando conserto: sem OS,
+            esse dinheiro não existe. A loja sem OS vê o que ela tem. */}
         <div className="card">
-          <p className="flex items-center gap-2 text-sm text-slate-500"><Clock size={16} /> A receber (em serviço)</p>
-          <p className="mt-1 text-2xl font-bold text-slate-800">{brl(stats.aReceber)}</p>
+          <p className="flex items-center gap-2 text-sm text-slate-500">
+            <Clock size={16} /> {temOS ? "A receber (em serviço)" : "Recebido no mês"}
+          </p>
+          <p className="mt-1 text-2xl font-bold text-slate-800">
+            {brl(temOS ? stats.aReceber : receitaBruta(stats.doMes))}
+          </p>
         </div>
         <div className="card">
           <p className="flex items-center gap-2 text-sm text-slate-500"><Users size={16} /> Clientes cadastrados</p>
@@ -117,10 +157,16 @@ export const Dashboard: React.FC = () => {
 
       {conferindo && <Conferencia onClose={() => setConferindo(false)} />}
 
-      {/* OS recentes */}
+      {/*
+        A lista de ordens recentes sai inteira na loja sem OS. Não basta
+        trocar o texto: a linha mostra marca e modelo do APARELHO, que numa
+        mercearia não existe, e o vazio mandava criar a primeira "em Ordens
+        de Serviço" — um menu que ela não tem.
+      */}
+      {temOS && (
       <div className="card">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="font-bold text-slate-700">Ordens recentes</h2>
+          <h2 className="font-bold text-slate-700">{palavras.ordemPlural} recentes</h2>
           <button className="flex items-center gap-1 text-sm font-semibold text-brand-600 hover:underline" onClick={() => navigate("/ordens")}>
             Ver todas <ArrowRight size={14} />
           </button>
@@ -144,6 +190,7 @@ export const Dashboard: React.FC = () => {
           </div>
         )}
       </div>
+      )}
     </div>
   );
 };

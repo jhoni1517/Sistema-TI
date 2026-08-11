@@ -122,29 +122,115 @@ export const contasParaAvisar = (contas: ContaPagar[], hoje = hojeISO()): ContaP
     .filter((c) => ["atrasada", "vence_hoje", "proxima"].includes(situacaoConta(c, hoje)))
     .sort((a, b) => diasAteVencer(a.vencimento, hoje) - diasAteVencer(b.vencimento, hoje));
 
-/** Quanto ainda vai sair no mês corrente considerando o que não foi pago */
-export const totalAPagarNoMes = (contas: ContaPagar[], hoje = hojeISO()): number => {
+/** Do mês corrente, ainda em aberto, de um lado só */
+const abertasNoMes = (
+  contas: ContaPagar[],
+  hoje: string,
+  querReceber: boolean
+): ContaPagar[] => {
   const mes = soData(hoje).slice(0, 7);
-  return contas
-    .filter((c) => c.ativo && !contaQuitada(c) && soData(c.vencimento).slice(0, 7) === mes)
-    .reduce((s, c) => s + n(c.valor), 0);
+  return contas.filter(
+    (c) =>
+      c.ativo &&
+      !contaQuitada(c) &&
+      ehReceber(c) === querReceber &&
+      soData(c.vencimento).slice(0, 7) === mes
+  );
 };
 
+/** Quanto ainda vai SAIR no mês corrente considerando o que não foi pago */
+export const totalAPagarNoMes = (contas: ContaPagar[], hoje = hojeISO()): number =>
+  abertasNoMes(contas, hoje, false).reduce((s, c) => s + n(c.valor), 0);
+
+/** Quanto ainda vai ENTRAR no mês corrente e não caiu */
+export const totalAReceberNoMes = (contas: ContaPagar[], hoje = hojeISO()): number =>
+  abertasNoMes(contas, hoje, true).reduce((s, c) => s + n(c.valor), 0);
+
+/**
+ * Atrasado, separado por lado.
+ *
+ * Somar os dois num número só daria um valor sem significado nenhum: uma
+ * conta de luz atrasada e um salário que não caiu são problemas opostos, e o
+ * que se faz com cada um é o oposto também.
+ */
 export const totalAtrasado = (contas: ContaPagar[], hoje = hojeISO()): number =>
   contas
-    .filter((c) => situacaoConta(c, hoje) === "atrasada")
+    .filter((c) => ehPagar(c) && situacaoConta(c, hoje) === "atrasada")
     .reduce((s, c) => s + n(c.valor), 0);
 
-/** Soma das contas fixas (recorrentes) ativas, normalizada para o mês */
+/** O que era para ter entrado e não entrou */
+export const totalAtrasadoAReceber = (contas: ContaPagar[], hoje = hojeISO()): number =>
+  contas
+    .filter((c) => ehReceber(c) && situacaoConta(c, hoje) === "atrasada")
+    .reduce((s, c) => s + n(c.valor), 0);
+
+/* ------------------------------------------------------------------ */
+/* Pagar ou receber                                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Esta conta é dinheiro ENTRANDO?
+ *
+ * Ausente é "pagar", e isso não é detalhe: toda conta cadastrada antes deste
+ * campo existir volta do banco sem ele. Ler ausente como "receber"
+ * transformaria o aluguel da loja em receita da noite para o dia.
+ */
+export const ehReceber = (c: Pick<ContaPagar, "tipo">): boolean => c?.tipo === "receber";
+
+/** O mesmo, do outro lado, para a leitura não depender de negação */
+export const ehPagar = (c: Pick<ContaPagar, "tipo">): boolean => !ehReceber(c);
+
+/**
+ * Normaliza qualquer recorrência para o valor mensal equivalente.
+ *
+ * Semanal usa 52/12, não 4: o ano tem 52 semanas, e multiplicar por 4
+ * esconde quase um mês inteiro de despesa por ano.
+ */
+const porMes = (c: ContaPagar): number => {
+  const meta = RECORRENCIA_META[c.recorrencia];
+  if (!meta) return 0;
+  if (meta.dias === 7) return n(c.valor) * (52 / 12);
+  if (meta.meses > 0) return n(c.valor) / meta.meses;
+  return 0;
+};
+
+/**
+ * Soma das contas fixas ativas A PAGAR, normalizada para o mês.
+ *
+ * O FILTRO DE `ehPagar` É O PONTO INTEIRO DESTA FUNÇÃO.
+ *
+ * Sem ele, um salário de R$ 3.000 cadastrado como receita fixa entraria como
+ * R$ 3.000 de CUSTO fixo — e o número que a pessoa usa para saber quanto
+ * precisa faturar por mês passaria a mostrar o dobro do que é. É a mesma
+ * família de erro da compra de estoque contada como despesa: dinheiro do
+ * lado errado da conta, num número que ninguém confere porque parece
+ * plausível.
+ */
 export const custoFixoMensal = (contas: ContaPagar[]): number =>
   contas
-    .filter((c) => c.ativo && c.recorrencia !== "unica")
-    .reduce((s, c) => {
-      const meta = RECORRENCIA_META[c.recorrencia];
-      if (meta.dias === 7) return s + n(c.valor) * (52 / 12); // semanal
-      if (meta.meses > 0) return s + n(c.valor) / meta.meses;
-      return s;
-    }, 0);
+    .filter((c) => c.ativo && c.recorrencia !== "unica" && ehPagar(c))
+    .reduce((s, c) => s + porMes(c), 0);
+
+/**
+ * O espelho: quanto entra todo mês de forma previsível.
+ *
+ * Salário, aposentadoria, aluguel recebido, mensalidade de cliente fixo. É o
+ * número que responde "dá para pagar as contas?" quando posto ao lado do
+ * custo fixo.
+ */
+export const receitaFixaMensal = (contas: ContaPagar[]): number =>
+  contas
+    .filter((c) => c.ativo && c.recorrencia !== "unica" && ehReceber(c))
+    .reduce((s, c) => s + porMes(c), 0);
+
+/**
+ * Sobra prevista do mês: o que entra fixo menos o que sai fixo.
+ *
+ * Negativo é informação, não erro — é a pessoa vendo que o fixo não fecha e
+ * que o resto precisa vir da venda. Zerar em zero esconderia exatamente isso.
+ */
+export const sobraFixaMensal = (contas: ContaPagar[]): number =>
+  Math.round((receitaFixaMensal(contas) - custoFixoMensal(contas)) * 100) / 100;
 
 /**
  * Registra o pagamento e devolve a conta já com o próximo vencimento.

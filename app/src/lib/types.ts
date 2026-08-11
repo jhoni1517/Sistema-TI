@@ -446,6 +446,28 @@ export interface PagamentoConta {
   referencia: string;
 }
 
+/**
+ * A conta é para PAGAR ou para RECEBER?
+ *
+ * Salário, aposentadoria, aluguel que a pessoa recebe, mensalidade de
+ * cliente fixo: tudo isso é o espelho exato de uma conta a pagar — mesma
+ * recorrência, mesmo histórico, e principalmente a MESMA conta de
+ * vencimento, que é a parte difícil e que já custou caro para acertar (dia
+ * 31, 29 de fevereiro, virada de ano).
+ *
+ * Por isso é um campo aqui e não uma tela nova: tela nova duplicaria a regra
+ * do vencimento, e regra escrita em dois lugares envelhece em um deles.
+ *
+ * Ausente = "pagar". É o que toda conta cadastrada antes deste campo é, e
+ * ler ausente como "receber" viraria despesa em receita da noite para o dia.
+ */
+export type TipoConta = "pagar" | "receber";
+
+export const TIPO_CONTA_META: Record<TipoConta, { label: string; verbo: string }> = {
+  pagar: { label: "A pagar", verbo: "Pagar" },
+  receber: { label: "A receber", verbo: "Recebi" },
+};
+
 export interface ContaPagar {
   id: ID;
   descricao: string;
@@ -459,6 +481,13 @@ export interface ContaPagar {
   lembreteDias: number;
   /** Conta desligada continua no histórico, mas para de cobrar */
   ativo: boolean;
+  /**
+   * Pagar (padrão) ou receber. Ver TipoConta.
+   *
+   * OPCIONAL DE PROPÓSITO: as contas que já existem no banco não têm o
+   * campo, e todas elas são "pagar".
+   */
+  tipo?: TipoConta;
   /** Reposição de estoque não é despesa do resultado (mesma regra do caixa) */
   compraEstoque?: boolean;
   /**

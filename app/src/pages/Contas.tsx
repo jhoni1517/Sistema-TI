@@ -38,6 +38,7 @@ import {
   SITUACAO_CONTA_META,
   diasAteVencer,
   pagarConta,
+  ehReceber,
   contasParaAvisar,
   totalAPagarNoMes,
   totalAtrasado,
@@ -67,6 +68,8 @@ import {
   type Meta,
   type Recorrencia,
   type TipoMeta,
+  TIPO_CONTA_META,
+  type TipoConta,
 } from "../lib/types";
 
 const novaConta = (): ContaPagar => ({
@@ -76,6 +79,9 @@ const novaConta = (): ContaPagar => ({
   valor: 0,
   vencimento: hojeISO(),
   recorrencia: "mensal",
+  // Explícito, mesmo sendo o padrão: conta nova nascendo sem o campo faria a
+  // tela ler "pagar" por omissão, e omissão não é escolha.
+  tipo: "pagar",
   lembreteDias: 3,
   ativo: true,
   pagamentos: [],
@@ -283,18 +289,31 @@ export const Contas: React.FC = () => {
        * procura por lucro inflado.
        */
       const sessaoAberta = sessoes.find((s) => !s.fechadoEm);
+      /*
+       * O LADO DO LANÇAMENTO VEM DO TIPO DA CONTA.
+       *
+       * Salário recebido lançado como saída tiraria do caixa o dinheiro que
+       * acabou de entrar — e o erro dobra de tamanho, porque o valor some do
+       * que entrou E aparece no que saiu. O mês fecharia com o dobro do
+       * salário de prejuízo.
+       *
+       * Receita fixa nunca é compra de estoque nem fatura de cartão: as duas
+       * marcas existem para tirar uma SAÍDA do resultado, e não há o que
+       * tirar de uma entrada.
+       */
+      const recebendo = ehReceber(pagando);
       await saveMovimento({
         id: uid(),
-        tipo: "saida",
-        categoria: pagando.categoria || "Despesa",
+        tipo: recebendo ? "entrada" : "saida",
+        categoria: pagando.categoria || (recebendo ? "Receita fixa" : "Despesa"),
         descricao: `${pagando.descricao} (venc. ${formatDate(pagando.vencimento)})`,
         valor: valorPg,
         formaPagamento: formaPg,
         sessaoId: sessaoAberta?.id,
-        compraEstoque: pagando.compraEstoque === true,
+        compraEstoque: !recebendo && pagando.compraEstoque === true,
         // Sem levar a marca junto, o lançamento no caixa vira despesa nova
         // e o mês conta o cartão duas vezes.
-        faturaCartao: pagando.faturaCartao === true,
+        faturaCartao: !recebendo && pagando.faturaCartao === true,
         data: nowISO(),
       });
 
@@ -303,8 +322,8 @@ export const Contas: React.FC = () => {
       setPagando(null);
       aviso.sucesso(
         pagando.recorrencia === "unica"
-          ? "Conta quitada e lançada no caixa."
-          : `Pago e lançado no caixa. Próximo vencimento: ${formatDate(atualizada.vencimento)}.`
+          ? `${recebendo ? "Recebimento" : "Conta"} quitado e lançado no caixa.`
+          : `${recebendo ? "Recebido" : "Pago"} e lançado no caixa. Próximo: ${formatDate(atualizada.vencimento)}.`
       );
     } catch (e) {
       aviso.erro(e instanceof Error ? e.message : String(e));
@@ -799,7 +818,40 @@ export const Contas: React.FC = () => {
               </select>
             </Field>
 
-            <Field label="Valor (R$) *">
+            {/*
+              PRIMEIRO CAMPO DE PROPÓSITO: ele muda o significado de todos os
+              outros. "Valor" de uma conta a pagar é quanto sai; de uma
+              receita fixa é quanto entra. Descobrir isso no fim do
+              formulário faria a pessoa reler tudo.
+            */}
+            <Field label="Isto é dinheiro que..." className="sm:col-span-2">
+              <div className="grid grid-cols-2 gap-2">
+                {(Object.keys(TIPO_CONTA_META) as TipoConta[]).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setEditando({ ...editando, tipo: t })}
+                    className={`rounded-lg border-2 px-3 py-2.5 text-sm font-semibold transition-colors ${
+                      (editando.tipo || "pagar") === t
+                        ? t === "receber"
+                          ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                          : "border-red-400 bg-red-50 text-red-700"
+                        : "border-slate-200 text-slate-500"
+                    }`}
+                  >
+                    {t === "receber" ? "Entra (recebo)" : "Sai (pago)"}
+                  </button>
+                ))}
+              </div>
+              {(editando.tipo || "pagar") === "receber" && (
+                <p className="mt-1.5 text-xs text-slate-500">
+                  Salário, aposentadoria, aluguel que você recebe, mensalidade
+                  de cliente fixo. Ao marcar como recebido, entra no caixa.
+                </p>
+              )}
+            </Field>
+
+            <Field label={(editando.tipo || "pagar") === "receber" ? "Valor que entra (R$) *" : "Valor (R$) *"}>
               <InputNumero
                 className="input"
                 value={editando.valor}
@@ -807,7 +859,7 @@ export const Contas: React.FC = () => {
               />
             </Field>
 
-            <Field label="Vencimento">
+            <Field label={(editando.tipo || "pagar") === "receber" ? "Cai no dia" : "Vencimento"}>
               <input
                 type="date"
                 className="input"
