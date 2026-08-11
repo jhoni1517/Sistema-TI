@@ -47,6 +47,11 @@ alter table ordens add column if not exists backup text;
 -- da fatura impede o mês de contar tudo duas vezes.
 alter table movimentos add column if not exists "faturaCartao" boolean;
 alter table contas_pagar add column if not exists "faturaCartao" boolean;
+-- Pagar (padrao) ou receber: salario, aposentadoria, aluguel recebido,
+-- mensalidade de cliente fixo. Sem default de propósito — nulo ja significa
+-- "pagar" na leitura, e um default gravaria o texto em toda linha antiga
+-- sem necessidade.
+alter table contas_pagar add column if not exists tipo text;
 
 -- ---------- Checklist diário ----------
 -- A tabela inteira nasce em supabase-migracao-checklist.sql; estas linhas
