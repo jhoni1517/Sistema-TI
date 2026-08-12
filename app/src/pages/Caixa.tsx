@@ -42,6 +42,7 @@ import {
   baseDaLista,
   rotuloDaLista,
   carimboDoLancamento,
+  totaisParaCongelar,
   problemaNaDataDoLancamento,
   type EscopoCaixa,
 } from "../lib/caixa";
@@ -150,6 +151,19 @@ export const Caixa: React.FC = () => {
         // calculado aqui faria o sistema concordar consigo mesmo para sempre
         // e a quebra de caixa nunca apareceria.
         valorContado: typeof contado === "number" ? contado : undefined,
+        /*
+         * CONGELA OS NÚMEROS QUE ESTÃO NA TELA AGORA.
+         *
+         * Guarda exatamente o `resumo` que o operador acabou de conferir, e
+         * não um recálculo — gravar número diferente do que ele viu seria a
+         * pior forma de errar aqui.
+         *
+         * Sem isto, mexer num lançamento antigo mudava retroativamente esta
+         * conferência. E com o campo de data no lançamento manual, dá para
+         * lançar hoje uma saída de semana passada, que cairia bem no meio de
+         * uma sessão já fechada e assinada.
+         */
+        totaisFechamento: totaisParaCongelar(resumo),
       });
       setFechando(false);
       aviso.sucesso("Caixa fechado. O resumo fica guardado na aba Fechamentos.");

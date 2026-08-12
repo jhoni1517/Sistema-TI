@@ -175,3 +175,46 @@ export function avisoDeEstoqueQueSubiu(
     `\n\nSE E CORRECAO DE CONTAGEM: confirme. O estoque sobe e nada sai do caixa.`
   );
 }
+
+/**
+ * Quanto MEXER em cada produto, em vez de qual saldo gravar.
+ *
+ * `saldosApos` devolve o saldo final — a tela lê o estoque, calcula e grava
+ * o número pronto. Isso é ler-modificar-gravar no navegador, e é o que faz
+ * dois caixas vendendo a MESMA peça ao mesmo tempo perderem uma das baixas:
+ * os dois leem 5, os dois gravam 4.
+ *
+ * Não é caso raro numa loja com dois balcões, e o estrago é invisível: o
+ * estoque fica maior que a prateleira, ninguém procura por mercadoria a
+ * mais, e a diferença só aparece na contagem meses depois, sem origem.
+ *
+ * Com o DELTA, quem soma é o banco — num UPDATE único que trava a linha, e
+ * sem janela entre ler e gravar. Ver supabase-migracao-estoque-atomico.sql.
+ *
+ * O sinal é o do movimento: baixa é negativo, retorno é positivo.
+ */
+export function deltasApos(
+  itens: { produtoId?: string; quantidade?: number }[],
+  produtos: Produto[],
+  direcao: "baixa" | "retorno" = "baixa"
+): { produto: Produto; delta: number }[] {
+  const somaPorProduto = new Map<string, number>();
+  for (const i of itens || []) {
+    if (!i.produtoId) continue;
+    somaPorProduto.set(i.produtoId, (somaPorProduto.get(i.produtoId) || 0) + n(i.quantidade));
+  }
+
+  const saida: { produto: Produto; delta: number }[] = [];
+  for (const [id, total] of somaPorProduto) {
+    const produto = (produtos || []).find((x) => x.id === id);
+    // Serviço não tem estoque, e produto que não está no cadastro não vira
+    // gravação fantasma. Mesmas duas regras de `saldosApos`.
+    if (!produto || produto.servico) continue;
+    const delta = grama(direcao === "baixa" ? -total : total);
+    // Delta zero não é movimento: pouparia uma ida ao banco e, mais
+    // importante, a função do banco recusa quantidade zero de propósito.
+    if (delta === 0) continue;
+    saida.push({ produto, delta });
+  }
+  return saida;
+}

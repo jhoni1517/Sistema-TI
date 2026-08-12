@@ -19,7 +19,7 @@ import { aviso } from "../components/Aviso";
 import { useApp } from "../store/AppStore";
 import { SectionTitle, EmptyState, InputNumero } from "../components/ui";
 import { uid, nowISO, brl, txt } from "../lib/format";
-import { saldosApos, faltaNoEstoque, avisoDeFalta } from "../lib/estoque";
+import { deltasApos, faltaNoEstoque, avisoDeFalta } from "../lib/estoque";
 import { proximoNumero as proximoNum, problemaParaNumerar } from "../lib/numeracao";
 import { printHTML } from "../lib/print";
 import { reciboPDV } from "../lib/recibo";
@@ -123,7 +123,7 @@ const BotaoNota: React.FC<{
 
 
 export const PDV: React.FC = () => {
-  const { produtos, clientes, sessoes, vendas, notas, config, ramo, fontesComFalha, saveVenda, saveMovimento, saveProduto, saveNota } =
+  const { produtos, clientes, sessoes, vendas, notas, config, ramo, fontesComFalha, saveVenda, saveMovimento, moverEstoque, saveNota } =
     useApp();
 
   /* Recursos do ramo: numa mercearia não existe pizza nem "sem cebola" */
@@ -486,11 +486,21 @@ export const PDV: React.FC = () => {
       }
       await saveVenda({ ...venda, movimentoId });
 
-      // Uma gravação por produto, com o saldo final. Descontar linha a
-      // linha lia sempre o saldo velho da tela: o mesmo produto em duas
-      // linhas descia uma vez só.
-      for (const { produto, quantidade } of saldosApos(itens, produtos)) {
-        await saveProduto({ ...produto, quantidade });
+      /*
+       * Uma gravação por produto, e quem SOMA é o banco.
+       *
+       * `deltasApos` junta as linhas do mesmo produto numa só — descontar
+       * linha a linha lia sempre o saldo velho da tela, e o mesmo produto em
+       * duas linhas descia uma vez só.
+       *
+       * E o que vai para o banco é o DELTA, não o saldo final. Mandar o
+       * saldo é ler-modificar-gravar no navegador: dois caixas vendendo a
+       * mesma peça ao mesmo tempo leem 5, gravam 4, e uma das baixas some. É
+       * o "dois aparelhos vendendo ao mesmo tempo" que o CLAUDE.md listava
+       * como pendente. Agora o banco resolve, num UPDATE que trava a linha.
+       */
+      for (const { produto, delta } of deltasApos(itens, produtos)) {
+        await moverEstoque(produto, delta);
       }
 
       setUltima({ ...venda, movimentoId });

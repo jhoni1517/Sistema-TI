@@ -53,6 +53,11 @@ alter table contas_pagar add column if not exists "faturaCartao" boolean;
 -- sem necessidade.
 alter table contas_pagar add column if not exists tipo text;
 
+-- Os numeros congelados no fechamento de caixa. Sem eles o historico
+-- recalculava tudo a cada abertura da tela, e mexer num lancamento antigo
+-- mudava retroativamente uma conferencia ja assinada. Ver lib/caixa.ts.
+alter table sessoes add column if not exists "totaisFechamento" jsonb;
+
 -- ---------- Checklist diário ----------
 -- A tabela inteira nasce em supabase-migracao-checklist.sql; estas linhas
 -- existem para o caso de o arquivo antigo já ter rodado sem elas.

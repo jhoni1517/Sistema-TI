@@ -836,6 +836,25 @@ export interface DevolucaoVenda {
   movimentoId?: ID;
 }
 
+/**
+ * Interface PRÓPRIA, e não objeto aninhado dentro de SessaoCaixa.
+ *
+ * O `esquema.test.ts` lê os tipos linha a linha procurando `campo:` para
+ * cobrar a coluna no banco, e não distingue nível de aninhamento: declarado
+ * lá dentro, ele exigia oito colunas novas em `sessoes` que não existem —
+ * tudo isto mora num jsonb só.
+ */
+export interface TotaisFechamento {
+  abertura: number;
+  entradas: number;
+  saidas: number;
+  sangrias: number;
+  saldo: number;
+  emEspecie: number;
+  quantidade: number;
+  porForma: Record<string, number>;
+}
+
 export interface SessaoCaixa {
   id: ID;
   abertoEm: string;
@@ -852,6 +871,24 @@ export interface SessaoCaixa {
    * conferência do fim do dia.
    */
   valorContado?: number;
+  /**
+   * OS NÚMEROS CONGELADOS NO FECHAMENTO.
+   *
+   * O histórico recalculava tudo a partir dos movimentos, a cada vez que a
+   * tela abria. Então mexer num lançamento antigo — corrigir um valor,
+   * apagar uma saída, lançar com data retroativa — mudava RETROATIVAMENTE a
+   * conferência de um dia que o operador já tinha contado e assinado.
+   *
+   * A diferença de ontem passava a mostrar um valor que não existia ontem, e
+   * quem procurasse o erro procuraria dinheiro que nunca faltou.
+   *
+   * O risco cresceu quando o lançamento manual ganhou campo de data: agora
+   * dá para lançar hoje uma saída de semana passada.
+   *
+   * Sessão fechada antes deste campo existir fica sem ele e continua sendo
+   * recalculada — é o melhor que dá para fazer com o histórico que já existe.
+   */
+  totaisFechamento?: TotaisFechamento;
   observacoes?: string;
 }
 
