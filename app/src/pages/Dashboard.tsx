@@ -12,6 +12,7 @@ import {
   ShieldAlert,
   ShoppingCart,
   HandCoins,
+  CalendarClock,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { brl, isToday, codigoOS, formatDate, txt } from "../lib/format";
@@ -20,10 +21,11 @@ import { OS_STATUS_META, type OSStatus } from "../lib/types";
 import { conferirTudo, dinheiroEmRisco } from "../lib/integridade";
 import { Conferencia } from "../components/Conferencia";
 import { temModulo, vocabulario } from "../lib/ramos";
+import { projetarCaixa, resumoDaProjecao } from "../lib/projecao";
 import { saldoFiado } from "../lib/calc";
 
 export const Dashboard: React.FC = () => {
-  const { ordens, clientes, produtos, movimentos, vendas, fiados, sessoes, comandas, config, ramo } = useApp();
+  const { ordens, clientes, produtos, movimentos, vendas, fiados, sessoes, comandas, contas, config, ramo } = useApp();
   const navigate = useNavigate();
   const [conferindo, setConferindo] = useState(false);
 
@@ -61,6 +63,16 @@ export const Dashboard: React.FC = () => {
   );
 
   const nomeCliente = (id: string) => clientes.find((c) => c.id === id)?.nome || "—";
+
+  /*
+   * A PERGUNTA QUE NENHUMA TELA RESPONDIA: "até o dia 20 o dinheiro dá?".
+   *
+   * Todo o resto do Painel olha para trás. Este bloco olha para frente, a
+   * partir do que já está combinado — conta cadastrada e renda cadastrada.
+   * Venda futura não entra: seria palpite, e palpite otimista dá permissão
+   * para gastar dinheiro que não vai chegar.
+   */
+  const projecao = useMemo(() => projetarCaixa(contas, undefined, 60), [contas]);
 
   /* O ramo manda no Painel igual manda no menu. */
   const temOS = temModulo(ramo, "os");
@@ -156,6 +168,31 @@ export const Dashboard: React.FC = () => {
       )}
 
       {conferindo && <Conferencia onClose={() => setConferindo(false)} />}
+
+      {/* Previsão dos próximos 60 dias. Só aparece com algo cadastrado —
+          um card dizendo "R$ 0,00" não ensina nada a quem ainda não usou. */}
+      {projecao.dias.length > 0 && (
+        <button
+          onClick={() => navigate("/contas")}
+          className={`card mb-6 flex w-full flex-wrap items-center gap-3 text-left ${
+            projecao.aperto ? "ring-2 ring-red-300" : ""
+          }`}
+        >
+          <CalendarClock
+            size={22}
+            className={projecao.aperto ? "text-red-500" : "text-slate-400"}
+          />
+          <span className="min-w-0 flex-1">
+            <span className="block font-bold text-slate-800">
+              {projecao.aperto ? "O mês não fecha" : "Os próximos 60 dias"}
+            </span>
+            <span className="block text-sm text-slate-500">
+              {resumoDaProjecao(projecao, 60)}
+            </span>
+          </span>
+          <ArrowRight size={16} className="text-slate-400" />
+        </button>
+      )}
 
       {/*
         A lista de ordens recentes sai inteira na loja sem OS. Não basta
