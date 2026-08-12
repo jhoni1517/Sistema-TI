@@ -7,6 +7,8 @@ import React, {
   useRef,
 } from "react";
 import { db, sincronizarPendentes } from "../lib/db";
+import { grama } from "../lib/estoque";
+import { supabase } from "../lib/supabase";
 import { tamanhoDaFila } from "../lib/fila";
 import { paraNuvem, precisaGravarNaNuvem } from "../lib/config";
 import { aviso } from "../components/Aviso";
@@ -116,6 +118,8 @@ interface AppState {
   saveOrdem: (o: OrdemServico) => Promise<void>;
   removeOrdem: (id: string) => Promise<void>;
   saveProduto: (p: Produto) => Promise<void>;
+  /** Mexe no estoque pelo banco, de forma atômica. Delta: baixa é negativo. */
+  moverEstoque: (p: Produto, delta: number) => Promise<void>;
   removeProduto: (id: string) => Promise<void>;
   saveMovimento: (m: MovimentoCaixa) => Promise<void>;
   removeMovimento: (id: string) => Promise<void>;
@@ -459,6 +463,55 @@ export const AppProvider: React.FC<{
   const removeProduto = async (id: string) => {
     await db.produtos.remove(id);
     setProdutos((prev) => prev.filter((x) => x.id !== id));
+  };
+
+  /**
+   * Mexe no estoque pelo BANCO, num UPDATE único que trava a linha.
+   *
+   * `saveProduto` com o saldo já calculado é ler-modificar-gravar no
+   * navegador: dois caixas vendendo a mesma peça ao mesmo tempo leem 5 e
+   * gravam 4, e uma das baixas some. O CLAUDE.md listava isso como
+   * pendente há meses.
+   *
+   * Aqui quem soma é o banco, sobre o valor corrente — não há janela entre
+   * ler e gravar porque não se lê. Ver
+   * supabase-migracao-estoque-atomico.sql.
+   *
+   * Cai de volta no caminho antigo se a função ainda não existir no banco.
+   * Sem isso, quem não rodou a migração não fecharia mais nenhuma venda — e
+   * uma loja parada é pior que uma baixa perdida de vez em quando.
+   */
+  const moverEstoque = async (produto: Produto, delta: number) => {
+    const atual = Number(produto.quantidade) || 0;
+    if (!supabase || produto.servico || delta === 0) return;
+    const { data, error } = await supabase.rpc("mover_estoque", {
+      p_produto: produto.id,
+      p_qtd: delta,
+    });
+
+    if (error) {
+      const semFuncao =
+        /function .*mover_estoque|does not exist|schema cache/i.test(error.message || "");
+      if (!semFuncao) throw new Error(error.message);
+      /*
+       * Grava direto, e não pela ação `saveProduto`.
+       *
+       * Ação chamando ação esconde de quem lê quem é o dono do try/catch —
+       * e o `salvar-com-erro.test.ts` reprova isso, com razão. Aqui o erro
+       * SOBE para a tela, que é quem mostra a mensagem: quem chama
+       * `moverEstoque` está no meio de uma venda e já tem o try/catch.
+       */
+      const recalculado = await db.produtos.save({
+        ...produto,
+        quantidade: grama(atual + delta),
+      });
+      setProdutos((prev) => prev.map((x) => (x.id === recalculado.id ? recalculado : x)));
+      return;
+    }
+
+    // O saldo NOVO vem do banco: é ele que vale, e não a conta da tela.
+    const quantidade = typeof data === "number" ? data : grama(atual + delta);
+    setProdutos((prev) => prev.map((x) => (x.id === produto.id ? { ...x, quantidade } : x)));
   };
 
   const saveMovimento = async (m: MovimentoCaixa) => {
@@ -818,6 +871,7 @@ export const AppProvider: React.FC<{
     saveOrdem,
     removeOrdem,
     saveProduto,
+    moverEstoque,
     removeProduto,
     saveMovimento,
     removeMovimento,

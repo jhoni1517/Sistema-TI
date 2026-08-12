@@ -1,7 +1,12 @@
 import { isToday, txt } from "./format";
 import { normalizar } from "./busca";
 import { receitaBruta, totalDespesas, totalSangrias } from "./calc";
-import type { MovimentoCaixa, SessaoCaixa, TipoMovimento } from "./types";
+import type {
+  MovimentoCaixa,
+  SessaoCaixa,
+  TipoMovimento,
+  TotaisFechamento,
+} from "./types";
 
 /**
  * Sessões de caixa: o que entrou, o que saiu e se bate com a gaveta.
@@ -47,10 +52,39 @@ export const movimentosDaSessao = (
     : // Sem sessão aberta a tela mostra o dia, para o caixa não parecer vazio
       movimentos.filter((m) => isToday(m.data));
 
+/**
+ * O resumo de uma sessão FECHADA sai dos números congelados, quando existem.
+ *
+ * Recalcular a partir dos movimentos fazia mexer num lançamento antigo mudar
+ * RETROATIVAMENTE uma conferência que o operador já tinha contado e
+ * assinado: a diferença de ontem passava a mostrar um valor que não existia
+ * ontem. Quem fosse procurar o erro procuraria dinheiro que nunca faltou.
+ *
+ * Ficou mais grave quando o lançamento manual ganhou campo de data — hoje dá
+ * para lançar uma saída de semana passada, e ela cairia dentro de uma sessão
+ * já fechada.
+ *
+ * Sessão fechada ANTES deste campo existir não tem os totais e continua
+ * sendo recalculada. É o melhor que dá para fazer com o histórico que já
+ * existe, e é por isso que a checagem é pelo campo e não pela data.
+ */
 export function resumoCaixa(
   sessao: SessaoCaixa | null,
   movimentos: MovimentoCaixa[]
 ): ResumoCaixa {
+  const congelado = sessao?.totaisFechamento;
+  if (congelado) {
+    const contado =
+      typeof sessao?.valorContado === "number" ? sessao.valorContado : undefined;
+    return {
+      ...congelado,
+      contado,
+      // A diferença continua sendo calculada, e sempre contra o que estava
+      // EM ESPÉCIE — o saldo soma cartão e Pix, que nunca passaram pela
+      // gaveta.
+      diferenca: contado === undefined ? undefined : arredonda(contado - congelado.emEspecie),
+    };
+  }
   const entradas = receitaBruta(movimentos);
   const saidas = totalDespesas(movimentos);
   const sangrias = totalSangrias(movimentos);
@@ -409,4 +443,25 @@ export function problemaNaDataDoLancamento(dia: string, agora = new Date()): str
     );
   }
   return "";
+}
+
+
+/**
+ * Os números a congelar no fechamento.
+ *
+ * Sai do MESMO `resumoCaixa` que a tela mostra, e não de um recálculo à
+ * parte: gravar um número diferente do que o operador acabou de ver na tela
+ * seria a pior forma possível de errar aqui.
+ */
+export function totaisParaCongelar(r: ResumoCaixa): TotaisFechamento {
+  return {
+    abertura: r.abertura,
+    entradas: r.entradas,
+    saidas: r.saidas,
+    sangrias: r.sangrias,
+    saldo: r.saldo,
+    emEspecie: r.emEspecie,
+    quantidade: r.quantidade,
+    porForma: { ...r.porForma },
+  };
 }
