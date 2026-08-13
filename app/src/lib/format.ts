@@ -51,14 +51,51 @@ export const brl = (v: number): string =>
 
 export const nowISO = (): string => new Date().toISOString();
 
+/**
+ * SÓ A DATA, SEM HORA, NUNCA PASSA PELO `new Date`.
+ *
+ * Relatado do balcão: "lanço uma coisa do dia 12 e ela aparece no dia 11".
+ *
+ * `new Date("2026-08-12")` é lido pelo JavaScript como MEIA-NOITE EM UTC.
+ * Convertido para o horário de Brasília (UTC-3), isso vira 21h do dia 11 —
+ * e `toLocaleDateString` mostra 11/08. Todo campo que guarda só a data
+ * aparecia um dia mais cedo: vencimento de conta, "cai no dia" da renda,
+ * validade do produto, nascimento do cliente.
+ *
+ * O erro é do lado que dói mais: a conta que vence dia 12 aparece vencendo
+ * dia 11, e quem paga no dia 11 acha que está adiantado.
+ *
+ * A regra da casa já dizia que data é texto AAAA-MM-DD e que a conta é em
+ * UTC. Ela valia para o CÁLCULO e ninguém tinha aplicado na EXIBIÇÃO — que
+ * é onde a pessoa lê.
+ *
+ * Texto vira texto: nada de fuso no meio.
+ */
+const SO_DATA = /^(\d{4})-(\d{2})-(\d{2})$/;
+
 export const formatDate = (iso?: string): string => {
   if (!iso) return "-";
-  return new Date(iso).toLocaleDateString("pt-BR");
+  const m = String(iso).match(SO_DATA);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  /*
+   * Carimbo COM hora continua indo para o horário local, e isso é o certo:
+   * uma venda gravada às 13:00 UTC aconteceu às 10:00 aqui, e é 10:00 que a
+   * pessoa lembra. Converter só é errado quando não há hora nenhuma para
+   * converter.
+   */
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "-" : d.toLocaleDateString("pt-BR");
 };
 
 export const formatDateTime = (iso?: string): string => {
   if (!iso) return "-";
-  return new Date(iso).toLocaleString("pt-BR", {
+  // Data pura não tem hora para mostrar, e forçá-la inventaria "00:00" —
+  // que no fuso do Brasil ainda voltaria um dia.
+  const m = String(iso).match(SO_DATA);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "-";
+  return d.toLocaleString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
