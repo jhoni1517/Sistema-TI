@@ -75,7 +75,9 @@ describe("o fim do teste", () => {
 
   it("depois do teste, a loja vence de verdade", () => {
     const fim = fimDoTeste(7, hoje).toISOString();
-    expect(diasParaVencer(fim)).toBeGreaterThan(0);
+    // A partir do MESMO dia de referência: comparar uma data congelada com o
+    // relógio real fazia este teste reprovar sozinho uma semana depois.
+    expect(diasParaVencer(fim, hoje.getTime())).toBeGreaterThan(0);
     expect(semPrazo(loja({ venceEm: fim }))).toBe(false);
   });
 });

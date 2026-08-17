@@ -19,7 +19,15 @@ export const FotosAparelho: React.FC<{
   fotos: string[];
   onChange: (fotos: string[]) => void;
   max?: number;
-}> = ({ fotos, onChange, max = 6 }) => {
+  /**
+   * Pasta no depósito de imagens.
+   *
+   * As da entrada e as do laudo não podem se misturar: as do laudo ficam
+   * abertas na página do cliente, e olhar a pasta é o jeito de saber, meses
+   * depois, qual foto foi publicada e qual nunca saiu da loja.
+   */
+  pasta?: string;
+}> = ({ fotos, onChange, max = 6, pasta = "aparelhos" }) => {
   const entrada = useRef<HTMLInputElement>(null);
   const [enviando, setEnviando] = useState(0);
 
@@ -38,7 +46,7 @@ export const FotosAparelho: React.FC<{
     const falhas: string[] = [];
     for (const arquivo of arquivos) {
       try {
-        novas.push(await enviarImagem(arquivo, obterLoja() || "", "aparelhos", 1000));
+        novas.push(await enviarImagem(arquivo, obterLoja() || "", pasta, 1000));
       } catch (e) {
         falhas.push(`${arquivo.name}: ${e instanceof Error ? e.message : String(e)}`);
       }

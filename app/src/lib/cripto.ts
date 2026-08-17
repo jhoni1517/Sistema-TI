@@ -75,12 +75,36 @@ export async function proteger(texto: string | null | undefined): Promise<string
   }
 }
 
-/** Decifra. Texto antigo (sem prefixo) volta inalterado. */
-export async function revelar(valor: string | null | undefined): Promise<string> {
+/**
+ * Decifra. Texto antigo (sem prefixo) volta inalterado.
+ *
+ * ------------------------------------------------------------
+ * DEVOLVE `null` QUANDO NÃO CONSEGUE LER, E NUNCA TEXTO VAZIO.
+ *
+ * A primeira versão devolvia "" nos dois casos que falham — chave que não
+ * carregou e bloco que não abre. Vazio é indistinguível de "o campo está em
+ * branco", e daí saíram os dois piores efeitos desta base:
+ *
+ * 1. A tela dizia "Nenhum dado de acesso registrado" para uma OS que TINHA a
+ *    senha gravada. A mensagem não era só inútil: ela era mentira, e mandava
+ *    o técnico ligar para o cliente perguntar de novo uma senha que o sistema
+ *    tinha na mão.
+ *
+ * 2. Pior: o vazio ficava na cópia em memória. Qualquer gravação seguinte
+ *    daquela OS — trocar status, acrescentar peça, receber — subia o vazio
+ *    por cima do bloco cifrado. A senha do cliente era APAGADA de vez, em
+ *    silêncio, sem ninguém ter mexido no campo. É exatamente o bug do
+ *    formulário de Configurações, que apagou a loja inteira, de novo.
+ *
+ * Com `null`, quem chama tem que decidir o que fazer — e a decisão certa é
+ * guardar o bloco cifrado como está. Ver `decifrarLinhas` em lib/db.ts.
+ * ------------------------------------------------------------
+ */
+export async function revelar(valor: string | null | undefined): Promise<string | null> {
   const cs = subtle();
   if (!valor) return "";
   if (!estaCifrado(valor)) return valor;
-  if (!chave || !cs) return "";
+  if (!chave || !cs) return null;
   try {
     const [, ivB64, ctB64] = valor.split(".");
     const claro = await cs.decrypt(
@@ -90,6 +114,6 @@ export async function revelar(valor: string | null | undefined): Promise<string>
     );
     return new TextDecoder().decode(claro);
   } catch {
-    return "";
+    return null;
   }
 }

@@ -22,6 +22,7 @@ import {
   EyeOff,
   ShieldAlert,
   ShieldCheck,
+  Camera,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
@@ -31,6 +32,8 @@ import { printHTML } from "../lib/print";
 import { obterLoja } from "../lib/db";
 import { linkDeRastreio } from "../lib/rastreio";
 import { registrarAcessoSigilo } from "../lib/auth";
+import { estadoDoSigilo, recadoDoSigilo, podeEditarSigilo } from "../lib/sigilo";
+import { fotosParaOCliente } from "../lib/fotos-laudo";
 import { reciboOS } from "../lib/recibo";
 import { mensagemCliente } from "../lib/mensagens";
 import { uid, nowISO, brl, abrirWhatsapp, formatDateTime, codigoOS, txt } from "../lib/format";
@@ -1083,18 +1086,34 @@ const OSForm: React.FC<{
           <legend className="flex items-center gap-1 px-2 text-sm font-bold text-amber-700">
             <KeyRound size={15} /> Acesso / Senhas (confidencial)
           </legend>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Senha / PIN">
-              <input className="input" value={os.senhaAparelho} onChange={(e) => setOs({ ...os, senhaAparelho: e.target.value })} />
-            </Field>
-            <Field label="Conta vinculada (Google/Apple)">
-              <input className="input" value={os.contaVinculada} onChange={(e) => setOs({ ...os, contaVinculada: e.target.value })} />
-            </Field>
-          </div>
-          <div className="mt-4">
-            <label className="label">Padrão de desbloqueio (desenhe tocando nos pontos)</label>
-            <PatternLock value={os.padraoDesbloqueio} onChange={(v) => setOs({ ...os, padraoDesbloqueio: v })} />
-          </div>
+          {/*
+            Bloco cifrado que não abriu não pode virar campo editável.
+            O técnico abriria a OS para corrigir o modelo do aparelho, salvaria,
+            e levaria junto o campo de senha que a tela mostrou vazio — apagando
+            do banco a senha do cliente sem ninguém ter tocado nela.
+          */}
+          {!podeEditarSigilo(os) ? (
+            <p className="flex items-start gap-2 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+              <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+              {recadoDoSigilo("ilegivel")} Enquanto isso, estes campos ficam
+              bloqueados: o que está gravado vai continuar lá quando você salvar.
+            </p>
+          ) : (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Senha / PIN">
+                  <input className="input" value={os.senhaAparelho} onChange={(e) => setOs({ ...os, senhaAparelho: e.target.value })} />
+                </Field>
+                <Field label="Conta vinculada (Google/Apple)">
+                  <input className="input" value={os.contaVinculada} onChange={(e) => setOs({ ...os, contaVinculada: e.target.value })} />
+                </Field>
+              </div>
+              <div className="mt-4">
+                <label className="label">Padrão de desbloqueio (desenhe tocando nos pontos)</label>
+                <PatternLock value={os.padraoDesbloqueio} onChange={(v) => setOs({ ...os, padraoDesbloqueio: v })} />
+              </div>
+            </>
+          )}
         </fieldset>
 
         {/* Defeito e checklist */}
@@ -1159,9 +1178,38 @@ const OSForm: React.FC<{
 
         <div>
           <label className="label">Fotos do aparelho na entrada</label>
+          <p className="mb-2 text-xs text-slate-500">
+            Só para a loja. Servem de prova do estado do aparelho na retirada e
+            o cliente não vê nenhuma delas.
+          </p>
           <FotosAparelho
             fotos={os.fotos || []}
             onChange={(fotos) => setOs({ ...os, fotos })}
+          />
+        </div>
+
+        {/*
+          As fotos do laudo são as ÚNICAS que saem para o cliente, e por isso
+          moram numa lista própria. "A placa está queimada, R$ 480" é uma frase
+          que ele tem que acreditar; a foto de perto da trilha queimada é a
+          mesma frase sem precisar de fé.
+
+          Separadas das de entrada de propósito: aquelas pegam a tela ligada e
+          a tela de bloqueio, e publicá-las seria pôr o celular do cliente numa
+          página aberta. Ver lib/fotos-laudo.ts.
+        */}
+        <div className="rounded-xl border border-brand-200 bg-brand-50/40 p-4">
+          <label className="label flex items-center gap-1.5 !text-brand-800">
+            <Camera size={15} /> Fotos do problema — estas o cliente vê
+          </label>
+          <p className="mb-2 text-xs text-brand-700/80">
+            Foto de perto da peça queimada, do conector partido, do que explica o
+            orçamento. Aparecem no link de acompanhamento junto com o valor.
+          </p>
+          <FotosAparelho
+            fotos={os.fotosLaudo || []}
+            onChange={(fotosLaudo) => setOs({ ...os, fotosLaudo })}
+            pasta="laudos"
           />
         </div>
 
@@ -1570,6 +1618,29 @@ const OSDetalhe: React.FC<{
           </div>
         )}
 
+        {/* As fotos que o cliente vê. Marcadas como tal na tela da loja: sem
+            isso não há como conferir, antes de mandar o link, o que foi
+            publicado. Saem na impressão junto do laudo, que é o que elas
+            comprovam. */}
+        {fotosParaOCliente(os).length > 0 && (
+          <div>
+            <p className="label flex items-center gap-1.5">
+              <Camera size={14} /> Fotos do problema — o cliente vê estas
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {fotosParaOCliente(os).map((url) => (
+                <a key={url} href={url} target="_blank" rel="noreferrer">
+                  <img
+                    src={url}
+                    alt=""
+                    className="h-24 w-24 rounded-lg border-2 border-brand-300 object-cover"
+                  />
+                </a>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Peças */}
         {os.pecas.length > 0 && (
           <div>
@@ -1754,7 +1825,8 @@ const OSDetalhe: React.FC<{
  */
 const BlocoSigilo: React.FC<{ os: OrdemServico }> = ({ os }) => {
   const [aberto, setAberto] = useState(false);
-  const temAlgo = !!(os.senhaAparelho || os.padraoDesbloqueio || os.contaVinculada);
+  const estado = estadoDoSigilo(os);
+  const temAlgo = estado === "tem";
 
   const revelarDados = () => {
     setAberto(true);
@@ -1764,9 +1836,17 @@ const BlocoSigilo: React.FC<{ os: OrdemServico }> = ({ os }) => {
   };
 
   return (
-    <div className="rounded-xl bg-amber-50 p-3 print:hidden">
+    <div
+      className={`rounded-xl p-3 print:hidden ${
+        estado === "ilegivel" ? "bg-red-50" : "bg-amber-50"
+      }`}
+    >
       <div className="flex items-center justify-between gap-2">
-        <p className="flex items-center gap-1 text-xs font-bold text-amber-700">
+        <p
+          className={`flex items-center gap-1 text-xs font-bold ${
+            estado === "ilegivel" ? "text-red-700" : "text-amber-700"
+          }`}
+        >
           <KeyRound size={13} /> Acesso (confidencial)
         </p>
         {temAlgo && (
@@ -1780,12 +1860,21 @@ const BlocoSigilo: React.FC<{ os: OrdemServico }> = ({ os }) => {
         )}
       </div>
 
-      {!temAlgo ? (
-        <p className="mt-1 text-sm text-amber-700/70">Nenhum dado de acesso registrado.</p>
-      ) : !aberto ? (
-        <p className="mt-1 text-sm text-amber-700/70">
-          Protegido. Clique em "Revelar" para exibir — fica registrado quem viu.
+      {/*
+        "Nada registrado" e "não consegui abrir" são opostos, e por um bom
+        tempo a tela disse a mesma frase para os dois. Quem lia mandava o
+        cliente repetir uma senha que o sistema tinha guardada.
+      */}
+      {estado !== "tem" ? (
+        <p
+          className={`mt-1 text-sm ${
+            estado === "ilegivel" ? "text-red-700" : "text-amber-700/70"
+          }`}
+        >
+          {recadoDoSigilo(estado)}
         </p>
+      ) : !aberto ? (
+        <p className="mt-1 text-sm text-amber-700/70">{recadoDoSigilo(estado)}</p>
       ) : (
         <>
           <div className="mt-1 grid gap-1 text-sm sm:grid-cols-3">

@@ -169,6 +169,22 @@ async function cifrarLinha<T>(table: TableName, row: T): Promise<T> {
   return copia as T;
 }
 
+/**
+ * Desce decifrando — e, quando NÃO consegue, deixa o bloco cifrado como está.
+ *
+ * A versão anterior trocava o bloco ilegível por texto vazio. Isso fazia a
+ * tela anunciar "Nenhum dado de acesso registrado" numa OS que tinha a senha
+ * gravada, e a gravação seguinte daquela OS (trocar status, receber, incluir
+ * peça) subia o vazio por cima do bloco: a senha do cliente sumia de vez, sem
+ * ninguém ter tocado no campo.
+ *
+ * Mantendo o bloco cifrado, as duas coisas se resolvem sozinhas:
+ *
+ * - `proteger` reconhece o que já está cifrado e devolve igual, então a
+ *   gravação seguinte regrava o MESMO bloco. Nada se perde.
+ * - `estaCifrado` continua verdadeiro na tela, que por isso consegue dizer
+ *   "não foi possível abrir" em vez de "não tem nada".
+ */
 async function decifrarLinhas<T>(table: TableName, rows: T[]): Promise<T[]> {
   const campos = SIGILOSOS[table];
   if (!campos) return rows;
@@ -177,7 +193,9 @@ async function decifrarLinhas<T>(table: TableName, rows: T[]): Promise<T[]> {
       const copia = { ...row } as Record<string, unknown>;
       for (const campo of campos) {
         const v = copia[campo];
-        if (estaCifrado(v as string)) copia[campo] = await revelar(v as string);
+        if (!estaCifrado(v as string)) continue;
+        const claro = await revelar(v as string);
+        if (claro !== null) copia[campo] = claro;
       }
       return copia as T;
     })
