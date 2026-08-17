@@ -1,4 +1,5 @@
 import { brl, codigoOS, negrito, txt } from "./format";
+import { avisoDeFotoNaMensagem } from "./fotos-laudo";
 import { totalOS, totalPecas, totalComOpcao } from "./calc";
 import {
   nomesDasOpcoes,
@@ -262,6 +263,12 @@ export function mensagemCliente(
   // O que o técnico encontrou — é isto que faltava na mensagem antiga
   const constatado = txt(o.defeitoConstatado).trim();
   if (constatado) partes.push(`${negrito("O que encontramos")}\n${constatado}`);
+
+  // A foto do problema vem colada no laudo, que é o que ela comprova. Anunciada
+  // aqui e não no fim: sem o aviso o cliente não tem motivo para abrir o link,
+  // e a única coisa que explica o preço fica atrás de um clique que ninguém dá.
+  const foto = avisoDeFotoNaMensagem(o, !!linkRastreio);
+  if (foto) partes.push(foto);
 
   // Orçamento só nas etapas em que ele existe de fato
   const mostraValores =

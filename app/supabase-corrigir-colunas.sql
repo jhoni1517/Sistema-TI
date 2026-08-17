@@ -71,6 +71,10 @@ alter table tarefas add column if not exists "atualizadoEm" text;
 -- Fotos do aparelho na entrada. Só os endereços; os arquivos ficam no
 -- depósito de imagens. É o que encerra discussão de arranhão na retirada.
 alter table ordens add column if not exists fotos jsonb default '[]'::jsonb;
+-- Fotos do LAUDO: as únicas que saem na página pública do cliente. Lista
+-- separada da de entrada de propósito — aquelas pegam a tela ligada e a tela
+-- de bloqueio do aparelho, e publicá-las seria expor o celular do cliente.
+alter table ordens add column if not exists "fotosLaudo" jsonb default '[]'::jsonb;
 alter table ordens add column if not exists "entregueEm" text;
 
 -- ---------- Produtos ----------

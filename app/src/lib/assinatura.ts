@@ -84,10 +84,24 @@ export const SITUACAO_META: Record<Situacao, { label: string; color: string }> =
   bloqueada: { label: "Bloqueada", color: "bg-slate-200 text-slate-700" },
 };
 
-/** Dias que faltam para vencer (negativo = já venceu) */
-export const diasParaVencer = (venceEm?: string | null): number | null => {
+/**
+ * Dias que faltam para vencer (negativo = já venceu).
+ *
+ * `agora` existe para o teste poder fixar o dia. Sem ele, o teste que
+ * conferia "depois do teste grátis a loja vence de verdade" partia de uma
+ * data congelada e comparava com o relógio real: passou uma semana e ele
+ * começou a reprovar sozinho, sem nada ter mudado no sistema.
+ *
+ * Teste que quebra pelo calendário é teste que a pessoa aprende a ignorar —
+ * e aí ele deixa de existir justamente no dia em que a conta quebrar de
+ * verdade.
+ */
+export const diasParaVencer = (
+  venceEm?: string | null,
+  agora: number = Date.now()
+): number | null => {
   if (!venceEm) return null;
-  const ms = new Date(venceEm).getTime() - Date.now();
+  const ms = new Date(venceEm).getTime() - agora;
   return Math.ceil(ms / 86400000);
 };
 

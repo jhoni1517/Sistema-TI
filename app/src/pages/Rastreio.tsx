@@ -10,6 +10,7 @@ import {
   ThumbsDown,
   ShieldCheck,
   ListChecks,
+  Camera,
 } from "lucide-react";
 import { supabase, supabaseEnabled } from "../lib/supabase";
 import { brl, formatDateTime, codigoOS } from "../lib/format";
@@ -56,6 +57,15 @@ interface OSPublica {
   primeiroNome: string | null;
   total: number | null;
   opcoes: OpcaoPublica[] | null;
+  /**
+   * Fotos do problema, escolhidas pela loja.
+   *
+   * Só as do laudo, nunca as da entrada: aquelas são a prova da loja sobre o
+   * estado do aparelho e pegam a tela ligada, a tela de bloqueio, o papel de
+   * parede. Quem faz esse corte é a função `consultar_os` — a lista já chega
+   * aqui limpa. Ver supabase-migracao-fotos-laudo.sql.
+   */
+  fotos: string[] | null;
   atualizadoEm: string | null;
 }
 
@@ -213,6 +223,48 @@ export const Rastreio: React.FC = () => {
                 </p>
                 <p className="mt-2 text-sm font-medium opacity-95">{meta.cliente}</p>
               </div>
+
+              {/*
+                A foto do problema, antes de qualquer preço.
+
+                "A placa está queimada, R$ 480" é uma frase que o cliente tem
+                que acreditar: ele não abriu o aparelho, não viu nada, e quem
+                está falando é quem ganha com o conserto. A foto de perto da
+                trilha queimada é a mesma frase sem precisar de fé — e por isso
+                vem ANTES do valor, não depois. Depois do número ela vira
+                justificativa; antes, ela é o motivo.
+
+                O corte de quais fotos saem é feito no banco, em
+                `consultar_os`. Aqui só se desenha o que chegou.
+              */}
+              {(os.fotos || []).length > 0 && (
+                <div className="mb-5">
+                  <p className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
+                    <Camera size={16} /> Fotos do seu aparelho
+                  </p>
+                  <p className="mb-3 mt-0.5 text-xs text-slate-500">
+                    Toque para ver de perto.
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(os.fotos || []).map((url) => (
+                      <a
+                        key={url}
+                        href={url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block overflow-hidden rounded-xl border border-slate-200"
+                      >
+                        <img
+                          src={url}
+                          alt="Foto do aparelho enviada pela assistência"
+                          loading="lazy"
+                          className="aspect-square w-full object-cover"
+                        />
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/*
                 Escolha do orçamento. Vem ANTES do valor porque é ela que

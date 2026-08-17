@@ -166,7 +166,8 @@ https://supabase.com/dashboard/project/nviagibefxqtognowqwe/sql/new:
 19. `supabase-migracao-teste-gratis.sql`
 20. `supabase-migracao-teste-controle.sql`
 21. `supabase-migracao-estoque-atomico.sql`
-22. `supabase-corrigir-colunas.sql`
+22. `supabase-migracao-fotos-laudo.sql`
+23. `supabase-corrigir-colunas.sql`
 
 `supabase-conta-teste.sql` fica de fora da ordem de propósito: ele cria uma
 loja de mentira para você mexer sem sujar dado de cliente. Rode só quando

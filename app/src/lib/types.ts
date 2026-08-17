@@ -240,6 +240,28 @@ export interface OrdemServico {
    * técnico, e quem perde é sempre a loja.
    */
   fotos?: string[];
+  /**
+   * Fotos do LAUDO — as únicas que o cliente vê.
+   *
+   * "A placa está queimada" é uma frase que o cliente tem que acreditar. A
+   * foto de perto da trilha queimada é a mesma frase sem precisar de fé, e é
+   * a diferença entre aprovar o orçamento e achar que está sendo enrolado.
+   *
+   * ------------------------------------------------------------
+   * POR QUE NÃO SÃO AS MESMAS FOTOS DA ENTRADA
+   *
+   * As de `fotos` são prova da loja: o trinco que já estava lá quando o
+   * aparelho chegou. Elas existem justamente para a discussão da retirada, e
+   * pegam a tela ligada, a tela de bloqueio, o que estiver aberto no
+   * aparelho. Mandar tudo para uma página pública seria publicar a tela do
+   * celular do cliente sem ele pedir.
+   *
+   * Duas listas separadas fazem a escolha ser um ato: a foto só chega ao
+   * cliente porque alguém a colocou no lugar que diz, com todas as letras,
+   * que ela vai para o cliente.
+   * ------------------------------------------------------------
+   */
+  fotosLaudo?: string[];
   // Quando ficou pronta (base para taxa de armazenamento)
   prontaEm?: string;
 }
