@@ -27,6 +27,7 @@ import { produtosParaOS } from "../lib/busca";
 import { comandasAbertas } from "../lib/comanda";
 import { TODAS_AS_FORMAS, nomeDaForma } from "../lib/pagamento";
 import { aposBaixa } from "../lib/estoque";
+import { lucroDoMovimento } from "../lib/calc";
 import { printHTML } from "../lib/print";
 import { reciboFechamento, reciboVenda, reciboMovimento } from "../lib/recibo";
 import {
@@ -477,6 +478,28 @@ export const Caixa: React.FC = () => {
                         <span className="mx-1">·</span>
                         {formatDateTime(m.data).slice(-5)}
                       </p>
+                      {/*
+                        O custo que veio junto com a entrada.
+
+                        "Entrou o valor total ou só o lucro?" chegou do balcão
+                        sobre uma OS de R$ 180 com peça de R$ 80. A conta
+                        sempre esteve certa — entra o cheio, o custo desconta
+                        no lucro — mas a linha mostrava só os R$ 180, e não
+                        havia como conferir olhando a tela. Quem tem dúvida
+                        sobre o próprio dinheiro não sossega com explicação:
+                        sossega vendo o número.
+                      */}
+                      {(() => {
+                        const l = lucroDoMovimento(m);
+                        if (!l) return null;
+                        return (
+                          <p className="truncate text-xs text-slate-500">
+                            custo {brl(l.custo)}
+                            <span className="mx-1">·</span>
+                            sobra <b className="text-emerald-600">{brl(l.lucro)}</b>
+                          </p>
+                        );
+                      })()}
                     </div>
 
                     <p
