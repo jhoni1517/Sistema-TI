@@ -151,6 +151,76 @@ body {
   }
 
   /*
+   * ============================================================
+   *  LINHA DE LISTA: nome à esquerda, valor e botões à direita
+   * ============================================================
+   *
+   * O BUG, MEDIDO NUM CELULAR DE 375px:
+   *
+   *   coluna do nome ......  12px de largura
+   *   crachá de status ....  vazava 57px POR CIMA do valor
+   *
+   * Na tela, "Lucas Ferreira da Silva" virava "Lu" numa linha e "S." na
+   * outra, com "R$ 180,00" escrito em cima da palavra "Aprovada". Quem
+   * abre a lista de OS no balcão não consegue ler de quem é o conserto.
+   *
+   * ------------------------------------------------------------
+   * POR QUE ACONTECIA
+   *
+   * O bloco do meio era `min-w-0 flex-1`, que é o que faz o texto comprido
+   * caber com reticências — e é justamente o que autoriza ele a encolher
+   * até ZERO. Os vizinhos (valor e botões) não tinham `shrink-0`, então
+   * ninguém segurava o tamanho, e os crachás lá de dentro, que não quebram
+   * linha, vazavam para fora do bloco de largura zero.
+   *
+   * O `flex-wrap` estava lá e não salvava: item de flex só quebra para a
+   * linha de baixo quando NÃO PODE mais encolher. Com `flex-1` ele sempre
+   * pode.
+   *
+   * ------------------------------------------------------------
+   * A REGRA, EM UM LUGAR SÓ
+   *
+   * Estas três classes existem para o conserto não morar em quatro telas
+   * diferentes — e para o `layout-lista.test.ts` poder cobrar que as quatro
+   * usam a mesma coisa. O padrão já tinha se repetido em OS, Caixa, Lojas
+   * e PDV.
+   *
+   *   .linha-card       a faixa; quebra em duas linhas quando aperta
+   *   .linha-card-info  o bloco do meio: encolhe, mas nunca abaixo de 14rem
+   *   .linha-card-fim   valor e botões: não encolhem nunca
+   *
+   * ------------------------------------------------------------
+   * QUANDO NÃO USAR `.linha-card-fim`
+   *
+   * Em bloco que já quebra linha por dentro — um grupo de campos, uma fila
+   * de crachás. `shrink-0` congela o bloco na largura de TUDO em uma linha
+   * só, então ele para de aproveitar a própria quebra e passa a estourar
+   * para fora da tela.
+   *
+   * Medido: a lista de Lojas, cujo bloco tem um campo de 144px, um seletor
+   * de 160px e mais um de 80px, ficava com 450px de largura num celular de
+   * 375 — e a PÁGINA passava a rolar para o lado. Sem `shrink-0` o mesmo
+   * bloco encolhe até a largura do maior campo e quebra sozinho.
+   *
+   * A regra curta: `.linha-card-fim` é para bloco compacto (um valor, dois
+   * ou três botões). Grupo que quebra por dentro não leva nada.
+   * ------------------------------------------------------------
+   *
+   * `basis-56` (14rem) é o piso: chegando nele, o bloco quebra para a linha
+   * de baixo em vez de continuar espremendo. `grow` e não `flex-1` porque
+   * `flex-1` é atalho para `flex: 1 1 0%` — o `0%` no fim apaga o piso.
+   */
+  .linha-card {
+    @apply flex flex-wrap items-center gap-x-4 gap-y-3;
+  }
+  .linha-card-info {
+    @apply min-w-0 grow basis-56;
+  }
+  .linha-card-fim {
+    @apply shrink-0;
+  }
+
+  /*
    * Troca de tela.
    *
    * Sem transição, mudar de página é um piscar: o conteúdo velho some e o

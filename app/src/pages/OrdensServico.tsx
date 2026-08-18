@@ -502,11 +502,11 @@ export const OrdensServico: React.FC = () => {
       ) : (
         <div className="space-y-3">
           {lista.map((o) => (
-            <div key={o.id} className="card flex flex-wrap items-center gap-4">
+            <div key={o.id} className="card linha-card">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
                 <Smartphone size={22} />
               </div>
-              <div className="min-w-0 flex-1">
+              <div className="linha-card-info">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-xs font-bold text-slate-400">{codigoOS(o.numero)}</span>
                   <span className={`badge ${OS_STATUS_META[o.status].color}`}>{OS_STATUS_META[o.status].label}</span>
@@ -552,8 +552,11 @@ export const OrdensServico: React.FC = () => {
                     return null;
                   })()}
                 </div>
-                <p className="flex items-center gap-1.5 truncate font-bold text-slate-800">
-                  {nomeCliente(o.clienteId)}
+                {/* O `truncate` tem que ficar no TEXTO, não no `p`: num
+                    contêiner flex ele não corta nada, e o nome comprido
+                    quebrava em pedaços de duas letras por linha. */}
+                <p className="flex items-center gap-1.5 font-bold text-slate-800">
+                  <span className="truncate">{nomeCliente(o.clienteId)}</span>
                   {classificacaoDe(cliente(o.clienteId)) !== "normal" && (
                     <span
                       className={`badge shrink-0 ${
@@ -570,11 +573,11 @@ export const OrdensServico: React.FC = () => {
                   {o.marca} {o.modelo} · {o.defeitoRelatado}
                 </p>
               </div>
-              <div className="text-right">
+              <div className="linha-card-fim text-right">
                 <p className="font-bold text-slate-800">{brl(totalOS(o))}</p>
                 <p className="text-xs text-slate-400">{formatDateTime(o.atualizadoEm)}</p>
               </div>
-              <div className="flex gap-1.5">
+              <div className="linha-card-fim ml-auto flex gap-1.5">
                 <button className="btn-ghost !p-2" title="Detalhes" onClick={() => setDetalhe(o)}>
                   <Eye size={16} />
                 </button>
