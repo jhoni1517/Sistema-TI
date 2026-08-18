@@ -134,6 +134,45 @@ export const limparCacheLocal = () => {
   }
 };
 
+/* ---------- Marca de escrita ----------
+ *
+ * UMA LEITURA QUE COMEÇOU ANTES DE UMA GRAVAÇÃO NÃO PODE APAGÁ-LA DA TELA.
+ *
+ * O bug que originou: a venda lançada no Caixa aparecia e sumia, e só voltava
+ * com F5. A tela recarrega tudo ao voltar o foco da janela — e recarregar são
+ * dezessete consultas que no 4G do balcão levam segundos. Quando o operador
+ * registrava a venda no meio dessa janela, a resposta da leitura (tirada do
+ * banco ANTES do insert) chegava depois e substituía a lista inteira,
+ * levando embora o lançamento que já estava na tela.
+ *
+ * O dinheiro estava gravado o tempo todo. Mas quem lança uma venda e não a vê
+ * lança de novo — e aí o furo deixa de ser de tela e passa a ser de caixa.
+ *
+ * O contador mora AQUI porque `upsert` e `remove` são o único ponto por onde
+ * toda gravação passa. Deixá-lo em cada ação da loja seria vinte lugares para
+ * esquecer um.
+ */
+let escritas = 0;
+
+/** Quantas gravações já aconteceram. Só serve para comparar com ela mesma. */
+export const marcaDeEscrita = (): number => escritas;
+
+/**
+ * Uma leitura que sabe se foi ultrapassada.
+ *
+ * Quem vai recarregar chama isto ANTES; quando os dados chegarem, `atual()`
+ * responde se alguma gravação aconteceu no meio. Se aconteceu, o que está na
+ * tela é mais novo que o que voltou do banco, e a leitura se descarta.
+ *
+ * Descartar é seguro: o estado da tela já tem o registro novo, e a próxima
+ * volta para o app recarrega de novo. O que se perde é a alteração de outro
+ * aparelho por alguns segundos; o que se ganha é a venda não sumir.
+ */
+export function leituraAtual(): () => boolean {
+  const inicio = escritas;
+  return () => escritas === inicio;
+}
+
 // ---------- Backend local ----------
 const localBackend = {
   list<T>(table: TableName): T[] {
@@ -249,6 +288,10 @@ async function getAll<T extends WithId>(table: TableName): Promise<T[]> {
 }
 
 async function upsert<T extends WithId>(table: TableName, row: T): Promise<T> {
+  // Sobe ANTES de tentar, e não depois de dar certo. Uma leitura em voo que
+  // termine no meio da gravação não pode ser aplicada: ela foi tirada do
+  // banco antes, e aplicá-la devolveria a tela ao estado anterior.
+  escritas++;
   if (supabaseEnabled && supabase) {
     // Sem loja definida a gravação seria recusada pelo banco com uma mensagem
     // técnica incompreensível. Melhor falhar aqui, dizendo o que fazer.
@@ -293,6 +336,9 @@ async function upsert<T extends WithId>(table: TableName, row: T): Promise<T> {
 }
 
 async function remove(table: TableName, id: string): Promise<void> {
+  // Mesma razão do upsert: apagar também é gravar. Sem isto, a leitura em voo
+  // ressuscitaria na tela o lançamento que o operador acabou de excluir.
+  escritas++;
   if (supabaseEnabled && supabase) {
     const { error } = await supabase.from(table).delete().eq("id", id);
     if (error) throw traduzirErroGravacao(error);
