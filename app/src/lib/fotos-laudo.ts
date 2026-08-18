@@ -1,5 +1,5 @@
 import { txt } from "./format";
-import type { OrdemServico } from "./types";
+import type { OrdemServico, VideoLaudo } from "./types";
 
 /**
  * As fotos do laudo — as que o cliente vê na página de acompanhamento.
@@ -61,22 +61,63 @@ export function fotosParaOCliente(
 }
 
 /**
- * A linha que entra na mensagem do WhatsApp quando há foto.
+ * Os vídeos que saem para o cliente.
+ *
+ * Mesma régua das fotos, com uma diferença: o vídeo carrega a capa junto, e
+ * uma capa apontando para lugar nenhum é pior que capa nenhuma — o navegador
+ * desenha o ícone de imagem quebrada em cima do player. Endereço de capa
+ * inválido vira vazio, e aí o player mostra o primeiro quadro.
+ */
+export function videosParaOCliente(
+  os: Pick<OrdemServico, "videosLaudo">
+): VideoLaudo[] {
+  const vistos = new Set<string>();
+  const saida: VideoLaudo[] = [];
+  for (const v of os.videosLaudo || []) {
+    const url = endereco(v?.url);
+    if (!url || vistos.has(url)) continue;
+    vistos.add(url);
+    const duracao = Number(v?.duracao);
+    saida.push({
+      url,
+      capa: endereco(v?.capa),
+      duracao: Number.isFinite(duracao) && duracao > 0 ? Math.round(duracao) : 0,
+    });
+    if (saida.length >= MAX) break;
+  }
+  return saida;
+}
+
+/**
+ * A linha que entra na mensagem do WhatsApp quando há foto ou vídeo.
  *
  * Sem ela o cliente recebe o valor e o link, e não tem por que abrir o link:
- * ele já sabe o status. A foto é o motivo de abrir, então precisa ser
+ * ele já sabe o status. A prova é o motivo de abrir, então precisa ser
  * anunciada — senão a única coisa que explica o preço fica escondida atrás de
  * um clique que ninguém dá.
+ *
+ * Uma frase só, mesmo com os dois: duas linhas seguidas dizendo quase a mesma
+ * coisa é o que faz a pessoa parar de ler a mensagem.
  *
  * Sem emoji: esta linha vai para o WhatsApp.
  */
 export function avisoDeFotoNaMensagem(
-  os: Pick<OrdemServico, "fotosLaudo">,
+  os: Pick<OrdemServico, "fotosLaudo" | "videosLaudo">,
   temLink: boolean
 ): string {
-  const quantas = fotosParaOCliente(os).length;
-  if (quantas === 0 || !temLink) return "";
-  return quantas === 1
-    ? "Tiramos uma foto do problema. Ela está no link abaixo."
-    : `Tiramos ${quantas} fotos do problema. Elas estão no link abaixo.`;
+  if (!temLink) return "";
+  const fotos = fotosParaOCliente(os).length;
+  const videos = videosParaOCliente(os).length;
+  if (fotos === 0 && videos === 0) return "";
+
+  const pedacos: string[] = [];
+  if (fotos > 0) pedacos.push(fotos === 1 ? "uma foto" : `${fotos} fotos`);
+  if (videos > 0) pedacos.push(videos === 1 ? "um vídeo" : `${videos} vídeos`);
+
+  const o = pedacos.join(" e ");
+  const plural = fotos + videos > 1;
+  return (
+    `Registramos ${o} do problema. ` +
+    (plural ? "Estão no link abaixo." : "Está no link abaixo.")
+  );
 }

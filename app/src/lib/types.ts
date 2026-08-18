@@ -173,6 +173,28 @@ export interface HistoricoOS {
   nota?: string;
 }
 
+/**
+ * Um vídeo do laudo, com a capa dele.
+ *
+ * A capa é um quadro do próprio vídeo salvo em JPEG, e é ela que faz a página
+ * do cliente abrir rápido: o navegador mostra a imagem de poucos KB na hora e
+ * só desce o arquivo grande quando alguém aperta o play. Sem capa, ou ele
+ * baixa o vídeo inteiro para saber o que desenhar, ou mostra um retângulo
+ * preto — que numa página de assistência técnica parece defeito do sistema.
+ *
+ * Interface própria, e não um objeto solto dentro de `OrdemServico`: o
+ * `esquema.test.ts` lê os tipos linha a linha e não entende aninhamento. Um
+ * objeto ali dentro faria ele cobrar uma coluna para cada campo. Já aconteceu
+ * com `TotaisFechamento`.
+ */
+export interface VideoLaudo {
+  url: string;
+  /** Endereço do quadro de capa. Vazio quando a geração falhou. */
+  capa?: string;
+  /** Segundos, para a tela mostrar "0:12" sem baixar o arquivo */
+  duracao?: number;
+}
+
 export interface OrdemServico {
   id: ID;
   numero: number;
@@ -262,6 +284,14 @@ export interface OrdemServico {
    * ------------------------------------------------------------
    */
   fotosLaudo?: string[];
+  /**
+   * Vídeos do laudo — também vão para o cliente.
+   *
+   * Foto resolve placa queimada. Não resolve "faz um barulho estranho quando
+   * liga" nem "a tela pisca de vez em quando", que é metade do que chega no
+   * balcão e a parte mais difícil de pôr por escrito.
+   */
+  videosLaudo?: VideoLaudo[];
   // Quando ficou pronta (base para taxa de armazenamento)
   prontaEm?: string;
 }
