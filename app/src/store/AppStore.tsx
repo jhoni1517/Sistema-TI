@@ -6,7 +6,8 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import { db, sincronizarPendentes } from "../lib/db";
+import { db, sincronizarPendentes, leituraAtual } from "../lib/db";
+import { podeRecarregar } from "../lib/recarga";
 import { grama } from "../lib/estoque";
 import { supabase } from "../lib/supabase";
 import { tamanhoDaFila } from "../lib/fila";
@@ -221,6 +222,8 @@ export const AppProvider: React.FC<{
   const [configCarregada, setConfigCarregada] = useState(false);
   /** A última configuração que ESTE aparelho conseguiu mandar para a nuvem */
   const ultimoEnviado = useRef<Config | null>(null);
+  /** Quando a última recarga completa começou. Ver lib/recarga.ts. */
+  const ultimaRecarga = useRef(0);
 
   // Aplica o tema (cor + claro/escuro) e reage à mudança do sistema no modo "auto"
   useEffect(() => {
@@ -247,6 +250,14 @@ export const AppProvider: React.FC<{
    *   2. Falha aparece na tela. Erro de carga engolido vira "sumiu tudo".
    */
   const reload = useCallback(async () => {
+    /*
+     * A leitura tira uma foto do banco AGORA e só aplica se ninguém gravar
+     * até ela voltar. Ver `leituraAtual` em lib/db.ts: a venda lançada no meio
+     * de uma recarga sumia da tela e só voltava com F5, porque a resposta da
+     * leitura — tirada antes do insert — chegava depois e substituía a lista.
+     */
+    const aindaVale = leituraAtual();
+    ultimaRecarga.current = Date.now();
     setLoading(true);
     setErroCarga("");
     setFontesComFalha([]);
@@ -272,6 +283,22 @@ export const AppProvider: React.FC<{
     ] as const;
 
     const resultados = await Promise.allSettled(fontes.map((f) => f.carregar()));
+
+    /*
+     * Gravou no meio: o que está na tela é mais novo que o que voltou do
+     * banco. Aplicar aqui apagaria a venda que o operador acabou de lançar —
+     * e quem lança uma venda e não a vê lança de novo, o que transforma um
+     * problema de tela num furo de caixa.
+     *
+     * Descartar é seguro: o estado já tem o registro, e a próxima volta ao
+     * app recarrega. O erro de carga também não se mexe — esta leitura
+     * simplesmente não aconteceu.
+     */
+    if (!aindaVale()) {
+      setLoading(false);
+      return;
+    }
+
     const falhas: string[] = [];
     const quebradas: string[] = [];
 
@@ -312,7 +339,9 @@ export const AppProvider: React.FC<{
     // Configurações da loja vindas da nuvem (nome, senha, etc.) — mantém aparência local
     try {
       const cloudCfg = await db.config.get();
-      if (cloudCfg) setConfig((prev) => ({ ...prev, ...cloudCfg }));
+      // Mesma trava das tabelas: configuração salva no meio da leitura não
+      // pode ser desfeita na tela por uma resposta mais velha.
+      if (cloudCfg && aindaVale()) setConfig((prev) => ({ ...prev, ...cloudCfg }));
       // Só a partir daqui gravar é seguro. Sem nuvem ligada também libera:
       // aí não existe nada para sobrescrever.
       setConfigCarregada(true);
@@ -391,11 +420,25 @@ export const AppProvider: React.FC<{
     };
   }, [sincronizar]);
 
-  // Recarrega ao voltar para a aba/app (mostra lançamentos feitos pelo WhatsApp ou por outro aparelho)
+  /**
+   * Recarrega ao voltar para a aba/app — mas não toda hora.
+   *
+   * A versão anterior recarregava a loja INTEIRA a cada volta do foco, e foco
+   * não é evento raro: dispara ao fechar o teclado do celular, ao voltar da
+   * câmera, ao tocar na página depois de olhar o WhatsApp, ao trocar de aba.
+   * Numa hora de balcão são dezenas de vezes, e cada uma são dezessete
+   * consultas mais a configuração e o ramo — segundos de ícone girando no 4G.
+   *
+   * Pior que a lentidão: cada recarga é uma janela em que uma resposta velha
+   * pode chegar depois de uma gravação. A trava de `leituraAtual` impede o
+   * estrago; o intervalo faz a janela quase não existir.
+   */
   useEffect(() => {
     if (!db.online) return;
     const aoVoltar = () => {
-      if (document.visibilityState === "visible") reload();
+      if (document.visibilityState !== "visible") return;
+      if (!podeRecarregar(ultimaRecarga.current)) return;
+      reload();
     };
     document.addEventListener("visibilitychange", aoVoltar);
     window.addEventListener("focus", aoVoltar);
