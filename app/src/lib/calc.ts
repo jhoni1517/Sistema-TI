@@ -122,6 +122,38 @@ export const custoProdutos = (movs: MovimentoCaixa[]): number =>
 export const lucroLiquido = (movs: MovimentoCaixa[]): number =>
   receitaBruta(movs) - custoProdutos(movs) - despesasOperacionais(movs);
 
+/**
+ * O que sobrou NESTE lançamento: o que entrou menos o custo que veio com ele.
+ *
+ * ------------------------------------------------------------
+ * POR QUE ISTO PRECISOU EXISTIR
+ *
+ * "Entrou o valor total ou só o lucro?" — a pergunta chegou do balcão sobre
+ * uma OS de R$ 180 com peça de R$ 80.
+ *
+ * A conta sempre esteve certa: no caixa entram os R$ 180 cheios, porque é o
+ * que o cliente pagou e é o que tem que bater com a gaveta; o custo viaja
+ * junto do lançamento, em `custoRelacionado`, e o lucro desconta.
+ *
+ * O problema era outro: a linha do caixa mostrava SÓ os R$ 180. O custo
+ * existia, estava gravado, e era invisível — não havia como conferir olhando
+ * a tela. Quem tem essa dúvida sobre o próprio dinheiro não sossega com
+ * explicação; sossega vendo o número.
+ *
+ * Devolve `null` quando o lançamento não carrega custo. Mostrar "lucro
+ * R$ 5,00" numa venda de R$ 5,00 sem custo cadastrado seria afirmar uma
+ * margem de 100% que ninguém conferiu.
+ * ------------------------------------------------------------
+ */
+export const lucroDoMovimento = (
+  m: MovimentoCaixa
+): { custo: number; lucro: number } | null => {
+  if (m.tipo !== "entrada") return null;
+  const custo = n(m.custoRelacionado);
+  if (custo <= 0) return null;
+  return { custo, lucro: n(m.valor) - custo };
+};
+
 /** Total já pago de um fiado */
 export const pagoFiado = (f: Fiado): number =>
   (f.pagamentos || []).reduce((s, p) => s + n(p.valor), 0);
