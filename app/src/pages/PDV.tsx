@@ -762,10 +762,10 @@ export const PDV: React.FC = () => {
                 const prod = produtos.find((p) => p.id === item.produtoId);
                 const val = prod ? situacaoValidade(prod) : "sem_validade";
                 return (
-                  <div key={i} className="card flex flex-wrap items-center gap-3 !p-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="flex items-center gap-1.5 truncate font-semibold text-slate-800">
-                        {item.descricao}
+                  <div key={i} className="card linha-card !p-3">
+                    <div className="linha-card-info">
+                      <p className="flex items-center gap-1.5 font-semibold text-slate-800">
+                        <span className="truncate">{item.descricao}</span>
                         {item.porPeso && (
                           <span className="badge bg-blue-100 text-blue-700">
                             <Scale size={11} /> kg
@@ -799,7 +799,7 @@ export const PDV: React.FC = () => {
 
                     {/* Quantidade: no peso, campo livre; no resto, mais e menos */}
                     {item.porPeso ? (
-                      <div className="flex items-center gap-1">
+                      <div className="linha-card-fim flex items-center gap-1">
                         {/* min=0: o campo é livre porque o peso precisa ser
                             digitado com a fila andando, mas o "-" ao lado do
                             teclado numérico não pode virar uma linha que
@@ -813,7 +813,7 @@ export const PDV: React.FC = () => {
                         <span className="text-xs text-slate-400">kg</span>
                       </div>
                     ) : (
-                      <div className="flex items-center gap-1">
+                      <div className="linha-card-fim flex items-center gap-1">
                         <button
                           className="btn-ghost !p-1.5"
                           onClick={() =>
@@ -836,18 +836,18 @@ export const PDV: React.FC = () => {
 
                     {/* Preço editável: item avulso nasce sem valor */}
                     <InputNumero
-                      className="input !w-24 !py-1.5 text-sm"
+                      className="input linha-card-fim !w-24 !py-1.5 text-sm"
                       min={0}
                       value={item.precoUnit}
                       onChange={(v) => mudarItem(i, { precoUnit: v ?? 0 })}
                     />
 
-                    <span className="w-24 text-right font-bold text-slate-800">
+                    <span className="linha-card-fim ml-auto w-24 text-right font-bold text-slate-800">
                       {brl(subtotalItem(item))}
                     </span>
 
                     <button
-                      className="btn-ghost !p-1.5 text-red-500"
+                      className="btn-ghost linha-card-fim !p-1.5 text-red-500"
                       title="Tirar do carrinho"
                       onClick={() => removerItem(i)}
                     >

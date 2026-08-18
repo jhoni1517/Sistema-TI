@@ -624,12 +624,12 @@ export const Lojas: React.FC = () => {
             const u = uso[l.id];
             const vezes = Number(l.testesDados) || 0;
             return (
-              <div key={l.id} className="card flex flex-wrap items-center gap-4">
+              <div key={l.id} className="card linha-card">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
                   <Store size={20} />
                 </div>
 
-                <div className="min-w-0 flex-1">
+                <div className="linha-card-info">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="font-semibold text-slate-800">{txt(l.nome)}</span>
                     {/*
@@ -747,7 +747,7 @@ export const Lojas: React.FC = () => {
                   )}
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <input
                     className="input !w-36 !py-1.5 text-sm"
                     placeholder="WhatsApp"

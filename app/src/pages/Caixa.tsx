@@ -1064,8 +1064,8 @@ const Fechamentos: React.FC<{
         const r = resumoCaixa(s, porSessao.get(s.id) ?? []);
         const conf = conferencia(r);
         return (
-          <div key={s.id} className="card flex flex-wrap items-center gap-3">
-            <div className="min-w-0 flex-1">
+          <div key={s.id} className="card linha-card">
+            <div className="linha-card-info">
               <p className="flex flex-wrap items-center gap-2 font-semibold text-slate-800">
                 {formatDate(s.abertoEm)}
                 <span className={`badge ${CONFERENCIA_META[conf].cor}`}>
@@ -1088,7 +1088,7 @@ const Fechamentos: React.FC<{
               <span className="font-bold text-slate-800">{brl(r.saldo)}</span>
             </div>
 
-            <div className="flex gap-1">
+            <div className="linha-card-fim ml-auto flex gap-1">
               <button className="btn-secondary !py-1.5 text-xs" onClick={() => onVer(s)}>
                 Ver
               </button>
