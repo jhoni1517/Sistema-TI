@@ -23,6 +23,8 @@ import {
   ShieldAlert,
   ShieldCheck,
   Camera,
+  Video,
+  Play,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
@@ -33,7 +35,9 @@ import { obterLoja } from "../lib/db";
 import { linkDeRastreio } from "../lib/rastreio";
 import { registrarAcessoSigilo } from "../lib/auth";
 import { estadoDoSigilo, recadoDoSigilo, podeEditarSigilo } from "../lib/sigilo";
-import { fotosParaOCliente } from "../lib/fotos-laudo";
+import { fotosParaOCliente, videosParaOCliente } from "../lib/fotos-laudo";
+import { VideosAparelho } from "../components/VideosAparelho";
+import { duracaoEscrita } from "../lib/video";
 import { reciboOS } from "../lib/recibo";
 import { mensagemCliente } from "../lib/mensagens";
 import { uid, nowISO, brl, abrirWhatsapp, formatDateTime, codigoOS, txt } from "../lib/format";
@@ -1211,6 +1215,19 @@ const OSForm: React.FC<{
             onChange={(fotosLaudo) => setOs({ ...os, fotosLaudo })}
             pasta="laudos"
           />
+
+          {/*
+            Vídeo resolve o que a foto não resolve: o barulho do cooler, a tela
+            que pisca, o curto que só aparece quando liga. É metade do que
+            chega no balcão e a parte mais difícil de pôr por escrito.
+          */}
+          <label className="label mt-4 flex items-center gap-1.5 !text-brand-800">
+            <Video size={15} /> Vídeos do problema
+          </label>
+          <VideosAparelho
+            videos={os.videosLaudo || []}
+            onChange={(videosLaudo) => setOs({ ...os, videosLaudo })}
+          />
         </div>
 
         {/* Peças */}
@@ -1622,10 +1639,10 @@ const OSDetalhe: React.FC<{
             isso não há como conferir, antes de mandar o link, o que foi
             publicado. Saem na impressão junto do laudo, que é o que elas
             comprovam. */}
-        {fotosParaOCliente(os).length > 0 && (
+        {(fotosParaOCliente(os).length > 0 || videosParaOCliente(os).length > 0) && (
           <div>
             <p className="label flex items-center gap-1.5">
-              <Camera size={14} /> Fotos do problema — o cliente vê estas
+              <Camera size={14} /> Problema registrado — o cliente vê isto
             </p>
             <div className="flex flex-wrap gap-2">
               {fotosParaOCliente(os).map((url) => (
@@ -1635,6 +1652,27 @@ const OSDetalhe: React.FC<{
                     alt=""
                     className="h-24 w-24 rounded-lg border-2 border-brand-300 object-cover"
                   />
+                </a>
+              ))}
+              {videosParaOCliente(os).map((v) => (
+                <a
+                  key={v.url}
+                  href={v.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="relative block h-24 w-32 overflow-hidden rounded-lg border-2 border-brand-300 bg-slate-900"
+                >
+                  {v.capa ? (
+                    <img src={v.capa} alt="" className="h-full w-full object-cover opacity-80" />
+                  ) : null}
+                  <span className="absolute inset-0 flex items-center justify-center text-white">
+                    <Play size={24} fill="currentColor" />
+                  </span>
+                  {duracaoEscrita(v.duracao) && (
+                    <span className="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[10px] font-semibold text-white">
+                      {duracaoEscrita(v.duracao)}
+                    </span>
+                  )}
                 </a>
               ))}
             </div>

@@ -70,7 +70,12 @@ export function problemaNoArquivo(arquivo: { type: string; size: number }): stri
  * navegador continuar mostrando a antiga é o tipo de coisa que faz a pessoa
  * achar que não salvou e tentar de novo cinco vezes.
  */
-export function caminhoDaImagem(lojaId: string, pasta: string, nome: string): string {
+export function caminhoDoArquivo(
+  lojaId: string,
+  pasta: string,
+  nome: string,
+  extensao = "jpg"
+): string {
   const limpo = nome
     // Nao e comparacao: e a limpeza do nome do arquivo que vai para o
     // Storage, porque acento em caminho de URL da problema.
@@ -81,8 +86,11 @@ export function caminhoDaImagem(lojaId: string, pasta: string, nome: string): st
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 40);
-  return `${lojaId}/${pasta}/${limpo || "img"}-${Date.now()}.jpg`;
+  return `${lojaId}/${pasta}/${limpo || "img"}-${Date.now()}.${extensao}`;
 }
+
+export const caminhoDaImagem = (lojaId: string, pasta: string, nome: string): string =>
+  caminhoDoArquivo(lojaId, pasta, nome, "jpg");
 
 /**
  * A imagem pertence a esta loja?
@@ -95,8 +103,8 @@ export const daLoja = (caminho: string, lojaId: string): boolean =>
   !!lojaId && caminho.startsWith(`${lojaId}/`);
 
 /** Extrai o caminho interno a partir da URL pública gravada no banco */
-export function caminhoDaUrl(url: string): string {
-  const marca = `/${BUCKET}/`;
+export function caminhoDaUrl(url: string, bucket = BUCKET): string {
+  const marca = `/${bucket}/`;
   const i = url.indexOf(marca);
   return i < 0 ? "" : decodeURIComponent(url.slice(i + marca.length));
 }

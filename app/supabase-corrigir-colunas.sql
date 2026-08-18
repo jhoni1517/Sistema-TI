@@ -75,6 +75,9 @@ alter table ordens add column if not exists fotos jsonb default '[]'::jsonb;
 -- separada da de entrada de propósito — aquelas pegam a tela ligada e a tela
 -- de bloqueio do aparelho, e publicá-las seria expor o celular do cliente.
 alter table ordens add column if not exists "fotosLaudo" jsonb default '[]'::jsonb;
+-- Vídeos do laudo, com a capa de cada um. O que a foto não mostra: o barulho
+-- do cooler, a tela que pisca, o curto que só aparece quando liga.
+alter table ordens add column if not exists "videosLaudo" jsonb default '[]'::jsonb;
 alter table ordens add column if not exists "entregueEm" text;
 
 -- ---------- Produtos ----------

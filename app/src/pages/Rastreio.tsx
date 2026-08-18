@@ -16,6 +16,7 @@ import { supabase, supabaseEnabled } from "../lib/supabase";
 import { brl, formatDateTime, codigoOS } from "../lib/format";
 import { OS_STATUS_META, type OSStatus } from "../lib/types";
 import { tokenDoLink, problemaNoLink } from "../lib/rastreio";
+import { duracaoEscrita } from "../lib/video";
 
 const FLUXO: OSStatus[] = [
   "aberta",
@@ -66,6 +67,8 @@ interface OSPublica {
    * aqui limpa. Ver supabase-migracao-fotos-laudo.sql.
    */
   fotos: string[] | null;
+  /** Vídeos do laudo, com a capa de cada um. Mesmo corte das fotos. */
+  videos: { url: string; capa?: string; duracao?: number }[] | null;
   atualizadoEm: string | null;
 }
 
@@ -237,32 +240,83 @@ export const Rastreio: React.FC = () => {
                 O corte de quais fotos saem é feito no banco, em
                 `consultar_os`. Aqui só se desenha o que chegou.
               */}
-              {(os.fotos || []).length > 0 && (
+              {((os.fotos || []).length > 0 || (os.videos || []).length > 0) && (
                 <div className="mb-5">
                   <p className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
-                    <Camera size={16} /> Fotos do seu aparelho
+                    <Camera size={16} /> Seu aparelho
                   </p>
                   <p className="mb-3 mt-0.5 text-xs text-slate-500">
-                    Toque para ver de perto.
+                    {(os.videos || []).length > 0
+                      ? "Toque para ver de perto ou assistir."
+                      : "Toque para ver de perto."}
                   </p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {(os.fotos || []).map((url) => (
-                      <a
-                        key={url}
-                        href={url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block overflow-hidden rounded-xl border border-slate-200"
-                      >
-                        <img
-                          src={url}
-                          alt="Foto do aparelho enviada pela assistência"
-                          loading="lazy"
-                          className="aspect-square w-full object-cover"
-                        />
-                      </a>
-                    ))}
-                  </div>
+
+                  {/*
+                    O VÍDEO NÃO BAIXA ATÉ A PESSOA TOCAR NELE.
+
+                    É isto que faz a página abrir rápido, e não o arquivo ser
+                    pequeno.
+
+                    `preload="none"` COM CAPA, e não "metadata". Medido no
+                    Chrome: com "metadata" o navegador pede o arquivo assim que
+                    a página abre, e um MP4 de celular guarda o índice no FIM —
+                    então, dependendo de como o servidor responde, esse pedido
+                    arrasta o arquivo inteiro. São dezenas de MB no 4G de quem
+                    só queria ver se o conserto ficou pronto. Com "none" o
+                    navegador não faz pedido nenhum: zero byte até o play.
+
+                    A capa é o que torna isso possível. Ela é um quadro do
+                    próprio vídeo em JPEG de poucos KB, e é o que o navegador
+                    desenha. SEM capa não dá para usar "none" — sobraria um
+                    retângulo preto, que numa página de assistência parece
+                    defeito do sistema. Por isso a escolha depende dela.
+
+                    `playsInline` é obrigatório: sem ele o iPhone sequestra a
+                    tela toda no play, e a pessoa perde de vista o orçamento
+                    que estava lendo.
+                  */}
+                  {(os.videos || []).map((v) => (
+                    <div key={v.url} className="relative mb-2">
+                      <video
+                        src={v.url}
+                        poster={v.capa || undefined}
+                        controls
+                        playsInline
+                        preload={v.capa ? "none" : "metadata"}
+                        className="w-full rounded-xl border border-slate-200 bg-slate-900"
+                      />
+                      {/* A duração vem do nosso cadastro: com preload="none" o
+                          player só a descobriria depois do play, e um vídeo sem
+                          tempo à vista é um vídeo que a pessoa não sabe se vale
+                          o dado móvel dela. */}
+                      {duracaoEscrita(v.duracao) && (
+                        <span className="pointer-events-none absolute right-2 top-2 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+                          {duracaoEscrita(v.duracao)}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+
+                  {(os.fotos || []).length > 0 && (
+                    <div className="grid grid-cols-3 gap-2">
+                      {(os.fotos || []).map((url) => (
+                        <a
+                          key={url}
+                          href={url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block overflow-hidden rounded-xl border border-slate-200"
+                        >
+                          <img
+                            src={url}
+                            alt="Foto do aparelho enviada pela assistência"
+                            loading="lazy"
+                            className="aspect-square w-full object-cover"
+                          />
+                        </a>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
 
