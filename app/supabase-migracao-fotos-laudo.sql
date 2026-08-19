@@ -106,20 +106,26 @@ as $$
   ),
   -- As fotos que o cliente vê. O teto de 6 é o mesmo da tela: o limite mora
   -- nos dois lugares porque a tela pode ser contornada e o banco não.
+  -- O CORTE VEM DEPOIS DO FILTRO. Com `and pos <= 6` na mesma cláusula, uma
+  -- entrada inválida no meio da lista gastava uma vaga do teto, e o cliente
+  -- perdia foto que a loja publicou de propósito. Medido rodando a função de
+  -- verdade num Postgres: sete fotos boas com duas entradas ruins antes delas
+  -- devolviam quatro.
   fotos_publicas as (
-    select coalesce(
-      (select jsonb_agg(f.valor order by f.pos)
-         from alvo a,
-              jsonb_array_elements(coalesce(a."fotosLaudo", '[]'::jsonb))
-                with ordinality as f(valor, pos)
-        where jsonb_typeof(f.valor) = 'string'
-          -- Só endereço de imagem publicado pelo próprio sistema. Sem isto,
-          -- um texto qualquer gravado na lista vira `src` na página do
-          -- cliente.
-          and (f.valor #>> '{}') ~* '^https?://'
-          and f.pos <= 6),
-      '[]'::jsonb
-    ) as v
+    select coalesce(jsonb_agg(valor order by pos), '[]'::jsonb) as v
+      from (
+        select f.valor, f.pos
+          from alvo a,
+               jsonb_array_elements(coalesce(a."fotosLaudo", '[]'::jsonb))
+                 with ordinality as f(valor, pos)
+         where jsonb_typeof(f.valor) = 'string'
+           -- Só endereço de imagem publicado pelo próprio sistema. Sem isto,
+           -- um texto qualquer gravado na lista vira `src` na página do
+           -- cliente.
+           and (f.valor #>> '{}') ~* '^https?://'
+         order by f.pos
+         limit 6
+      ) boas
   )
   select
     a.numero,

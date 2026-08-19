@@ -144,6 +144,13 @@ describe("a função pública só devolve as fotos do laudo", () => {
     }
   });
 
+  it("o teto corta DEPOIS do filtro, e não junto dele", () => {
+    // Mesmo bug da migração do vídeo, achado rodando num Postgres: com
+    // `and pos <= 6` junto do filtro, entrada inválida gastava vaga do teto.
+    expect(sql).not.toMatch(/and\s+f\.pos\s*<=/);
+    expect(sql).toMatch(/order by f\.pos\s*\n\s*limit 6/);
+  });
+
   it("recolhe a permissão do public antes de conceder, ao recriar a função", () => {
     // Recriar uma função devolve EXECUTE a todo mundo por padrão. Sem o
     // revoke, a migração deixaria a porta mais aberta do que estava.
