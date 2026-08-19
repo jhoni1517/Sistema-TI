@@ -90,10 +90,24 @@ describe("dias e situação", () => {
   it("avulsa já paga fica quitada", () => {
     const paga = C({
       recorrencia: "unica",
+      valor: 1500,
+      vencimento: "2026-07-01",
+      pagamentos: [{ data: "x", valor: 1500, formaPagamento: "pix", referencia: "2026-07-01" }],
+    });
+    expect(situacaoConta(paga, "2026-07-27")).toBe("paga");
+  });
+
+  it("avulsa paga PELA METADE continua cobrando", () => {
+    // Este teste tinha R$ 100 pagos numa conta de R$ 1.500 e mesmo assim
+    // esperava "paga" — porque a regra antiga era "qualquer pagamento fecha".
+    // Era o bug: os R$ 1.400 restantes sumiam da lista.
+    const meia = C({
+      recorrencia: "unica",
+      valor: 1500,
       vencimento: "2026-07-01",
       pagamentos: [{ data: "x", valor: 100, formaPagamento: "pix", referencia: "2026-07-01" }],
     });
-    expect(situacaoConta(paga, "2026-07-27")).toBe("paga");
+    expect(situacaoConta(meia, "2026-07-27")).toBe("atrasada");
   });
 });
 

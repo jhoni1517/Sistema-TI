@@ -1,4 +1,11 @@
-import { hojeISO, soData, contaQuitada, ehReceber, proximoVencimento } from "./contas";
+import {
+  hojeISO,
+  soData,
+  contaQuitada,
+  ehReceber,
+  proximoVencimento,
+  saldoDaConta,
+} from "./contas";
 import { txt } from "./format";
 import type { ContaPagar } from "./types";
 
@@ -134,6 +141,20 @@ export function ocorrenciasDaConta(
   };
   if (base.valor <= 0) return [];
 
+  /*
+   * A PRIMEIRA ocorrência vale o SALDO; as seguintes valem o valor cheio.
+   *
+   * Pagos R$ 300 de uma fatura de R$ 1.000, o que ainda tem que sair neste
+   * mês são R$ 700 — mas o mês que vem volta a ser R$ 1.000. Usar o saldo em
+   * todas faria a previsão do trimestre inteiro nascer R$ 300 mais barata; e
+   * usar o cheio na primeira mandaria a pessoa separar dinheiro que ela já
+   * pagou.
+   *
+   * Previsão existe para decidir se dá para pagar o fornecedor hoje: os dois
+   * erros mentem sobre isso, um para cada lado.
+   */
+  const saldo = centavos(saldoDaConta(c));
+
   const saida: Compromisso[] = [];
   let dia = soData(c.vencimento);
   const diaOriginal = new Date(dia + "T00:00:00Z").getUTCDate() || undefined;
@@ -145,9 +166,13 @@ export function ocorrenciasDaConta(
    */
   for (let i = 0; i < 400; i++) {
     if (dia > ate) break;
+    // Só a primeira volta é o ciclo corrente, e só ela leva o saldo abatido.
+    const valor = i === 0 ? saldo : base.valor;
     if (dia >= de) {
-      saida.push({ ...base, dia, projetado: i > 0, atrasado: false });
-    } else if (i === 0 && base.direcao === "sai") {
+      // Saldo zerado na primeira volta é ciclo já quitado: pula a ocorrência
+      // sem cortar as futuras, que continuam valendo o valor cheio.
+      if (valor > 0) saida.push({ ...base, valor, dia, projetado: i > 0, atrasado: false });
+    } else if (i === 0 && base.direcao === "sai" && valor > 0) {
       /*
        * CONTA VENCIDA E NÃO PAGA: entra HOJE.
        *
@@ -174,7 +199,7 @@ export function ocorrenciasDaConta(
        * Só a primeira volta (i === 0) faz isso. As seguintes são datas
        * calculadas para o futuro e nunca caem antes de hoje.
        */
-      saida.push({ ...base, dia: de, projetado: false, atrasado: true });
+      saida.push({ ...base, valor, dia: de, projetado: false, atrasado: true });
     }
     if (c.recorrencia === "unica") break;
     const proxima = proximoVencimento(dia, c.recorrencia, diaOriginal);
