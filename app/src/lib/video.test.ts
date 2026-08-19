@@ -221,8 +221,9 @@ describe("a função pública devolve o vídeo campo a campo", () => {
   });
 
   it("só deixa passar endereço de verdade, no vídeo e na capa", () => {
+    // Sem alias: o filtro mora na subconsulta e a montagem vem depois dela.
     expect(sql).toMatch(/\(v\.valor ->> 'url'\) ~\* '\^https\?:\/\/'/);
-    expect(sql).toMatch(/\(v\.valor ->> 'capa'\) ~\* '\^https\?:\/\/'/);
+    expect(sql).toMatch(/\(valor ->> 'capa'\) ~\* '\^https\?:\/\/'/);
   });
 
   it("o depósito de vídeo é separado do de imagem", () => {
@@ -230,6 +231,22 @@ describe("a função pública devolve o vídeo campo a campo", () => {
     // scanner, que é lido inteiro em toda carga de produtos.
     expect(sql).toMatch(/storage\.buckets[\s\S]*'videos'/);
     expect(sql).not.toMatch(/'imagens',\s*'imagens'/);
+  });
+
+  it("o teto corta DEPOIS do filtro, e não junto dele", () => {
+    /*
+     * BUG ACHADO RODANDO A FUNÇÃO NUM POSTGRES DE VERDADE.
+     *
+     * Com `and pos <= 6` na mesma cláusula do filtro, a posição contada é a
+     * da lista ORIGINAL: uma entrada inválida no meio gastava uma vaga do
+     * teto. Sete fotos boas com duas entradas ruins antes delas devolviam
+     * QUATRO — o cliente perdia foto que a loja publicou de propósito.
+     *
+     * Ler o SQL não pegava. Rodar pegou.
+     */
+    expect(sql).not.toMatch(/and\s+[fv]\.pos\s*<=/);
+    expect(sql).toMatch(/order by f\.pos\s*\n\s*limit 6/);
+    expect(sql).toMatch(/order by v\.pos\s*\n\s*limit 3/);
   });
 
   it("continua sem devolver nada sigiloso", () => {
