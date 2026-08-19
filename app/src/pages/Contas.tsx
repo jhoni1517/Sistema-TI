@@ -38,6 +38,9 @@ import {
   SITUACAO_CONTA_META,
   diasAteVencer,
   pagarConta,
+  saldoDaConta,
+  pagoNaReferencia,
+  parcialmentePaga,
   ehReceber,
   ehPagar,
   contasParaAvisar,
@@ -277,7 +280,9 @@ export const Contas: React.FC = () => {
   };
 
   const abrirPagamento = (c: ContaPagar) => {
-    setValorPg(Number(c.valor) || 0);
+    // O SALDO, e não o valor cheio: numa fatura de R$ 1.000 com R$ 300 já
+    // pagos, oferecer R$ 1.000 de novo é oferecer pagar duas vezes.
+    setValorPg(saldoDaConta(c));
     setFormaPg("pix");
     setPagando(c);
   };
@@ -318,7 +323,11 @@ export const Contas: React.FC = () => {
         id: uid(),
         tipo: recebendo ? "entrada" : "saida",
         categoria: pagando.categoria || (recebendo ? "Receita fixa" : "Despesa"),
-        descricao: `${pagando.descricao} (venc. ${formatDate(pagando.vencimento)})`,
+        descricao:
+          `${pagando.descricao} (venc. ${formatDate(pagando.vencimento)})` +
+          // No fechamento do mês ninguém lembra por que aquela conta saiu
+          // pela metade. A marca vai junto, na linha do caixa.
+          (valorPg < saldoDaConta(pagando) ? " - parcial" : ""),
         valor: valorPg,
         formaPagamento: formaPg,
         sessaoId: sessaoAberta?.id,
@@ -332,10 +341,22 @@ export const Contas: React.FC = () => {
       await saveConta(atualizada);
 
       setPagando(null);
+      /*
+       * A frase tem que combinar com o que ACONTECEU.
+       *
+       * Dizer "próximo: 10/09" depois de um pagamento parcial faria a pessoa
+       * sair da tela achando que o mês está resolvido — e a dívida que
+       * continua ali só reapareceria no aviso de vencimento, dias depois.
+       */
+      const restou = saldoDaConta(atualizada);
+      const parcial = atualizada.vencimento === pagando.vencimento && restou > 0;
       aviso.sucesso(
-        pagando.recorrencia === "unica"
-          ? `${recebendo ? "Recebimento" : "Conta"} quitado e lançado no caixa.`
-          : `${recebendo ? "Recebido" : "Pago"} e lançado no caixa. Próximo: ${formatDate(atualizada.vencimento)}.`
+        parcial
+          ? `${brl(valorPg)} lançado no caixa. Ainda faltam ${brl(restou)} nesta conta, ` +
+              `com vencimento em ${formatDate(atualizada.vencimento)}.`
+          : pagando.recorrencia === "unica"
+            ? `${recebendo ? "Recebimento" : "Conta"} quitado e lançado no caixa.`
+            : `${recebendo ? "Recebido" : "Pago"} e lançado no caixa. Próximo: ${formatDate(atualizada.vencimento)}.`
       );
     } catch (e) {
       aviso.erro(e instanceof Error ? e.message : String(e));
@@ -522,6 +543,13 @@ export const Contas: React.FC = () => {
                         <Repeat size={11} /> {RECORRENCIA_META[c.recorrencia].label}
                       </span>
                     )}
+                    {/* Sem este crachá, uma conta paga pela metade fica igual
+                        a uma intocada, e a pessoa paga o valor cheio de novo. */}
+                    {parcialmentePaga(c) && (
+                      <span className="badge bg-amber-100 text-amber-700">
+                        Parcial · faltam {brl(saldoDaConta(c))}
+                      </span>
+                    )}
                   </div>
                   <p className="mt-0.5 text-xs text-slate-500">
                     {txt(c.categoria)}
@@ -538,7 +566,19 @@ export const Contas: React.FC = () => {
                   </p>
                 </div>
 
-                <span className="text-lg font-bold text-slate-800">{brl(c.valor)}</span>
+                {/* O número grande é o que ainda tem que sair do bolso. O
+                    valor cheio fica embaixo, menor, para a conferência com o
+                    boleto continuar possível. */}
+                <span className="text-right">
+                  <span className="block text-lg font-bold text-slate-800">
+                    {brl(parcialmentePaga(c) ? saldoDaConta(c) : Number(c.valor) || 0)}
+                  </span>
+                  {parcialmentePaga(c) && (
+                    <span className="block text-xs text-slate-400">
+                      de {brl(Number(c.valor) || 0)}
+                    </span>
+                  )}
+                </span>
 
                 <div className="flex gap-1.5">
                   {c.ativo && sit !== "paga" && (
@@ -966,6 +1006,16 @@ export const Contas: React.FC = () => {
               <p className="text-sm text-slate-500">
                 Vencimento {formatDate(pagando.vencimento)} · {txt(pagando.categoria)}
               </p>
+              {/* Com parte já paga, o número que importa é o que FALTA. Sem
+                  esta linha a pessoa não tem como saber de quanto ainda é a
+                  dívida na hora de digitar o valor. */}
+              {parcialmentePaga(pagando) && (
+                <p className="mt-1 text-sm text-slate-600">
+                  Conta {brl(Number(pagando.valor) || 0)} · já pago{" "}
+                  {brl(pagoNaReferencia(pagando))} ·{" "}
+                  <b className="text-amber-700">faltam {brl(saldoDaConta(pagando))}</b>
+                </p>
+              )}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
@@ -991,11 +1041,33 @@ export const Contas: React.FC = () => {
               </Field>
             </div>
 
-            <p className="mt-3 text-xs text-slate-500">
-              O valor será lançado como saída no caixa.
-              {pagando.recorrencia !== "unica" &&
-                " Como esta conta se repete, ela reaparece no próximo vencimento."}
-            </p>
+            {/*
+              O aviso muda conforme o valor digitado, e é a peça central desta
+              função: quem paga R$ 300 de R$ 1.000 precisa saber, ANTES de
+              confirmar, que a conta continua na lista devendo R$ 700 e que o
+              vencimento não vai andar. Um texto fixo dizendo "reaparece no
+              próximo vencimento" seria mentira em metade dos casos.
+            */}
+            {(() => {
+              const falta = Math.round((saldoDaConta(pagando) - valorPg) * 100) / 100;
+              const lado = ehReceber(pagando) ? "entrada" : "saída";
+              if (falta > 0) {
+                return (
+                  <p className="mt-3 rounded-lg bg-amber-50 p-2.5 text-xs text-amber-800">
+                    Pagamento parcial: entra como {lado} de {brl(valorPg)} no caixa e a
+                    conta CONTINUA na lista devendo <b>{brl(falta)}</b>, no mesmo
+                    vencimento de {formatDate(pagando.vencimento)}.
+                  </p>
+                );
+              }
+              return (
+                <p className="mt-3 text-xs text-slate-500">
+                  O valor será lançado como {lado} no caixa.
+                  {pagando.recorrencia !== "unica" &&
+                    " Como esta conta se repete, ela reaparece no próximo vencimento."}
+                </p>
+              );
+            })()}
           </div>
         )}
       </Modal>

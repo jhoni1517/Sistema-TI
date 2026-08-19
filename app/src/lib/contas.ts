@@ -102,9 +102,67 @@ export const SITUACAO_CONTA_META: Record<SituacaoConta, { label: string; cor: st
   inativa: { label: "Desligada", cor: "bg-slate-100 text-slate-500" },
 };
 
+/**
+ * ============================================================
+ *  PAGAMENTO PARCIAL
+ * ============================================================
+ *
+ * A fatura do cartão é R$ 1.000 e neste mês dá para pagar R$ 300.
+ *
+ * Antes, todo pagamento fechava o ciclo: a conta era dada como paga e a
+ * recorrente pulava para o mês seguinte. Os R$ 700 que continuavam devidos
+ * sumiam da lista, da previsão e do aviso — e a única lembrança de que
+ * existiam era a memória de quem pagou.
+ *
+ * Agora o pagamento abate. Enquanto sobrar saldo, a conta FICA no mesmo
+ * vencimento, continua atrasando e continua aparecendo. Ela só anda quando
+ * for realmente quitada.
+ *
+ * ------------------------------------------------------------
+ * O QUE COLA CADA PAGAMENTO AO SEU CICLO
+ *
+ * `PagamentoConta.referencia` — o vencimento a que aquele pagamento se
+ * refere. O campo já existia; era o que faltava usar. Somar TODOS os
+ * pagamentos da conta daria o total pago na vida dela: uma conta de luz
+ * paga há dois anos apareceria com saldo negativo e nunca mais cobraria
+ * nada.
+ * ------------------------------------------------------------
+ */
+
+const centavos = (v: number): number => Math.round((Number(v) || 0) * 100) / 100;
+
+/** Quanto já foi pago PARA ESTE vencimento (o corrente, por padrão) */
+export const pagoNaReferencia = (c: ContaPagar, referencia?: string): number => {
+  const alvo = soData(referencia ?? c.vencimento);
+  return centavos(
+    (c.pagamentos || [])
+      .filter((p) => soData(p.referencia) === alvo)
+      .reduce((s, p) => s + n(p.valor), 0)
+  );
+};
+
+/**
+ * Quanto ainda falta neste vencimento.
+ *
+ * Nunca negativo: pagar R$ 1.100 numa conta de R$ 1.000 deixa saldo zero, e
+ * não um crédito de R$ 100 que abateria o mês seguinte sozinho. Crédito com
+ * fornecedor é conversa entre pessoas, não conta de sistema — e um abatimento
+ * automático que ninguém pediu é a pior forma de errar aqui.
+ */
+export const saldoDaConta = (c: ContaPagar): number =>
+  Math.max(0, centavos(n(c.valor) - pagoNaReferencia(c)));
+
+/** Já entrou dinheiro neste ciclo, mas ainda falta? */
+export const parcialmentePaga = (c: ContaPagar): boolean => {
+  const pago = pagoNaReferencia(c);
+  return pago > 0 && pago < n(c.valor);
+};
+
 /** Uma conta única já quitada não volta a cobrar */
 export const contaQuitada = (c: ContaPagar): boolean =>
-  c.recorrencia === "unica" && (c.pagamentos || []).length > 0;
+  c.recorrencia === "unica" &&
+  (c.pagamentos || []).length > 0 &&
+  saldoDaConta(c) <= 0;
 
 export function situacaoConta(c: ContaPagar, hoje = hojeISO()): SituacaoConta {
   if (!c.ativo) return "inativa";
@@ -138,13 +196,22 @@ const abertasNoMes = (
   );
 };
 
+/*
+ * Daqui para baixo o que vale é o SALDO, e não o valor cheio da conta.
+ *
+ * Pagos R$ 300 de uma fatura de R$ 1.000, o que ainda vai sair do caixa são
+ * R$ 700. Continuar somando os R$ 1.000 faria a tela cobrar de novo um
+ * dinheiro que já saiu — e quem olha "a pagar este mês" está decidindo se dá
+ * para pagar o fornecedor hoje.
+ */
+
 /** Quanto ainda vai SAIR no mês corrente considerando o que não foi pago */
 export const totalAPagarNoMes = (contas: ContaPagar[], hoje = hojeISO()): number =>
-  abertasNoMes(contas, hoje, false).reduce((s, c) => s + n(c.valor), 0);
+  centavos(abertasNoMes(contas, hoje, false).reduce((s, c) => s + saldoDaConta(c), 0));
 
 /** Quanto ainda vai ENTRAR no mês corrente e não caiu */
 export const totalAReceberNoMes = (contas: ContaPagar[], hoje = hojeISO()): number =>
-  abertasNoMes(contas, hoje, true).reduce((s, c) => s + n(c.valor), 0);
+  centavos(abertasNoMes(contas, hoje, true).reduce((s, c) => s + saldoDaConta(c), 0));
 
 /**
  * Atrasado, separado por lado.
@@ -154,15 +221,19 @@ export const totalAReceberNoMes = (contas: ContaPagar[], hoje = hojeISO()): numb
  * que se faz com cada um é o oposto também.
  */
 export const totalAtrasado = (contas: ContaPagar[], hoje = hojeISO()): number =>
-  contas
-    .filter((c) => ehPagar(c) && situacaoConta(c, hoje) === "atrasada")
-    .reduce((s, c) => s + n(c.valor), 0);
+  centavos(
+    contas
+      .filter((c) => ehPagar(c) && situacaoConta(c, hoje) === "atrasada")
+      .reduce((s, c) => s + saldoDaConta(c), 0)
+  );
 
 /** O que era para ter entrado e não entrou */
 export const totalAtrasadoAReceber = (contas: ContaPagar[], hoje = hojeISO()): number =>
-  contas
-    .filter((c) => ehReceber(c) && situacaoConta(c, hoje) === "atrasada")
-    .reduce((s, c) => s + n(c.valor), 0);
+  centavos(
+    contas
+      .filter((c) => ehReceber(c) && situacaoConta(c, hoje) === "atrasada")
+      .reduce((s, c) => s + saldoDaConta(c), 0)
+  );
 
 /* ------------------------------------------------------------------ */
 /* Pagar ou receber                                                     */
@@ -233,8 +304,15 @@ export const sobraFixaMensal = (contas: ContaPagar[]): number =>
   Math.round((receitaFixaMensal(contas) - custoFixoMensal(contas)) * 100) / 100;
 
 /**
- * Registra o pagamento e devolve a conta já com o próximo vencimento.
- * A recorrente nunca "fecha": ela apenas anda para o ciclo seguinte.
+ * Registra o pagamento e devolve a conta já no estado seguinte.
+ *
+ * QUITOU: a recorrente anda para o ciclo seguinte; a única fecha.
+ * FALTOU: a conta NÃO anda. Fica no mesmo vencimento, continua atrasando e
+ * continua na lista, agora com o saldo abatido.
+ *
+ * Andar com saldo em aberto era o bug: pagar R$ 300 de uma fatura de
+ * R$ 1.000 dava a conta como paga e empurrava o vencimento para o mês que
+ * vem. Os R$ 700 sumiam da lista, da previsão e do aviso de vencimento.
  */
 export function pagarConta(
   c: ContaPagar,
@@ -248,18 +326,30 @@ export function pagarConta(
     referencia: soData(c.vencimento),
   };
   const pagamentos = [...(c.pagamentos || []), pagamento];
+  const depois = { ...c, pagamentos };
 
-  if (c.recorrencia === "unica") return { ...c, pagamentos };
+  // Ainda falta: fica onde está. Vale para única e para recorrente.
+  if (saldoDaConta(depois) > 0) return depois;
 
-  // O dia original vem do primeiro vencimento cadastrado, para que uma conta
-  // do dia 31 volte a cair no dia 31 depois de passar por fevereiro.
+  if (c.recorrencia === "unica") return depois;
+
+  /*
+   * O dia original vem do PRIMEIRO pagamento da vida da conta, e é assim de
+   * propósito: a referência dele é o vencimento como foi cadastrado. Uma
+   * conta do dia 31 passa por fevereiro (28) e precisa VOLTAR para 31 em
+   * março — se o dia saísse do vencimento corrente, ela ficaria presa no 28
+   * para sempre depois do primeiro fevereiro.
+   *
+   * O pagamento parcial não atrapalha isto: as parcelas do mesmo ciclo
+   * entram com a MESMA referência, então `pagamentos[0]` continua sendo a
+   * primeira quitação e continua apontando para o vencimento de origem.
+   */
   const diaOriginal = new Date(
     soData(pagamentos[0].referencia) + "T00:00:00Z"
   ).getUTCDate();
 
   return {
-    ...c,
-    pagamentos,
+    ...depois,
     vencimento: proximoVencimento(c.vencimento, c.recorrencia, diaOriginal),
   };
 }
@@ -494,8 +584,10 @@ export function resumoRenda(contas: ContaPagar[], hoje = hojeISO()): ResumoRenda
   for (const c of minhas) {
     if (contaQuitada(c)) continue;
     if (soData(c.vencimento).slice(0, 7) !== mes) continue;
-    if (situacaoConta(c, hoje) === "atrasada") atrasado += n(c.valor);
-    else aReceberMes += n(c.valor);
+    // O saldo, e não o valor cheio: metade do salário que já caiu não pode
+    // continuar contando como dinheiro que ainda vem.
+    if (situacaoConta(c, hoje) === "atrasada") atrasado += saldoDaConta(c);
+    else aReceberMes += saldoDaConta(c);
   }
 
   const arredonda = (v: number) => Math.round(v * 100) / 100;
