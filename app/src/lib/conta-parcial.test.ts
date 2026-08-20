@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   pagarConta,
   saldoDaConta,
@@ -203,5 +204,55 @@ describe("a previsão de caixa", () => {
     expect(p.dias[0].dia).toBe("2026-08-12");
     expect(p.dias[0].sai).toBe(700);
     expect(p.dias[0].compromissos[0].atrasado).toBe(true);
+  });
+});
+
+/*
+ * A tela de Renda fixa tem modal próprio, com vocabulário próprio: aqui o
+ * dinheiro CAI, não vence, e ninguém "paga" um salário. A regra é a mesma do
+ * Contas a pagar, mas a tela é outra — e a segunda tela é justamente onde
+ * uma regra escrita costuma ficar de fora.
+ */
+describe("a tela de Renda fixa usa a mesma regra", () => {
+  const tela = readFileSync(new URL("../pages/Renda.tsx", import.meta.url), "utf8")
+    .replace(/\{\s*\/\*[\s\S]*?\*\/\s*\}/g, "")
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "");
+
+  it("o campo já vem com o que FALTA, não com o combinado", () => {
+    // De R$ 650 com R$ 400 recebidos, oferecer R$ 650 de novo faria a pessoa
+    // lançar o mês inteiro duas vezes.
+    expect(tela).toMatch(/setValorRec\(saldoDaConta\(c\)\)/);
+    expect(tela).not.toMatch(/setValorRec\(Number\(c\.valor\)/);
+  });
+
+  it("avisa antes de confirmar que a renda continua esperando", () => {
+    expect(tela).toMatch(/Caiu só uma parte/);
+    expect(tela).toMatch(/CONTINUA na lista esperando/);
+  });
+
+  it("a lista mostra quanto ainda vem, e não o combinado", () => {
+    expect(tela).toMatch(/parcialmentePaga\(c\) \? saldoDaConta\(c\)/);
+    expect(tela).toMatch(/Caiu em parte · faltam/);
+  });
+
+  it("o alarme de valor diferente compara com o que falta", () => {
+    /*
+     * Comparando com o cadastrado, lançar os R$ 250 certos de uma renda de
+     * R$ 650 com R$ 400 já recebidos disparava "diferente do cadastrado
+     * (R$ 650,00)" — alarme falso no lançamento CORRETO. Alarme que dispara
+     * sempre é alarme que ninguém lê.
+     */
+    expect(tela).toMatch(/valorRec !== saldoDaConta\(recebendo\)/);
+  });
+
+  it("o lançamento no caixa sai marcado como parcial", () => {
+    expect(tela).toMatch(/" - parcial"/);
+  });
+
+  it("não promete a próxima data quando ainda falta cair", () => {
+    // "Próximo: 05/09" depois de um recebimento parcial faria a pessoa sair
+    // da tela achando que o mês está resolvido.
+    expect(tela).toMatch(/Ainda faltam \$\{brl\(restou\)\} desta renda/);
   });
 });
