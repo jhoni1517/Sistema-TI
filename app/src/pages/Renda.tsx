@@ -22,6 +22,9 @@ import {
   situacaoConta,
   contaQuitada,
   pagarConta,
+  saldoDaConta,
+  pagoNaReferencia,
+  parcialmentePaga,
   diasAteVencer,
   SITUACAO_CONTA_META,
 } from "../lib/contas";
@@ -116,7 +119,10 @@ export const Renda: React.FC = () => {
 
   const abrirRecebimento = (c: ContaPagar) => {
     setRecebendo(c);
-    setValorRec(Number(c.valor) || 0);
+    // O que ainda falta cair, e não o combinado: de R$ 650 com R$ 400 já
+    // recebidos, oferecer R$ 650 de novo faria a pessoa lançar o mês inteiro
+    // duas vezes.
+    setValorRec(saldoDaConta(c));
     setFormaRec("pix");
   };
 
@@ -145,7 +151,11 @@ export const Renda: React.FC = () => {
         id: uid(),
         tipo: "entrada",
         categoria: recebendo.categoria || "Renda fixa",
-        descricao: `${recebendo.descricao} (${formatDate(recebendo.vencimento)})`,
+        descricao:
+          `${recebendo.descricao} (${formatDate(recebendo.vencimento)})` +
+          // No fechamento do mês ninguém lembra por que o salário entrou
+          // pela metade. A marca vai junto, na linha do caixa.
+          (valorRec < saldoDaConta(recebendo) ? " - parcial" : ""),
         valor: valorRec,
         formaPagamento: formaRec,
         sessaoId: sessaoAberta?.id,
@@ -154,10 +164,20 @@ export const Renda: React.FC = () => {
 
       await saveConta(atualizada);
       setRecebendo(null);
+      /*
+       * A frase tem que combinar com o que ACONTECEU. Dizer "próximo: 05/09"
+       * depois de um recebimento parcial faria a pessoa sair da tela achando
+       * que o mês está resolvido — e é justamente quem depende deste dinheiro
+       * que não pode ser enganado sobre ele.
+       */
+      const restou = saldoDaConta(atualizada);
+      const parcial = atualizada.vencimento === recebendo.vencimento && restou > 0;
       aviso.sucesso(
-        recebendo.recorrencia === "unica"
-          ? "Recebimento lançado no caixa."
-          : `Recebido e lançado no caixa. Próximo: ${formatDate(atualizada.vencimento)}.`
+        parcial
+          ? `${brl(valorRec)} lançado no caixa. Ainda faltam ${brl(restou)} desta renda.`
+          : recebendo.recorrencia === "unica"
+            ? "Recebimento lançado no caixa."
+            : `Recebido e lançado no caixa. Próximo: ${formatDate(atualizada.vencimento)}.`
       );
     } catch (e) {
       aviso.erro(e instanceof Error ? e.message : String(e));
@@ -288,7 +308,17 @@ export const Renda: React.FC = () => {
                   </div>
 
                   <div className="text-right">
-                    <p className="font-bold text-emerald-600">{brl(c.valor)}</p>
+                    {/* O número grande é o que ainda vem. Sem isso, uma renda
+                        que caiu pela metade fica igual a uma que não caiu, e
+                        a pessoa conta com dinheiro que já gastou. */}
+                    <p className="font-bold text-emerald-600">
+                      {brl(parcialmentePaga(c) ? saldoDaConta(c) : Number(c.valor) || 0)}
+                    </p>
+                    {parcialmentePaga(c) && (
+                      <p className="text-[11px] text-slate-400">
+                        de {brl(Number(c.valor) || 0)} · já caiu {brl(pagoNaReferencia(c))}
+                      </p>
+                    )}
                     {c.ativo && !contaQuitada(c) && (
                       <p className="text-[11px] text-slate-400">
                         {dias < 0
@@ -300,9 +330,21 @@ export const Renda: React.FC = () => {
                     )}
                   </div>
 
-                  <span className={`badge ${meta.cor}`}>
-                    {/* "Paga" e "Atrasada" são palavras de conta a pagar. */}
-                    {sit === "paga" ? "Recebido" : sit === "atrasada" ? "Não caiu" : meta.label}
+                  <span
+                    className={`badge ${
+                      parcialmentePaga(c) ? "bg-amber-100 text-amber-700" : meta.cor
+                    }`}
+                  >
+                    {/* "Paga" e "Atrasada" são palavras de conta a pagar. E
+                        "caiu em parte" precisa existir: sem ele, quem recebeu
+                        R$ 400 de R$ 650 lê "Não caiu" e liga cobrando tudo. */}
+                    {parcialmentePaga(c)
+                      ? `Caiu em parte · faltam ${brl(saldoDaConta(c))}`
+                      : sit === "paga"
+                        ? "Recebido"
+                        : sit === "atrasada"
+                          ? "Não caiu"
+                          : meta.label}
                   </span>
 
                   <div className="flex items-center gap-1">
@@ -443,6 +485,16 @@ export const Renda: React.FC = () => {
           }
         >
           <div className="grid gap-4">
+            {/* Com parte já recebida, o número que importa é o que FALTA.
+                Sem esta linha não há como saber de quanto ainda é a diferença
+                na hora de digitar. */}
+            {parcialmentePaga(recebendo) && (
+              <p className="rounded-lg bg-slate-50 p-2.5 text-sm text-slate-600">
+                Combinado {brl(Number(recebendo.valor) || 0)} · já caiu{" "}
+                {brl(pagoNaReferencia(recebendo))} ·{" "}
+                <b className="text-amber-700">faltam {brl(saldoDaConta(recebendo))}</b>
+              </p>
+            )}
             <Field label="Quanto entrou (R$)">
               <InputNumero className="input" value={valorRec} onChange={(v) => setValorRec(v ?? 0)} />
               {/*
@@ -452,9 +504,17 @@ export const Renda: React.FC = () => {
                 mentir para o lado otimista — e quem depende do dinheiro é
                 justamente quem não pode ser enganado sobre ele.
               */}
-              {valorRec !== Number(recebendo.valor) && (
+              {/*
+                Compara com o que FALTA, e não com o cadastrado. Numa renda de
+                R$ 650 com R$ 400 já recebidos, lançar os R$ 250 certos
+                disparava "diferente do cadastrado (R$ 650,00)" — um alarme
+                falso justamente no lançamento correto, e alarme que dispara
+                sempre é alarme que ninguém lê.
+              */}
+              {valorRec !== saldoDaConta(recebendo) && (
                 <p className="mt-1 text-xs text-amber-600">
-                  Diferente do cadastrado ({brl(recebendo.valor)}). Vai entrar o valor digitado.
+                  Diferente do previsto ({brl(saldoDaConta(recebendo))}). Vai entrar o
+                  valor digitado.
                 </p>
               )}
             </Field>
@@ -471,11 +531,31 @@ export const Renda: React.FC = () => {
                 ))}
               </select>
             </Field>
-            <p className="text-xs text-slate-500">
-              Entra no Caixa como entrada.
-              {recebendo.recorrencia !== "unica" &&
-                " A próxima data é calculada sozinha, e o dia do mês é preservado."}
-            </p>
+            {/*
+              O aviso muda conforme o valor digitado. Quem recebeu R$ 400 de
+              R$ 650 precisa saber, ANTES de confirmar, que a renda continua na
+              lista esperando os R$ 250 — e que a data não vai pular para o mês
+              que vem. Um texto fixo dizendo "a próxima data é calculada
+              sozinha" seria mentira em metade dos casos.
+            */}
+            {(() => {
+              const falta = Math.round((saldoDaConta(recebendo) - valorRec) * 100) / 100;
+              if (falta > 0) {
+                return (
+                  <p className="rounded-lg bg-amber-50 p-2.5 text-xs text-amber-800">
+                    Caiu só uma parte: entram {brl(valorRec)} no Caixa e esta renda
+                    CONTINUA na lista esperando <b>{brl(falta)}</b>, na mesma data.
+                  </p>
+                );
+              }
+              return (
+                <p className="text-xs text-slate-500">
+                  Entra no Caixa como entrada.
+                  {recebendo.recorrencia !== "unica" &&
+                    " A próxima data é calculada sozinha, e o dia do mês é preservado."}
+                </p>
+              );
+            })()}
           </div>
         </Modal>
       )}
