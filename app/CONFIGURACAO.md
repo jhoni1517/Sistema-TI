@@ -168,7 +168,8 @@ https://supabase.com/dashboard/project/nviagibefxqtognowqwe/sql/new:
 21. `supabase-migracao-estoque-atomico.sql`
 22. `supabase-migracao-fotos-laudo.sql`
 23. `supabase-migracao-video-laudo.sql`
-24. `supabase-corrigir-colunas.sql`
+24. `supabase-migracao-ramo-motores.sql`
+25. `supabase-corrigir-colunas.sql`
 
 `supabase-conta-teste.sql` fica de fora da ordem de propósito: ele cria uma
 loja de mentira para você mexer sem sujar dado de cliente. Rode só quando

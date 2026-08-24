@@ -51,8 +51,6 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
    * serviço sumiram da tela do dono numa tentativa de só dar uma olhada.
    */
   const [ramo, setRamo] = useState<Ramo | null>(() => lerRamoAparelho());
-  /** Mostra os quatro tipos mesmo quando o aparelho já conhece a conta */
-  const [verTipos, setVerTipos] = useState(false);
   /**
    * Nome e logo que este aparelho já tem guardados.
    *
@@ -109,7 +107,19 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
 
   const conhecida = lembrado ?? ramoDaConta;
   const ramoNaTela = conhecida ?? ramo;
-  const mostraEscolha = !conhecida || verTipos;
+  /*
+   * O SELETOR DE TIPO DE LOJA SÓ APARECE NO CADASTRO.
+   *
+   * Quem entra já tem loja: a escolha nunca valeu para ele — só o
+   * administrador demonstrando o sistema muda de ramo, e clicar sem nada
+   * acontecer parecia defeito. Com a lista crescendo (são cinco tipos e vêm
+   * mais), a primeira tela do sistema virava uma parede de botões antes do
+   * campo de e-mail.
+   *
+   * No cadastro é o contrário: ali a escolha é o dado mais importante da
+   * conta, porque decide quais telas a loja vai ter.
+   */
+  const mostraEscolha = modo === "criar";
 
   const forca = forcaSenha(senha);
 
@@ -269,15 +279,7 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
             <p className="mt-0.5 text-xs text-amber-100/70">
               Reconhecemos esta conta.
             </p>
-            {!verTipos && (
-              <button
-                type="button"
-                onClick={() => setVerTipos(true)}
-                className="mt-1 text-xs text-slate-400 underline"
-              >
-                Ver outros tipos de loja
-              </button>
-            )}
+
           </div>
         )}
 

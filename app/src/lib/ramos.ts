@@ -25,7 +25,12 @@
  * ---------------------------------------------------------------------
  */
 
-export type Ramo = "assistencia" | "mercearia" | "pizzaria" | "bebidas";
+export type Ramo =
+  | "assistencia"
+  | "motores"
+  | "mercearia"
+  | "pizzaria"
+  | "bebidas";
 
 /**
  * Telas que aparecem ou não conforme o ramo.
@@ -50,6 +55,26 @@ export type Modulo =
  */
 export type Recurso =
   | "imei" // número de série do aparelho, na OS
+  /**
+   * Senha, padrão de desbloqueio e conta vinculada do aparelho.
+   *
+   * NASCEU DE UM PEDIDO ÓBVIO EM RETROSPECTO: "imagina numa pizzaria ter
+   * senha do celular". O bloco confidencial era incondicional, então toda
+   * loja de qualquer ramo via um campo pedindo a senha do celular do
+   * cliente — e num rebobinamento de motor isso não é só estranho, é pedir
+   * dado sigiloso que a loja não tem por que guardar.
+   *
+   * Guardar senha de terceiro é o maior risco jurídico deste sistema. Só
+   * pede quem precisa.
+   */
+  | "senhaAparelho"
+  /**
+   * Placa do motor: potência, tensão, rotação e fases.
+   *
+   * É o que o rebobinador anota ANTES de abrir. Sem esses quatro números
+   * não dá para calcular o fio nem conferir se o motor voltou igual.
+   */
+  | "dadosMotor"
   | "garantia" // prazo de garantia impresso no comprovante
   | "peso" // produto vendido por quilo, com preço por kg
   | "validade" // data de vencimento no estoque, com alerta
@@ -72,6 +97,15 @@ export interface Vocabulario {
   /** O que se vende: peça, produto, item */
   item: string;
   itemPlural: string;
+  /**
+   * O que entra para consertar: aparelho, equipamento.
+   *
+   * "Dados do aparelho" numa oficina de rebobinamento soa a celular, e a
+   * pessoa que trabalha ali passa o dia lendo a palavra errada. Trocar
+   * custa uma linha e muda como a loja enxerga o sistema.
+   */
+  aparelho: string;
+  aparelhoPlural: string;
 }
 
 export interface RamoMeta {
@@ -80,6 +114,23 @@ export interface RamoMeta {
   vocabulario: Vocabulario;
   modulos: Modulo[];
   recursos: Recurso[];
+  /**
+   * O que a loja recebe para consertar, na ordem em que aparece no seletor.
+   *
+   * Estava escrito à mão dentro da tela da OS — "Celular, Notebook, PC,
+   * Tablet" — e por isso a oficina de motores abria a ordem escolhendo
+   * entre celular e tablet. Vazio em ramo que não conserta nada.
+   */
+  aparelhos: string[];
+  /**
+   * Checklist de entrada, conferido com o cliente na frente.
+   *
+   * Também estava à mão na tela: "Tela sem trincos", "Touch funciona",
+   * "Câmera OK". Num motor não se confere touch — confere-se se o eixo gira
+   * e se a carcaça está trincada. Checklist errado é checklist que ninguém
+   * marca, e aí a prova da entrada deixa de existir.
+   */
+  checklist: string[];
 }
 
 const VENDA: Vocabulario = {
@@ -88,6 +139,9 @@ const VENDA: Vocabulario = {
   ordemCurta: "Venda",
   item: "Produto",
   itemPlural: "Produtos",
+  // Sem conserto, mas o campo existe para toda a tela poder ler sem checar.
+  aparelho: "Item",
+  aparelhoPlural: "Itens",
 };
 
 export const RAMO_META: Record<Ramo, RamoMeta> = {
@@ -100,9 +154,75 @@ export const RAMO_META: Record<Ramo, RamoMeta> = {
       ordemCurta: "OS",
       item: "Peça",
       itemPlural: "Peças",
+      aparelho: "Aparelho",
+      aparelhoPlural: "Aparelhos",
     },
     modulos: ["os", "rastreio"],
-    recursos: ["imei", "garantia"],
+    recursos: ["imei", "senhaAparelho", "garantia"],
+    aparelhos: ["Celular", "Notebook", "PC", "Tablet", "Impressora", "Console", "Outro"],
+    checklist: [
+      "Liga normalmente",
+      "Tela sem trincos",
+      "Touch funciona",
+      "Botões OK",
+      "Câmera OK",
+      "Alto-falante OK",
+      "Carrega",
+      "Molhou / oxidação",
+    ],
+  },
+  /**
+   * Rebobinamento e manutenção de motor elétrico e bomba d'água.
+   *
+   * É assistência técnica com outro conteúdo, e por isso reaproveita a OS
+   * inteira — laudo, orçamento com opções, aprovação pelo link, garantia,
+   * peças, caixa. O que muda é o que se pergunta na entrada.
+   *
+   * O QUE ENTRA: a placa do motor. Potência, tensão, rotação e fases são os
+   * quatro números que o rebobinador anota antes de abrir; sem eles não dá
+   * para calcular a bitola do fio nem conferir, na volta, se o motor saiu
+   * igual ao que entrou.
+   *
+   * O QUE SAI: IMEI e senha do aparelho. Motor não tem IMEI, e pedir a senha
+   * do celular de quem trouxe uma bomba d'água é pedir dado sigiloso sem ter
+   * por que guardar.
+   */
+  motores: {
+    label: "Motores e bombas",
+    descricao: "Rebobinamento, motor elétrico e bomba d'água: laudo, orçamento e garantia",
+    vocabulario: {
+      ordem: "Ordem de Serviço",
+      ordemPlural: "Ordens de Serviço",
+      ordemCurta: "OS",
+      item: "Peça",
+      itemPlural: "Peças",
+      // "Aparelho" puxa para eletrônico. Quem trabalha ali fala equipamento.
+      aparelho: "Equipamento",
+      aparelhoPlural: "Equipamentos",
+    },
+    modulos: ["os", "rastreio"],
+    recursos: ["dadosMotor", "garantia"],
+    aparelhos: [
+      "Motor monofásico",
+      "Motor trifásico",
+      "Bomba d'água",
+      "Bomba submersa",
+      "Motobomba",
+      "Compressor",
+      "Ventilador / exaustor",
+      "Betoneira",
+      "Outro",
+    ],
+    checklist: [
+      "Eixo gira livre",
+      "Rolamentos OK",
+      "Carcaça sem trinco",
+      "Ventoinha e tampa",
+      "Caixa de ligação",
+      "Capacitor",
+      "Veio molhado / enferrujado",
+      "Cheiro de queimado",
+    ],
   },
   mercearia: {
     label: "Mercearia / mercado",
@@ -110,6 +230,8 @@ export const RAMO_META: Record<Ramo, RamoMeta> = {
     vocabulario: VENDA,
     modulos: ["pdv"],
     recursos: ["peso", "validade"],
+    aparelhos: [],
+    checklist: [],
   },
   pizzaria: {
     label: "Pizzaria / lanchonete",
@@ -120,9 +242,14 @@ export const RAMO_META: Record<Ramo, RamoMeta> = {
       ordemCurta: "Pedido",
       item: "Item",
       itemPlural: "Itens",
+      aparelho: "Item",
+      aparelhoPlural: "Itens",
     },
     modulos: ["pdv", "delivery", "mesas", "producao"],
     recursos: ["meioAMeio", "observacaoItem"],
+    // Pizzaria não conserta nada: as duas listas ficam vazias de propósito.
+    aparelhos: [],
+    checklist: [],
   },
   bebidas: {
     label: "Loja de bebidas / adega",
@@ -130,6 +257,8 @@ export const RAMO_META: Record<Ramo, RamoMeta> = {
     vocabulario: VENDA,
     modulos: ["pdv", "delivery"],
     recursos: ["validade", "idadeMinima"],
+    aparelhos: [],
+    checklist: [],
   },
 };
 
@@ -150,6 +279,24 @@ export const temRecurso = (ramo: string | undefined | null, recurso: Recurso): b
 /** As palavras deste ramo */
 export const vocabulario = (ramo?: string | null): Vocabulario =>
   RAMO_META[ramoDe(ramo)].vocabulario;
+
+/**
+ * O que este ramo recebe para consertar.
+ *
+ * Devolve a lista da assistência quando o ramo não conserta nada: a tela da
+ * OS só existe para quem tem o módulo, e um seletor vazio ali seria pior que
+ * um seletor errado — não daria nem para salvar a ordem.
+ */
+export const aparelhosDoRamo = (ramo?: string | null): string[] => {
+  const lista = RAMO_META[ramoDe(ramo)].aparelhos;
+  return lista.length > 0 ? lista : RAMO_META.assistencia.aparelhos;
+};
+
+/** O checklist de entrada deste ramo. Mesma regra da lista acima. */
+export const checklistDoRamo = (ramo?: string | null): string[] => {
+  const lista = RAMO_META[ramoDe(ramo)].checklist;
+  return lista.length > 0 ? lista : RAMO_META.assistencia.checklist;
+};
 
 /* ------------------------------------------------------------------ */
 /* Ramo escolhido no aparelho                                          */
