@@ -78,6 +78,13 @@ alter table ordens add column if not exists "fotosLaudo" jsonb default '[]'::jso
 -- Vídeos do laudo, com a capa de cada um. O que a foto não mostra: o barulho
 -- do cooler, a tela que pisca, o curto que só aparece quando liga.
 alter table ordens add column if not exists "videosLaudo" jsonb default '[]'::jsonb;
+-- Placa do motor, no ramo de motores e bombas. Texto e não número: "3/4 cv"
+-- e "220/380V" é como está escrito na plaqueta, e obrigar a converter faria
+-- o atendente arredondar de cabeça na frente do cliente.
+alter table ordens add column if not exists potencia text;
+alter table ordens add column if not exists tensao text;
+alter table ordens add column if not exists rotacao text;
+alter table ordens add column if not exists fases text;
 alter table ordens add column if not exists "entregueEm" text;
 
 -- ---------- Produtos ----------

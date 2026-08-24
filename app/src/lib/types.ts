@@ -205,6 +205,24 @@ export interface OrdemServico {
   modelo: string;
   cor?: string;
   imeiSerial?: string;
+  /**
+   * Placa do motor: potência, tensão, rotação e fases.
+   *
+   * São os quatro números que o rebobinador anota ANTES de abrir. Sem eles
+   * não dá para calcular a bitola do fio, nem conferir na volta se o motor
+   * saiu igual ao que entrou — e é justamente essa conferência que o cliente
+   * cobra quando o motor esquenta depois do conserto.
+   *
+   * Texto e não número: "1,5 CV", "3/4 cv", "220/380V" e "1750 rpm" é como
+   * está escrito na plaqueta, e obrigar a converter faria o atendente
+   * arredondar de cabeça na frente do cliente.
+   *
+   * Só aparece no ramo de motores. Ver o recurso `dadosMotor` em ramos.ts.
+   */
+  potencia?: string;
+  tensao?: string;
+  rotacao?: string;
+  fases?: string;
   // Senhas / acesso (dados sensíveis)
   senhaAparelho?: string;
   padraoDesbloqueio?: string;

@@ -35,6 +35,12 @@ import { obterLoja } from "../lib/db";
 import { linkDeRastreio } from "../lib/rastreio";
 import { registrarAcessoSigilo } from "../lib/auth";
 import { estadoDoSigilo, recadoDoSigilo, podeEditarSigilo } from "../lib/sigilo";
+import {
+  temRecurso,
+  vocabulario,
+  aparelhosDoRamo,
+  checklistDoRamo,
+} from "../lib/ramos";
 import { fotosParaOCliente, videosParaOCliente } from "../lib/fotos-laudo";
 import { VideosAparelho } from "../components/VideosAparelho";
 import { duracaoEscrita } from "../lib/video";
@@ -99,16 +105,6 @@ import {
   garantiasVencendo,
 } from "../lib/garantia";
 
-const CHECKLIST_ITENS = [
-  "Liga normalmente",
-  "Tela sem trincos",
-  "Touch funciona",
-  "Botões OK",
-  "Câmera OK",
-  "Alto-falante OK",
-  "Carrega",
-  "Molhou / oxidação",
-];
 
 const STATUS_LIST = Object.keys(OS_STATUS_META) as OSStatus[];
 
@@ -860,6 +856,10 @@ const OSForm: React.FC<{
   onSave: () => void;
   onClose: () => void;
 }> = ({ os, setOs, clientes, produtos, onSave, onClose }) => {
+  // O ramo vem do store, e não por prop: passar por parâmetro obrigaria a
+  // mexer em toda chamada, e o que muda aqui é só qual campo aparece.
+  const { ramo } = useApp();
+  const voc = vocabulario(ramo);
   const trava = travaAtendimento(clientes.find((c) => c.id === os.clienteId));
 
   const addPeca = (opcao?: string) =>
@@ -1056,7 +1056,7 @@ const OSForm: React.FC<{
         {/* Aparelho */}
         <fieldset className="rounded-xl border border-slate-200 p-4">
           <legend className="flex items-center gap-1 px-2 text-sm font-bold text-slate-600">
-            <Smartphone size={15} /> Dados do aparelho
+            <Smartphone size={15} /> Dados do {voc.aparelho.toLowerCase() /* texto-cru-proposital */}
           </legend>
           <div className="grid gap-4 sm:grid-cols-3">
             <Field label="Tipo">
@@ -1065,7 +1065,7 @@ const OSForm: React.FC<{
                 value={os.tipoAparelho}
                 onChange={(e) => setOs({ ...os, tipoAparelho: e.target.value })}
               >
-                {["Celular", "Notebook", "PC", "Tablet", "Impressora", "Console", "Outro"].map((t) => (
+                {aparelhosDoRamo(ramo).map((t) => (
                   <option key={t}>{t}</option>
                 ))}
               </select>
@@ -1079,16 +1079,61 @@ const OSForm: React.FC<{
             <Field label="Cor">
               <input className="input" value={os.cor} onChange={(e) => setOs({ ...os, cor: e.target.value })} />
             </Field>
-            <Field label="IMEI / Nº de série">
-              <input className="input" value={os.imeiSerial} onChange={(e) => setOs({ ...os, imeiSerial: e.target.value })} />
-            </Field>
+            {/*
+              IMEI só onde existe IMEI. Motor e bomba não têm — e um campo
+              pedindo IMEI numa oficina de rebobinamento é o tipo de coisa
+              que faz o sistema parecer emprestado de outro ramo.
+            */}
+            {temRecurso(ramo, "imei") && (
+              <Field label="IMEI / Nº de série">
+                <input className="input" value={os.imeiSerial} onChange={(e) => setOs({ ...os, imeiSerial: e.target.value })} />
+              </Field>
+            )}
             <Field label="Acessórios entregues">
-              <input className="input" placeholder="chip, cartão, capa..." value={os.acessorios} onChange={(e) => setOs({ ...os, acessorios: e.target.value })} />
+              <input className="input" placeholder={temRecurso(ramo, "imei") ? "chip, cartão, capa..." : "cabo, chave, suporte..."} value={os.acessorios} onChange={(e) => setOs({ ...os, acessorios: e.target.value })} />
             </Field>
           </div>
+
+          {/*
+            A PLACA DO MOTOR.
+
+            São os quatro números que o rebobinador anota antes de abrir. Sem
+            eles não dá para calcular a bitola do fio nem conferir, na volta,
+            se o motor saiu igual ao que entrou — e é essa conferência que o
+            cliente cobra quando o motor esquenta depois do conserto.
+
+            Texto e não número: "3/4 cv" e "220/380V" é como está escrito na
+            plaqueta, e obrigar a converter faria o atendente arredondar de
+            cabeça na frente do cliente.
+          */}
+          {temRecurso(ramo, "dadosMotor") && (
+            <div className="mt-4">
+              <label className="label">Placa do equipamento</label>
+              <div className="grid gap-4 sm:grid-cols-4">
+                <Field label="Potência">
+                  <input className="input" placeholder="1,5 CV" value={os.potencia || ""} onChange={(e) => setOs({ ...os, potencia: e.target.value })} />
+                </Field>
+                <Field label="Tensão">
+                  <input className="input" placeholder="220/380V" value={os.tensao || ""} onChange={(e) => setOs({ ...os, tensao: e.target.value })} />
+                </Field>
+                <Field label="Rotação">
+                  <input className="input" placeholder="1750 rpm" value={os.rotacao || ""} onChange={(e) => setOs({ ...os, rotacao: e.target.value })} />
+                </Field>
+                <Field label="Fases">
+                  <select className="input" value={os.fases || ""} onChange={(e) => setOs({ ...os, fases: e.target.value })}>
+                    <option value="">—</option>
+                    <option>Monofásico</option>
+                    <option>Bifásico</option>
+                    <option>Trifásico</option>
+                  </select>
+                </Field>
+              </div>
+            </div>
+          )}
         </fieldset>
 
-        {/* Senhas */}
+        {/* Senhas: só no ramo que guarda senha de aparelho. Ver ramos.ts. */}
+        {temRecurso(ramo, "senhaAparelho") && (
         <fieldset className="rounded-xl border border-amber-200 bg-amber-50/40 p-4">
           <legend className="flex items-center gap-1 px-2 text-sm font-bold text-amber-700">
             <KeyRound size={15} /> Acesso / Senhas (confidencial)
@@ -1122,6 +1167,7 @@ const OSForm: React.FC<{
             </>
           )}
         </fieldset>
+        )}
 
         {/* Defeito e checklist */}
         <div className="grid gap-4 sm:grid-cols-2">
@@ -1169,7 +1215,7 @@ const OSForm: React.FC<{
         <div>
           <label className="label">Checklist de entrada</label>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {CHECKLIST_ITENS.map((item) => (
+            {checklistDoRamo(ramo).map((item) => (
               <label key={item} className="flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm">
                 <input
                   type="checkbox"
@@ -1410,6 +1456,8 @@ const OSDetalhe: React.FC<{
   /** Gravação em andamento: o botão não pode aceitar o segundo clique */
   registrando: boolean;
 }> = ({ os, clienteNome, cliente, config, onClose, onStatus, onAvisar, onEditar, onExcluir, onReceber, onFiado, pagamentoRegistrado, historicoAparelho, registrando }) => {
+  const { ramo } = useApp();
+  const voc = vocabulario(ramo);
   const [forma, setForma] = useState<FormaPagamento>("dinheiro");
   const [parcelas, setParcelas] = useState<Parcela[]>([]);
   const [dividido, setDividido] = useState(false);
@@ -1535,13 +1583,25 @@ const OSDetalhe: React.FC<{
         <div className="grid gap-4 sm:grid-cols-2">
           <Info label="Cliente" value={clienteNome} />
           <Info label="Telefone" value={cliente?.telefone || "—"} />
-          <Info label="Aparelho" value={`${os.tipoAparelho} ${os.marca} ${os.modelo}`} />
+          <Info label={voc.aparelho} value={`${os.tipoAparelho} ${os.marca} ${os.modelo}`} />
           <Info label="Cor / IMEI" value={`${os.cor || "—"} · ${os.imeiSerial || "—"}`} />
           <Info label="Acessórios" value={os.acessorios || "—"} />
           <Info label="Técnico" value={os.tecnico || "—"} />
         </div>
 
-        <BlocoSigilo os={os} />
+        {temRecurso(ramo, "senhaAparelho") && <BlocoSigilo os={os} />}
+
+        {/* A placa, no detalhe e na impressão: é o que o cliente confere
+            quando vem buscar, e o que prova que voltou o mesmo motor. */}
+        {temRecurso(ramo, "dadosMotor") &&
+          [os.potencia, os.tensao, os.rotacao, os.fases].some((v) => txt(v).trim()) && (
+            <div className="grid gap-2 sm:grid-cols-4">
+              <Info label="Potência" value={txt(os.potencia) || "—"} />
+              <Info label="Tensão" value={txt(os.tensao) || "—"} />
+              <Info label="Rotação" value={txt(os.rotacao) || "—"} />
+              <Info label="Fases" value={txt(os.fases) || "—"} />
+            </div>
+          )}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Info label="Defeito relatado" value={os.defeitoRelatado} />

@@ -2,6 +2,9 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   RAMOS,
   RAMO_META,
+  aparelhosDoRamo,
+  checklistDoRamo,
+  type Ramo,
   ramoDe,
   temModulo,
   temRecurso,
@@ -29,13 +32,59 @@ describe("ramos", () => {
     expect(temModulo("padaria", "pdv")).toBe(false);
   });
 
-  it("só a assistência tem ordem de serviço e rastreio", () => {
-    expect(temModulo("assistencia", "os")).toBe(true);
-    expect(temModulo("assistencia", "rastreio")).toBe(true);
-    for (const r of RAMOS.filter((x) => x !== "assistencia")) {
-      expect(temModulo(r, "os"), r).toBe(false);
-      expect(temModulo(r, "rastreio"), r).toBe(false);
+  it("quem conserta tem ordem de serviço e rastreio; quem vende, não", () => {
+    /*
+     * Este teste dizia "só a assistência tem OS" e reprovou quando o ramo de
+     * motores e bombas entrou — corretamente, porque a premissa mudou: o
+     * rebobinamento é conserto com laudo, orçamento e garantia, e reaproveita
+     * a OS inteira. O que continua valendo é a fronteira: quem VENDE não tem
+     * ordem de serviço nenhuma.
+     */
+    const CONSERTAM: Ramo[] = ["assistencia", "motores"];
+    for (const r of RAMOS) {
+      const conserta = CONSERTAM.includes(r);
+      expect(temModulo(r, "os"), r).toBe(conserta);
+      expect(temModulo(r, "rastreio"), r).toBe(conserta);
     }
+  });
+
+  it("senha de aparelho só onde faz sentido guardar senha de terceiro", () => {
+    /*
+     * "Imagina na área de restaurante ter senha do celular." O bloco
+     * confidencial era incondicional, então toda loja de qualquer ramo via um
+     * campo pedindo a senha do celular do cliente. Guardar senha de terceiro
+     * é o maior risco jurídico deste sistema: só pede quem precisa.
+     */
+    expect(temRecurso("assistencia", "senhaAparelho")).toBe(true);
+    for (const r of RAMOS.filter((x) => x !== "assistencia")) {
+      expect(temRecurso(r, "senhaAparelho"), r).toBe(false);
+    }
+  });
+
+  it("motor não tem IMEI, e celular não tem placa", () => {
+    expect(temRecurso("motores", "imei")).toBe(false);
+    expect(temRecurso("motores", "dadosMotor")).toBe(true);
+    expect(temRecurso("assistencia", "imei")).toBe(true);
+    expect(temRecurso("assistencia", "dadosMotor")).toBe(false);
+  });
+
+  it("quem conserta tem lista de equipamento e checklist próprios", () => {
+    // Estavam escritos à mão dentro da tela da OS: a oficina de motores abria
+    // a ordem escolhendo entre celular e tablet, e conferia "touch funciona".
+    expect(aparelhosDoRamo("motores")).toContain("Bomba d'água");
+    expect(aparelhosDoRamo("motores")).not.toContain("Celular");
+    expect(aparelhosDoRamo("assistencia")).toContain("Celular");
+
+    expect(checklistDoRamo("motores")).toContain("Eixo gira livre");
+    expect(checklistDoRamo("motores")).not.toContain("Touch funciona");
+    expect(checklistDoRamo("assistencia")).toContain("Touch funciona");
+  });
+
+  it("ramo que não conserta cai na lista da assistência em vez de vazia", () => {
+    // A tela da OS só existe para quem tem o módulo. Mas um seletor vazio ali
+    // seria pior que um errado: não daria nem para salvar a ordem.
+    expect(aparelhosDoRamo("pizzaria").length).toBeGreaterThan(0);
+    expect(checklistDoRamo("pizzaria").length).toBeGreaterThan(0);
   });
 
   it("assistência não tem PDV: lá a venda nasce da OS, não do balcão", () => {
