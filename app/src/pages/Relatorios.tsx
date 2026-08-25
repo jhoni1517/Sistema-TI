@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import { TrendingUp, DollarSign, Percent, Wrench, Users, Package , FileText } from "lucide-react";
 import { useApp } from "../store/AppStore";
+import { temModulo } from "../lib/ramos";
 import { SectionTitle, Field } from "../components/ui";
 import { csvDoPeriodo, nomeDoArquivo, limitesDoMes } from "../lib/contabil";
 import {
@@ -38,7 +39,8 @@ import { OS_STATUS_META, type OSStatus } from "../lib/types";
 const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
 export const Relatorios: React.FC = () => {
-  const { movimentos, ordens, produtos, vendas, config } = useApp();
+  const { movimentos, ordens, produtos, vendas, config, ramo } = useApp();
+  const temOS = temModulo(ramo, "os");
   const [meses, setMeses] = useState(6);
 
   const acc = accentHex(config.corDestaque);
@@ -352,7 +354,10 @@ export const Relatorios: React.FC = () => {
           </ResponsiveContainer>
         </div>
 
-        {/* OS por status */}
+        {/* OS por status. Sem OS, um gráfico vazio com título de "Ordens por
+            status" ocupa metade da tela dizendo que falta cadastrar algo que
+            aquela loja nunca vai cadastrar. */}
+        {temOS && (
         <div className="card">
           <h3 className="mb-4 flex items-center gap-2 font-bold text-slate-700"><Wrench size={16} /> Ordens por status</h3>
           {porStatus.length === 0 ? (
@@ -370,6 +375,7 @@ export const Relatorios: React.FC = () => {
             </ResponsiveContainer>
           )}
         </div>
+        )}
 
         {/* Formas de pagamento */}
         <div className="card lg:col-span-2">
@@ -397,6 +403,7 @@ export const Relatorios: React.FC = () => {
           página, com números diferentes, debaixo do mesmo título, e a errada
           era a que pagava mais.
         */}
+        {temOS && (
         <div className="card lg:col-span-2">
           <h3 className="mb-1 flex items-center gap-2 font-bold text-slate-700"><Users size={16} /> Comissão por técnico</h3>
           <p className="mb-4 text-xs text-slate-400">
@@ -434,6 +441,7 @@ export const Relatorios: React.FC = () => {
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   );

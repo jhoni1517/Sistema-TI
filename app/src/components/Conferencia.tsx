@@ -4,6 +4,7 @@ import { ShieldCheck, AlertTriangle, Info, XCircle, ArrowRight } from "lucide-re
 import { Modal } from "./ui";
 import { useApp } from "../store/AppStore";
 import { brl } from "../lib/format";
+import { vocabulario } from "../lib/ramos";
 import {
   conferirTudo,
   dinheiroEmRisco,
@@ -42,7 +43,8 @@ const ESTILO: Record<Gravidade, { cor: string; icone: React.ReactNode; rotulo: s
 };
 
 export const Conferencia: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const { ordens, vendas, movimentos, produtos, fiados, clientes, sessoes } = useApp();
+  const { ordens, vendas, movimentos, produtos, fiados, clientes, sessoes, ramo } = useApp();
+  const voc = vocabulario(ramo);
   const navigate = useNavigate();
 
   const achados = useMemo(
@@ -64,9 +66,9 @@ export const Conferencia: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           <ShieldCheck className="mx-auto mb-3 text-emerald-500" size={40} />
           <p className="font-semibold text-slate-700">Nada fora do lugar.</p>
           <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-            Venda sem lançamento no caixa, aparelho entregue sem pagamento, estoque
-            negativo, dívida sem dono e caixa esquecido aberto — nenhum desses aparece
-            hoje.
+            Venda sem lançamento no caixa, {voc.ordemCurta} entregue sem pagamento,
+            estoque negativo, dívida sem dono e caixa esquecido aberto — nenhum desses
+            aparece hoje.
           </p>
         </div>
       ) : (

@@ -7,6 +7,7 @@ import { uid, nowISO, whatsappLink, formatDate, brl, txt, mascaraDocumento, soDi
 import { normalizar } from "../lib/busca";
 import { avaliarCliente, classificacaoDe, travaFiado, devendo } from "../lib/clientes";
 import { garantiasDoCliente } from "../lib/garantia";
+import { temModulo, vocabulario } from "../lib/ramos";
 import { aoApagarCliente, textoDaConfirmacao } from "../lib/exclusao";
 import { Relacionamento } from "../components/Relacionamento";
 import { CLASSIFICACAO_META, type Classificacao, type Cliente } from "../lib/types";
@@ -24,7 +25,9 @@ const vazio = (): Cliente => ({
 });
 
 export const Clientes: React.FC = () => {
-  const { clientes, ordens, fiados, vendas, saveCliente, removeCliente } = useApp();
+  const { clientes, ordens, fiados, vendas, saveCliente, removeCliente, ramo } = useApp();
+  const temOS = temModulo(ramo, "os");
+  const voc = vocabulario(ramo);
 
   /**
    * O que este cliente já significou para a loja.
@@ -219,9 +222,14 @@ export const Clientes: React.FC = () => {
                     <Phone size={13} /> {c.telefone || "sem telefone"}
                   </p>
                 </div>
-                <span className="badge bg-brand-50 text-brand-700">
-                  <Wrench size={12} /> {osCount(c.id)} OS
-                </span>
+                {/* Numa loja que não conserta nada, "0 OS" em toda linha da
+                    lista é ruído puro: um número que nunca sai de zero e uma
+                    chave inglesa que não quer dizer nada ali. */}
+                {temOS && (
+                  <span className="badge bg-brand-50 text-brand-700">
+                    <Wrench size={12} /> {osCount(c.id)} {voc.ordemCurta}
+                  </span>
+                )}
               </div>
               {c.cpf && (
                 <p className="mt-2 text-xs text-slate-400">
@@ -441,16 +449,18 @@ export const Clientes: React.FC = () => {
                         <span>
                           Compras: <b>{hist.compras}</b>
                         </span>
-                        <span>
-                          Ordens: <b>{hist.ordens}</b>
-                        </span>
+                        {temOS && (
+                          <span>
+                            {voc.ordemPlural}: <b>{hist.ordens}</b>
+                          </span>
+                        )}
                         {hist.devendo > 0 && (
                           <span className="text-red-600">
                             Deve: <b>{brl(hist.devendo)}</b>
                           </span>
                         )}
                       </div>
-                      {hist.garantias.length > 0 && (
+                      {temOS && hist.garantias.length > 0 && (
                         <p className="mt-2 text-xs text-emerald-700">
                           {hist.garantias.length} serviço(s) ainda na garantia — o mais
                           curto vence em {hist.garantias[0].garantia.diasRestantes} dia(s).

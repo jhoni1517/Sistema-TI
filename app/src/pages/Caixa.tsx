@@ -27,6 +27,7 @@ import { produtosParaOS } from "../lib/busca";
 import { comandasAbertas } from "../lib/comanda";
 import { TODAS_AS_FORMAS, nomeDaForma } from "../lib/pagamento";
 import { aposBaixa } from "../lib/estoque";
+import { temModulo } from "../lib/ramos";
 import { lucroDoMovimento } from "../lib/calc";
 import { printHTML } from "../lib/print";
 import { reciboFechamento, reciboVenda, reciboMovimento } from "../lib/recibo";
@@ -49,7 +50,17 @@ import {
 } from "../lib/caixa";
 import type { MovimentoCaixa, TipoMovimento, FormaPagamento, SessaoCaixa, Produto, Cliente } from "../lib/types";
 
-const CATS_ENTRADA = ["Venda", "Serviço", "OS", "Sinal / Entrada", "Outro"];
+/**
+ * Categorias de entrada.
+ *
+ * "OS" só faz sentido onde existe ordem de serviço: numa pizzaria ela ficava
+ * na lista sem nunca ser escolhida, e categoria que ninguém usa suja o
+ * relatório por categoria do mês inteiro.
+ */
+const catsEntrada = (temOS: boolean): string[] =>
+  temOS
+    ? ["Venda", "Serviço", "OS", "Sinal / Entrada", "Outro"]
+    : ["Venda", "Serviço", "Sinal / Entrada", "Outro"];
 const CATS_SAIDA = ["Despesa", "Compra de peça", "Fornecedor", "Aluguel", "Energia", "Água", "Internet", "Salário", "Marketing", "Outro"];
 
 interface Extra {
@@ -670,6 +681,7 @@ const MovimentoModal: React.FC<{
   onClose: () => void;
   onSave: (m: MovimentoCaixa, extra?: Extra) => void;
 }> = ({ tipo, produtos, clientes, onClose, onSave }) => {
+  const { ramo } = useApp();
   const [descricao, setDescricao] = useState("");
   const [valor, setValor] = useState(0);
   const [categoria, setCategoria] = useState("");
@@ -710,7 +722,7 @@ const MovimentoModal: React.FC<{
 
   if (!tipo) return null;
   const titulo = tipo === "entrada" ? "Nova entrada / venda" : tipo === "sangria" ? "Sangria (retirada)" : "Saída / Despesa";
-  const cats = tipo === "entrada" ? CATS_ENTRADA : CATS_SAIDA;
+  const cats = tipo === "entrada" ? catsEntrada(temModulo(ramo, "os")) : CATS_SAIDA;
 
   const pickProduto = (p: Produto) => {
     setProdId(p.id);

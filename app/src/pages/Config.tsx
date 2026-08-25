@@ -3,7 +3,7 @@ import { aviso } from "../components/Aviso";
 import { ImagemUpload } from "../components/ImagemUpload";
 import { Store, KeyRound, Cloud, Download, Upload, Save, Database, Palette, Sun, Moon, Monitor, Percent, FileText, ShieldCheck } from "lucide-react";
 import { useApp } from "../store/AppStore";
-import { RAMO_META, temRecurso, temModulo } from "../lib/ramos";
+import { RAMO_META, temRecurso, temModulo, vocabulario } from "../lib/ramos";
 import { REGRA_MEIO_A_MEIO_META, regraDe, type RegraMeioAMeio } from "../lib/pizza";
 import {
   REGIME_META,
@@ -25,6 +25,9 @@ import type { Config as ConfigType } from "../lib/types";
 
 export const Config: React.FC = () => {
   const { config, saveConfig, reload, ramoContratado, clientes, ordens, produtos, movimentos, sessoes, fiados, categorias, fornecedores, cotacoes, precos } = useApp();
+  // As palavras do ramo CONTRATADO, e não do escolhido no aparelho: esta tela
+  // ajusta a loja de verdade, e tem que falar a língua dela.
+  const vocRamo = vocabulario(ramoContratado);
   const [form, setForm] = useState<ConfigType>(config);
   const [salvo, setSalvo] = useState(false);
   const [importando, setImportando] = useState(false);
@@ -335,12 +338,20 @@ export const Config: React.FC = () => {
 
       {/* Termos do recibo */}
       <div className="card mb-5">
-        <h3 className="mb-1 flex items-center gap-2 font-bold text-slate-700"><FileText size={18} /> Termos do recibo (guarda / abandono)</h3>
-        <p className="mb-4 text-sm text-slate-500">Aparece no rodapé do recibo da OS. Após o prazo, o aparelho pode ser vendido para custear o serviço ou descartado, conforme a lei.</p>
+        <h3 className="mb-1 flex items-center gap-2 font-bold text-slate-700">
+          <FileText size={18} /> {temModulo(ramoContratado, "os") ? "Termos do recibo (guarda / abandono)" : "Recibo e atendimento"}
+        </h3>
+        <p className="mb-4 text-sm text-slate-500">
+          {temModulo(ramoContratado, "os")
+            ? `Aparece no rodapé do recibo da ${vocRamo.ordemCurta}. Após o prazo, o ${vocRamo.aparelho.toLowerCase() /* texto-cru-proposital */} pode ser vendido para custear o serviço ou descartado, conforme a lei.`
+            : "Ajustes do recibo e do atendimento desta loja."}
+        </p>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Prazo para retirada (dias)">
-            <InputNumero value={form.diasAbandono ?? 90} onChange={(v) => mudar({ diasAbandono: v })} />
-          </Field>
+          {temModulo(ramoContratado, "os") && (
+            <Field label="Prazo para retirada (dias)">
+              <InputNumero value={form.diasAbandono ?? 90} onChange={(v) => mudar({ diasAbandono: v })} />
+            </Field>
+          )}
           {temRecurso(ramoContratado, "peso") && (
             <Field label="A balança grava o quê na etiqueta?" className="sm:col-span-2">
               <div className="grid max-w-md grid-cols-2 gap-2">
@@ -667,9 +678,14 @@ export const Config: React.FC = () => {
               Obtenha mais avaliações, e copie o link.
             </p>
           </Field>
-          <Field label="Taxa de armazenamento por dia (R$)">
-            <InputNumero value={form.taxaArmazenamentoDia ?? 0} onChange={(v) => mudar({ taxaArmazenamentoDia: v })} />
-          </Field>
+          {/* Guarda e abandono só existem onde o cliente DEIXA alguma coisa.
+              Numa pizzaria não há o que abandonar, e cobrar diária de guarda
+              é uma pergunta sem resposta possível. */}
+          {temModulo(ramoContratado, "os") && (
+            <Field label="Taxa de armazenamento por dia (R$)">
+              <InputNumero value={form.taxaArmazenamentoDia ?? 0} onChange={(v) => mudar({ taxaArmazenamentoDia: v })} />
+            </Field>
+          )}
         </div>
       </div>
 
@@ -693,18 +709,28 @@ export const Config: React.FC = () => {
       {/* Operação */}
       <div className="card mb-5">
         <h3 className="mb-4 flex items-center gap-2 font-bold text-slate-700"><KeyRound size={18} /> Operação</h3>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Comissão padrão do técnico (%)">
-            <InputNumero value={form.comissaoPadrao ?? 0} onChange={(v) => mudar({ comissaoPadrao: v })} />
-          </Field>
-        </div>
+        {/* A comissão do técnico sai do LUCRO das OS entregues. Sem OS não há
+            de onde tirar, e o campo ficava pedindo um percentual que nunca
+            seria usado. */}
+        {temModulo(ramoContratado, "os") && (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Comissão padrão do técnico (%)">
+              <InputNumero value={form.comissaoPadrao ?? 0} onChange={(v) => mudar({ comissaoPadrao: v })} />
+            </Field>
+          </div>
+        )}
         <p className="mt-3 text-xs text-slate-500">
           A senha de acesso é individual: cada pessoa entra com o próprio e-mail
           e troca a senha aqui mesmo, em "Minha conta".
         </p>
       </div>
 
-      {/* Proteção dos dados do cliente */}
+      {/* Proteção dos dados do cliente.
+          Este cartão inteiro fala de senha de aparelho: só aparece onde o
+          sistema realmente guarda uma. Guardar senha de terceiro é o maior
+          risco jurídico daqui, e oferecer o ajuste a quem não guarda nada
+          sugere que guarda. */}
+      {temRecurso(ramoContratado, "senhaAparelho") && (
       <div className="card mb-5">
         <h3 className="mb-1 flex items-center gap-2 font-bold text-slate-700">
           <ShieldCheck size={18} /> Proteção dos dados do cliente
@@ -736,6 +762,7 @@ export const Config: React.FC = () => {
           Quem abre a senha de um aparelho fica registrado com data e hora.
         </p>
       </div>
+      )}
 
       {/* Aparência */}
       <div className="card mb-5">
