@@ -18,7 +18,7 @@ import { RAMO_META, type Modulo } from "../lib/ramos";
 const NOME_MODULO: Record<Modulo, string> = {
   os: "Ordens de Serviço",
   rastreio: "Acompanhamento público",
-  pdv: "Frente de caixa",
+  pdv: "Vender (frente de caixa)",
   delivery: "Entregas",
   mesas: "Comandas de mesa",
   producao: "Fila de preparo",

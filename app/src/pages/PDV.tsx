@@ -580,7 +580,7 @@ export const PDV: React.FC = () => {
   return (
     <div>
       <SectionTitle
-        title="Frente de caixa"
+        title="Vender"
         subtitle={
           sessao
             ? "Leia o código ou digite o nome — F2 fecha, F3 consulta preço, F4 limpa"

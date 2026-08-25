@@ -71,7 +71,7 @@ interface Extra {
 }
 
 export const Caixa: React.FC = () => {
-  const { movimentos, sessoes, produtos, clientes, comandas, config, saveMovimento, removeMovimento, saveSessao, saveProduto } = useApp();
+  const { movimentos, sessoes, produtos, clientes, comandas, config, ramo, saveMovimento, removeMovimento, saveSessao, saveProduto } = useApp();
   /** Lançamento de movimento em andamento: barra o segundo clique */
   const [lancandoMov, setLancandoMov] = useState(false);
   const [modal, setModal] = useState<TipoMovimento | null>(null);
@@ -355,6 +355,22 @@ export const Caixa: React.FC = () => {
           {detalhes ? "Menos detalhes" : "Ver detalhes"}
         </button>
       </div>
+
+      {/*
+        As duas telas se confundiam, e a pergunta chegou do balcão: "por que
+        tem dois caixas?".
+
+        A venda do balcão já cai aqui sozinha — quem vende em Vender NÃO
+        precisa lançar nada nesta tela. Sem esta linha, o caminho natural é
+        lançar nos dois lugares, e aí o dia fecha com o dobro do que entrou.
+      */}
+      {temModulo(ramo, "pdv") && (
+        <p className="-mt-3 mb-6 text-xs text-slate-500">
+          A venda feita em <b>Vender</b> entra aqui sozinha, com a baixa do
+          estoque. <b>Entrada / Venda</b> nesta tela é para o dinheiro que não
+          passou por lá — um serviço avulso, um recebimento.
+        </p>
+      )}
 
       {/* Abas: o dia a dia e o histórico de conferência */}
       <div className="mb-4 flex gap-2">

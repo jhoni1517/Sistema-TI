@@ -49,7 +49,16 @@ const nav: Array<{
 }> = [
   { to: "/", label: "Painel", icon: LayoutDashboard, end: true, recurso: "*" },
   { to: "/ordens", label: "Ordens de Serviço", icon: Wrench, recurso: "os", modulo: "os" },
-  { to: "/pdv", label: "Frente de caixa", icon: ShoppingCart, recurso: "caixa", modulo: "pdv" },
+  /*
+   * "Vender", e não "Frente de caixa".
+   *
+   * Com "Caixa" logo abaixo no mesmo menu, os dois viraram "os dois caixas" —
+   * a pergunta chegou assim, do balcão. São telas diferentes: aqui se FAZ a
+   * venda (produto, estoque, troco); lá se cuida da GAVETA (abre, fecha,
+   * confere, sangria). Um verbo e um substantivo separam melhor que dois
+   * nomes que dividem a mesma palavra.
+   */
+  { to: "/pdv", label: "Vender", icon: ShoppingCart, recurso: "caixa", modulo: "pdv" },
   { to: "/mesas", label: "Comandas", icon: Utensils, recurso: "caixa", modulo: "mesas" },
   { to: "/cozinha", label: "Cozinha", icon: ChefHat, recurso: "caixa", modulo: "producao" },
   { to: "/entrega", label: "Entrega", icon: Bike, recurso: "caixa", modulo: "delivery" },
