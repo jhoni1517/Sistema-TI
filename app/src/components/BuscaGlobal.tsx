@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Wrench, Users, Package, X, CornerDownLeft } from "lucide-react";
 import { useApp } from "../store/AppStore";
+import { temModulo, vocabulario } from "../lib/ramos";
 import { buscarTudo, type Resultado, type TipoResultado } from "../lib/busca";
 
 /**
@@ -16,7 +17,9 @@ export const BuscaGlobal: React.FC<{ aberto: boolean; onClose: () => void }> = (
   aberto,
   onClose,
 }) => {
-  const { clientes, ordens, produtos } = useApp();
+  const { clientes, ordens, produtos, ramo } = useApp();
+  const temOS = temModulo(ramo, "os");
+  const voc = vocabulario(ramo);
   const [q, setQ] = useState("");
   const [escolhido, setEscolhido] = useState(0);
   const navigate = useNavigate();
@@ -61,7 +64,14 @@ export const BuscaGlobal: React.FC<{ aberto: boolean; onClose: () => void }> = (
           <input
             autoFocus
             className="flex-1 bg-transparent py-4 text-sm text-slate-800 outline-none placeholder:text-slate-400"
-            placeholder="OS, cliente, telefone, IMEI, código de barras..."
+            /* O que a busca acha muda com o ramo: numa mercearia não há OS
+               nem IMEI, e prometer os dois no campo faz a pessoa procurar o
+               que não existe. */
+            placeholder={
+              temOS
+                ? `${voc.ordemCurta}, cliente, telefone, IMEI, código de barras...`
+                : "Cliente, telefone, produto, código de barras..."
+            }
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => {
