@@ -220,6 +220,27 @@ export function fiscalDoProduto(
 }
 
 /**
+ * O que vale para o SERVIÇO: o do produto, ou o padrão da loja.
+ *
+ * Espelha `fiscalDoProduto`, do outro lado da nota. A diferença que importa
+ * é que aqui o padrão da loja cobre o item SEM cadastro — e o item sem
+ * cadastro de uma OS é a mão de obra, que é o principal da nota de serviço
+ * de uma assistência. Sem esse padrão, a NFS-e da OS nunca sairia.
+ *
+ * A alíquota é o número puro: 3 quer dizer 3%. Guardar 0,03 e mostrar 3
+ * seria mais uma conversão para alguém errar no meio.
+ */
+export function servicoDoProduto(
+  p: Produto | undefined,
+  config: Config
+): { codigoServico: string; aliquotaIss: number } {
+  return {
+    codigoServico: txt(p?.codigoServico).trim() || txt(config.codigoServicoPadrao).trim(),
+    aliquotaIss: Number(p?.aliquotaIss) || Number(config.aliquotaIssPadrao) || 0,
+  };
+}
+
+/**
  * O que falta na LOJA para emitir qualquer nota.
  *
  * Estes três não têm padrão nem palpite possível: ou a loja informou, ou
@@ -297,7 +318,9 @@ export function pendenciasDoProduto(p: Produto, config: Config): string[] {
    * serviços (LC 116) e a alíquota de ISS.
    */
   if (documentoDoProduto(p) === "nfse") {
-    if (!txt(p.codigoServico).trim()) {
+    // O padrão da loja conta: obrigar a digitar o mesmo código da lista de
+    // serviços em cada produto é o caminho para ninguém preencher nenhum.
+    if (!servicoDoProduto(p, config).codigoServico) {
       faltas.push(`${nome}: código do serviço (o contador informa)`);
     }
     return faltas;

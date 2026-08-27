@@ -170,6 +170,12 @@ alter table lojas add column if not exists isento boolean default false;
 -- troca vinda da própria loja (ver supabase-migracao-ramo-loja.sql).
 alter table lojas add column if not exists ramo text;
 
+-- ---------- Notas fiscais ----------
+-- A OS gera DUAS notas (peça e mão de obra). Quem já tinha a tabela antes
+-- disso não ganha a coluna pelo create table, e sem ela a primeira nota de
+-- OS derruba a gravação inteira de `notas`, em silêncio.
+alter table notas add column if not exists "osId" text;
+
 -- ---------- Confere o resultado ----------
 -- Deve listar compraEstoque, custoRelacionado, osId e sessaoId.
 select column_name, data_type
