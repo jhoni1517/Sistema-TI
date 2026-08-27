@@ -1472,7 +1472,9 @@ const OSForm: React.FC<{
  * A conta de qual item cai de que lado é `lib/nota-os.ts`, com teste. Aqui
  * só mora a tela.
  */
-const NotaFiscalDaOS: React.FC<{ os: OrdemServico; config: Config }> = ({
+// Exportado só para o teste desenhar a tela sem navegador. Ver
+// nota-os.tela.test.tsx: era o único pedaço da nota da OS sem cobertura.
+export const NotaFiscalDaOS: React.FC<{ os: OrdemServico; config: Config }> = ({
   os: osDoModal,
   config,
 }) => {
