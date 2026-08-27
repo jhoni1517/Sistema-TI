@@ -23,6 +23,26 @@ alter table lojas add column if not exists catalogo_recado text;
 comment on column lojas.catalogo_ativo is
   'A loja quer o catálogo público no ar? Desligado por padrão: ninguém publica preço sem escolher publicar.';
 
+-- ---------- As colunas que a vitrine LÊ ----------
+--
+-- Sem estas três, este arquivo inteiro morria numa loja NOVA.
+--
+-- A trinca da promoção nascia lá no `supabase-corrigir-colunas.sql`, que é o
+-- ÚLTIMO da ordem — e a função aqui embaixo lê as três. Quem seguisse o
+-- CONFIGURACAO.md à risca via o passo 13 abortar com "column
+-- p.precoPromocional does not exist", uma frase que não diz a ninguém o que
+-- fazer, e seguia para o 14 achando que era um aviso.
+--
+-- O estrago não é o erro na tela: é que a função `catalogo_loja` NÃO É
+-- CRIADA. O catálogo público da loja nova simplesmente não existe, e o
+-- `grant` logo abaixo também não roda. Só apareceu quando as 25 migrações
+-- foram rodadas em ordem num Postgres de verdade.
+--
+-- Migração pede a coluna de que precisa, e não confia na ordem.
+alter table produtos add column if not exists "precoPromocional" numeric;
+alter table produtos add column if not exists "promocaoInicio" text;
+alter table produtos add column if not exists "promocaoFim" text;
+
 -- ---------- A vitrine ----------
 -- Regra de preço IGUAL à do lib/promocao.ts: promoção só vale se for mais
 -- barata que o preço cheio e se a data de hoje estiver dentro do prazo.

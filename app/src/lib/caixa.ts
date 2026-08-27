@@ -21,7 +21,17 @@ export interface ResumoCaixa {
   entradas: number;
   saidas: number;
   sangrias: number;
-  /** Quanto deveria haver na gaveta */
+  /**
+   * Abertura + tudo que entrou - tudo que saiu. NÃO é o que está na gaveta.
+   *
+   * Este comentário já disse "quanto deveria haver na gaveta", que é
+   * exatamente a crença que custou a conferência inteira: o saldo soma
+   * cartão e Pix, que nunca passaram por lá. Quem conferir contra ele acusa
+   * falta todo santo dia numa loja que vende na maquininha.
+   *
+   * Para gaveta existe `emEspecie`, logo abaixo, e é ele que vale na
+   * conferência, no fechamento impresso e no aviso de sangria.
+   */
   saldo: number;
   /**
    * Só o que está em papel na gaveta: abertura + entradas em dinheiro, menos
