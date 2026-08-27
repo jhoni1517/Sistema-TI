@@ -3,6 +3,8 @@ import { Store, Copy, ExternalLink, MessageCircle } from "lucide-react";
 import { aviso } from "./Aviso";
 import { db, obterLoja } from "../lib/db";
 import { abrirWhatsapp } from "../lib/format";
+import { TETO_CATALOGO, foraDoCatalogo, publicaveis } from "../lib/catalogo";
+import { useApp } from "../store/AppStore";
 
 /**
  * A vitrine pública: liga, desliga e manda o link.
@@ -14,6 +16,8 @@ import { abrirWhatsapp } from "../lib/format";
  * link recebia "este catálogo não está disponível" sem saber o porquê.
  */
 export const CatalogoPublico: React.FC<{ nomeLoja?: string }> = ({ nomeLoja }) => {
+  const { produtos } = useApp();
+  const sobrando = foraDoCatalogo(produtos);
   const loja = obterLoja();
   const link = loja
     ? `${window.location.origin}${window.location.pathname}#/catalogo/${loja}`
@@ -109,6 +113,22 @@ export const CatalogoPublico: React.FC<{ nomeLoja?: string }> = ({ nomeLoja }) =
 
       {ativo && !link && (
         <p className="mt-3 text-xs text-amber-700">Entre de novo para gerar o link.</p>
+      )}
+
+      {/*
+        O teto era invisível. A vitrine publica 300 itens, e a loja com 400
+        mandava o link achando que mandou a loja inteira — enquanto 100
+        produtos simplesmente não existiam para quem abria.
+        O aviso só aparece quando sobra: "mostra até 300" fixo na tela seria
+        mais um texto que ninguém lê. Ver lib/catalogo.ts.
+      */}
+      {ativo && sobrando > 0 && (
+        <p className="mt-3 rounded-lg bg-amber-50 p-2.5 text-xs text-amber-800">
+          <b>{sobrando}</b> {sobrando === 1 ? "produto seu fica" : "produtos seus ficam"} de
+          fora: a vitrine publica {TETO_CATALOGO} de cada vez, e você tem{" "}
+          {publicaveis(produtos).length} com preço. Quem abrir o link não vê{" "}
+          {sobrando === 1 ? "esse" : "esses"}.
+        </p>
       )}
 
       {ativo && link && (
