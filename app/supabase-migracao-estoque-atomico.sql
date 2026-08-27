@@ -51,7 +51,27 @@
  * uma loja não mexe no estoque da outra. Trocar para DEFINER aqui abriria
  * exatamente o buraco que as políticas fecham.
  */
-create or replace function mover_estoque(p_produto uuid, p_qtd numeric)
+-- ------------------------------------------------------------
+-- O ID DO PRODUTO É TEXTO, E ESTA FUNÇÃO PEDIA UUID
+--
+-- `produtos.id` é `text` desde o supabase-schema.sql, e a tela gera o id
+-- com `uid()` — algo como "m4x8k2p9abc". Enquanto o parâmetro era `uuid`,
+-- TODA chamada morria com "invalid input syntax for type uuid", e essa
+-- mensagem não bate com o desvio de segurança do AppStore (que só reconhece
+-- "função não existe"). Resultado: ou a venda subia com um erro do Postgres
+-- na cara do atendente, ou caía no caminho antigo — que é exatamente o
+-- ler-modificar-gravar que esta migração existe para eliminar.
+--
+-- Ou seja: a correção de concorrência nunca chegou a valer. Só apareceu
+-- chamando a função com um id de verdade, num Postgres de verdade.
+--
+-- O `drop` abaixo é obrigatório: `create or replace` não muda o tipo de um
+-- parâmetro, ele cria uma SEGUNDA função. Com as duas no banco, o PostgREST
+-- não sabe qual chamar e responde erro de ambiguidade.
+-- ------------------------------------------------------------
+drop function if exists mover_estoque(uuid, numeric);
+
+create or replace function mover_estoque(p_produto text, p_qtd numeric)
 returns numeric
 language plpgsql
 set search_path = public
@@ -93,11 +113,15 @@ begin
   return v_novo;
 end $$;
 
-grant execute on function mover_estoque(uuid, numeric) to authenticated;
+grant execute on function mover_estoque(text, numeric) to authenticated;
 
 /* ---------- Confere ---------- */
 
--- Tem que devolver uma linha, com pronargs = 2.
-select proname, pronargs, prosecdef as security_definer
+-- Tem que devolver UMA linha só, com o primeiro argumento em `text`. Duas
+-- linhas aqui significa que a versão antiga (uuid) ficou no banco, e aí o
+-- PostgREST não sabe qual chamar.
+select proname,
+       pg_get_function_arguments(oid) as argumentos,
+       prosecdef as security_definer
   from pg_proc
  where proname = 'mover_estoque';
