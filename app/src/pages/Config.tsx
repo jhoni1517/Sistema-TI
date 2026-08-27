@@ -506,6 +506,39 @@ export const Config: React.FC = () => {
             </p>
           </Field>
 
+          {/*
+            O que a nota de SERVIÇO precisa e o produto não tem como dar.
+            A mão de obra de uma OS é uma linha sem cadastro — não existe
+            "produto mão de obra" a preencher. Sem estes dois, a NFS-e da
+            assistência nunca sai.
+          */}
+          <Field label="Código da lista de serviços (LC 116)">
+            <input
+              className="input"
+              placeholder="14.01"
+              value={form.codigoServicoPadrao || ""}
+              onChange={(e) => mudar({ codigoServicoPadrao: e.target.value })}
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              Vale para a mão de obra e para todo serviço sem código próprio.
+              Conserto de aparelho costuma ser 14.01. Quem informa é o contador.
+            </p>
+          </Field>
+
+          <Field label="Alíquota de ISS (%)">
+            <InputNumero
+              className="input"
+              min={0}
+              max={100}
+              value={form.aliquotaIssPadrao ?? undefined}
+              onChange={(v) => mudar({ aliquotaIssPadrao: v ?? 0 })}
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              Em por cento: 3 quer dizer 3%. É a alíquota da sua cidade, e quem
+              informa é o contador.
+            </p>
+          </Field>
+
           <Field label="Regime tributário" className="sm:col-span-2">
             <div className="grid max-w-md gap-2">
               {(Object.keys(REGIME_META) as RegimeTributario[]).map((k) => {

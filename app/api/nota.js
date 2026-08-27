@@ -146,7 +146,20 @@ async function credenciais() {
  */
 async function enviarNota(cred, nota, pedido) {
   const base = BASE[cred.ambiente === "producao" ? "producao" : "homologacao"];
-  const r = await fetch(`${base}/v2/nfce?ref=${encodeURIComponent(nota.id)}`, {
+  /*
+   * O caminho vem do TIPO da nota, e isso não é detalhe.
+   *
+   * Uma ordem de serviço gera as duas: NFC-e das peças (ICMS, SEFAZ do
+   * estado) e NFS-e da mão de obra (ISS, prefeitura). Enquanto este robô
+   * mandava tudo para /nfce, a nota de serviço da OS ia para o governo
+   * errado — e o emissor a recusaria pedindo NCM de mão de obra, que é um
+   * número que não existe.
+   *
+   * Qualquer coisa fora de "nfse" cai em nfce: nota nova sem tipo é venda
+   * de balcão, que é o que sempre foi.
+   */
+  const caminho = String(nota.tipo || "") === "nfse" ? "nfse" : "nfce";
+  const r = await fetch(`${base}/v2/${caminho}?ref=${encodeURIComponent(nota.id)}`, {
     method: "POST",
     headers: {
       // O emissor usa Basic com o token no lugar do usuário e senha vazia.
@@ -172,13 +185,27 @@ async function enviarNota(cred, nota, pedido) {
    */
   const status = String(corpo.status || "");
   if (status === "autorizado") {
+    /*
+     * Os dois documentos voltam com nomes diferentes para a mesma coisa.
+     *
+     * A NFC-e tem chave de 44 dígitos e protocolo da SEFAZ; a NFS-e tem
+     * CÓDIGO DE VERIFICAÇÃO da prefeitura e nenhuma chave. É por esse código
+     * que o cliente confere a nota no site da cidade, então ele é guardado
+     * no mesmo campo `chave` — o que a tela mostra é "o número que confere
+     * a nota", e ter duas colunas para isso só criaria uma sempre vazia.
+     */
     return {
       situacao: "autorizada",
-      chave: corpo.chave_nfe || corpo.chave || "",
+      chave: corpo.chave_nfe || corpo.chave || corpo.codigo_verificacao || "",
       numero: String(corpo.numero || ""),
       serie: String(corpo.serie || ""),
       protocolo: String(corpo.protocolo || ""),
-      url: corpo.caminho_danfe || corpo.url_danfe || "",
+      url:
+        corpo.caminho_danfe ||
+        corpo.url_danfe ||
+        corpo.url ||
+        corpo.caminho_xml_nota_fiscal ||
+        "",
       emitidaEm: new Date().toISOString(),
     };
   }

@@ -25,6 +25,7 @@ import {
   Camera,
   Video,
   Play,
+  FileText,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
@@ -84,6 +85,24 @@ import {
   type Config,
   type Produto,
 } from "../lib/types";
+import {
+  separarOS,
+  documentoDaPeca,
+  ladoTemNota,
+  problemaDoLado,
+  pagamentosDaOS,
+  pedidoDoServicoDaOS,
+  pedidoDaMercadoriaDaOS,
+  type LadoDaNota,
+} from "../lib/nota-os";
+import {
+  notaDaOS,
+  notaPendenteDaOS,
+  empurrarFilaDeNotas,
+  precisaDeAtencao,
+} from "../lib/nota";
+import { DOCUMENTO_META, SITUACAO_NOTA_META } from "../lib/fiscal";
+import { supabase } from "../lib/supabase";
 import { produtosParaOS, normalizar } from "../lib/busca";
 import {
   consolidar,
@@ -1437,6 +1456,198 @@ const OSForm: React.FC<{
   );
 };
 
+/**
+ * ============ A NOTA FISCAL DA OS ============
+ *
+ * Uma ordem de serviço gera DUAS notas, e essa é a única razão desta tela
+ * existir separada do botão de nota do PDV:
+ *
+ *   mão de obra .... NFS-e ... ISS ..... prefeitura
+ *   peça ........... NFC-e ... ICMS .... SEFAZ do estado
+ *
+ * Emitir tudo como mercadoria paga ICMS sobre serviço; emitir tudo como
+ * serviço paga ISS sobre peça. Os dois erros só aparecem meses depois, no
+ * contador, com o valor já recolhido errado.
+ *
+ * A conta de qual item cai de que lado é `lib/nota-os.ts`, com teste. Aqui
+ * só mora a tela.
+ */
+const NotaFiscalDaOS: React.FC<{ os: OrdemServico; config: Config }> = ({
+  os: osDoModal,
+  config,
+}) => {
+  const { ordens, produtos, clientes, movimentos, notas, saveNota, saveOrdem } = useApp();
+  const [pedindo, setPedindo] = useState("");
+
+  /*
+   * A OS VIVA da loja, e não a cópia que o modal abriu com.
+   *
+   * O detalhe guarda um retrato da OS no momento em que a janela abriu.
+   * Mover um item de lado grava certo no banco e a tela não mexia um fio —
+   * a pessoa clica de novo, e de novo, achando que o botão não funciona.
+   */
+  const os = ordens.find((o) => o.id === osDoModal.id) || osDoModal;
+
+  const lados = useMemo(() => separarOS(os, produtos), [os, produtos]);
+  const pecas = useMemo(() => pecasEfetivas(os), [os]);
+  const parcelas = useMemo(() => pagamentosDaOS(movimentos, os.id), [movimentos, os.id]);
+  const cliente = clientes.find((c) => c.id === os.clienteId);
+
+  /**
+   * Move a peça para o outro lado da nota.
+   *
+   * Grava na OS porque a escolha vale para a nota de amanhã também — se
+   * ficasse só no estado da tela, reabrir a OS mandaria a peça de volta
+   * para o lado errado e a segunda emissão sairia diferente da primeira.
+   *
+   * Coincidindo com o que o cadastro já diz, o campo é APAGADO em vez de
+   * gravado igual: peça marcada à toa vira mentira depois que alguém
+   * corrige o cadastro do produto.
+   */
+  const mover = async (p: PecaOS, destino: "nfce" | "nfse") => {
+    const i = os.pecas.indexOf(p);
+    if (i < 0) return;
+    const natural = documentoDaPeca({ ...p, documentoForcado: undefined }, produtos);
+    const pecasNovas = os.pecas.map((x, k) =>
+      k === i ? { ...x, documentoForcado: destino === natural ? undefined : destino } : x
+    );
+    try {
+      await saveOrdem({ ...os, pecas: pecasNovas, atualizadoEm: nowISO() });
+    } catch (e) {
+      aviso.erro(
+        "Não foi possível mover o item:\n\n" + (e instanceof Error ? e.message : String(e))
+      );
+    }
+  };
+
+  /**
+   * Põe UM dos lados na fila e manda emitir na hora.
+   *
+   * Um lado de cada vez, e não os dois num clique: são documentos de
+   * governos diferentes, e um pode passar enquanto o outro é recusado. Um
+   * botão só faria a tela dizer "deu certo" quando metade deu.
+   */
+  const pedir = async (lado: LadoDaNota) => {
+    const problema = problemaDoLado(lado, produtos, config);
+    if (problema) return aviso.alerta(problema);
+    if (pedindo) return;
+    setPedindo(lado.documento);
+    try {
+      const pedido =
+        lado.documento === "nfse"
+          ? pedidoDoServicoDaOS(os, lado, produtos, config, parcelas, cliente)
+          : pedidoDaMercadoriaDaOS(os, lado, produtos, config, parcelas, cliente);
+      await saveNota({
+        ...notaPendenteDaOS(uid(), os.id, lado.documento),
+        pedido,
+      } as never);
+
+      const { data } = (await supabase?.auth.getSession()) || { data: undefined };
+      const empurrao = await empurrarFilaDeNotas(data?.session?.access_token);
+      const nome = DOCUMENTO_META[lado.documento].curto;
+      aviso.sucesso(
+        empurrao.ok
+          ? `${nome} pedida e enviada. O resultado aparece aqui em segundos.`
+          : `${nome} pedida e na fila. O envio imediato não respondeu (${empurrao.motivo}), ` +
+              "mas ela sai sozinha. Não peça de novo."
+      );
+    } catch (e) {
+      aviso.erro(
+        "Não foi possível pedir a nota:\n\n" + (e instanceof Error ? e.message : String(e))
+      );
+    } finally {
+      setPedindo("");
+    }
+  };
+
+  const bloco = (lado: LadoDaNota) => {
+    const meta = DOCUMENTO_META[lado.documento];
+    const nota = notaDaOS(notas, os.id, lado.documento);
+    return (
+      <div key={lado.documento} className="rounded-lg border border-slate-200 p-2.5">
+        <div className="linha-card">
+          <div className="linha-card-info">
+            <p className="text-sm font-semibold text-slate-700">{meta.label}</p>
+            <p className="text-xs text-slate-500">
+              {meta.imposto} · {brl(lado.total)}
+              {lado.desconto > 0 && ` (desconto de ${brl(lado.desconto)})`}
+            </p>
+          </div>
+          {!ladoTemNota(lado) ? (
+            <span className="text-xs text-slate-400">Nada deste lado</span>
+          ) : nota ? (
+            <span
+              className={`badge ${precisaDeAtencao(nota) ? "bg-red-100 text-red-700" : SITUACAO_NOTA_META[nota.situacao].cor}`}
+              title={nota.erro || SITUACAO_NOTA_META[nota.situacao].explicacao}
+            >
+              {SITUACAO_NOTA_META[nota.situacao].label}
+            </span>
+          ) : (
+            <button
+              className="btn-secondary !py-1.5 text-sm"
+              disabled={!!pedindo}
+              onClick={() => pedir(lado)}
+            >
+              <FileText size={15} /> {pedindo === lado.documento ? "Pedindo..." : "Emitir"}
+            </button>
+          )}
+        </div>
+        {nota?.erro && <p className="mt-1 text-xs text-red-600">{nota.erro}</p>}
+      </div>
+    );
+  };
+
+  if (!ladoTemNota(lados.servico) && !ladoTemNota(lados.mercadoria)) return null;
+
+  return (
+    <div className="space-y-2 rounded-xl border border-slate-200 p-3 no-print">
+      <p className="label flex items-center gap-1.5">
+        <FileText size={14} /> Nota fiscal
+      </p>
+      <p className="text-xs text-slate-500">
+        São dois documentos: a mão de obra é nota de serviço (ISS, prefeitura) e a
+        peça é nota de consumidor (ICMS, SEFAZ). Cada um sai por conta própria.
+      </p>
+
+      {bloco(lados.servico)}
+      {bloco(lados.mercadoria)}
+
+      {/*
+        Mover item de lado. Existe porque o cadastro erra — "instalação de
+        SSD" cadastrada como produto comum, "cabo HDMI" cadastrado como
+        serviço. Travar a emissão até alguém corrigir o cadastro é parar a
+        loja por causa de um campo.
+      */}
+      {pecas.length > 0 && (
+        <details className="text-xs">
+          <summary className="cursor-pointer text-slate-500">
+            Algum item está no documento errado?
+          </summary>
+          <div className="mt-2 space-y-1.5">
+            {pecas.map((p, i) => {
+              const atual = documentoDaPeca(p, produtos);
+              const outro = atual === "nfse" ? "nfce" : "nfse";
+              return (
+                <div key={i} className="linha-card">
+                  <span className="linha-card-info truncate text-slate-600">{p.descricao}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="badge bg-slate-100 text-slate-600">
+                      {DOCUMENTO_META[atual].curto}
+                    </span>
+                    <button className="btn-ghost !py-1 text-xs" onClick={() => mover(p, outro)}>
+                      Mover para {DOCUMENTO_META[outro].curto}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+};
+
 // ============ DETALHE / IMPRESSÃO ============
 const OSDetalhe: React.FC<{
   os: OrdemServico;
@@ -1794,6 +2005,8 @@ const OSDetalhe: React.FC<{
         </div>
 
         <p className="text-center text-xs text-slate-400">{config.nomeLoja}</p>
+
+        <NotaFiscalDaOS os={os} config={config} />
 
         {/* Entregue mas sem nenhum pagamento registrado: precisa de saída */}
         {os.status === "entregue" && !pagamentoRegistrado && (

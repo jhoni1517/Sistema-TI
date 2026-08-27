@@ -165,6 +165,21 @@ export interface PecaOS {
    * em qualquer um. Ver lib/orcamento.ts.
    */
   opcao?: string;
+  /**
+   * De que lado da nota esta peça cai, quando o cadastro está errado.
+   *
+   * Vazio = segue o produto (`servico` marcado vira NFS-e). Preenchido = o
+   * atendente moveu a peça na hora de emitir, e a escolha vale só nesta OS.
+   *
+   * Existe porque o cadastro erra: "instalação de SSD" cadastrada como
+   * produto comum, "cabo HDMI" cadastrado como serviço. Travar a emissão
+   * até alguém corrigir o cadastro é parar a loja por causa de um campo —
+   * mover na hora resolve a nota de hoje, corrigir o cadastro resolve as
+   * próximas. Ver lib/nota-os.ts.
+   *
+   * Mora no jsonb de `pecas`, então não pede coluna nova.
+   */
+  documentoForcado?: "nfce" | "nfse";
 }
 
 export interface HistoricoOS {
@@ -1228,6 +1243,20 @@ export interface Config {
    * técnica precisa das duas, porque vende peça e cobra mão de obra.
    */
   inscricaoMunicipal?: string;
+  /**
+   * O código da lista de serviços (LC 116) e a alíquota de ISS da LOJA.
+   *
+   * O produto já tem os dele (`codigoServico`, `aliquotaIss`), e é ele que
+   * manda quando existe. Estes dois são o padrão para o que NÃO tem cadastro
+   * — e o que não tem cadastro numa OS é justamente a mão de obra, que é o
+   * item mais importante da nota de serviço de uma assistência.
+   *
+   * Sem eles a NFS-e não sai, e obrigar a digitar o mesmo código em cada OS
+   * é o caminho para ninguém preencher nenhum. Quem informa é o contador,
+   * uma vez.
+   */
+  codigoServicoPadrao?: string;
+  aliquotaIssPadrao?: number;
   /*
    * Endereço PARTIDO em campos, só para a nota.
    *

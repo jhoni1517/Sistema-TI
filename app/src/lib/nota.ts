@@ -5,7 +5,9 @@ import {
   CODIGO_PAGAMENTO,
   fiscalDoProduto,
   pendenciasParaEmitir,
+  servicoDoProduto,
   type SituacaoNota,
+  type TipoDocumento,
 } from "./fiscal";
 import type { Cliente, Config, ItemVenda, Produto, Venda } from "./types";
 
@@ -43,6 +45,14 @@ const duasCasas = (v: number): number => centavos(v);
 export interface Nota {
   id: string;
   vendaId?: string;
+  /**
+   * A ordem de serviço que originou, quando não veio de uma venda.
+   *
+   * Uma OS gera DUAS notas — NFC-e da peça e NFS-e da mão de obra — e as
+   * duas apontam para a mesma OS. É por isso que a busca é por lista e não
+   * por uma nota só, ao contrário da venda.
+   */
+  osId?: string;
   tipo: "nfce" | "nfse";
   situacao: SituacaoNota;
   erro?: string;
@@ -234,6 +244,72 @@ function linhaDaNota(
   };
 }
 
+/* ------------------------------------------------------------------ */
+/* O outro documento: a nota de SERVIÇO                                */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A NFS-e não é uma NFC-e com outro nome.
+ *
+ * Os campos são incompatíveis, e é por isso que existe uma segunda interface
+ * em vez de campos opcionais na primeira: mercadoria leva NCM, CFOP, CSOSN e
+ * origem; serviço leva código da lista (LC 116), alíquota de ISS e o código
+ * IBGE do município que RECEBE o imposto. Um objeto só, com metade dos
+ * campos vazios em cada caso, é como se manda NCM de mão de obra por
+ * engano — e a prefeitura devolve um número que não diz nada a quem está no
+ * balcão.
+ */
+export interface ItemDoServico {
+  numero: number;
+  descricao: string;
+  quantidade: number;
+  valorUnitario: number;
+  valorBruto: number;
+  /** Código da lista de serviços (LC 116). Do produto, ou o padrão da loja. */
+  codigoServico: string;
+  /** Em por cento: 3 quer dizer 3%. */
+  aliquotaIss: number;
+}
+
+export interface PedidoDeNotaDeServico {
+  /**
+   * O texto que descreve o serviço.
+   *
+   * A prefeitura recebe UM campo corrido, não uma lista de itens — por isso
+   * a lista vira texto. Os itens vão junto mesmo assim, porque o emissor
+   * precisa deles para calcular, e porque é o que a conferência lê depois.
+   */
+  discriminacao: string;
+  /** Código IBGE do município onde o serviço foi prestado. É quem recolhe. */
+  codigoMunicipio: string;
+  itens: ItemDoServico[];
+  pagamentos: PagamentoDaNota[];
+  valorTotal: number;
+  valorDesconto: number;
+  cpfDestinatario?: string;
+  nomeDestinatario?: string;
+}
+
+/** Uma linha da nota de serviço, com o código e a alíquota que valem */
+export function linhaDoServico(
+  item: ItemVenda,
+  numero: number,
+  produtos: Produto[],
+  config: Config
+): ItemDoServico {
+  const p = item.produtoId ? produtos.find((x) => x.id === item.produtoId) : undefined;
+  const s = servicoDoProduto(p, config);
+  return {
+    numero,
+    descricao: txt(item.descricao).trim(),
+    quantidade: n(item.quantidade),
+    valorUnitario: duasCasas(n(item.precoUnit)),
+    valorBruto: subtotalItem(item),
+    codigoServico: s.codigoServico,
+    aliquotaIss: s.aliquotaIss,
+  };
+}
+
 /**
  * A venda pode virar nota agora?
  *
@@ -285,9 +361,45 @@ export function notaPendente(
   };
 }
 
+/**
+ * Uma nota nova, pendente, para um dos lados da ORDEM DE SERVIÇO.
+ *
+ * Igual à da venda em tudo menos em duas coisas: aponta para a OS e o tipo
+ * vem de fora, porque a mesma OS gera as duas.
+ */
+export function notaPendenteDaOS(
+  id: string,
+  osId: string,
+  tipo: TipoDocumento,
+  agora = new Date().toISOString()
+): Nota {
+  return {
+    id,
+    osId,
+    tipo,
+    situacao: "pendente",
+    tentativas: 0,
+    criadoEm: agora,
+    atualizadoEm: agora,
+  };
+}
+
 /** A nota desta venda, se já existe alguma */
 export const notaDaVenda = (notas: Nota[], vendaId?: string): Nota | undefined =>
   vendaId ? (notas || []).find((x) => x.vendaId === vendaId) : undefined;
+
+/**
+ * As notas desta OS. São até duas: a de serviço e a de mercadoria.
+ *
+ * Cancelada NÃO conta como emitida: a loja que cancelou uma nota errada
+ * precisa poder emitir a certa, e a tela decide isso por esta lista.
+ */
+export const notasDaOS = (notas: Nota[], osId?: string): Nota[] =>
+  osId ? (notas || []).filter((x) => x.osId === osId && x.situacao !== "cancelada") : [];
+
+/** Já existe nota deste tipo nesta OS? É o que impede emitir duas vezes. */
+export const notaDaOS = (notas: Nota[], osId: string, tipo: TipoDocumento): Nota | undefined =>
+  notasDaOS(notas, osId).find((x) => x.tipo === tipo);
 
 /**
  * As notas que precisam de gente olhando, da mais antiga para a mais nova.

@@ -33,6 +33,9 @@ create table if not exists notas (
   id text primary key,
   -- A venda que originou. É por ela que a tela liga uma coisa na outra.
   "vendaId" text,
+  -- A ordem de serviço que originou, quando não veio de uma venda. Uma OS
+  -- gera DUAS notas (peça e mão de obra), e as duas apontam para ela.
+  "osId" text,
   -- nfce (mercadoria) ou nfse (serviço). Uma OS de assistência gera as duas.
   tipo text not null default 'nfce',
   -- pendente / autorizada / rejeitada / cancelada
@@ -71,6 +74,18 @@ create table if not exists notas (
 -- O robô procura o que está pendente; a tela procura pela venda.
 create index if not exists notas_pendentes_idx on notas ("lojaId", situacao);
 create index if not exists notas_venda_idx on notas ("vendaId");
+
+-- Quem já tinha a tabela antes da nota na OS não recebe a coluna pelo
+-- `create table if not exists` acima: ele não faz nada quando a tabela já
+-- existe. Sem esta linha, a primeira nota de OS derruba a gravação inteira
+-- de `notas` com "Could not find the 'osId' column" — em silêncio.
+--
+-- E ela vem ANTES do índice logo abaixo. Índice sobre coluna que ainda não
+-- existe não é "if not exists", é ERRO — e derruba o resto do arquivo
+-- junto. Foi escrito na ordem errada da primeira vez, e um Postgres de
+-- verdade com a tabela antiga é que mostrou.
+alter table notas add column if not exists "osId" text;
+create index if not exists notas_os_idx on notas ("osId");
 
 alter table notas enable row level security;
 
