@@ -106,13 +106,21 @@ import { supabase } from "../lib/supabase";
 import { produtosParaOS, normalizar } from "../lib/busca";
 import {
   consolidar,
-  problemaNoPagamento,
   faltaNoPagamento,
   trocoDoPagamento,
   FORMAS_DE_COMPRA,
   type Parcela,
 } from "../lib/pagamento";
 import { travaAtendimento, classificacaoDe, travaFiado } from "../lib/clientes";
+import {
+  contaDaOS,
+  problemaNaEntradaDaOS,
+  recebidoDaOS,
+  faltaNaOS,
+  entregaOAparelho,
+  DESTINO_META,
+  type DestinoDoResto,
+} from "../lib/os-pagamento";
 import { backupDe, avisoDeBackup, perguntaAntesDeConcluir } from "../lib/backup";
 import { saldosApos } from "../lib/estoque";
 import { proximoNumero as proximoNum, problemaParaNumerar } from "../lib/numeracao";
@@ -590,6 +598,27 @@ export const OrdensServico: React.FC = () => {
               </div>
               <div className="linha-card-fim text-right">
                 <p className="font-bold text-slate-800">{brl(totalOS(o))}</p>
+                {/*
+                  O SINAL PRECISA APARECER AQUI.
+
+                  Sem esta linha o sinal seria invisível: a OS ficaria com
+                  cara de intocada, ninguém cobraria o resto, e o dinheiro
+                  que já entrou não bateria com nada. É o mesmo erro que o
+                  caderno do balcão comete.
+
+                  Só aparece quando há sinal E ainda falta — OS paga por
+                  inteiro e OS sem nenhum pagamento não têm o que dizer aqui.
+                */}
+                {(() => {
+                  const recebido = recebidoDaOS(movimentos, o.id);
+                  const resta = faltaNaOS(totalOS(o), movimentos, o.id);
+                  if (recebido <= 0 || resta <= 0) return null;
+                  return (
+                    <p className="text-xs font-semibold text-amber-700">
+                      Sinal de {brl(recebido)} · faltam {brl(resta)}
+                    </p>
+                  );
+                })()}
                 <p className="text-xs text-slate-400">{formatDateTime(o.atualizadoEm)}</p>
               </div>
               <div className="linha-card-fim ml-auto flex gap-1.5">
@@ -669,7 +698,7 @@ export const OrdensServico: React.FC = () => {
             }
             setDetalhe(null);
           }}
-          onReceber={async (parcelas) => {
+          onReceber={async (parcelas, destino) => {
             if (escolhaPendente(detalhe)) return;
             const guarda = guardaDaEntrega(detalhe);
             const valor = totalDaEntrega(detalhe, guarda);
@@ -678,6 +707,14 @@ export const OrdensServico: React.FC = () => {
                 "Esta OS está com valor zero. Informe a mão de obra ou as peças antes de receber."
               );
             }
+            /*
+             * O que já entrou por esta OS abate o de hoje.
+             *
+             * Sem isso, a segunda parcela de um sinal cobraria o total de
+             * novo: R$ 1.100 no caixa por um serviço de R$ 800, e a sobra
+             * aparecendo na conferência da gaveta dias depois, sem origem.
+             */
+            const jaRecebido = recebidoDaOS(movimentos, detalhe.id);
             /*
              * Já existe dinheiro lançado para esta OS?
              *
@@ -690,14 +727,6 @@ export const OrdensServico: React.FC = () => {
              * Não bloqueia: cobrar de novo por um segundo serviço é
              * legítimo. Só não deixa acontecer sem ninguém decidir.
              */
-            if (!semPagamento({ ...detalhe, status: "entregue" })) {
-              const ok = confirm(
-                `A ${codigoOS(detalhe.numero)} já tem pagamento registrado.\n\n` +
-                  `Receber de novo lança mais ${brl(valor)} no caixa e desconta as ` +
-                  `peças do estoque outra vez.\n\nÉ um serviço novo?`
-              );
-              if (!ok) return;
-            }
             /*
              * Depois de o dinheiro entrar, "nada foi alterado" é mentira.
              *
@@ -714,8 +743,54 @@ export const OrdensServico: React.FC = () => {
              * apareceria na gaveta dias depois sem origem.
              */
             const formas = consolidar(parcelas);
-            const problemaPag = problemaNoPagamento(valor, formas);
+            const problemaPag = problemaNaEntradaDaOS(valor, formas, jaRecebido);
             if (problemaPag) return aviso.alerta(problemaPag);
+
+            /*
+             * Faltar dinheiro virou PERGUNTA, e não mais recusa.
+             *
+             * Antes o sistema respondia "Faltam R$ 500 para fechar a venda"
+             * e acabava ali. No balcão isso acontece o tempo todo, e o
+             * atendente resolvia por fora, no caderno — que é onde o valor
+             * some.
+             *
+             * As duas saídas não são a mesma coisa, e a diferença é o
+             * APARELHO: no fiado ele sai hoje e vira dívida em A Receber; no
+             * sinal ele fica na loja e a OS continua aberta. Ver
+             * lib/os-pagamento.ts.
+             */
+            const conta = contaDaOS(valor, formas, jaRecebido);
+            if (conta.situacao === "parcial" && !destino) {
+              // A tela esconde o botão simples quando falta dinheiro, então
+              // isto não acontece pela interface. Mas voltar em silêncio é a
+              // pior resposta possível: quem clicou fica olhando uma janela
+              // que não fez nada e clica de novo.
+              return aviso.alerta(
+                `Faltam ${brl(conta.falta)} para fechar. Escolha o que fazer com o resto: ` +
+                  "levar e ficar devendo, ou deixar como sinal."
+              );
+            }
+            const entrega = conta.situacao !== "parcial" || entregaOAparelho(destino!);
+
+            /*
+             * Fechar um SINAL não é receber duas vezes.
+             *
+             * O aviso abaixo existe para a OS que reabriu e voltou a mostrar
+             * o botão de receber limpo. Mas depois do sinal a OS TEM
+             * pagamento e ainda falta dinheiro — disparar aqui faria a
+             * segunda parcela perguntar "é um serviço novo?" toda vez, e
+             * pergunta que aparece sempre é pergunta que a pessoa aprende a
+             * responder no automático.
+             */
+            const fechandoSinal = jaRecebido > 0 && jaRecebido < valor;
+            if (!fechandoSinal && !semPagamento({ ...detalhe, status: "entregue" })) {
+              const ok = confirm(
+                `A ${codigoOS(detalhe.numero)} já tem pagamento registrado.\n\n` +
+                  `Receber de novo lança mais ${brl(conta.agora)} no caixa e desconta as ` +
+                  `peças do estoque outra vez.\n\nÉ um serviço novo?`
+              );
+              if (!ok) return;
+            }
 
             if (registrando) return; // clique duplo no balcão acontece o tempo todo
             setRegistrando(true);
@@ -742,6 +817,10 @@ export const OrdensServico: React.FC = () => {
                   categoria: "OS",
                   descricao:
                     `${codigoOS(detalhe.numero)} - ${nomeCliente(detalhe.clienteId)}` +
+                    // Sinal vai escrito no lançamento: no fechamento do mês
+                    // uma OS de R$ 800 que entrou R$ 300 parece erro, e quem
+                    // for conferir precisa ver o motivo na própria linha.
+                    (!entrega ? " (sinal)" : "") +
                     // A guarda vai NOMEADA no lançamento: no fechamento do mês
                     // ninguém lembra por que aquela OS entrou mais cara.
                     (guarda > 0 ? ` (inclui guarda ${brl(guarda)})` : "") +
@@ -749,9 +828,17 @@ export const OrdensServico: React.FC = () => {
                   valor: f.valor,
                   formaPagamento: f.forma,
                   osId: detalhe.id,
-                  // O custo vai INTEIRO no primeiro: dividir o CMV entre as
-                  // formas de pagamento não significa nada.
-                  custoRelacionado: i === 0 ? custo : 0,
+                  /*
+                   * O custo vai INTEIRO no primeiro: dividir o CMV entre as
+                   * formas de pagamento não significa nada.
+                   *
+                   * E só quando o aparelho SAI. O custo é da mercadoria que
+                   * deixou a prateleira, e no sinal ela não deixou — lançar
+                   * ali jogaria o custo inteiro contra um pedaço da receita
+                   * e o mês fecharia com prejuízo num serviço lucrativo. É a
+                   * mesma regra do "compra de estoque não é despesa".
+                   */
+                  custoRelacionado: entrega && i === 0 ? custo : 0,
                   // Sem isto, uma OS paga com o caixa aberto não entrava no
                   // fechamento daquela sessão e a conta do dia não batia.
                   sessaoId: sessaoAberta?.id,
@@ -759,31 +846,62 @@ export const OrdensServico: React.FC = () => {
                 });
               }
               dinheiroEntrou = true;
-              if (detalhe.status === "entregue") {
-                // OS já entregue: não dá para saber se a baixa foi feita, e
-                // descontar duas vezes estraga o estoque. Quem estava no
-                // balcão sabe a resposta — então perguntamos.
-                const baixar = confirm(
-                  "Descontar as peças do estoque agora?\n\n" +
-                    "OK = as peças ainda NÃO foram descontadas.\n" +
-                    "Cancelar = o estoque já está certo."
-                );
-                if (baixar) await baixarEstoqueEEntregar(detalhe);
-              } else {
-                await baixarEstoqueEEntregar(detalhe);
+
+              /*
+               * O resto vira dívida ANTES da baixa do estoque, pela mesma
+               * razão de o dinheiro vir antes: falhando no meio, sobra uma
+               * dívida sem baixa — que salta aos olhos na conferência. Ao
+               * contrário, o aparelho sai e a dívida some, e dívida que some
+               * ninguém procura.
+               */
+              if (conta.situacao === "parcial" && destino === "fiado") {
+                await saveFiado({
+                  id: uid(),
+                  clienteId: detalhe.clienteId,
+                  descricao:
+                    `${codigoOS(detalhe.numero)} · ${detalhe.marca} ${detalhe.modelo}` +
+                    ` (pagou ${brl(conta.agora)} de ${brl(valor)})`,
+                  osId: detalhe.id,
+                  valor: conta.falta,
+                  pagamentos: [],
+                  quitado: false,
+                  criadoEm: nowISO(),
+                });
               }
+
+              if (entrega) {
+                if (detalhe.status === "entregue") {
+                  // OS já entregue: não dá para saber se a baixa foi feita, e
+                  // descontar duas vezes estraga o estoque. Quem estava no
+                  // balcão sabe a resposta — então perguntamos.
+                  const baixar = confirm(
+                    "Descontar as peças do estoque agora?\n\n" +
+                      "OK = as peças ainda NÃO foram descontadas.\n" +
+                      "Cancelar = o estoque já está certo."
+                  );
+                  if (baixar) await baixarEstoqueEEntregar(detalhe);
+                } else {
+                  await baixarEstoqueEEntregar(detalhe);
+                }
+              }
+
               setDetalhe(null);
               const troco = trocoDoPagamento(valor, formas);
-              aviso.sucesso(
-                `${brl(valor)} lançado no caixa.` + (troco > 0 ? ` Troco: ${brl(troco)}.` : "")
-              );
+              const recado = !entrega
+                ? `${brl(conta.agora)} de sinal no caixa. Faltam ${brl(conta.falta)} — ` +
+                  "o aparelho fica na loja até o cliente fechar."
+                : conta.situacao === "parcial"
+                  ? `${brl(conta.agora)} no caixa e ${brl(conta.falta)} lançados em ` +
+                    "'A Receber'. O aparelho foi entregue."
+                  : `${brl(conta.agora)} lançado no caixa.`;
+              aviso.sucesso(recado + (troco > 0 ? ` Troco: ${brl(troco)}.` : ""));
             } catch (e) {
               aviso.erro(
                 "Não foi possível concluir a entrega:\n\n" +
                   (e instanceof Error ? e.message : String(e)) +
                   "\n\n" +
                   (dinheiroEntrou
-                    ? `ATENÇÃO: os ${brl(valor)} JÁ entraram no caixa. NÃO receba de novo. ` +
+                    ? `ATENÇÃO: os ${brl(conta.agora)} JÁ entraram no caixa. NÃO receba de novo. ` +
                       "O que faltou foi a baixa das peças e a entrega — acerte em Estoque " +
                       "e mude o status da OS na mão."
                     : "Nada foi alterado. Tente de novo.")
@@ -1651,7 +1769,9 @@ export const NotaFiscalDaOS: React.FC<{ os: OrdemServico; config: Config }> = ({
 };
 
 // ============ DETALHE / IMPRESSÃO ============
-const OSDetalhe: React.FC<{
+// Exportado só para o teste desenhar o painel de recebimento sem navegador.
+// Ver os-parcial.tela.test.tsx.
+export const OSDetalhe: React.FC<{
   os: OrdemServico;
   clienteNome: string;
   cliente?: { nome: string; telefone: string; cpf?: string };
@@ -1661,7 +1781,7 @@ const OSDetalhe: React.FC<{
   onAvisar: () => void;
   onEditar: () => void;
   onExcluir: () => void;
-  onReceber: (parcelas: Parcela[]) => void;
+  onReceber: (parcelas: Parcela[], destino?: DestinoDoResto) => void;
   onFiado: () => void;
   /** Já existe lançamento no caixa ou fiado para esta OS? */
   pagamentoRegistrado: boolean;
@@ -1669,7 +1789,9 @@ const OSDetalhe: React.FC<{
   /** Gravação em andamento: o botão não pode aceitar o segundo clique */
   registrando: boolean;
 }> = ({ os, clienteNome, cliente, config, onClose, onStatus, onAvisar, onEditar, onExcluir, onReceber, onFiado, pagamentoRegistrado, historicoAparelho, registrando }) => {
-  const { ramo } = useApp();
+  // `movimentos` vem do store porque é lá que o dinheiro da OS mora: um
+  // campo separado começaria a divergir do caixa no primeiro estorno.
+  const { ramo, movimentos } = useApp();
   const voc = vocabulario(ramo);
   const [forma, setForma] = useState<FormaPagamento>("dinheiro");
   const [parcelas, setParcelas] = useState<Parcela[]>([]);
@@ -1688,10 +1810,34 @@ const OSDetalhe: React.FC<{
     config.diasAbandono || 90
   ).valor;
   const aCobrar = totalDaEntrega(os, guarda);
-  const falta = faltaNoPagamento(aCobrar, parcelas);
+
+  /*
+   * O que JÁ entrou por esta OS, e o que ainda falta cobrar hoje.
+   *
+   * Depois de um sinal, o botão não pode continuar dizendo o total: quem
+   * pagou R$ 300 de R$ 800 na semana passada vê "Receber R$ 800" e cobra o
+   * valor cheio de novo. Ver lib/os-pagamento.ts.
+   */
+  const jaRecebido = recebidoDaOS(movimentos, os.id);
+  const restaCobrar = Math.max(0, Math.round((aCobrar - jaRecebido) * 100) / 100);
+
+  /*
+   * "Recebeu só uma parte?" fica escondido atrás de um toque de propósito.
+   *
+   * O caminho comum é o cliente pagar tudo, e ele tem que continuar sendo um
+   * clique só — campo de valor sempre visível é mais uma coisa para conferir
+   * com a fila andando.
+   */
+  const [parcial, setParcial] = useState(false);
+  const [valorParcial, setValorParcial] = useState<number | undefined>(undefined);
+
+  const falta = faltaNoPagamento(restaCobrar, parcelas);
   // Sem divisão, a "lista de formas" é uma só, com o total inteiro. Assim o
   // caminho de gravação é UM, e o comum não vira caso especial.
-  const parcelasFinais: Parcela[] = dividido ? parcelas : [{ forma, valor: aCobrar }];
+  const parcelasFinais: Parcela[] = dividido
+    ? parcelas
+    : [{ forma, valor: parcial ? (valorParcial ?? 0) : restaCobrar }];
+  const conta = contaDaOS(aCobrar, consolidar(parcelasFinais), jaRecebido);
   const [incluirCliente, setIncluirCliente] = useState(true);
 
   // o link leva a loja: a consulta pública só devolve dados desta loja
@@ -2023,7 +2169,7 @@ const OSDetalhe: React.FC<{
             <div className="flex flex-wrap items-center gap-2">
               <SeletorDeForma forma={forma} onForma={setForma} />
               <button className="btn-success !py-1.5 text-sm" disabled={registrando} onClick={() => onReceber(parcelasFinais)}>
-                {registrando ? "Registrando..." : `Registrar ${brl(aCobrar)} no caixa`}
+                {registrando ? "Registrando..." : `Registrar ${brl(restaCobrar)} no caixa`}
               </button>
               <button className="btn-secondary !py-1.5 text-sm" disabled={registrando} onClick={onFiado}>
                 <HandCoins size={15} /> Lançar como fiado
@@ -2039,13 +2185,71 @@ const OSDetalhe: React.FC<{
               <DollarSign size={18} className="text-emerald-600" />
               <span className="text-sm font-semibold text-emerald-800">Receber e entregar:</span>
               {!dividido && <SeletorDeForma forma={forma} onForma={setForma} />}
-              <button className="btn-success !py-1.5 text-sm" disabled={registrando} onClick={() => onReceber(parcelasFinais)}>
-                {registrando ? "Registrando..." : `Receber ${brl(aCobrar)}`}
-              </button>
+              {!dividido && parcial && (
+                <InputNumero
+                  className="input !w-28 !py-1.5 text-sm"
+                  min={0}
+                  value={valorParcial}
+                  onChange={setValorParcial}
+                />
+              )}
+              {conta.situacao !== "parcial" && (
+                <button
+                  className="btn-success !py-1.5 text-sm"
+                  disabled={registrando}
+                  onClick={() => onReceber(parcelasFinais)}
+                >
+                  {registrando ? "Registrando..." : `Receber ${brl(conta.agora || restaCobrar)}`}
+                </button>
+              )}
               <button className="btn-secondary !py-1.5 text-sm" disabled={registrando} onClick={onFiado} title="Entregar e deixar para pagar depois">
                 <HandCoins size={15} /> Fiado
               </button>
             </div>
+
+            {/* Já entrou dinheiro antes: o botão acima cobra só o que falta. */}
+            {jaRecebido > 0 && (
+              <p className="mt-2 text-xs text-emerald-800">
+                Já recebido nesta OS: <b>{brl(jaRecebido)}</b> de {brl(aCobrar)}.
+              </p>
+            )}
+
+            {/*
+              O CLIENTE PAGOU MENOS DO QUE A CONTA.
+
+              Antes o sistema respondia "Faltam R$ 500 para fechar a venda" e
+              acabava ali — e o atendente resolvia por fora, no caderno, que é
+              onde o valor some.
+
+              As duas saídas não são a mesma coisa, e a diferença é o
+              APARELHO: no fiado ele sai hoje e vira dívida em A Receber; no
+              sinal ele fica na loja. Por isso são dois botões e não um
+              seletor: cada um diz o que acontece com o aparelho.
+            */}
+            {conta.situacao === "parcial" && (
+              <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-2.5">
+                <p className="text-sm font-semibold text-amber-900">
+                  Faltam {brl(conta.falta)}. O que fazer com o resto?
+                </p>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {(Object.keys(DESTINO_META) as DestinoDoResto[]).map((k) => (
+                    <button
+                      key={k}
+                      className="rounded-lg border border-amber-300 bg-white p-2 text-left transition hover:bg-amber-100 disabled:opacity-60"
+                      disabled={registrando}
+                      onClick={() => onReceber(parcelasFinais, k)}
+                    >
+                      <span className="block text-sm font-semibold text-slate-800">
+                        {DESTINO_META[k].label}
+                      </span>
+                      <span className="block text-xs text-slate-500">
+                        {DESTINO_META[k].explicacao}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/*
               Conserto de R$ 800 pago metade no cartão e metade em espécie é
@@ -2053,15 +2257,29 @@ const OSDetalhe: React.FC<{
               R$ 400 e a maquininha, sobra de R$ 400 — todo dia, sem origem.
             */}
             {!dividido ? (
-              <button
-                className="btn-ghost mt-2 !py-1 text-xs"
-                onClick={() => {
-                  setDividido(true);
-                  setParcelas([{ forma, valor: aCobrar }]);
-                }}
-              >
-                <Plus size={13} /> Dividir entre formas de pagamento
-              </button>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  className="btn-ghost !py-1 text-xs"
+                  onClick={() => {
+                    setDividido(true);
+                    setParcelas([{ forma, valor: restaCobrar }]);
+                  }}
+                >
+                  <Plus size={13} /> Dividir entre formas de pagamento
+                </button>
+                <button
+                  className="btn-ghost !py-1 text-xs"
+                  onClick={() => {
+                    const ligando = !parcial;
+                    setParcial(ligando);
+                    // Nasce no valor cheio: quem abriu vai BAIXAR o número, e
+                    // começar em branco faria o botão sumir até digitar algo.
+                    setValorParcial(ligando ? restaCobrar : undefined);
+                  }}
+                >
+                  <HandCoins size={13} /> {parcial ? "Pagou tudo" : "Recebeu só uma parte?"}
+                </button>
+              </div>
             ) : (
               <div className="mt-2 space-y-2">
                 {parcelas.map((pc, i) => (
