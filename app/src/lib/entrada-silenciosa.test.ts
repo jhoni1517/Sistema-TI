@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { avisoDeEstoqueQueSubiu } from "./estoque";
 import { carimboDoLancamento, problemaNaDataDoLancamento } from "./caixa";
 import type { Produto } from "./types";
@@ -13,16 +15,37 @@ import type { Produto } from "./types";
 const p = (q: number, extra: Partial<Produto> = {}): Produto =>
   ({ id: "f1", nome: "Fonte 500W", quantidade: q, custo: 120, preco: 200, ...extra }) as Produto;
 
-describe("estoque que sobe no cadastro tem que perguntar", () => {
-  it("subiu: avisa, e diz onde a compra deve ser lançada", () => {
+describe("estoque que sobe no cadastro tem que dizer o que vai acontecer", () => {
+  /*
+   * O recado já foi um `confirm()` bloqueante na hora de salvar, e virou
+   * texto ao lado do campo de quantidade. O que ele PRECISA dizer não mudou;
+   * mudou o tamanho e a ordem, porque ao lado do campo o nome do produto é
+   * redundante (a pessoa está olhando para ele) e o que importa é a
+   * consequência de salvar assim.
+   */
+  it("subiu: diz o que acontece salvando assim, e onde a compra deve ir", () => {
     const a = avisoDeEstoqueQueSubiu(p(2), p(3));
-    expect(a).toContain("Fonte 500W");
+    expect(a).toContain("Sobe 1");
+    // A consequência vem PRIMEIRO: é a frase que decide para quem só lê uma.
+    expect(a).toContain("nada sai do caixa");
     expect(a).toContain("Entrada de nota");
-    expect(a).toContain("DESCONTA DO CAIXA");
+    expect(a).toContain("custo médio");
   });
 
   it("produto novo com estoque também avisa — mercadoria não nasce do nada", () => {
-    expect(avisoDeEstoqueQueSubiu(undefined, p(1))).toContain("nasce com 1");
+    expect(avisoDeEstoqueQueSubiu(undefined, p(1))).toContain("Nasce com 1");
+  });
+
+  it("cabe em uma linha: recado ao lado do campo não é roteiro de diálogo", () => {
+    /*
+     * O texto antigo tinha três parágrafos porque precisava explicar dois
+     * botões. Sem os botões, texto longo ao lado do campo vira parede que
+     * ninguém lê — e o recado deixa de proteger do mesmo jeito que a
+     * pergunta automática deixava.
+     */
+    const a = avisoDeEstoqueQueSubiu(p(2), p(3));
+    expect(a.length, `recado com ${a.length} caracteres`).toBeLessThan(220);
+    expect(a).not.toContain("\n");
   });
 
   /**
@@ -86,5 +109,41 @@ describe("a data do lançamento manual", () => {
 
   it("data inválida é recusada", () => {
     expect(problemaNaDataDoLancamento("", agora)).toContain("válida");
+  });
+});
+
+describe("o recado de estoque não volta a ser diálogo do navegador", () => {
+  const tela = readFileSync(
+    join(__dirname, "..", "pages", "Estoque.tsx"),
+    "utf8"
+  );
+
+  it("salvar produto não abre `confirm()` por causa da quantidade", () => {
+    /*
+     * Relatado do balcão: "tá muito chata, tudo que vou cadastrar aparece
+     * isso, e não consigo usar mais nada no navegador por causa dela".
+     *
+     * As duas queixas são a mesma causa. `confirm()` é diálogo NATIVO: ele
+     * congela a aba inteira, não só o sistema — qualquer outra coisa aberta
+     * na mesma janela fica presa até alguém responder. E ele disparava em
+     * trabalho ROTINEIRO, não em ação destrutiva.
+     *
+     * Os outros `confirm()` da tela continuam de pé de propósito: apagar
+     * produto e apagar categoria são destrutivos, acontecem raramente e a
+     * pergunta ali é esperada. O que não pode voltar é ele no caminho de
+     * gravar um cadastro.
+     */
+    const salvar = tela.slice(tela.indexOf("const salvar"), tela.indexOf("return ("));
+    expect(salvar).not.toMatch(/confirm\([^)]*aviEstoque/);
+    // A CHAMADA, e não a menção: o comentário que explica a mudança cita o
+    // nome da função de propósito, e não pode reprovar o próprio conserto.
+    expect(salvar).not.toContain("avisoDeEstoqueQueSubiu(");
+  });
+
+  it("o recado continua aparecendo, ao lado do campo de quantidade", () => {
+    // Tirar o diálogo não podia virar tirar a proteção: o texto tem que
+    // continuar na tela, só que sem interromper ninguém.
+    expect(tela).toContain("avisoDeEstoqueQueSubiu");
+    expect(tela).toContain("Abrir Entrada de nota");
   });
 });
