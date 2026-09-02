@@ -146,13 +146,53 @@ as $$
                  'nome', o.opcao,
                  'total', (select v from base) + o.v,
                  'escolhida', o.opcao = (select opcao from atual),
+                 /*
+                  * A LISTA TEM QUE FECHAR COM O PREÇO DE CIMA.
+                  *
+                  * Ela pegava só `i.opcao = o.opcao`, enquanto o total logo
+                  * acima soma a `base` — mão de obra, desconto e os itens
+                  * que entram em QUALQUER opção. O cliente lia "Opção 1,
+                  * R$ 730,00" com uma peça de R$ 480 embaixo, e os R$ 250 da
+                  * bateria não apareciam em lugar nenhum.
+                  *
+                  * Relatado do balcão, na OS00033: "coloquei a bateria nos
+                  * dois orçamentos e não apareceu pro cliente". Preço que não
+                  * fecha com a lista faz a loja parecer que está inflando o
+                  * orçamento — e a página promete, com todas as letras, que
+                  * cada opção JÁ É o valor do serviço completo.
+                  *
+                  * Agora a lista traz tudo que entra na conta, na ordem em
+                  * que a loja digitou: mão de obra primeiro, porque é o que a
+                  * OS é, e o desconto por último, porque ele é o abate.
+                  */
                  'itens', (
-                   select jsonb_agg(jsonb_build_object(
-                            'descricao', i.descricao,
-                            'quantidade', i.quantidade,
-                            'valor', i.valor
-                          ) order by i.pos)
-                     from itens i where i.opcao = o.opcao
+                   select jsonb_agg(x.item order by x.ordem)
+                     from (
+                       select -1 as ordem,
+                              jsonb_build_object(
+                                'descricao', 'Mão de obra',
+                                'quantidade', 1,
+                                'valor', coalesce(a."maoDeObra", 0)
+                              ) as item
+                        where coalesce(a."maoDeObra", 0) > 0
+                       union all
+                       select i.pos,
+                              jsonb_build_object(
+                                'descricao', i.descricao,
+                                'quantidade', i.quantidade,
+                                'valor', i.valor
+                              )
+                         from itens i
+                        where i.opcao = o.opcao or i.opcao = ''
+                       union all
+                       select 1000000000,
+                              jsonb_build_object(
+                                'descricao', 'Desconto',
+                                'quantidade', 1,
+                                'valor', -coalesce(a.desconto, 0)
+                              )
+                        where coalesce(a.desconto, 0) > 0
+                     ) x
                  )
                ) order by o.ordem)
           from opcoes o

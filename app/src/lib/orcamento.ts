@@ -1,3 +1,5 @@
+import { txt } from "./format";
+import { normalizar } from "./busca";
 import type { OrdemServico, PecaOS } from "./types";
 
 /**
@@ -92,14 +94,37 @@ export const comOpcao = (o: OrdemServico, nome: string): OrdemServico => ({
   opcaoEscolhida: nome.trim() || undefined,
 });
 
-/** Nome livre para o próximo orçamento: "Opção 1", "Opção 2"... */
+/**
+ * Nome livre para o próximo orçamento: "Opção 1", "Opção 2"...
+ *
+ * ------------------------------------------------------------
+ * O NÚMERO NUNCA VOLTA, MESMO DEPOIS DE SOBRAR
+ *
+ * A primeira versão procurava o primeiro número LIVRE. Parecia arrumado e
+ * embaralhava a tela: apagando a última peça da "Opção 1", ela sumia da
+ * lista (a opção só existe enquanto tem peça), e o próximo "adicionar"
+ * devolvia "Opção 1" de novo — que aparecia DEPOIS da "Opção 2", porque a
+ * ordem sai de onde a peça está na lista.
+ *
+ * Relatado assim, do balcão: "a 1 meio que sumiu e virou 1 de novo a 2".
+ *
+ * Agora ele passa do maior já usado. O número não se repete e a lista sai em
+ * ordem crescente sozinha, sem precisar reordenar nada — e reordenar seria
+ * perigoso, porque a mesma ordem existe no SQL da página do cliente
+ * (`order by o.ordem`), e as duas divergindo mostrariam sugestões
+ * diferentes para o mesmo orçamento.
+ *
+ * Nome escrito à mão ("Completo") não entra na conta: quem renomeou não
+ * quer numeração.
+ * ------------------------------------------------------------
+ */
 export function proximoNomeDeOpcao(o: OrdemServico): string {
-  const usados = nomesDasOpcoes(o);
-  for (let i = 1; i <= usados.length + 1; i++) {
-    const nome = `Opção ${i}`;
-    if (!usados.includes(nome)) return nome;
+  let maior = 0;
+  for (const nome of nomesDasOpcoes(o)) {
+    const n = Number(nome.match(/^Opção (\d+)$/)?.[1]);
+    if (Number.isFinite(n) && n > maior) maior = n;
   }
-  return `Opção ${usados.length + 1}`;
+  return `Opção ${maior + 1}`;
 }
 
 /**
@@ -145,3 +170,92 @@ export const juntarEmUmOrcamento = (o: OrdemServico): OrdemServico => ({
   pecas: (o.pecas || []).map((p) => ({ ...p, opcao: undefined })),
   opcaoEscolhida: undefined,
 });
+
+/**
+ * Passa a oferecer mais de uma opção, levando o que já foi digitado para a
+ * PRIMEIRA delas.
+ *
+ * ------------------------------------------------------------
+ * A PRIMEIRA VERSÃO DEIXAVA TUDO NO BALDE COMUM, E ISSO COBRAVA EM DOBRO
+ *
+ * O raciocínio era: "as peças que já estavam digitadas continuam valendo
+ * para as duas — jogá-las numa opção obrigaria a redigitar tudo na outra".
+ * Parece economia de digitação e é o contrário.
+ *
+ * Relatado do balcão, na OS00033: a loja tinha SSD 120 GB, bateria e
+ * carcaça digitados. Clicou em "mais de uma opção", os três viraram COMUNS,
+ * e ela montou a Opção 1 com SSD 240 GB, bateria e carcaça — que é como
+ * qualquer pessoa monta uma opção: inteira.
+ *
+ * O resultado foi a Opção 1 somando R$ 1.360 em vez de R$ 730: duas
+ * baterias, duas carcaças e os dois SSDs no mesmo orçamento. Exatamente o
+ * "orçamento cobrando as duas fontes" que este recurso existe para impedir,
+ * entrando por outra porta.
+ *
+ * Opção é um CENÁRIO INTEIRO — é assim que a loja pensa e é assim que o
+ * cliente lê. O que já estava na tela é o primeiro cenário, não um pedaço
+ * solto que entra em todos. O balde comum continua existindo (pasta térmica,
+ * limpeza), mas agora ele é uma escolha deliberada, e não o lugar onde o
+ * trabalho já feito cai sozinho.
+ * ------------------------------------------------------------
+ *
+ * A segunda opção nasce com uma linha em branco, para ter onde digitar.
+ */
+export function paraDuasOpcoes(o: OrdemServico): OrdemServico {
+  const primeira = "Opção 1";
+  const segunda = "Opção 2";
+  const jaDigitadas = (o.pecas || []).filter(
+    (p) => txt(p.descricao).trim() || n(p.precoUnit) > 0 || p.produtoId
+  );
+
+  return {
+    ...o,
+    pecas: [
+      // O que já existia vira o primeiro cenário, inteiro.
+      ...jaDigitadas.map((p) => ({ ...p, opcao: primeira })),
+      { descricao: "", quantidade: 1, custoUnit: 0, precoUnit: 0, opcao: segunda },
+    ],
+    /*
+     * Sem escolha registrada de propósito: quem decide é o cliente. Marcar a
+     * primeira aqui faria a loja mandar um orçamento já "aprovado" por ela.
+     */
+    opcaoEscolhida: undefined,
+  };
+}
+
+/**
+ * As peças que estão no comum E dentro de alguma opção — ou seja, cobradas
+ * duas vezes no mesmo orçamento.
+ *
+ * Devolve a descrição de cada uma, uma vez só. Vazio quando está tudo certo.
+ *
+ * A comparação é pela DESCRIÇÃO, sem acento e sem caixa, e não pelo
+ * `produtoId`: a peça digitada à mão não tem id nenhum, e foi justamente a
+ * digitada à mão que apareceu repetida no caso real.
+ *
+ * Por que não bloquear: cobrar duas unidades da mesma peça é legítimo (dois
+ * pentes de memória). Só que aí a quantidade é 2 numa linha só — duas linhas
+ * iguais em lugares diferentes é quase sempre engano, e o sistema tem que
+ * dizer isso antes de o orçamento sair para o cliente.
+ */
+export function itensRepetidos(o: OrdemServico, nome: string): string[] {
+  const chave = (p: PecaOS): string => normalizar(txt(p.descricao));
+  const comuns = new Set(itensInclusos(o).map(chave).filter(Boolean));
+  const vistos = new Set<string>();
+  const saida: string[] = [];
+
+  for (const p of pecasDaOpcao(o, nome)) {
+    const k = chave(p);
+    if (!k || !comuns.has(k) || vistos.has(k)) continue;
+    vistos.add(k);
+    saida.push(txt(p.descricao).trim());
+  }
+  return saida;
+}
+
+/** O mesmo, para a OS inteira: qual opção tem repetição e qual peça é */
+export function repeticoesDaOS(o: OrdemServico): { opcao: string; itens: string[] }[] {
+  return nomesDasOpcoes(o)
+    .map((nome) => ({ opcao: nome, itens: itensRepetidos(o, nome) }))
+    .filter((x) => x.itens.length > 0);
+}

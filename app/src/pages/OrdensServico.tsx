@@ -71,6 +71,8 @@ import {
   removerOpcao,
   juntarEmUmOrcamento,
   pecasEfetivas,
+  paraDuasOpcoes,
+  itensRepetidos,
 } from "../lib/orcamento";
 import {
   OS_STATUS_META,
@@ -1012,7 +1014,30 @@ const OSForm: React.FC<{
     n[i] = p;
     setOs({ ...os, pecas: n });
   };
-  const delPeca = (i: number) => setOs({ ...os, pecas: os.pecas.filter((_, x) => x !== i) });
+  /**
+   * Apaga a linha da peça — mas não deixa a OPÇÃO sumir junto.
+   *
+   * A opção só existe enquanto tem peça. Apagando a última, ela desaparecia
+   * da tela sem ninguém pedir, e o próximo "adicionar" a trazia de volta com
+   * outro número, embaralhando a lista. Relatado assim: "a 1 meio que sumiu e
+   * virou 1 de novo a 2".
+   *
+   * Apagar a opção inteira tem botão próprio, com confirmação. O que a
+   * lixeira da linha faz é apagar a linha: sobrando nenhuma, fica uma em
+   * branco para digitar a próxima.
+   */
+  const delPeca = (i: number) => {
+    const alvo = opcaoDaPeca(os.pecas[i]);
+    const restam = os.pecas.filter((p, x) => x !== i && opcaoDaPeca(p) === alvo);
+    const semEla = os.pecas.filter((_, x) => x !== i);
+    setOs({
+      ...os,
+      pecas:
+        alvo && restam.length === 0
+          ? [...semEla, { descricao: "", quantidade: 1, custoUnit: 0, precoUnit: 0, opcao: alvo }]
+          : semEla,
+    });
+  };
 
   const nomes = nomesDasOpcoes(os);
   /**
@@ -1027,21 +1052,15 @@ const OSForm: React.FC<{
   const faixa = faixaOS(os);
 
   /** Começa a oferecer opções: duas, que é o mínimo para haver escolha */
-  const usarVariosOrcamentos = () => {
-    const a = "Opção 1";
-    const b = "Opção 2";
-    setOs({
-      ...os,
-      // As peças que já estavam digitadas continuam valendo para as duas —
-      // jogá-las numa opção obrigaria a redigitar tudo na outra.
-      pecas: [
-        ...os.pecas,
-        { descricao: "", quantidade: 1, custoUnit: 0, precoUnit: 0, opcao: a },
-        { descricao: "", quantidade: 1, custoUnit: 0, precoUnit: 0, opcao: b },
-      ],
-      opcaoEscolhida: undefined,
-    });
-  };
+  /*
+   * O que já estava digitado vira a OPÇÃO 1, e não item comum.
+   *
+   * Antes ficava no balde comum, com a justificativa de poupar digitação. Na
+   * OS00033 isso cobrou duas baterias e duas carcaças do cliente: a pessoa
+   * montou a Opção 1 inteira, como qualquer um monta, e o comum entrou por
+   * cima. Ver `paraDuasOpcoes` em lib/orcamento.ts.
+   */
+  const usarVariosOrcamentos = () => setOs(paraDuasOpcoes(os));
 
   const usarOrcamentoUnico = () => {
     if (
@@ -1495,6 +1514,29 @@ const OSForm: React.FC<{
                       </span>
                     </span>
                   </div>
+                  {/*
+                    A MESMA PEÇA NO COMUM E AQUI DENTRO É COBRANÇA DUPLA.
+
+                    Aconteceu na OS00033: bateria e carcaça nos dois lugares,
+                    e a opção somou R$ 1.360 em vez de R$ 730 — um orçamento
+                    cobrando duas baterias, para o cliente ler.
+
+                    Avisa e não bloqueia: cobrar duas unidades é legítimo, só
+                    que aí a quantidade é 2 numa linha só. Duas linhas iguais
+                    em lugares diferentes é quase sempre engano.
+                  */}
+                  {(() => {
+                    const repetidas = itensRepetidos(os, nome);
+                    if (repetidas.length === 0) return null;
+                    return (
+                      <p className="mb-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">
+                        <b>{repetidas.join(", ")}</b>{" "}
+                        {repetidas.length === 1 ? "está" : "estão"} em "Entra em qualquer
+                        opção" e também aqui — o cliente é cobrado duas vezes. Apague de um
+                        dos dois lados.
+                      </p>
+                    );
+                  })()}
                   <div className="space-y-2">
                     {os.pecas.map((p, i) => (opcaoDaPeca(p) === nome ? linhaPeca(p, i) : null))}
                   </div>

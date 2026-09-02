@@ -29,6 +29,16 @@
 # no Supabase de produção: é um banco descartável em /var/tmp.
 
 set -e
+
+# O Postgres recusa iniciar como root, e a mensagem que ele dá ("cannot be
+# run as root") não diz o que fazer. Em vez de mandar o próximo se virar, o
+# script se rebaixa sozinho para o usuário do banco.
+if [ "$(id -u)" = "0" ] && id postgres >/dev/null 2>&1; then
+  AQUI_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+  chmod -R a+rX "$AQUI_ROOT" 2>/dev/null || true
+  exec su postgres -c "PORTA=${PORTA:-5610} DADOS=${DADOS:-/var/tmp/pg-sistema-ti} bash '$0'"
+fi
+
 PORTA=${PORTA:-5610}
 DADOS=${DADOS:-/var/tmp/pg-sistema-ti}
 AQUI="$(cd "$(dirname "$0")/.." && pwd)"
