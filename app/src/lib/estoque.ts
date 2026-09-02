@@ -1,5 +1,4 @@
 import type { Produto } from "./types";
-import { txt } from "./format";
 
 /**
  * A baixa de estoque, num lugar só.
@@ -149,7 +148,28 @@ export function avisoDeFalta(
  * diz o CLAUDE.md, LUCRO INFLADO É INVISÍVEL — ninguém procura por ele. Uma
  * saída de caixa sobrando salta aos olhos; esta não salta nada.
  *
- * Devolve o aviso a mostrar, ou vazio quando não há o que perguntar.
+ * ------------------------------------------------------------
+ * ERA UMA PERGUNTA BLOQUEANTE, E VIROU RECADO NO FORMULÁRIO
+ *
+ * A primeira versão disto era um `confirm()` do navegador na hora de salvar.
+ * Duas coisas quebradas nisso, as duas relatadas do balcão:
+ *
+ * 1. Aparecia em TODO cadastro com quantidade. Pergunta que aparece sempre é
+ *    pergunta que a pessoa aprende a responder no automático — e aí ela para
+ *    de proteger justamente no dia em que era compra de verdade. É a mesma
+ *    regra do aviso de sangria e da diferença de caixa.
+ *
+ * 2. `confirm()` é diálogo NATIVO: ele congela a aba inteira do navegador,
+ *    não só o sistema. Quem usa qualquer outra ferramenta na mesma janela
+ *    fica preso até responder.
+ *
+ * O texto continua o mesmo em conteúdo; o que mudou foi ONDE ele aparece.
+ * Agora fica ao lado do campo de quantidade, enquanto a pessoa digita — que
+ * é quando ela ainda lembra se comprou ou se contou. Salvar não interrompe
+ * mais nada.
+ * ------------------------------------------------------------
+ *
+ * Devolve o recado a mostrar, ou vazio quando não há o que dizer.
  * Diminuir estoque não entra aqui: quebra e perda não tiram dinheiro do
  * caixa, então não há decisão de dinheiro a tomar.
  */
@@ -167,12 +187,19 @@ export function avisoDeEstoqueQueSubiu(
   const custo = n(depois.custo);
   const gasto = custo > 0 ? ` (${quanto} x ${custo.toFixed(2)})` : "";
 
+  /*
+   * Curto, e dizendo primeiro o que VAI acontecer.
+   *
+   * O texto antigo era um roteiro de três parágrafos porque precisava
+   * explicar dois botões de um diálogo. Ao lado do campo, o que importa é
+   * uma frase: salvando assim, nada sai do caixa. Quem comprou reconhece o
+   * próprio caso na segunda e clica no botão que leva à Entrada de nota.
+   */
   return (
-    `O estoque de "${txt(depois.nome) || "este produto"}" ` +
-    (novo ? `nasce com ${para}.` : `sobe de ${grama(de)} para ${grama(para)}, mais ${quanto}.`) +
-    `\n\nSE VOCE COMPROU${gasto}: cancele e use "Entrada de nota". ` +
-    `Ela soma o estoque, recalcula o custo médio e DESCONTA DO CAIXA.` +
-    `\n\nSE E CORRECAO DE CONTAGEM: confirme. O estoque sobe e nada sai do caixa.`
+    `${novo ? `Nasce com ${para}` : `Sobe ${quanto}, de ${grama(de)} para ${grama(para)}`}` +
+    `. Salvando assim é correção de contagem: nada sai do caixa.` +
+    ` Se você COMPROU${gasto}, use "Entrada de nota" — ela desconta do caixa` +
+    ` e recalcula o custo médio.`
   );
 }
 

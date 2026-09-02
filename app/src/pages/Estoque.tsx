@@ -136,22 +136,17 @@ export const Estoque: React.FC = () => {
     if (aviProm && !confirm(`${aviProm}\n\nSalvar assim mesmo?`)) return;
 
     /*
-     * ESTOQUE QUE SOBE AQUI NÃO ENCOSTA NO CAIXA, E ISSO PRECISA SER DITO.
+     * O aviso de estoque que sobe NÃO mora mais aqui.
      *
-     * Relatado do balcão: "comprei uma fonte, entrou no estoque, e não deu
-     * baixa no dinheiro". Foi exatamente este caminho. O cadastro grava a
-     * quantidade que está no campo — é o certo para corrigir contagem, e é
-     * o errado para registrar compra, e nada na tela diferenciava os dois.
+     * Era um `confirm()` nesta linha, e ele aparecia em todo cadastro com
+     * quantidade. Duas coisas quebradas: pergunta que aparece sempre vira
+     * clique automático e para de proteger, e `confirm()` é diálogo nativo
+     * — congela a aba inteira do navegador, não só o sistema.
      *
-     * Perguntar é o único jeito, porque só quem digitou sabe qual dos dois
-     * era. Cancelar leva para "Entrada de nota", que é onde a compra tem
-     * caixa, custo médio e frete.
+     * Agora o recado fica ao lado do campo de quantidade, enquanto a pessoa
+     * digita, com um botão que leva direto à Entrada de nota. Salvar não
+     * interrompe mais nada. Ver `avisoDeEstoqueQueSubiu` em lib/estoque.ts.
      */
-    const aviEstoque = avisoDeEstoqueQueSubiu(
-      produtos.find((x) => x.id === editando.id),
-      editando
-    );
-    if (aviEstoque && !confirm(aviEstoque)) return;
 
     // grava os textos de categoria/fornecedor para exibição/compatibilidade
     const p = {
@@ -630,6 +625,34 @@ export const Estoque: React.FC = () => {
                     value={editando.quantidade}
                     onChange={(v) => setEditando({ ...editando, quantidade: (v ?? 0) })}
                   />
+                  {/*
+                    O recado que era um `confirm()` na hora de salvar.
+                    Aqui ele aparece enquanto a pessoa digita — que é quando
+                    ela ainda lembra se comprou ou se contou — e o botão
+                    leva para onde a compra tem caixa, custo médio e frete.
+                  */}
+                  {(() => {
+                    const recado = avisoDeEstoqueQueSubiu(
+                      produtos.find((x) => x.id === editando.id),
+                      editando
+                    );
+                    if (!recado) return null;
+                    return (
+                      <p className="mt-1.5 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">
+                        {recado}{" "}
+                        <button
+                          type="button"
+                          className="font-bold underline"
+                          onClick={() => {
+                            setEditando(null);
+                            setEntrada(true);
+                          }}
+                        >
+                          Abrir Entrada de nota
+                        </button>
+                      </p>
+                    );
+                  })()}
                 </Field>
 
             {/* Estoque mínimo sugerido pelo consumo real. O número do
