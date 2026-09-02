@@ -303,3 +303,99 @@ suite("o total que o cliente vê no link é o que a loja vai cobrar", () => {
     expect(divergentes, divergentes.slice(0, 10).join("\n")).toEqual([]);
   });
 });
+
+suite("o preço que o cliente lê fecha com a lista que ele vê", () => {
+  it("a soma dos itens de cada opção é o total daquela opção", () => {
+    /*
+     * Relatado do balcão, na OS00033: "coloquei a bateria nos dois
+     * orçamentos e não apareceu pro cliente". A página mostrava "Opção 1,
+     * R$ 730,00" com uma peça de R$ 480 embaixo — os R$ 250 da bateria
+     * entravam na conta e sumiam da lista.
+     *
+     * Preço que não fecha com a lista faz a loja parecer que está inflando
+     * o orçamento, e a página promete com todas as letras que cada opção JÁ
+     * É o valor do serviço completo.
+     *
+     * O sorteio inclui mão de obra e desconto de propósito: os dois moram na
+     * `base` do SQL, que é exatamente o pedaço que não aparecia.
+     */
+    const r = semente(908070);
+    const ordens: string[] = [];
+    const esperado: { numero: number; opcoes: number }[] = [];
+
+    for (let i = 0; i < 120; i++) {
+      const numero = 9000 + i;
+      const comuns = Math.floor(r() * 3);
+      const pecas: Record<string, unknown>[] = [];
+      for (let k = 0; k < comuns; k++) {
+        pecas.push({
+          descricao: `Comum ${k}`,
+          quantidade: 1 + Math.floor(r() * 3),
+          custoUnit: 1,
+          precoUnit: Math.round(r() * 30000) / 100,
+        });
+      }
+      const quantasOpcoes = 2 + Math.floor(r() * 2);
+      for (let o = 1; o <= quantasOpcoes; o++) {
+        for (let k = 0; k < 1 + Math.floor(r() * 3); k++) {
+          pecas.push({
+            descricao: `Peça ${o}-${k}`,
+            quantidade: 1 + Math.floor(r() * 3),
+            custoUnit: 1,
+            precoUnit: Math.round(r() * 60000) / 100,
+            opcao: `Opção ${o}`,
+          });
+        }
+      }
+      const mao = r() < 0.6 ? Math.round(r() * 40000) / 100 : 0;
+      const desc = r() < 0.3 ? Math.round(r() * 5000) / 100 : 0;
+
+      ordens.push(
+        `('oc${i}', ${numero}, 'cpar', 'Notebook', 'D', 'x', 'd', ` +
+          `'${JSON.stringify(pecas).replace(/'/g, "''")}'::jsonb, ${mao}, ${desc}, ` +
+          `'aguardando_aprovacao', 90, '${LOJA}', now()::text, now()::text)`
+      );
+      esperado.push({ numero, opcoes: quantasOpcoes });
+    }
+
+    const saida = rodar(`
+      delete from ordens where "lojaId" = '${LOJA}';
+      insert into clientes (id, nome, telefone, "lojaId", "criadoEm")
+      values ('cpar', 'Cliente Paridade', '41999999999', '${LOJA}', now()::text)
+      on conflict (id) do nothing;
+      insert into ordens (id, numero, "clienteId", "tipoAparelho", marca, modelo,
+                          "defeitoRelatado", pecas, "maoDeObra", desconto,
+                          status, "garantiaDias", "lojaId", "criadoEm", "atualizadoEm")
+      values ${ordens.join(",\n")};
+      select json_agg(json_build_object(
+               'numero', o.numero,
+               'opcao', x->>'nome',
+               'total', (x->>'total')::numeric,
+               'soma', (select coalesce(sum((i->>'valor')::numeric), 0)
+                          from jsonb_array_elements(x->'itens') i)
+             ))
+        from ordens o
+        cross join lateral consultar_os('${LOJA}', o.numero, o.rastreio) c
+        cross join lateral jsonb_array_elements(c.opcoes) x
+       where o."lojaId" = '${LOJA}';
+    `);
+
+    const linhas = JSON.parse(saida.trim().split("\n").pop()!) as {
+      numero: number;
+      opcao: string;
+      total: number;
+      soma: number;
+    }[];
+
+    // Toda opção de toda OS foi conferida — sem isto o teste passaria vazio.
+    expect(linhas.length).toBe(esperado.reduce((s, x) => s + x.opcoes, 0));
+
+    const divergentes = linhas
+      .filter((l) => Math.abs(Number(l.total) - Number(l.soma)) > 0.001)
+      .map(
+        (l) =>
+          `OS ${l.numero} ${l.opcao}: a página cobra ${l.total} e lista ${l.soma}`
+      );
+    expect(divergentes, divergentes.slice(0, 10).join("\n")).toEqual([]);
+  });
+});
