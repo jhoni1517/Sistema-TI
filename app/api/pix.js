@@ -35,6 +35,8 @@
 //   PIX_CHAVE_CRIPTO            -> 32 bytes em base64; cifra o token da loja
 //   SITE_URL (opcional)         -> endereço do site para o aviso do Mercado
 //                                  Pago. Sem ela, usa o do próprio pedido.
+//   TELEGRAM_TOKEN              -> o mesmo robô dos lembretes diários: avisa
+//                                  o chat DA LOJA quando o Pix cai.
 //
 // O Access Token de CADA LOJA não é variável de ambiente: cada loja recebe
 // na conta dela, e o token mora cifrado em `pix_credencial`.
@@ -46,6 +48,7 @@ const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || SERVICE_KEY;
 const CHAVE_CRIPTO = process.env.PIX_CHAVE_CRIPTO;
 const MP = "https://api.mercadopago.com";
+const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 
 /**
  * Em que status o link oferece o Pix.
@@ -140,6 +143,49 @@ function movimentoDoPix(pagamento, ordem, nomeCliente, sessaoId, lojaId) {
     data: pagamento.date_approved || new Date().toISOString(),
     sessaoId: sessaoId || null,
   };
+}
+
+/**
+ * O recado do Pix que caiu, para o Telegram da loja.
+ *
+ * Texto puro, sem Markdown e sem emoji: nome de cliente com "_" ou "*"
+ * quebrava a formatação do Telegram e a mensagem inteira era recusada — e
+ * emoji chega como "?" em aparelho velho.
+ */
+function recadoDoPix(movimento, numero, nomeCliente) {
+  const valor = Number(movimento.valor || 0).toFixed(2).replace(".", ",");
+  return (
+    `Pix recebido: R$ ${valor}\n` +
+    `${codigoOS(numero)}${nomeCliente ? ` - ${nomeCliente}` : ""}\n` +
+    "Pago pelo link de acompanhamento. Já está no caixa."
+  );
+}
+
+/**
+ * Avisa o chat do Telegram DA LOJA. Loja sem chat configurado não recebe
+ * nada — o mesmo silêncio dos lembretes diários, que é o lado seguro.
+ *
+ * Falha aqui NUNCA derruba o pagamento: o dinheiro já entrou no caixa, e
+ * responder erro ao Mercado Pago faria ele repetir o aviso por dias. Vai
+ * para o log da Vercel, que é o canal que sobra quando o de aviso quebra.
+ */
+async function avisarLoja(lojaId, texto) {
+  if (!TELEGRAM_TOKEN) return false;
+  try {
+    const [cfg] = (await sb(`configuracoes?select=dados&id=eq.${lojaId}`)) || [];
+    const chat = String(cfg?.dados?.telegramChatId || "").trim();
+    if (!chat) return false;
+    const r = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chat, text: texto }),
+    });
+    if (!r.ok) console.error("Pix: Telegram recusou o aviso", r.status, await r.text());
+    return r.ok;
+  } catch (e) {
+    console.error("Pix: falha ao avisar no Telegram", e?.message || e);
+    return false;
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -283,11 +329,14 @@ async function processarPagamento(lojaId, pagamento) {
     lojaId
   );
 
-  await sb("movimentos?on_conflict=id", {
+  // `return=representation` devolve SÓ a linha que entrou agora. Aviso
+  // repetido volta vazio — é assim que o Telegram também avisa uma vez só.
+  const inseridos = await sb("movimentos?on_conflict=id", {
     method: "POST",
-    headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+    headers: { Prefer: "resolution=ignore-duplicates,return=representation" },
     body: JSON.stringify([movimento]),
   });
+  const novo = Array.isArray(inseridos) && inseridos.length > 0;
 
   await sb(`pix_cobrancas?id=eq.${pagamento.id}`, {
     method: "PATCH",
@@ -297,7 +346,8 @@ async function processarPagamento(lojaId, pagamento) {
       movimentoId: movimento.id,
     }),
   });
-  return { ok: true, pago: true, valor: movimento.valor };
+  if (novo) await avisarLoja(lojaId, recadoDoPix(movimento, ordem.numero, cliente?.nome));
+  return { ok: true, pago: true, valor: movimento.valor, novo };
 }
 
 /* ------------------------------------------------------------------ */

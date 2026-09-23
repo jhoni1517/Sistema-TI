@@ -40,3 +40,31 @@ export function validadeDoQR(expiraEm: string | null | undefined, agora = new Da
   if (minutos < 1) return "";
   return minutos === 1 ? "Vale por mais 1 minuto" : `Vale por mais ${minutos} minutos`;
 }
+
+/** De quanto em quanto tempo o sistema aberto olha se caiu Pix novo */
+export const SEGUNDOS_ENTRE_OLHADAS_DO_PIX = 30;
+
+export interface PixPago {
+  id: string;
+  valor: number;
+  osId: string;
+  pagoEm: string;
+}
+
+/**
+ * Os Pix que caíram desde a última olhada e ainda não foram avisados.
+ *
+ * `vistos` guarda o que já foi avisado NESTE aparelho: sem ele, cada olhada
+ * de 30 segundos avisaria de novo o mesmo pagamento enquanto ele estiver
+ * na janela de busca — e aviso que repete é aviso que a pessoa aprende a
+ * fechar sem ler.
+ */
+export function pixQueCairam(linhas: PixPago[] | null | undefined, vistos: Set<string>): PixPago[] {
+  return (linhas || []).filter((l) => l && l.id && !vistos.has(String(l.id)));
+}
+
+/** O texto do aviso. Sem emoji: a notificação do celular também vira "?". */
+export function textoDoPixRecebido(valor: number, codigo: string): string {
+  const v = (Number(valor) || 0).toFixed(2).replace(".", ",");
+  return `R$ ${v}${codigo ? ` da ${codigo}` : ""}, pago pelo link. Já está no caixa.`;
+}
