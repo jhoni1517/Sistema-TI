@@ -30,7 +30,7 @@ import {
   FileText,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
-import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
+import { Modal, Field, SectionTitle, InputNumero } from "../components/ui";
 import { PatternLock } from "../components/PatternLock";
 import { FotosAparelho } from "../components/FotosAparelho";
 import { printHTML } from "../lib/print";
@@ -469,7 +469,7 @@ export const OrdensServico: React.FC = () => {
         subtitle={`${ordens.length} no total`}
         action={
           <button
-            className="btn-primary"
+            className="btn bg-sinal text-sinal-tinta hover:bg-sinal/90 focus-visible:ring-sinal"
             onClick={() => {
               /*
                * Com a lista de ordens quebrada, a próxima nasce OS00001 e
@@ -494,8 +494,8 @@ export const OrdensServico: React.FC = () => {
         const vencendo = garantiasVencendo(ordens, 7);
         if (vencendo.length === 0) return null;
         return (
-          <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-            <p className="flex items-center gap-2 text-sm font-bold text-emerald-800">
+          <div className="mb-4 rounded-md border border-linha bg-concreto p-3">
+            <p className="flex items-center gap-2 text-sm font-bold text-tinta">
               <ShieldCheck size={16} /> {vencendo.length} garantia(s) vencendo nesta semana
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
@@ -503,13 +503,14 @@ export const OrdensServico: React.FC = () => {
                 <button
                   key={o.id}
                   onClick={() => setDetalhe(o)}
-                  className="badge bg-emerald-100 text-emerald-800 hover:opacity-80"
+                  className="inline-flex items-center gap-1 rounded border border-linha bg-cartao px-2 py-0.5 text-xs font-semibold text-tinta hover:border-sinal"
                 >
-                  {codigoOS(o.numero)} · {nomeCliente(o.clienteId)} · {garantia.diasRestantes}d
+                  <span className="valor">{codigoOS(o.numero)}</span> · {nomeCliente(o.clienteId)} ·{" "}
+                  <span className="valor">{garantia.diasRestantes}d</span>
                 </button>
               ))}
             </div>
-            <p className="mt-2 text-xs text-emerald-700">
+            <p className="mt-2 text-xs text-tinta-suave">
               Chamar antes custa uma mensagem e evita o retorno bravo no dia 91.
             </p>
           </div>
@@ -522,10 +523,10 @@ export const OrdensServico: React.FC = () => {
           <button
             key={f}
             onClick={() => setFiltro(f)}
-            className={`chip text-xs capitalize ${
+            className={`chip !rounded text-xs ${
               filtro === f
-                ? "bg-brand-600 text-white"
-                : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                ? "bg-tinta text-cartao"
+                : "border border-linha bg-cartao text-tinta-suave hover:border-tinta-suave"
             }`}
           >
             {f === "abertas" ? "Em aberto" : f === "todas" ? "Todas" : OS_STATUS_META[f as OSStatus].label}
@@ -534,9 +535,9 @@ export const OrdensServico: React.FC = () => {
       </div>
 
       <div className="relative mb-4 max-w-md">
-        <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+        <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-tinta-suave" />
         <input
-          className="input pl-10"
+          className="input !rounded-md !border-linha !bg-cartao pl-10 !text-tinta focus:!border-sinal focus:!ring-sinal/30"
           placeholder="Buscar por cliente, código ou aparelho..."
           value={busca}
           onChange={(e) => setBusca(e.target.value)}
@@ -544,18 +545,36 @@ export const OrdensServico: React.FC = () => {
       </div>
 
       {lista.length === 0 ? (
-        <EmptyState icon={<Wrench size={48} />} title="Nenhuma ordem de serviço" hint="Clique em 'Nova OS' para começar." />
+        // "Bancada vazia" só quando a loja não tem OS nenhuma: com filtro ou
+        // busca, a bancada tem coisa e o texto mentiria.
+        <div className="flex flex-col items-center justify-center rounded-md border-2 border-dashed border-linha py-16 text-center">
+          <Wrench size={44} className="mb-3 text-linha" />
+          <p className="font-semibold text-tinta">
+            {ordens.length === 0 ? "Bancada vazia." : "Nada com esse filtro."}
+          </p>
+          <p className="mt-1 text-sm text-tinta-suave">
+            {ordens.length === 0 ? "Chegou aparelho? Toque em Nova OS." : "Troque o filtro ou apague a busca."}
+          </p>
+        </div>
       ) : (
         <div className="space-y-3">
           {lista.map((o) => (
-            <div key={o.id} className="card linha-card">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
+            <div key={o.id} className="linha-card rounded-md border border-linha bg-cartao p-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-md bg-concreto text-tinta-suave">
                 <Smartphone size={22} />
               </div>
               <div className="linha-card-info">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-xs font-bold text-slate-400">{codigoOS(o.numero)}</span>
-                  <span className={`badge ${OS_STATUS_META[o.status].color}`}>{OS_STATUS_META[o.status].label}</span>
+                  <span className="valor text-xs font-semibold text-tinta-suave">{codigoOS(o.numero)}</span>
+                  {/* Status é fundo cheio, nunca letra colorida no papel: no
+                      modo escuro a letra colorida não passa contraste
+                      (docs/DESIGN.md). As cores de status já são apagadas de
+                      propósito, para dez delas na lista não virarem borrão. */}
+                  <span
+                    className={`inline-flex items-center rounded px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${OS_STATUS_META[o.status].carimbo}`}
+                  >
+                    {OS_STATUS_META[o.status].label}
+                  </span>
                   {(() => {
                     // "Esse conserto ainda está na garantia?" chega toda
                     // semana. A resposta estava em duas telas mais uma conta
@@ -573,7 +592,7 @@ export const OrdensServico: React.FC = () => {
                   })()}
                   {semPagamento(o) && (
                     <button
-                      className="badge bg-amber-100 text-amber-800 hover:bg-amber-200"
+                      className="inline-flex items-center gap-1 rounded bg-status-aprovacao px-2 py-0.5 text-xs font-semibold text-white hover:opacity-90"
                       onClick={() => setDetalhe(o)}
                       title="Nada foi lançado no caixa para esta OS"
                     >
@@ -586,15 +605,21 @@ export const OrdensServico: React.FC = () => {
                     const t = taxaArmazenamento(o, config.taxaArmazenamentoDia || 0, config.diasAbandono || 90);
                     if (t.valor > 0)
                       return (
-                        <span className="badge bg-red-100 text-red-700" title={`${t.diasExcedidos} dia(s) além do prazo`}>
-                          <AlertTriangle size={11} /> Guarda {brl(t.valor)}
+                        <span
+                          className="inline-flex items-center gap-1 rounded bg-status-cancelada px-2 py-0.5 text-xs font-semibold text-white"
+                          title={`${t.diasExcedidos} dia(s) além do prazo`}
+                        >
+                          <AlertTriangle size={11} /> Guarda <span className="valor">{brl(t.valor)}</span>
                         </span>
                       );
                     // O selo de abandono (30/60/90) já diz isto, com mais peso.
                     if (dias >= 15 && !alertaDeAbandono(o))
                       return (
-                        <span className="badge bg-amber-100 text-amber-700" title="Aparelho parado há muito tempo">
-                          <Clock size={11} /> {dias} dias
+                        <span
+                          className="inline-flex items-center gap-1 rounded border border-linha bg-concreto px-2 py-0.5 text-xs font-semibold text-tinta"
+                          title="Aparelho parado há muito tempo"
+                        >
+                          <Clock size={11} /> <span className="valor">{dias}</span> dias
                         </span>
                       );
                     return null;
@@ -603,7 +628,7 @@ export const OrdensServico: React.FC = () => {
                 {/* O `truncate` tem que ficar no TEXTO, não no `p`: num
                     contêiner flex ele não corta nada, e o nome comprido
                     quebrava em pedaços de duas letras por linha. */}
-                <p className="flex items-center gap-1.5 font-bold text-slate-800">
+                <p className="flex items-center gap-1.5 font-bold text-tinta">
                   <span className="truncate">{nomeCliente(o.clienteId)}</span>
                   {classificacaoDe(cliente(o.clienteId)) !== "normal" && (
                     <span
@@ -617,12 +642,12 @@ export const OrdensServico: React.FC = () => {
                     </span>
                   )}
                 </p>
-                <p className="truncate text-sm text-slate-500">
+                <p className="truncate text-sm text-tinta-suave">
                   {o.marca} {o.modelo} · {o.defeitoRelatado}
                 </p>
               </div>
               <div className="linha-card-fim text-right">
-                <p className="font-bold text-slate-800">{brl(totalOS(o))}</p>
+                <p className="valor font-semibold text-tinta">{brl(totalOS(o))}</p>
                 {/*
                   O SINAL PRECISA APARECER AQUI.
 
@@ -639,21 +664,22 @@ export const OrdensServico: React.FC = () => {
                   const resta = faltaNaOS(totalOS(o), movimentos, o.id);
                   if (recebido <= 0 || resta <= 0) return null;
                   return (
-                    <p className="text-xs font-semibold text-amber-700">
-                      Sinal de {brl(recebido)} · faltam {brl(resta)}
+                    <p className="text-xs font-semibold text-sinal">
+                      Sinal de <span className="valor">{brl(recebido)}</span> · faltam{" "}
+                      <span className="valor">{brl(resta)}</span>
                     </p>
                   );
                 })()}
-                <p className="text-xs text-slate-400">{formatDateTime(o.atualizadoEm)}</p>
+                <p className="valor text-xs text-tinta-suave">{formatDateTime(o.atualizadoEm)}</p>
               </div>
               <div className="linha-card-fim ml-auto flex gap-1.5">
-                <button className="btn-ghost !p-2" title="Detalhes" onClick={() => setDetalhe(o)}>
+                <button className="btn-ghost !p-2 !text-tinta-suave hover:!bg-concreto" title="Detalhes" onClick={() => setDetalhe(o)}>
                   <Eye size={16} />
                 </button>
-                <button className="btn-ghost !p-2" title="Avisar cliente" onClick={() => avisarCliente(o)}>
+                <button className="btn-ghost !p-2 hover:!bg-concreto" title="Avisar cliente" onClick={() => avisarCliente(o)}>
                   <MessageCircle size={16} className="text-emerald-600" />
                 </button>
-                <button className="btn-ghost !p-2" title="Editar" onClick={() => setEditando(o)}>
+                <button className="btn-ghost !p-2 !text-tinta-suave hover:!bg-concreto" title="Editar" onClick={() => setEditando(o)}>
                   <Pencil size={16} />
                 </button>
               </div>
@@ -2174,41 +2200,50 @@ export const OSDetalhe: React.FC<{
 
         <div className="flex items-center justify-between">
           {/*
-            Aqui a OS está sozinha na tela, então a situação vai em cor cheia
-            — o crachá pálido serve para a lista, onde dez cores fortes viram
-            um borrão. No papel volta a fundo branco: cor cheia sai como uma
-            tarja cinza com letra branca por cima, ilegível.
+            Estado final (pronto, entregue, cancelado) sai como carimbo, torto
+            e com contorno duplo: é a única coisa da tela que grita. O resto
+            vai em fundo cheio sem girar — carimbo em tudo vira bagunça.
+            No papel volta a fundo branco: cor cheia sai como uma tarja cinza
+            com letra branca por cima, ilegível.
           */}
           <span
-            className={`badge text-sm print:border print:border-slate-300 print:bg-white print:text-black ${OS_STATUS_META[os.status].forte}`}
+            className={`${
+              ["pronta", "entregue", "cancelada"].includes(os.status)
+                ? "carimbo my-2 ml-2 !px-3 !py-1 text-base"
+                : "inline-flex rounded px-3 py-1 text-sm font-bold uppercase tracking-wide"
+            } ${OS_STATUS_META[os.status].carimbo} print:rotate-0 print:border print:border-slate-300 print:bg-white print:text-black print:outline-none`}
           >
             {OS_STATUS_META[os.status].label}
           </span>
-          <span className="text-sm text-slate-400">Aberta em {formatDateTime(os.criadoEm)}</span>
+          <span className="text-sm text-tinta-suave">
+            Aberta em <span className="valor">{formatDateTime(os.criadoEm)}</span>
+          </span>
         </div>
 
         {/* Etiqueta com QR Code de acompanhamento */}
-        <div className="flex items-center gap-3 rounded-xl bg-slate-50 p-3">
-          <div className="shrink-0 rounded bg-white p-1.5 ring-1 ring-slate-200">
+        <div className="flex items-center gap-3 rounded-md border border-dashed border-linha bg-concreto p-3">
+          <div className="shrink-0 rounded bg-white p-1.5 ring-1 ring-linha">
             <QRCodeImg text={trackingUrl} size={84} />
           </div>
-          <div className="text-xs text-slate-500">
-            <p className="text-sm font-bold text-slate-700">Etiqueta de acompanhamento</p>
-            <p>Cole no aparelho — o cliente escaneia e vê o status da OS.</p>
-            <p className="mt-1 font-mono font-bold text-slate-600">{codigoOS(os.numero)}</p>
+          <div className="text-xs text-tinta-suave">
+            <p className="text-sm font-bold text-tinta">Etiqueta de acompanhamento</p>
+            <p>Cola no aparelho. O cliente aponta a câmera e vê como tá o conserto.</p>
+            <p className="valor mt-1 text-sm font-semibold text-tinta">{codigoOS(os.numero)}</p>
           </div>
         </div>
 
         {/* Alterar status */}
         <div className="no-print">
-          <label className="label">Alterar estado do equipamento</label>
+          <p className="rotulo mb-1">Mudar a situação</p>
           <div className="flex flex-wrap gap-1.5">
             {STATUS_LIST.map((s) => (
               <button
                 key={s}
                 onClick={() => onStatus(s)}
-                className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${
-                  os.status === s ? "bg-brand-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                className={`min-h-[2.25rem] rounded px-2.5 py-1 text-xs font-semibold transition sm:min-h-0 ${
+                  os.status === s
+                    ? OS_STATUS_META[s].carimbo
+                    : "border border-linha bg-cartao text-tinta-suave hover:border-tinta-suave"
                 }`}
               >
                 {OS_STATUS_META[s].label}
@@ -2469,9 +2504,9 @@ export const OSDetalhe: React.FC<{
           <Linha label="Mão de obra" value={brl(os.maoDeObra)} />
           {os.desconto > 0 && <Linha label="Desconto" value={`- ${brl(os.desconto)}`} />}
           {guarda > 0 && <Linha label="Taxa de guarda" value={brl(guarda)} />}
-          <div className="flex justify-between border-t pt-1 text-base font-bold">
+          <div className="flex justify-between border-t border-dashed border-linha pt-1 text-base font-bold text-tinta">
             <span>Total</span>
-            <span>{brl(aCobrar)}</span>
+            <span className="valor">{brl(aCobrar)}</span>
           </div>
         </div>
 
@@ -2925,13 +2960,13 @@ const QRCodeImg: React.FC<{ text: string; size?: number }> = ({ text, size = 84 
 
 const Info: React.FC<{ label: string; value: string }> = ({ label, value }) => (
   <div>
-    <p className="text-xs font-semibold uppercase text-slate-400">{label}</p>
-    <p className="text-sm text-slate-800">{value}</p>
+    <p className="rotulo">{label}</p>
+    <p className="text-sm text-tinta">{value}</p>
   </div>
 );
 const Linha: React.FC<{ label: string; value: string }> = ({ label, value }) => (
-  <div className="flex justify-between text-slate-600">
+  <div className="flex justify-between text-tinta-suave">
     <span>{label}</span>
-    <span>{value}</span>
+    <span className="valor">{value}</span>
   </div>
 );
