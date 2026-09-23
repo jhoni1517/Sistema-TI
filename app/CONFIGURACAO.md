@@ -70,7 +70,7 @@ Variables**. Marque **Production**, **Preview** e **Development** em todas.
 | `TELEGRAM_TOKEN` | Robô do Telegram | Nenhuma notificação chega no celular |
 | `TELEGRAM_CHAT_ID` | Seu chat, **só para a cobrança de mensalidade** | Você não recebe o resumo de quem está devendo |
 | `PIX_CHAVE_CRIPTO` | Cifra o token do Mercado Pago de cada loja (32 bytes em base64; gere no SQL do Supabase com `select encode(gen_random_bytes(32), 'base64');`) | "Ligar Pix pelo link" recusa gravar o token. **Trocar esta chave invalida os tokens já gravados**: cada loja cola o dela de novo |
-| `GEMINI_API_KEY` | IA: nota por foto, sugestão de diagnóstico e OS por voz (crie em aistudio.google.com → Get API key) | Os três botões de IA respondem "Falta GEMINI_API_KEY" e não gastam crédito |
+| `GEMINI_API_KEY` | IA: nota por foto, sugestão de diagnóstico e OS por voz (crie em aistudio.google.com → Get API key) | Os botões de IA não aparecem (a sugestão pelo histórico continua). Com a chave, eles aparecem sozinhos. Criando a chave SEM cadastrar cartão no Google, fica no plano grátis e não tem como cobrar |
 | `GEMINI_MODELO` (opcional) | Troca o modelo do Gemini. Padrão: `gemini-2.5-flash-lite` | Nada: usa o padrão |
 | `SITE_URL` (opcional) | Endereço do site para o aviso de pagamento do Mercado Pago | Nada: sem ela usa o endereço de quem chamou |
 
@@ -176,13 +176,12 @@ https://supabase.com/dashboard/project/nviagibefxqtognowqwe/sql/new:
 25. `supabase-migracao-rastreio-delivery.sql`
 26. `supabase-migracao-pix-os.sql`
 27. `supabase-migracao-ia.sql`
-28. `supabase-migracao-whatsapp-os.sql`
-29. `supabase-corrigir-colunas.sql`
+28. `supabase-corrigir-colunas.sql`
 
 Quem já rodou o de número 18 antes da nota na ordem de serviço precisa
 rodá-lo **de novo**: ele ganhou a coluna `osId`, que é o que liga a nota à
 OS. Sem ela a primeira nota de OS não é gravada e fica pendente para sempre.
-Rodar de novo não quebra nada — o arquivo é repetível. O de número 29
+Rodar de novo não quebra nada — o arquivo é repetível. O de número 28
 também põe a coluna, se for mais fácil rodar só ele.
 
 `supabase-conta-teste.sql` fica de fora da ordem de propósito: ele cria uma

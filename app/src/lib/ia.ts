@@ -12,6 +12,31 @@ import { PLANO_META, planoDe, type RecursoIA } from "./planos";
  * (leitura-nota, sugestao, voz-os), com teste — e nada é gravado sem a
  * pessoa revisar na tela.
  */
+/**
+ * A IA está ligada nesta instalação? Liga sozinha quando existe
+ * GEMINI_API_KEY na Vercel — quem responde é o servidor, uma vez por
+ * abertura do sistema.
+ *
+ * Sem chave, os botões de IA NEM APARECEM: botão que existe e responde
+ * "falta chave" é botão quebrado na frente do cliente. Falha de rede na
+ * pergunta também esconde (o lado seguro), e a próxima abertura pergunta
+ * de novo. A sugestão pelo histórico da loja não depende disto: é conta
+ * feita no navegador.
+ */
+let consulta: Promise<boolean> | null = null;
+export function iaLigada(): Promise<boolean> {
+  if (!consulta) {
+    consulta = fetch("/api/ia?acao=status")
+      .then((r) => (r.ok ? r.json() : { ligada: false }))
+      .then((d) => d?.ligada === true)
+      .catch(() => {
+        consulta = null;
+        return false;
+      });
+  }
+  return consulta;
+}
+
 export interface RespostaIA {
   bruto: string;
   usados: number;

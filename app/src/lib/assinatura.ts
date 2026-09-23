@@ -28,7 +28,7 @@ export interface Loja {
    * troca vinda da própria loja.
    */
   ramo?: string | null;
-  /** O que a loja comprou: decide limite de IA e WhatsApp automático. Ver lib/planos.ts. */
+  /** O que a loja comprou: decide o limite de IA. Ver lib/planos.ts. */
   plano?: string | null;
   ultimoPagamento?: string | null;
   criadoEm?: string | null;

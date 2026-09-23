@@ -4,9 +4,8 @@ import { txt } from "./format";
  * O que cada plano inclui.
  *
  * `lojas.plano` existia desde a primeira migração ("essencial") e nada lia.
- * Agora ele decide duas coisas que custam dinheiro por uso — a IA (cada
- * leitura é uma chamada paga ao Gemini) e o WhatsApp automático (cada
- * mensagem é cobrada pela Meta).
+ * Agora ele decide o que custa dinheiro por uso: a IA, onde cada leitura é
+ * uma chamada paga ao Gemini.
  *
  * Quem muda o plano é o administrador do sistema, na tela Lojas; um gatilho
  * no banco recusa a troca vinda da própria loja (supabase-migracao-ia.sql),
@@ -23,17 +22,15 @@ export const PLANOS: Plano[] = ["essencial", "completo"];
 
 export const PLANO_META: Record<
   Plano,
-  { label: string; limitesIA: Record<RecursoIA, number>; whatsappAutomatico: boolean }
+  { label: string; limitesIA: Record<RecursoIA, number> }
 > = {
   essencial: {
     label: "Essencial",
     limitesIA: { nota: 20, diagnostico: 30, voz: 30 },
-    whatsappAutomatico: false,
   },
   completo: {
     label: "Completo",
     limitesIA: { nota: 200, diagnostico: 300, voz: 300 },
-    whatsappAutomatico: true,
   },
 };
 

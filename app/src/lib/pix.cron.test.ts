@@ -106,7 +106,7 @@ describe("o valor do Pix é o mesmo da tela", () => {
 /* ------------------------------------------------------------------ */
 
 describe("o token da loja fica cifrado", () => {
-  // O cofre saiu de pix.js para api/_cofre.js, que o WhatsApp também usa.
+  // O cofre saiu de pix.js para api/_cofre.js, para a próxima credencial usar o mesmo.
   const fonteCofre = readFileSync(resolve(__dirname, "..", "..", "api", "_cofre.js"), "utf8").replace(
     /export function/g,
     "function"

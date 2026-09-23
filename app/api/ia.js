@@ -63,6 +63,13 @@ const INSTRUCAO_VOZ =
 
 export default async function handler(req, res) {
   const acao = String(req.query?.acao || "");
+  // A tela pergunta se mostra os botões de IA. Só "sim" ou "não": a chave
+  // nunca sai daqui. Sem chave na Vercel, os botões nem aparecem — botão
+  // que existe e responde "falta chave" é botão quebrado na frente do
+  // cliente.
+  if (acao === "status") {
+    return res.status(200).json({ ligada: Boolean(process.env.GEMINI_API_KEY) });
+  }
   try {
     if (acao === "ler-nota") {
       return await atenderIA(req, res, "nota", (b) => {

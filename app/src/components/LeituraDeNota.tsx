@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState } from "react";
 import { Camera, Check, X, AlertTriangle } from "lucide-react";
 import { aviso } from "./Aviso";
+import { useIaLigada } from "./useIaLigada";
 import { InputNumero } from "./ui";
 import { brl } from "../lib/format";
 import { prepararImagem } from "../lib/imagens";
@@ -31,6 +32,7 @@ export const LeituraDeNota: React.FC<{
   const [nota, setNota] = useState<NotaLida | null>(null);
   const [linhas, setLinhas] = useState<ItemCasado[]>([]);
   const [uso, setUso] = useState("");
+  const ligada = useIaLigada();
 
   const usaveis = useMemo(
     () => produtos.filter((p) => !p.servico).sort((a, b) => a.nome.localeCompare(b.nome)),
@@ -64,6 +66,9 @@ export const LeituraDeNota: React.FC<{
   /** As opções do seletor: as mais parecidas primeiro, depois o resto */
   const opcoesPara = (descricao: string) =>
     [...usaveis].sort((a, b) => parecenca(descricao, b.nome) - parecenca(descricao, a.nome)).slice(0, 30);
+
+  // IA desligada: a entrada volta a ser a de sempre, por busca.
+  if (!ligada) return null;
 
   if (!nota) {
     return (

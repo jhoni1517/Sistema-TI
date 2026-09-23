@@ -48,3 +48,26 @@ describe("teto de funções da Vercel", () => {
     expect(funcoes.length, funcoes.join(", ")).toBeLessThanOrEqual(12);
   });
 });
+
+/**
+ * A IA custa por chamada, e nasce DESLIGADA. Cada tela que chama a IA tem
+ * que perguntar antes — senão aparece um botão que gasta dinheiro (ou
+ * responde "falta chave") numa loja que nunca pediu IA.
+ */
+describe("a IA só aparece ligada", () => {
+  it("o servidor diz ligada só com a chave, e nunca devolve a chave", () => {
+    const ia = readFileSync(resolve(api, "ia.js"), "utf8");
+    expect(ia).toContain("ligada: Boolean(process.env.GEMINI_API_KEY)");
+    // Só o booleano sai: a chave em si nunca vai para a resposta.
+    expect(ia).not.toMatch(/:\s*process\.env\.GEMINI_API_KEY\s*[,}]/);
+  });
+
+  const telas = ["LeituraDeNota.tsx", "SugestaoDaOS.tsx", "OSPorVoz.tsx"];
+  for (const t of telas) {
+    it(`${t} pergunta ao servidor se a IA está ligada antes de mostrar o botão`, () => {
+      const fonte = readFileSync(resolve(__dirname, "..", "components", t), "utf8");
+      expect(fonte).toContain("useIaLigada()");
+      expect(fonte).toMatch(/!ligada|ligada &&/);
+    });
+  }
+});

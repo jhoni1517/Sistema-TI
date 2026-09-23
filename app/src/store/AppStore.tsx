@@ -13,7 +13,6 @@ import { supabase } from "../lib/supabase";
 import { tamanhoDaFila } from "../lib/fila";
 import { paraNuvem, precisaGravarNaNuvem } from "../lib/config";
 import { aviso } from "../components/Aviso";
-import { avisarPorWhatsapp, recadoDoAviso } from "../lib/whatsapp-envio";
 import { aplicarTema } from "../lib/themes";
 import {
   ramoDe,
@@ -470,24 +469,10 @@ export const AppProvider: React.FC<{
   };
 
   const saveOrdem = async (o: OrdemServico) => {
-    const statusAntes = ordens.find((x) => x.id === o.id)?.status;
     // `gravado` e não `o`: o banco preenche colunas que a tela não tem
     // como saber (o segredo do rastreio é uma), e guardar o objeto que
     // subiu deixaria a tela sem elas até o próximo F5.
     const gravado = await db.ordens.save(o);
-    /*
-     * WhatsApp automático (plano completo): TODA mudança de status passa por
-     * aqui — seletor, entrega, OS nova —, e é por isso que o aviso mora aqui
-     * e não em cada botão. Sem await: a OS já está gravada, e o aviso é
-     * extra; a gravação não espera nem falha por causa dele.
-     */
-    if (gravado.status !== statusAntes) {
-      avisarPorWhatsapp(gravado.id, gravado.status).then((r) => {
-        const recado = recadoDoAviso(r);
-        if (recado.tipo === "sucesso") aviso.sucesso(recado.texto);
-        else if (recado.tipo === "alerta") aviso.alerta(recado.texto);
-      });
-    }
     setOrdens((prev) => {
       const i = prev.findIndex((x) => x.id === gravado.id);
       if (i >= 0) {
