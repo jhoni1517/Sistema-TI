@@ -89,6 +89,9 @@ alter table ordens add column if not exists "videosLaudo" jsonb default '[]'::js
 alter table ordens add column if not exists "previsaoEntrega" text;
 -- Retorno em garantia: liga o prazo de 30 dias do CDC (lib/prazos.ts).
 alter table ordens add column if not exists "retornoGarantia" boolean default false;
+-- Quando pedimos avaliação no Google ao cliente: segura o próximo pedido
+-- por 90 dias (lib/avaliacao.ts).
+alter table clientes add column if not exists "avaliacaoPedidaEm" text;
 -- Placa do motor, no ramo de motores e bombas. Texto e não número: "3/4 cv"
 -- e "220/380V" é como está escrito na plaqueta, e obrigar a converter faria
 -- o atendente arredondar de cabeça na frente do cliente.

@@ -1,4 +1,5 @@
 import { brl, codigoOS, negrito, txt } from "./format";
+import { avaliacaoRecente } from "./avaliacao";
 import { avisoDeFotoNaMensagem } from "./fotos-laudo";
 import { totalOS, totalPecas, totalComOpcao } from "./calc";
 import {
@@ -212,9 +213,12 @@ export function ondeRetirar(o: OrdemServico, config: Config): string {
  * Sem emoji: em alguns aparelhos elas chegam como "?" e sujam justamente a
  * mensagem que deveria causar boa impressão.
  */
-export function pedidoDeAvaliacao(o: OrdemServico, config: Config): string {
+export function pedidoDeAvaliacao(o: OrdemServico, config: Config, cliente?: Cliente): string {
   const link = txt(config.linkAvaliacao).trim();
   if (!link || o.status !== "entregue") return "";
+  // Já pedimos a esta pessoa há pouco: o convite repetido na mensagem de
+  // entrega cansa do mesmo jeito que o botão. Ver lib/avaliacao.ts.
+  if (avaliacaoRecente(cliente)) return "";
   const loja = txt(config.nomeLoja).trim() || "nossa loja";
   return (
     `Seu feedback é importante para a ${loja}. ` +
@@ -301,7 +305,7 @@ export function mensagemCliente(
   // Pedido de avaliação só na entrega. Pedir estrela antes de o serviço
   // terminar é pedir no pior momento, e nota ruim colhida no meio do caminho
   // fica lá para sempre.
-  const avaliacao = pedidoDeAvaliacao(o, config);
+  const avaliacao = pedidoDeAvaliacao(o, config, cliente);
   if (avaliacao) partes.push(avaliacao);
 
   return partes.filter(Boolean).join("\n\n");

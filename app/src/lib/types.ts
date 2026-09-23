@@ -157,6 +157,11 @@ export interface Cliente {
   /** Aniversário (AAAA-MM-DD). O ano pode ser qualquer um: só o dia importa. */
   nascimento?: string;
   /**
+   * Quando pedimos avaliação no Google a esta pessoa (AAAA-MM-DD).
+   * Segura o próximo pedido por 90 dias — ver lib/avaliacao.ts.
+   */
+  avaliacaoPedidaEm?: string;
+  /**
    * Teto do fiado deste cliente. Vazio = sem teto.
    *
    * "Fio pra você" é decisão de dono, tomada uma vez. Sem o teto no sistema,

@@ -9,6 +9,7 @@ import {
   Pencil,
   Trash2,
   MessageCircle,
+  Star,
   Printer,
   Smartphone,
   KeyRound,
@@ -143,6 +144,8 @@ import {
   garantiasVencendo,
 } from "../lib/garantia";
 import { alertaDeAbandono, mensagemDeAbandono, prazoDoConserto } from "../lib/prazos";
+import { podePedirAvaliacao, mensagemPedidoAvaliacao } from "../lib/avaliacao";
+import { hojeISO } from "../lib/contas";
 import { SeloPrazo } from "../components/SeloPrazo";
 
 
@@ -1962,8 +1965,32 @@ export const OSDetalhe: React.FC<{
 }> = ({ os, clienteNome, cliente, config, onClose, onStatus, onAvisar, onEditar, onExcluir, onReceber, onFiado, pagamentoRegistrado, historicoAparelho, registrando }) => {
   // `movimentos` vem do store porque é lá que o dinheiro da OS mora: um
   // campo separado começaria a divergir do caixa no primeiro estorno.
-  const { ramo, movimentos } = useApp();
+  const { ramo, movimentos, clientes, saveCliente } = useApp();
   const voc = vocabulario(ramo);
+  /** O cadastro inteiro: é nele que fica anotado quando pedimos avaliação */
+  const clienteCompleto = (clientes || []).find((c) => c.id === os.clienteId);
+  const avaliacao = podePedirAvaliacao(os, clienteCompleto, config);
+  const [pedindoAvaliacao, setPedindoAvaliacao] = useState(false);
+  /**
+   * Abre o WhatsApp ANTES de gravar: janela aberta depois de um `await` é
+   * bloqueada no iPhone, e o botão pareceria morto. Se a anotação falhar,
+   * a tela diz — senão a pessoa pede de novo na semana que vem.
+   */
+  const pedirAvaliacao = async () => {
+    if (!clienteCompleto || !avaliacao.pode || pedindoAvaliacao) return;
+    abrirWhatsapp(txt(clienteCompleto.telefone), mensagemPedidoAvaliacao(os, clienteCompleto, config));
+    setPedindoAvaliacao(true);
+    try {
+      await saveCliente({ ...clienteCompleto, avaliacaoPedidaEm: hojeISO() });
+    } catch (e) {
+      aviso.erro(
+        "A mensagem abriu, mas não ficou anotado que o pedido foi feito:\n\n" +
+          (e instanceof Error ? e.message : String(e))
+      );
+    } finally {
+      setPedindoAvaliacao(false);
+    }
+  };
   const [forma, setForma] = useState<FormaPagamento>("dinheiro");
   const [parcelas, setParcelas] = useState<Parcela[]>([]);
   const [dividido, setDividido] = useState(false);
@@ -2213,6 +2240,24 @@ export const OSDetalhe: React.FC<{
             </div>
           );
         })()}
+
+        {/* Avaliação no Google: só entregue, e uma vez a cada 90 dias por
+            pessoa. O motivo de não poder aparece escrito — botão cinza sem
+            explicação parece sistema travado. */}
+        {os.status === "entregue" && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-3 no-print">
+            <span className="min-w-0 flex-1 text-sm text-slate-600">
+              {avaliacao.pode ? "Cliente satisfeito é a hora de pedir estrela." : avaliacao.motivo}
+            </span>
+            <button
+              className="btn-secondary !py-1.5 text-xs"
+              disabled={!avaliacao.pode || pedindoAvaliacao}
+              onClick={pedirAvaliacao}
+            >
+              <Star size={14} /> Pedir avaliação
+            </button>
+          </div>
+        )}
 
         {/* Prazos: retorno em garantia (30 dias do CDC) e aparelho parado.
             O aviso de abandono já sai com a mensagem pronta — é o registro
