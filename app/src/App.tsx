@@ -25,6 +25,7 @@ import { Rastreio } from "./pages/Rastreio";
 import { PainelBancada } from "./pages/PainelBancada";
 import { Catalogo } from "./pages/Catalogo";
 import { AreaCliente } from "./pages/AreaCliente";
+import { CadastroCliente } from "./pages/CadastroCliente";
 import { SemPerfil } from "./pages/SemPerfil";
 import { Lojas } from "./pages/Lojas";
 import { Assinatura } from "./pages/Assinatura";
@@ -174,6 +175,8 @@ const App: React.FC = () => (
       {/* Área do cliente: CPF e senha que o cliente cria. Não é usuário do
           sistema; quem confere tudo são as funções do banco. */}
       <Route path="/cliente/:loja" element={<AreaCliente />} />
+      {/* Só o formulário: o cadastro cai na lista da loja, sem senha */}
+      <Route path="/cadastro/:loja" element={<CadastroCliente />} />
       <Route path="/*" element={<AreaProtegida />} />
     </Routes>
   </HashRouter>

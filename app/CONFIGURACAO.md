@@ -177,12 +177,13 @@ https://supabase.com/dashboard/project/nviagibefxqtognowqwe/sql/new:
 26. `supabase-migracao-pix-os.sql`
 27. `supabase-migracao-ia.sql`
 28. `supabase-migracao-area-cliente.sql`
-29. `supabase-corrigir-colunas.sql`
+29. `supabase-migracao-cadastro-link.sql`
+30. `supabase-corrigir-colunas.sql`
 
 Quem já rodou o de número 18 antes da nota na ordem de serviço precisa
 rodá-lo **de novo**: ele ganhou a coluna `osId`, que é o que liga a nota à
 OS. Sem ela a primeira nota de OS não é gravada e fica pendente para sempre.
-Rodar de novo não quebra nada — o arquivo é repetível. O de número 29
+Rodar de novo não quebra nada — o arquivo é repetível. O de número 30
 também põe a coluna, se for mais fácil rodar só ele.
 
 `supabase-conta-teste.sql` fica de fora da ordem de propósito: ele cria uma

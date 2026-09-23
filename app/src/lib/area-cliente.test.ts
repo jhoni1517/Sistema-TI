@@ -139,3 +139,24 @@ describe("as travas do banco", () => {
     expect(sql).not.toMatch(/gerar_acesso_cliente\(text\) to anon/);
   });
 });
+
+describe("só o formulário", () => {
+  it("link e recado", async () => {
+    const { linkDeCadastro, mensagemDeFormulario } = await import("./area-cliente");
+    expect(linkDeCadastro("https://x.app/", "abc")).toBe("https://x.app/#/cadastro/abc");
+    expect(linkDeCadastro("https://x.app/", "")).toBe("");
+    expect(mensagemDeFormulario("Loja X", "https://l")).toContain("https://l");
+  });
+  it("valida sem pedir senha, e-mail só se preenchido", async () => {
+    const { erroDoFormulario } = await import("./area-cliente");
+    const f = { nome: "Maria Silva", cpf: "52998224725", telefone: "11999998888", nascimento: "1990-02-10", email: "", endereco: "" };
+    expect(erroDoFormulario(f, "2026-09-23")).toBe("");
+    expect(erroDoFormulario({ ...f, email: "maria@" }, "2026-09-23")).toMatch(/e-mail/);
+    expect(erroDoFormulario({ ...f, email: "maria@x.com" }, "2026-09-23")).toBe("");
+  });
+  it("as duas portas usam a mesma trava no banco", () => {
+    const sql = readFileSync(new URL("../../supabase-migracao-cadastro-link.sql", import.meta.url), "utf8");
+    expect(sql.match(/r := _cliente_pelo_link\(/g)?.length).toBe(2);
+    expect(sql).toMatch(/revoke all on function _cliente_pelo_link[^;]*anon/);
+  });
+});

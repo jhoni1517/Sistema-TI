@@ -4,7 +4,14 @@ import { Plus, Search, Pencil, Trash2, Users, Phone, MessageCircle, Wrench, User
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { db, obterLoja } from "../lib/db";
-import { linkDaArea, linkDeAcesso, mensagemDeAcesso, mensagemDeCadastro } from "../lib/area-cliente";
+import {
+  linkDaArea,
+  linkDeAcesso,
+  linkDeCadastro,
+  mensagemDeAcesso,
+  mensagemDeCadastro,
+  mensagemDeFormulario,
+} from "../lib/area-cliente";
 import { abrirWhatsapp, uid, nowISO, whatsappLink, formatDate, brl, txt, mascaraDocumento, soDigitos, documentoValido } from "../lib/format";
 import { normalizar } from "../lib/busca";
 import { avaliarCliente, classificacaoDe, travaFiado, devendo } from "../lib/clientes";
@@ -42,19 +49,31 @@ export const Clientes: React.FC = () => {
   const temOS = temModulo(ramo, "os");
 
   /**
-   * Link para o próprio cliente se cadastrar. Sem número, o WhatsApp abre a
-   * lista de contatos com o texto pronto: é só escolher a pessoa.
+   * Link para o próprio cliente se cadastrar. Dois jeitos: só o formulário
+   * (cai na lista, sem senha) ou o cadastro da área do cliente (com senha,
+   * para acompanhar os consertos). Sem número, o WhatsApp abre a lista de
+   * contatos com o texto pronto: é só escolher a pessoa.
    */
-  const mandarCadastro = async (telefone: string) => {
+  const [linkPara, setLinkPara] = useState<{ telefone: string } | null>(null);
+  const mandarCadastro = (telefone: string) => setLinkPara({ telefone: txt(telefone) });
+  const enviarLink = async (tipo: "formulario" | "area") => {
+    const telefone = linkPara?.telefone || "";
     try {
       if (!(await db.loja.areaClienteAtiva())) {
         return aviso.alerta(
           "A Área do cliente está desligada. Ligue em Configurações > Área do cliente e tente de novo."
         );
       }
-      const link = linkDaArea(`${window.location.origin}${window.location.pathname}`, obterLoja());
+      const origem = `${window.location.origin}${window.location.pathname}`;
+      const link = tipo === "formulario" ? linkDeCadastro(origem, obterLoja()) : linkDaArea(origem, obterLoja());
       if (!link) throw new Error("Entre de novo no sistema para gerar o link.");
-      abrirWhatsapp(txt(telefone), mensagemDeCadastro(config.nomeLoja, link));
+      abrirWhatsapp(
+        telefone,
+        tipo === "formulario"
+          ? mensagemDeFormulario(config.nomeLoja, link)
+          : mensagemDeCadastro(config.nomeLoja, link)
+      );
+      setLinkPara(null);
     } catch (e) {
       aviso.erro("Não deu para mandar o link:\n\n" + (e instanceof Error ? e.message : String(e)));
     }
@@ -190,6 +209,30 @@ export const Clientes: React.FC = () => {
       />
 
       {relacionamento && <Relacionamento onClose={() => setRelacionamento(false)} />}
+
+      <Modal open={!!linkPara} onClose={() => setLinkPara(null)} title="Mandar link de cadastro">
+        <div className="space-y-2">
+          <p className="text-sm text-slate-500">
+            {linkPara?.telefone ? "Vai para o WhatsApp digitado." : "O WhatsApp abre para você escolher o contato."}
+          </p>
+          <button type="button" className="btn-secondary w-full !justify-start !py-3 text-left" onClick={() => enviarLink("formulario")}>
+            <span>
+              <b className="block">Só o cadastro</b>
+              <span className="text-xs font-normal text-slate-500">
+                O cliente preenche e aparece aqui na lista de clientes. Sem senha.
+              </span>
+            </span>
+          </button>
+          <button type="button" className="btn-secondary w-full !justify-start !py-3 text-left" onClick={() => enviarLink("area")}>
+            <span>
+              <b className="block">Cadastro + Área do cliente</b>
+              <span className="text-xs font-normal text-slate-500">
+                Ele cria uma senha e acompanha os consertos pelo celular.
+              </span>
+            </span>
+          </button>
+        </div>
+      </Modal>
 
       <div className="mb-4 flex flex-wrap gap-2">
         {(["todos", "normal", "atencao", "bloqueado"] as const).map((f) => (

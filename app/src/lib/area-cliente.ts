@@ -119,6 +119,15 @@ export const linkDaArea = (origem: string, loja: string | null | undefined): str
   return l ? `${origem}#/cliente/${encodeURIComponent(l)}` : "";
 };
 
+/**
+ * Link só do formulário: o cliente preenche e o cadastro cai na lista da
+ * loja, sem senha e sem área. É o "preenche aqui que eu já te cadastro".
+ */
+export const linkDeCadastro = (origem: string, loja: string | null | undefined): string => {
+  const l = txt(loja).trim();
+  return l ? `${origem}#/cadastro/${encodeURIComponent(l)}` : "";
+};
+
 /** Link pessoal para criar a senha. Vale 48 horas e uma vez só (no banco). */
 export const linkDeAcesso = (origem: string, loja: string | null | undefined, token: string): string => {
   const base = linkDaArea(origem, loja);
@@ -145,12 +154,22 @@ export function mensagemDeAcesso(nomeCliente: string, nomeLoja: string, link: st
   ].join("\n");
 }
 
-/** Recado com o link de cadastro, para a loja mandar a quem ainda não é cliente */
+/** Recado com o link da área (cadastro com senha) */
 export function mensagemDeCadastro(nomeLoja: string, link: string): string {
   return [
     `Oi! Aqui é da ${txt(nomeLoja).trim() || "loja"}.`,
     "",
     "Faça seu cadastro por este link e acompanhe seus consertos pelo celular:",
+    link,
+  ].join("\n");
+}
+
+/** Recado com o link só do formulário */
+export function mensagemDeFormulario(nomeLoja: string, link: string): string {
+  return [
+    `Oi! Aqui é da ${txt(nomeLoja).trim() || "loja"}.`,
+    "",
+    "Para adiantar seu atendimento, preencha seu cadastro por este link. Leva um minuto:",
     link,
   ].join("\n");
 }
@@ -179,6 +198,22 @@ export function erroDaSenha(senha: string, confirmacao: string): string {
   if (txt(senha).length < MINIMO_SENHA) return `A senha precisa de pelo menos ${MINIMO_SENHA} caracteres.`;
   if (senha !== confirmacao) return "As duas senhas não estão iguais.";
   return "";
+}
+
+export interface FormularioDoCliente {
+  nome: string;
+  cpf: string;
+  telefone: string;
+  nascimento: string;
+  email: string;
+  endereco: string;
+}
+
+/** O que está errado no formulário sem senha, ou vazio */
+export function erroDoFormulario(c: FormularioDoCliente, hoje: string): string {
+  const email = txt(c.email).trim();
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return "Confira o e-mail.";
+  return erroDoCadastro({ ...c, senha: "xxxxxx", confirmacao: "xxxxxx" }, hoje);
 }
 
 /**
