@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Mic, Square, UserPlus } from "lucide-react";
 import { aviso } from "./Aviso";
 import { useApp } from "../store/AppStore";
-import { perguntarIA, paraBase64, usoDoMes } from "../lib/ia";
+import { perguntarIA, paraBase64, usoDoMes, iaLigada } from "../lib/ia";
 import { lerOSPorVoz, clienteDaVoz, preencherPelaVoz, type OSPorVoz as Ditado } from "../lib/voz-os";
 import { uid, nowISO } from "../lib/format";
 import type { Cliente, OrdemServico } from "../lib/types";
@@ -47,7 +47,8 @@ export const OSPorVoz: React.FC<{
   );
 
   const suportado = typeof window !== "undefined" && "MediaRecorder" in window && !!navigator.mediaDevices;
-  if (!suportado) return null;
+  // IA desligada: cada áudio seria uma chamada paga ao Gemini.
+  if (!suportado || !iaLigada()) return null;
 
   const enviar = async (audio: Blob) => {
     setOuvindo(true);

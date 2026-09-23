@@ -21,7 +21,6 @@ import { importarTudo, type DumpLoja } from "../lib/db";
 import { problemaNoChatId } from "../lib/config";
 import { CatalogoPublico, TituloCatalogo } from "../components/CatalogoPublico";
 import { CredencialPix } from "../components/CredencialPix";
-import { CredencialWhatsapp } from "../components/CredencialWhatsapp";
 import { CredencialFiscal } from "../components/CredencialFiscal";
 import type { Config as ConfigType } from "../lib/types";
 
@@ -359,7 +358,6 @@ export const Config: React.FC = () => {
 
       {/* Pix pelo link: só onde existe OS com link de acompanhamento */}
       {temModulo(ramoContratado, "os") && <CredencialPix />}
-      {temModulo(ramoContratado, "os") && <CredencialWhatsapp />}
 
       {/* Termos do recibo */}
       <div className="card mb-5">

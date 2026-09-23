@@ -4,7 +4,7 @@ import { aviso } from "./Aviso";
 import { InputNumero } from "./ui";
 import { brl } from "../lib/format";
 import { prepararImagem } from "../lib/imagens";
-import { perguntarIA, paraBase64, usoDoMes } from "../lib/ia";
+import { perguntarIA, paraBase64, usoDoMes, iaLigada } from "../lib/ia";
 import {
   lerRespostaDaIA,
   casarItens,
@@ -64,6 +64,9 @@ export const LeituraDeNota: React.FC<{
   /** As opções do seletor: as mais parecidas primeiro, depois o resto */
   const opcoesPara = (descricao: string) =>
     [...usaveis].sort((a, b) => parecenca(descricao, b.nome) - parecenca(descricao, a.nome)).slice(0, 30);
+
+  // IA desligada: a entrada volta a ser a de sempre, por busca.
+  if (!iaLigada()) return null;
 
   if (!nota) {
     return (

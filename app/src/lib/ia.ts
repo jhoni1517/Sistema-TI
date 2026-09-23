@@ -12,6 +12,16 @@ import { PLANO_META, planoDe, type RecursoIA } from "./planos";
  * (leitura-nota, sugestao, voz-os), com teste — e nada é gravado sem a
  * pessoa revisar na tela.
  */
+/**
+ * A IA está ligada nesta instalação?
+ *
+ * Cada chamada ao Gemini custa. Sem `VITE_IA_LIGADA=1` na Vercel, os botões
+ * de IA NEM APARECEM — botão que existe e responde "falta chave" é botão
+ * quebrado na frente do cliente. A sugestão pelo histórico da loja não
+ * depende disto: ela é conta feita no navegador, de graça.
+ */
+export const iaLigada = (): boolean => import.meta.env.VITE_IA_LIGADA === "1";
+
 export interface RespostaIA {
   bruto: string;
   usados: number;

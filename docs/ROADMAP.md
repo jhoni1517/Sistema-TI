@@ -119,7 +119,10 @@ diagnóstico a partir de OS anteriores.
 
 ### 11. Avisos de status por WhatsApp Cloud API
 
-**[JÁ EXISTE — feito em 23/09/2026, plano Completo]** `api/whatsapp-os.js`, `lib/whatsapp-os.ts`, migração 28. Os modelos precisam de aprovação na Meta. Antes: **[PARCIAL — a Cloud API existia só para o robô do caixa]**
+**[PARCIAL — a Cloud API existe só para o robô do caixa]**
+
+Foi feito e **tirado em 23/09/2026**, por decisão do dono: tem custo por
+mensagem na Meta, e vai ser refeito do zero quando fizer sentido.
 
 `api/whatsapp.js` usa a Cloud API (`WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`)
 para **receber** lançamentos de caixa e responder a quem digitou. Os avisos
@@ -138,5 +141,6 @@ existe nada disso.
 4. Avaliação (item 6)
 5. Painel de TV (item 7)
 6. Pix pelo link (item 3) — depende de escolher o provedor
-7. WhatsApp automático, IA e voz (itens 8 a 11) — dependem de conta e custo
+7. IA (itens 8 a 10) está pronta e DESLIGADA; WhatsApp automático (item
+   11) fica para depois. Os dois dependem de conta e custo
    por mensagem/chamada; decidir antes de codar

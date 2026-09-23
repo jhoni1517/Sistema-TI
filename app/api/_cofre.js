@@ -1,9 +1,10 @@
 // ============================================================
-//  O cofre das credenciais das lojas (Mercado Pago, WhatsApp).
+//  O cofre das credenciais das lojas (hoje, o token do Mercado Pago).
 //
 //  Arquivo com "_" não vira função da Vercel: é código compartilhado.
-//  Um cofre só, e não uma cópia em cada função: duas cópias de código de
-//  criptografia envelhecem diferente, e a que ficar para trás é a porta.
+//  Separado de pix.js para a próxima credencial usar o MESMO cofre: duas
+//  cópias de código de criptografia envelhecem diferente, e a que ficar
+//  para trás é a porta.
 //
 //  A chave é PIX_CHAVE_CRIPTO (32 bytes em base64). O nome ficou do Pix,
 //  que foi o primeiro a usar; trocar agora obrigaria cada loja a colar o

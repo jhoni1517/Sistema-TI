@@ -17,8 +17,8 @@
 
 -- ---------- O plano é o que foi VENDIDO ----------
 -- A coluna existe desde a primeira migração e nada lia. Agora ela decide
--- limite de IA e WhatsApp automático, então passa a ter a mesma trava do
--- ramo: só o administrador do sistema troca.
+-- o limite de IA, então passa a ter a mesma trava do ramo: só o
+-- administrador do sistema troca.
 alter table lojas add column if not exists plano text default 'essencial';
 update lojas set plano = 'essencial' where plano is null or plano not in ('essencial', 'completo');
 

@@ -48,3 +48,20 @@ describe("teto de funções da Vercel", () => {
     expect(funcoes.length, funcoes.join(", ")).toBeLessThanOrEqual(12);
   });
 });
+
+/**
+ * A IA custa por chamada, e nasce DESLIGADA. Cada tela que chama a IA tem
+ * que perguntar antes — senão aparece um botão que gasta dinheiro (ou
+ * responde "falta chave") numa loja que nunca pediu IA.
+ */
+describe("a IA só aparece ligada", () => {
+  const telas = ["LeituraDeNota.tsx", "SugestaoDaOS.tsx", "OSPorVoz.tsx"];
+  for (const t of telas) {
+    it(`${t} pergunta iaLigada() antes de mostrar o botão`, () => {
+      const fonte = readFileSync(resolve(__dirname, "..", "components", t), "utf8");
+      expect(fonte).toContain("iaLigada()");
+      // Toda chamada à IA da tela está num arquivo que confere a trava.
+      if (fonte.includes("perguntarIA(")) expect(fonte).toContain("iaLigada");
+    });
+  }
+});

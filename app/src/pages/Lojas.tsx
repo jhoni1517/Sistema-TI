@@ -446,7 +446,7 @@ export const Lojas: React.FC = () => {
   };
 
   /*
-   * O plano decide o que custa dinheiro por uso (IA e WhatsApp automático).
+   * O plano decide o que custa dinheiro por uso (a IA).
    * Muda só aqui: o banco recusa a troca vinda da própria loja
    * (supabase-migracao-ia.sql).
    */
@@ -794,7 +794,7 @@ export const Lojas: React.FC = () => {
                   <select
                     className="input !w-32 !py-1.5 text-sm"
                     value={planoDe(l.plano)}
-                    title="Plano: limite de IA e WhatsApp automático"
+                    title="Plano: limite de IA"
                     onChange={(e) => mudarPlano(l, e.target.value as Plano)}
                   >
                     {PLANOS.map((p) => (
