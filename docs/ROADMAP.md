@@ -9,7 +9,11 @@ Legenda: **[JÁ EXISTE]**, **[PARCIAL — o que falta]**, **[NÃO EXISTE]**.
 
 ### 1. Página pública de rastreio da OS com linha do tempo, fotos de entrada, previsão e marca da loja
 
-**[PARCIAL — falta linha do tempo com data, previsão, marca da loja e contato]**
+**[JÁ EXISTE — feito em 23/09/2026, migração 25]** Linha do tempo com data,
+previsão, marca da loja, fotos do laudo com hora e botão de WhatsApp. O
+texto abaixo é a auditoria de antes.
+
+**[era PARCIAL — faltava linha do tempo com data, previsão, marca da loja e contato]**
 
 Existe (`pages/Rastreio.tsx`, `lib/rastreio.ts`, função `consultar_os` em
 `supabase-migracao-video-laudo.sql`):
@@ -51,14 +55,16 @@ de codar é preciso escolher o provedor.
 
 ### 4. Prazo legal de 30 dias (CDC) para conserto contado da abertura, com alertas
 
-**[NÃO EXISTE]**
+**[JÁ EXISTE — feito em 23/09/2026]** `lib/prazos.ts`, marca "Retorno em
+garantia" na OS, selo na lista/detalhe e card no painel. Antes: **[NÃO EXISTE]**
 
 Existe só a garantia contada da entrega (`lib/garantia.ts`). Nada conta prazo
 de conserto a partir da abertura.
 
 ### 5. Alerta de aparelho abandonado (pronto e não retirado)
 
-**[PARCIAL — faltam os alertas escalonados e a mensagem pronta]**
+**[JÁ EXISTE — feito em 23/09/2026]** Marcos de 30/60/90 dias com mensagem
+pronta (`lib/prazos.ts`). Antes: **[PARCIAL — faltavam os alertas escalonados e a mensagem pronta]**
 
 Existe:
 - Taxa de guarda por dia depois de `diasAbandono` (`taxaArmazenamento` em
@@ -72,7 +78,8 @@ cada um.
 
 ### 6. Pedido de avaliação no Google após entrega
 
-**[PARCIAL — falta o botão dedicado e o controle de 90 dias]**
+**[JÁ EXISTE — feito em 23/09/2026]** Botão "Pedir avaliação" e trava de 90
+dias por cliente (`lib/avaliacao.ts`). Antes: **[PARCIAL — faltava o botão e o controle de 90 dias]**
 
 Existe: campo `linkAvaliacao` em Configurações; o pedido entra na mensagem
 de entrega e no recibo (`pedidoDeAvaliacao` em `lib/mensagens.ts` e
@@ -83,7 +90,7 @@ para não pedir de novo ao mesmo cliente em 90 dias.
 
 ### 7. Painel de TV da bancada com a fila de OS
 
-**[NÃO EXISTE]**
+**[JÁ EXISTE — feito em 23/09/2026]** Rota `/painel` (`lib/painel.ts`). Antes: **[NÃO EXISTE]**
 
 `pages/Cozinha.tsx` (fila de preparo da pizzaria) é o modelo mais próximo:
 tela cheia com atualização periódica. Não há realtime do Supabase no
