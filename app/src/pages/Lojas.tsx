@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { PLANOS, PLANO_META, planoDe, type Plano } from "../lib/planos";
 import {
   Store,
   CheckCircle2,
@@ -444,6 +445,27 @@ export const Lojas: React.FC = () => {
     }
   };
 
+  /*
+   * O plano decide o que custa dinheiro por uso (IA e WhatsApp automático).
+   * Muda só aqui: o banco recusa a troca vinda da própria loja
+   * (supabase-migracao-ia.sql).
+   */
+  const mudarPlano = async (l: Loja, plano: Plano) => {
+    if (planoDe(l.plano) === plano) return;
+    if (!confirm(`Mudar "${l.nome}" para o plano ${PLANO_META[plano].label}?`)) return;
+    try {
+      await atualizarLoja(l.id, { plano });
+      setLojas((prev) => prev.map((x) => (x.id === l.id ? { ...x, plano } : x)));
+      aviso.sucesso(`${l.nome} agora está no plano ${PLANO_META[plano].label}.`);
+    } catch (e) {
+      aviso.erro(
+        "Não foi possível mudar o plano:\n\n" +
+          (e instanceof Error ? e.message : String(e)) +
+          "\n\nSe o erro fala de coluna, rode o supabase-migracao-ia.sql."
+      );
+    }
+  };
+
   const mudarValor = async (l: Loja, valor: number) => {
     try {
       await atualizarLoja(l.id, { valor_mensal: valor });
@@ -766,6 +788,18 @@ export const Lojas: React.FC = () => {
                     {RAMOS.map((r) => (
                       <option key={r} value={r}>
                         {RAMO_META[r].label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="input !w-32 !py-1.5 text-sm"
+                    value={planoDe(l.plano)}
+                    title="Plano: limite de IA e WhatsApp automático"
+                    onChange={(e) => mudarPlano(l, e.target.value as Plano)}
+                  >
+                    {PLANOS.map((p) => (
+                      <option key={p} value={p}>
+                        {PLANO_META[p].label}
                       </option>
                     ))}
                   </select>

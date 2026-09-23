@@ -28,6 +28,8 @@ export interface Loja {
    * troca vinda da própria loja.
    */
   ramo?: string | null;
+  /** O que a loja comprou: decide limite de IA e WhatsApp automático. Ver lib/planos.ts. */
+  plano?: string | null;
   ultimoPagamento?: string | null;
   criadoEm?: string | null;
   /**
@@ -378,7 +380,7 @@ export async function listarLojas(): Promise<Loja[]> {
   if (!supabase) return [];
   const { data, error } = await supabase
     .from("lojas")
-    .select('id, nome, "venceEm", "testeAte", "motivoTeste", "testesDados", valor_mensal, bloqueada, isento, ramo, observacoes, whatsapp, "ultimoPagamento", "criadoEm"')
+    .select('id, nome, "venceEm", "testeAte", "motivoTeste", "testesDados", valor_mensal, bloqueada, isento, ramo, plano, observacoes, whatsapp, "ultimoPagamento", "criadoEm"')
     .order("criadoEm", { ascending: false });
   if (error) throw new Error(error.message);
   return (data as Loja[]) || [];

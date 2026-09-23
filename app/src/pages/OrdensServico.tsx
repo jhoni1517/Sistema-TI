@@ -149,6 +149,8 @@ import { alertaDeAbandono, mensagemDeAbandono, prazoDoConserto } from "../lib/pr
 import { podePedirAvaliacao, mensagemPedidoAvaliacao } from "../lib/avaliacao";
 import { hojeISO } from "../lib/contas";
 import { SeloPrazo } from "../components/SeloPrazo";
+import { SugestaoDaOS } from "../components/SugestaoDaOS";
+import { OSPorVoz } from "../components/OSPorVoz";
 
 
 const STATUS_LIST = Object.keys(OS_STATUS_META) as OSStatus[];
@@ -1050,8 +1052,18 @@ const OSForm: React.FC<{
 }> = ({ os, setOs, clientes, produtos, onSave, onClose }) => {
   // O ramo vem do store, e não por prop: passar por parâmetro obrigaria a
   // mexer em toda chamada, e o que muda aqui é só qual campo aparece.
-  const { ramo } = useApp();
+  // As ordens também: são o histórico que a Sugestão compara.
+  const { ramo, ordens } = useApp();
   const voc = vocabulario(ramo);
+  /**
+   * A OS de AGORA, para quem responde depois de um await (a voz): a
+   * variável `os` da closure é a de quando o microfone foi ligado, e
+   * aplicar por cima dela apagaria o que a pessoa digitou enquanto a IA
+   * pensava.
+   */
+  const osAtual = React.useRef(os);
+  osAtual.current = os;
+  const osNova = !(ordens || []).some((o) => o.id === os.id);
   const trava = travaAtendimento(clientes.find((c) => c.id === os.clienteId));
 
   const addPeca = (opcao?: string) =>
@@ -1224,6 +1236,17 @@ const OSForm: React.FC<{
       }
     >
       <div className="space-y-6">
+        {/* Ditar a OS: só na OS nova. Preenche os campos vazios; salvar
+            continua sendo o botão de sempre, depois de conferir. */}
+        {osNova && (
+          <OSPorVoz
+            os={os}
+            clientes={clientes}
+            comSenha={temRecurso(ramo, "senhaAparelho")}
+            onPreencher={(patch) => setOs({ ...osAtual.current, ...patch })}
+          />
+        )}
+
         {/* Cliente & Status */}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Cliente *">
@@ -1460,6 +1483,27 @@ const OSForm: React.FC<{
             <textarea className="input" rows={3} value={os.defeitoConstatado} onChange={(e) => setOs({ ...os, defeitoConstatado: e.target.value })} />
           </Field>
         </div>
+
+        {/* Sugestão pelo histórico da loja (e, se pedir, pela IA). Só
+            preenche campo quando o técnico clica em "Usar". */}
+        <SugestaoDaOS
+          os={os}
+          ordens={ordens || []}
+          produtos={produtos}
+          onUsarOrcamento={(pecas, maoDeObra) =>
+            setOs({
+              ...os,
+              pecas: [...(os.pecas || []), ...pecas],
+              ...(maoDeObra !== null ? { maoDeObra } : {}),
+            })
+          }
+          onUsarLaudo={(texto) =>
+            setOs({
+              ...os,
+              defeitoConstatado: [txt(os.defeitoConstatado).trim(), texto].filter(Boolean).join("\n"),
+            })
+          }
+        />
 
         {/*
           QUAL WINDOWS. Aparece sozinho quando o serviço é formatação ou

@@ -16,7 +16,9 @@ import {
   type ItemEntrada,
 } from "../lib/entrada";
 import { FORMAS_DE_COMPRA } from "../lib/pagamento";
-import type { FormaPagamento, MovimentoCaixa } from "../lib/types";
+import type { FormaPagamento, MovimentoCaixa, Produto } from "../lib/types";
+import { LeituraDeNota } from "./LeituraDeNota";
+import { paraEntrada } from "../lib/leitura-nota";
 
 /**
  * Nota do fornecedor virando estoque.
@@ -39,13 +41,20 @@ export const EntradaNota: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const [nota, setNota] = useState("");
   const [forma, setForma] = useState<FormaPagamento>("dinheiro");
   const [gravando, setGravando] = useState(false);
+  /**
+   * Produtos que a leitura por foto achou e o estoque não tem. Só existem
+   * na tela até o "Lançar": são gravados junto da entrada, depois do
+   * dinheiro. Fechar a janela antes não deixa cadastro órfão.
+   */
+  const [novos, setNovos] = useState<Produto[]>([]);
+  const todos = useMemo(() => [...produtos, ...novos], [produtos, novos]);
 
   const sessao = useMemo(() => achaSessaoAberta(sessoes), [sessoes]);
   // useMemo aqui: "entrada" é recriado a cada render, então o cache nunca
   // valia e as dependências declaradas mentiam sobre o que ele observa.
   const entrada = useMemo(() => ({ itens, frete, desconto }), [itens, frete, desconto]);
-  const problema = problemaNaEntrada(entrada, produtos);
-  const avisos = useMemo(() => avisosDeMargem(entrada, produtos), [entrada, produtos]);
+  const problema = problemaNaEntrada(entrada, todos);
+  const avisos = useMemo(() => avisosDeMargem(entrada, todos), [entrada, todos]);
 
   const sugestoes = useMemo(() => {
     const t = normalizar(busca);
@@ -137,14 +146,22 @@ export const EntradaNota: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
       const rateado = custoRateado(entrada);
       for (const i of itens) {
-        const p = produtos.find((x) => x.id === i.produtoId);
+        // `todos` inclui os produtos novos da leitura por foto: eles nascem
+        // aqui, com a quantidade e o custo desta nota.
+        const p = todos.find((x) => x.id === i.produtoId);
         if (!p || Number(i.quantidade) <= 0) continue;
         await saveProduto(
           aplicarEntrada(p, i.quantidade, rateado[i.produtoId] ?? i.custoUnit)
         );
       }
 
-      aviso.sucesso(`Entrada lançada. ${itens.length} item(ns) no estoque.`);
+      const cadastrados = novos.filter((p) => itens.some((i) => i.produtoId === p.id)).length;
+      aviso.sucesso(
+        `Entrada lançada. ${itens.length} item(ns) no estoque.` +
+          (cadastrados > 0
+            ? ` ${cadastrados} produto(s) novo(s) cadastrado(s) sem preço de venda: defina em Estoque antes de vender.`
+            : "")
+      );
       onClose();
     } catch (e) {
       aviso.erro(
@@ -215,6 +232,27 @@ export const EntradaNota: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         </Field>
       </div>
 
+      <LeituraDeNota
+        produtos={produtos}
+        onUsar={(casados, nota) => {
+          const r = paraEntrada(casados, produtos, uid, nowISO());
+          setNovos((v) => [...v, ...r.novos]);
+          // Produto que já estava na lista soma a quantidade, em vez de
+          // aparecer duas vezes (a lista usa o produto como chave).
+          setItens((v) => {
+            const lista = [...v];
+            for (const i of r.itens) {
+              const j = lista.findIndex((x) => x.produtoId === i.produtoId);
+              if (j >= 0) lista[j] = { ...lista[j], quantidade: lista[j].quantidade + i.quantidade, custoUnit: i.custoUnit };
+              else lista.push(i);
+            }
+            return lista;
+          });
+          if (!fornecedor && nota.fornecedor) setFornecedor(nota.fornecedor);
+          aviso.sucesso(`${r.itens.length} item(ns) na entrada. Confira e clique em Lançar.`);
+        }}
+      />
+
       <div className="relative mb-2">
         <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
         <input
@@ -244,7 +282,7 @@ export const EntradaNota: React.FC<{ onClose: () => void }> = ({ onClose }) => {
 
       {itens.length === 0 ? (
         <p className="py-8 text-center text-sm text-slate-400">
-          Busque os produtos da nota acima. Só entra o que já está cadastrado.
+          Leia a nota por foto ou busque os produtos acima.
         </p>
       ) : (
         <div className="mb-3 space-y-2">

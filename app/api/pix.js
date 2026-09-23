@@ -41,7 +41,7 @@
 // O Access Token de CADA LOJA não é variável de ambiente: cada loja recebe
 // na conta dela, e o token mora cifrado em `pix_credencial`.
 
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { cifrar, decifrar } from "./_cofre.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -186,32 +186,6 @@ async function avisarLoja(lojaId, texto) {
     console.error("Pix: falha ao avisar no Telegram", e?.message || e);
     return false;
   }
-}
-
-/* ------------------------------------------------------------------ */
-/* Cofre do token                                                      */
-/* ------------------------------------------------------------------ */
-
-/**
- * AES-256-GCM: cifra E confere. Um token trocado no banco por outra pessoa
- * não decifra — o GCM recusa em vez de devolver lixo.
- */
-function cifrar(texto, chaveB64) {
-  const chave = Buffer.from(String(chaveB64 || ""), "base64");
-  if (chave.length !== 32) throw new Error("PIX_CHAVE_CRIPTO precisa ter 32 bytes em base64.");
-  const iv = randomBytes(12);
-  const c = createCipheriv("aes-256-gcm", chave, iv);
-  const corpo = Buffer.concat([c.update(String(texto), "utf8"), c.final()]);
-  return ["v1", iv.toString("base64"), c.getAuthTag().toString("base64"), corpo.toString("base64")].join(":");
-}
-
-function decifrar(guardado, chaveB64) {
-  const [versao, iv, tag, corpo] = String(guardado || "").split(":");
-  if (versao !== "v1") throw new Error("Token do Pix gravado num formato desconhecido.");
-  const chave = Buffer.from(String(chaveB64 || ""), "base64");
-  const d = createDecipheriv("aes-256-gcm", chave, Buffer.from(iv, "base64"));
-  d.setAuthTag(Buffer.from(tag, "base64"));
-  return Buffer.concat([d.update(Buffer.from(corpo, "base64")), d.final()]).toString("utf8");
 }
 
 /* ------------------------------------------------------------------ */
