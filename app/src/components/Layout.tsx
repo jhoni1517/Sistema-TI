@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { AvisoDePix } from "./AvisoDePix";
 import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { BuscaGlobal } from "./BuscaGlobal";
 import { AvisoAssinatura } from "./AvisoAssinatura";
@@ -129,6 +130,8 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
 
   return (
     <div className="flex min-h-screen bg-slate-100">
+      {/* Pix pelo link que caiu com o sistema aberto. Ver AvisoDePix. */}
+      <AvisoDePix />
       {/* Overlay mobile */}
       {open && (
         <div

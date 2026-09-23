@@ -144,8 +144,14 @@ function bancoFalso() {
     sessoes: [{ id: "sessao-1" }],
     movimentos: [],
     pix_cobrancas: [{ id: "123", status: "pending" }],
+    configuracoes: [{ id: LOJA, dados: { telegramChatId: "555" } }],
   };
+  const telegram: { chat_id: string; text: string }[] = [];
   const fetchFalso = async (url: string, opcoes: RequestInit = {}) => {
+    if (url.startsWith("https://api.telegram.org/")) {
+      telegram.push(JSON.parse(String(opcoes.body)));
+      return { ok: true, status: 200, text: async () => "{}" };
+    }
     const u = new URL(url);
     const tabela = u.pathname.split("/").pop()!;
     const linhas = tabelas[tabela] || [];
@@ -156,28 +162,34 @@ function bancoFalso() {
       saida = id ? linhas.filter((l) => l.id === id) : linhas;
     } else if (metodo === "POST") {
       const prefer = String((opcoes.headers as Record<string, string>)?.Prefer || "");
+      const entrou: unknown[] = [];
       for (const nova of JSON.parse(String(opcoes.body))) {
         const existe = linhas.some((l) => l.id === nova.id);
         if (existe && !prefer.includes("ignore-duplicates")) {
           return { ok: false, status: 409, text: async () => "duplicate key" };
         }
-        if (!existe) linhas.push(nova);
+        if (!existe) {
+          linhas.push(nova);
+          entrou.push(nova);
+        }
       }
       tabelas[tabela] = linhas;
+      // Como o PostgREST: "return=representation" devolve só o que entrou.
+      if (prefer.includes("return=representation")) saida = entrou;
     } else if (metodo === "PATCH") {
       const id = u.searchParams.get("id")?.replace("eq.", "");
       for (const l of linhas) if (l.id === id) Object.assign(l, JSON.parse(String(opcoes.body)));
     }
     return { ok: true, status: 200, text: async () => (saida ? JSON.stringify(saida) : "") };
   };
-  return { tabelas, fetchFalso };
+  return { tabelas, fetchFalso, telegram };
 }
 
 function roboDoPix(fetchFalso: unknown) {
   return montar<(loja: string, p: Record<string, unknown>) => Promise<{ ok: boolean; pago?: boolean }>>(
-    ["centavos", "codigoOS", "movimentoDoPix", "sb", "sessaoAberta", "processarPagamento"],
+    ["centavos", "codigoOS", "movimentoDoPix", "recadoDoPix", "sb", "avisarLoja", "sessaoAberta", "processarPagamento"],
     "processarPagamento",
-    { fetch: fetchFalso, SUPABASE_URL: "https://banco.teste", SERVICE_KEY: "chave" }
+    { fetch: fetchFalso, SUPABASE_URL: "https://banco.teste", SERVICE_KEY: "chave", TELEGRAM_TOKEN: "robo", console }
   );
 }
 
@@ -223,6 +235,26 @@ describe("o aviso repetido não lança duas vezes", () => {
     expect(corpo.indexOf('"movimentos?on_conflict=id"')).toBeLessThan(
       corpo.indexOf("movimentoId: movimento.id")
     );
+  });
+
+  it("o Telegram da loja avisa UMA vez, mesmo com o aviso do Mercado Pago repetido", async () => {
+    const { telegram, fetchFalso } = bancoFalso();
+    const processar = roboDoPix(fetchFalso);
+    await processar(LOJA, aprovado);
+    await processar(LOJA, aprovado);
+    expect(telegram).toHaveLength(1);
+    expect(telegram[0].chat_id).toBe("555");
+    expect(telegram[0].text).toContain("R$ 480,00");
+    expect(telegram[0].text).toContain("OS00033");
+    expect(telegram[0].text).not.toMatch(/\p{Extended_Pictographic}/u);
+  });
+
+  it("loja sem chat do Telegram: o pagamento entra do mesmo jeito, sem aviso", async () => {
+    const { tabelas, telegram, fetchFalso } = bancoFalso();
+    tabelas.configuracoes = [{ id: LOJA, dados: {} }];
+    await roboDoPix(fetchFalso)(LOJA, aprovado);
+    expect(telegram).toHaveLength(0);
+    expect(tabelas.movimentos).toHaveLength(1);
   });
 
   it("pendente não lança nada", async () => {
@@ -273,5 +305,24 @@ describe("o QR na página", () => {
     expect(validadeDoQR("2026-09-23T15:01:10Z", agora)).toBe("Vale por mais 1 minuto");
     expect(validadeDoQR("2026-09-23T14:59:00Z", agora)).toBe("");
     expect(validadeDoQR("", agora)).toBe("");
+  });
+});
+
+describe("aviso de Pix com o sistema aberto", () => {
+  it("avisa só o que ainda não foi visto neste aparelho", async () => {
+    const { pixQueCairam } = await import("./pix");
+    const linhas = [
+      { id: "1", valor: 10, osId: "a", pagoEm: "2026-09-23T15:00:00Z" },
+      { id: "2", valor: 20, osId: "b", pagoEm: "2026-09-23T15:01:00Z" },
+    ];
+    expect(pixQueCairam(linhas, new Set(["1"])).map((p) => p.id)).toEqual(["2"]);
+    expect(pixQueCairam(null, new Set())).toEqual([]);
+  });
+
+  it("o texto diz valor e OS, sem emoji", async () => {
+    const { textoDoPixRecebido } = await import("./pix");
+    const t = textoDoPixRecebido(1, "OS00033");
+    expect(t).toBe("R$ 1,00 da OS00033, pago pelo link. Já está no caixa.");
+    expect(t).not.toMatch(/\p{Extended_Pictographic}/u);
   });
 });
