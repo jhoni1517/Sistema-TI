@@ -20,6 +20,7 @@ import { carregarSessao, type Sessao } from "../lib/auth";
 import { importarTudo, type DumpLoja } from "../lib/db";
 import { problemaNoChatId } from "../lib/config";
 import { CatalogoPublico, TituloCatalogo } from "../components/CatalogoPublico";
+import { AreaDoClienteLoja } from "../components/AreaDoClienteLoja";
 import { CredencialPix } from "../components/CredencialPix";
 import { CredencialFiscal } from "../components/CredencialFiscal";
 import type { Config as ConfigType } from "../lib/types";
@@ -304,6 +305,10 @@ export const Config: React.FC = () => {
               Este mesmo botão fica em <b>Estoque &rarr; Catálogo</b>, que é onde
               ele é mais fácil de achar.
             </p>
+          </div>
+
+          <div className="sm:col-span-2 rounded-md border border-linha p-3">
+            <AreaDoClienteLoja nomeLoja={form.nomeLoja} />
           </div>
 
           {/* O ramo é o que a loja CONTRATOU, não uma preferência: quem
