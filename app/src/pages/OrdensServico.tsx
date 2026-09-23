@@ -86,6 +86,7 @@ import {
   type FormaPagamento,
   type Config,
   type Produto,
+  type VersaoWindows,
 } from "../lib/types";
 import {
   separarOS,
@@ -124,6 +125,14 @@ import {
   type DestinoDoResto,
 } from "../lib/os-pagamento";
 import { backupDe, avisoDeBackup, perguntaAntesDeConcluir } from "../lib/backup";
+import {
+  WINDOWS_META,
+  versaoWindowsDe,
+  pedeWindows,
+  ehNotebook,
+  problemaNaFonte,
+  textoDaFonte,
+} from "../lib/entrada-os";
 import { saldosApos } from "../lib/estoque";
 import { proximoNumero as proximoNum, problemaParaNumerar } from "../lib/numeracao";
 import { aoApagarOrdem, textoDaConfirmacao } from "../lib/exclusao";
@@ -245,6 +254,9 @@ export const OrdensServico: React.FC = () => {
     if (!editando) return;
     if (!editando.clienteId) return aviso.alerta("Selecione o cliente.");
     if (!editando.defeitoRelatado.trim()) return aviso.alerta("Descreva o defeito relatado.");
+    // "Deixou a fonte" sem dizer qual não protege ninguém na retirada.
+    const semModelo = problemaNaFonte(editando);
+    if (semModelo) return aviso.alerta(semModelo);
 
     // Cliente bloqueado só passa com autorização explícita, e só na abertura:
     // OS que já está na bancada precisa continuar editável, senão o aparelho
@@ -1219,7 +1231,17 @@ const OSForm: React.FC<{
               <select
                 className="input"
                 value={os.tipoAparelho}
-                onChange={(e) => setOs({ ...os, tipoAparelho: e.target.value })}
+                onChange={(e) =>
+                  setOs({
+                    ...os,
+                    tipoAparelho: e.target.value,
+                    // Celular não tem fonte de notebook. Sobrando do tipo
+                    // anterior, a resposta sairia no recibo assinado.
+                    ...(ehNotebook(e.target.value)
+                      ? {}
+                      : { fonteDeixada: undefined, fonteModelo: undefined }),
+                  })
+                }
               >
                 {aparelhosDoRamo(ramo).map((t) => (
                   <option key={t}>{t}</option>
@@ -1249,6 +1271,53 @@ const OSForm: React.FC<{
               <input className="input" placeholder={temRecurso(ramo, "imei") ? "chip, cartão, capa..." : "cabo, chave, suporte..."} value={os.acessorios} onChange={(e) => setOs({ ...os, acessorios: e.target.value })} />
             </Field>
           </div>
+
+          {/*
+            FONTE DO NOTEBOOK. É o acessório que mais some e o mais caro de
+            repor, e "eu deixei a fonte aí" na retirada, sem nada escrito,
+            vira palavra contra palavra. Só aparece para notebook: pergunta
+            de fonte numa OS de celular é campo que ninguém preenche.
+          */}
+          {ehNotebook(os.tipoAparelho) && (
+            <div className="mt-4">
+              <label className="label">Deixou a fonte / carregador?</label>
+              <div className="flex flex-wrap gap-2">
+                {([
+                  [true, "Sim, deixou"],
+                  [false, "Não deixou"],
+                ] as const).map(([v, rotulo]) => (
+                  <button
+                    key={rotulo}
+                    type="button"
+                    onClick={() =>
+                      setOs({
+                        ...os,
+                        fonteDeixada: v,
+                        fonteModelo: v ? os.fonteModelo : undefined,
+                      })
+                    }
+                    className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                      os.fonteDeixada === v
+                        ? "border-brand-500 bg-brand-50 text-brand-700"
+                        : "border-slate-200 text-slate-500 hover:bg-slate-50"
+                    }`}
+                  >
+                    {rotulo}
+                  </button>
+                ))}
+              </div>
+              {os.fonteDeixada === true && (
+                <Field label="Modelo da fonte *" className="mt-2">
+                  <input
+                    className="input"
+                    placeholder="Ex.: Dell 65W original, genérica 19V"
+                    value={os.fonteModelo || ""}
+                    onChange={(e) => setOs({ ...os, fonteModelo: e.target.value })}
+                  />
+                </Field>
+              )}
+            </div>
+          )}
 
           {/*
             A PLACA DO MOTOR.
@@ -1334,6 +1403,34 @@ const OSForm: React.FC<{
             <textarea className="input" rows={3} value={os.defeitoConstatado} onChange={(e) => setOs({ ...os, defeitoConstatado: e.target.value })} />
           </Field>
         </div>
+
+        {/*
+          QUAL WINDOWS. Aparece sozinho quando o serviço é formatação ou
+          instalação de sistema — pelas peças ou pelo defeito digitado.
+          Perguntar na entrada evita o técnico parar na bancada para ligar
+          para o cliente, e o cliente que pediu 11 Pro receber 10 Lite.
+        */}
+        {pedeWindows(os) && (
+          <div>
+            <label className="label">Qual Windows instalar?</label>
+            <div className="grid grid-cols-3 gap-2">
+              {(Object.keys(WINDOWS_META) as VersaoWindows[]).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setOs({ ...os, versaoWindows: v })}
+                  className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                    versaoWindowsDe(os.versaoWindows) === v
+                      ? "border-brand-500 bg-brand-50 text-brand-700"
+                      : "border-slate-200 text-slate-500 hover:bg-slate-50"
+                  }`}
+                >
+                  {WINDOWS_META[v].label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/*
           Backup: o único erro desta loja que nenhum conserto posterior
@@ -1987,6 +2084,10 @@ export const OSDetalhe: React.FC<{
           <Info label={voc.aparelho} value={`${os.tipoAparelho} ${os.marca} ${os.modelo}`} />
           <Info label="Cor / IMEI" value={`${os.cor || "—"} · ${os.imeiSerial || "—"}`} />
           <Info label="Acessórios" value={os.acessorios || "—"} />
+          {textoDaFonte(os) && <Info label="Fonte / carregador" value={textoDaFonte(os)} />}
+          {versaoWindowsDe(os.versaoWindows) && (
+            <Info label="Windows" value={WINDOWS_META[versaoWindowsDe(os.versaoWindows)!].label} />
+          )}
           <Info label="Técnico" value={os.tecnico || "—"} />
         </div>
 

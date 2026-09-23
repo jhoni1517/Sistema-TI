@@ -41,6 +41,12 @@ alter table ordens add column if not exists rastreio text;
 -- O que foi combinado sobre o backup dos dados do cliente. Formatação e
 -- troca de SSD apagam tudo, e apagar não tem desfazer.
 alter table ordens add column if not exists backup text;
+-- Qual Windows instalar na formatação, e a fonte que o notebook deixou.
+-- A fonte é o acessório que mais some e o mais caro de repor: escrita no
+-- papel assinado, deixa de ser palavra contra palavra na retirada.
+alter table ordens add column if not exists "versaoWindows" text;
+alter table ordens add column if not exists "fonteDeixada" boolean;
+alter table ordens add column if not exists "fonteModelo" text;
 
 -- ---------- Fatura do cartão ----------
 -- Cada compra no crédito já é despesa quando acontece. Marcar o pagamento

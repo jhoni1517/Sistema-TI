@@ -182,6 +182,8 @@ export interface PecaOS {
   documentoForcado?: "nfce" | "nfse";
 }
 
+export type VersaoWindows = "10_lite" | "10_pro" | "11_pro";
+
 export interface HistoricoOS {
   data: string;
   status: OSStatus;
@@ -244,6 +246,18 @@ export interface OrdemServico {
   contaVinculada?: string;
   // Estado / diagnóstico
   acessorios?: string; // capinha, chip, cartão...
+  /**
+   * Qual Windows instalar, quando a OS é formatação. Só aparece na tela
+   * quando o serviço instala sistema — ver lib/entrada-os.ts.
+   */
+  versaoWindows?: VersaoWindows;
+  /**
+   * O notebook veio com a fonte/carregador? `undefined` = ninguém perguntou,
+   * que é diferente de "não deixou". Só aparece para notebook.
+   */
+  fonteDeixada?: boolean;
+  /** Qual fonte: é a prova na retirada ("a minha era a original de 90W"). */
+  fonteModelo?: string;
   defeitoRelatado: string;
   defeitoConstatado?: string;
   checklist: Record<string, boolean>;
