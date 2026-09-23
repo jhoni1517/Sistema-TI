@@ -45,7 +45,8 @@ regra de `lib/orcamento.ts`.
 
 ### 3. Pagamento Pix pelo link com baixa automática no caixa
 
-**[NÃO EXISTE]**
+**[JÁ EXISTE — feito em 23/09/2026, Mercado Pago, migração 26]** `api/pix.js`,
+`lib/pix.ts`, `CredencialPix` em Configurações. Antes: **[NÃO EXISTE]**
 
 E não há provedor para reaproveitar: a mensalidade é cobrada com **chave Pix
 estática** digitada pelo operador (`chave_pix` em `lib/assinatura.ts`,

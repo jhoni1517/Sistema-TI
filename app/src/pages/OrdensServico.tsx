@@ -10,6 +10,7 @@ import {
   Trash2,
   MessageCircle,
   Star,
+  CheckCircle2,
   Printer,
   Smartphone,
   KeyRound,
@@ -121,6 +122,7 @@ import {
   problemaNaEntradaDaOS,
   recebidoDaOS,
   faltaNaOS,
+  lancamentoParaOCusto,
   entregaOAparelho,
   DESTINO_META,
   type DestinoDoResto,
@@ -925,6 +927,38 @@ export const OrdensServico: React.FC = () => {
                     ? `ATENÇÃO: os ${brl(conta.agora)} JÁ entraram no caixa. NÃO receba de novo. ` +
                       "O que faltou foi a baixa das peças e a entrega — acerte em Estoque " +
                       "e mude o status da OS na mão."
+                    : "Nada foi alterado. Tente de novo.")
+              );
+            } finally {
+              setRegistrando(false);
+            }
+          }}
+          onEntregarPago={async () => {
+            if (registrando) return;
+            setRegistrando(true);
+            let custoEntrou = false;
+            try {
+              // Dinheiro primeiro, mesmo sem dinheiro novo: o custo das peças
+              // vai no lançamento que já existe ANTES da baixa do estoque.
+              // Falhando no meio, sobra custo sem baixa — que a contagem
+              // acha. Ao contrário, a peça sai e o mês fecha com lucro
+              // inflado, que ninguém procura. Ver lib/os-pagamento.ts.
+              const lancamento = lancamentoParaOCusto(movimentos, detalhe.id);
+              const custo = custoPecas(detalhe);
+              if (lancamento && custo > 0) {
+                await saveMovimento({ ...lancamento, custoRelacionado: custo });
+              }
+              custoEntrou = true;
+              await baixarEstoqueEEntregar(detalhe);
+              setDetalhe(null);
+              aviso.sucesso(`${codigoOS(detalhe.numero)} entregue. O caixa não foi movimentado: ela já estava paga.`);
+            } catch (e) {
+              aviso.erro(
+                "Não foi possível concluir a entrega:\n\n" +
+                  (e instanceof Error ? e.message : String(e)) +
+                  "\n\n" +
+                  (custoEntrou
+                    ? "O custo das peças já foi lançado. Falta a baixa do estoque e mudar o status da OS na mão."
                     : "Nada foi alterado. Tente de novo.")
               );
             } finally {
@@ -1957,12 +1991,14 @@ export const OSDetalhe: React.FC<{
   onExcluir: () => void;
   onReceber: (parcelas: Parcela[], destino?: DestinoDoResto) => void;
   onFiado: () => void;
+  /** Entregar a OS que já foi paga antes (Pix pelo link ou sinal cheio) */
+  onEntregarPago: () => void;
   /** Já existe lançamento no caixa ou fiado para esta OS? */
   pagamentoRegistrado: boolean;
   historicoAparelho: OrdemServico[];
   /** Gravação em andamento: o botão não pode aceitar o segundo clique */
   registrando: boolean;
-}> = ({ os, clienteNome, cliente, config, onClose, onStatus, onAvisar, onEditar, onExcluir, onReceber, onFiado, pagamentoRegistrado, historicoAparelho, registrando }) => {
+}> = ({ os, clienteNome, cliente, config, onClose, onStatus, onAvisar, onEditar, onExcluir, onReceber, onFiado, onEntregarPago, pagamentoRegistrado, historicoAparelho, registrando }) => {
   // `movimentos` vem do store porque é lá que o dinheiro da OS mora: um
   // campo separado começaria a divergir do caixa no primeiro estorno.
   const { ramo, movimentos, clientes, saveCliente } = useApp();
@@ -2421,8 +2457,27 @@ export const OSDetalhe: React.FC<{
           </div>
         )}
 
+        {/*
+          JÁ ESTÁ PAGO — Pix pelo link ou sinal cheio no balcão.
+
+          Sem este bloco, a OS paga aparecia com "Receber R$ 0,00": o botão
+          não fechava nada e o aparelho não tinha como sair pelo sistema.
+          Aqui só se entrega: nenhum dinheiro entra de novo.
+        */}
+        {os.status !== "entregue" && os.status !== "cancelada" && restaCobrar === 0 && jaRecebido > 0 && (
+          <div className="flex flex-wrap items-center gap-2 rounded-xl bg-emerald-50 p-3 no-print">
+            <CheckCircle2 size={18} className="text-emerald-600" />
+            <span className="min-w-0 flex-1 text-sm text-emerald-800">
+              Já está pago: <b>{brl(jaRecebido)}</b> no caixa. É só entregar.
+            </span>
+            <button className="btn-success !py-1.5 text-sm" disabled={registrando} onClick={onEntregarPago}>
+              {registrando ? "Registrando..." : "Entregar"}
+            </button>
+          </div>
+        )}
+
         {/* Receber pagamento */}
-        {os.status !== "entregue" && os.status !== "cancelada" && (
+        {os.status !== "entregue" && os.status !== "cancelada" && !(restaCobrar === 0 && jaRecebido > 0) && (
           <div className="rounded-xl bg-emerald-50 p-3 no-print">
             <div className="flex flex-wrap items-center gap-2">
               <DollarSign size={18} className="text-emerald-600" />
