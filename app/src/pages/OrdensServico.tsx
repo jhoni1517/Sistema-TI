@@ -149,6 +149,7 @@ import { alertaDeAbandono, mensagemDeAbandono, prazoDoConserto } from "../lib/pr
 import { podePedirAvaliacao, mensagemPedidoAvaliacao } from "../lib/avaliacao";
 import { hojeISO } from "../lib/contas";
 import { SeloPrazo } from "../components/SeloPrazo";
+import { SugestaoDaOS } from "../components/SugestaoDaOS";
 
 
 const STATUS_LIST = Object.keys(OS_STATUS_META) as OSStatus[];
@@ -1050,7 +1051,8 @@ const OSForm: React.FC<{
 }> = ({ os, setOs, clientes, produtos, onSave, onClose }) => {
   // O ramo vem do store, e não por prop: passar por parâmetro obrigaria a
   // mexer em toda chamada, e o que muda aqui é só qual campo aparece.
-  const { ramo } = useApp();
+  // As ordens também: são o histórico que a Sugestão compara.
+  const { ramo, ordens } = useApp();
   const voc = vocabulario(ramo);
   const trava = travaAtendimento(clientes.find((c) => c.id === os.clienteId));
 
@@ -1460,6 +1462,27 @@ const OSForm: React.FC<{
             <textarea className="input" rows={3} value={os.defeitoConstatado} onChange={(e) => setOs({ ...os, defeitoConstatado: e.target.value })} />
           </Field>
         </div>
+
+        {/* Sugestão pelo histórico da loja (e, se pedir, pela IA). Só
+            preenche campo quando o técnico clica em "Usar". */}
+        <SugestaoDaOS
+          os={os}
+          ordens={ordens || []}
+          produtos={produtos}
+          onUsarOrcamento={(pecas, maoDeObra) =>
+            setOs({
+              ...os,
+              pecas: [...(os.pecas || []), ...pecas],
+              ...(maoDeObra !== null ? { maoDeObra } : {}),
+            })
+          }
+          onUsarLaudo={(texto) =>
+            setOs({
+              ...os,
+              defeitoConstatado: [txt(os.defeitoConstatado).trim(), texto].filter(Boolean).join("\n"),
+            })
+          }
+        />
 
         {/*
           QUAL WINDOWS. Aparece sozinho quando o serviço é formatação ou
