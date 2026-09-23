@@ -79,7 +79,11 @@ as $$
            -- A CHAVE da cor ("laranja"), nunca um valor livre: o que sai
            -- daqui vira estilo na página pública.
            case
-             when (c.dados ->> 'corDestaque') ~ '^[a-z]{1,20}$'
+             -- Sem cifrão na regex: o editor do Supabase corta o comando no
+             -- cifrão e manda a função pela metade ("unterminated
+             -- dollar-quoted string"). Só letras, de 1 a 20.
+             when (c.dados ->> 'corDestaque') !~ '[^a-z]'
+              and length(c.dados ->> 'corDestaque') between 1 and 20
              then c.dados ->> 'corDestaque'
              else null
            end as cor,
@@ -288,7 +292,9 @@ as $$
     a."atualizadoEm",
     (select v from historico_publico) as historico,
     case
-      when a."previsaoEntrega" ~ '^\d{4}-\d{2}-\d{2}$'
+      -- AAAA-MM-DD exato. O tamanho faz o papel do cifrão (ver acima).
+      when a."previsaoEntrega" ~ '^\d{4}-\d{2}-\d{2}'
+       and length(a."previsaoEntrega") = 10
       then a."previsaoEntrega"
       else null
     end as previsao,
