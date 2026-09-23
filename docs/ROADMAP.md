@@ -1,0 +1,134 @@
+# Roadmap — assistência técnica
+
+Auditoria feita em 23/09/2026 lendo o código, não a memória. Cada item diz
+onde está o que já existe, para ninguém refazer o que pronto.
+
+Legenda: **[JÁ EXISTE]**, **[PARCIAL — o que falta]**, **[NÃO EXISTE]**.
+
+---
+
+### 1. Página pública de rastreio da OS com linha do tempo, fotos de entrada, previsão e marca da loja
+
+**[PARCIAL — falta linha do tempo com data, previsão, marca da loja e contato]**
+
+Existe (`pages/Rastreio.tsx`, `lib/rastreio.ts`, função `consultar_os` em
+`supabase-migracao-video-laudo.sql`):
+- Link com segredo por OS (`rastreio`), conferido dentro da função SQL
+- Situação em destaque, aparelho, primeiro nome, valor
+- Fotos e vídeos **do laudo** (até 6 e 3), com o corte feito no banco
+
+Falta:
+- **Linha do tempo com data/hora.** A tela desenha um fluxo fixo de etapas,
+  não o `historico` real da OS. A função não devolve o histórico.
+- **Previsão de entrega.** Não existe campo na OS.
+- **Marca da loja.** A função não devolve nome, logo nem cor da loja; o topo
+  mostra a chave inglesa do sistema.
+- **Botão "Falar com a loja".** A página não tem telefone da loja.
+- "Aguardando peça" não aparece no fluxo desenhado (a etapa existe no tipo).
+
+Atenção: **fotos de ENTRADA não devem ir para o cliente.** Isso é decisão
+registrada em `types.ts` (`fotosLaudo`) e em `supabase-migracao-fotos-laudo.sql`:
+as de entrada são a prova da loja e pegam tela de bloqueio e papel de
+parede. O que vai para a página são as do laudo.
+
+### 2. Aprovação de orçamento pelo link
+
+**[JÁ EXISTE]**
+
+`responder_orcamento` (exige o segredo do link), com escolha entre
+orçamentos alternativos e o total de cada um calculado no banco pela mesma
+regra de `lib/orcamento.ts`.
+
+### 3. Pagamento Pix pelo link com baixa automática no caixa
+
+**[NÃO EXISTE]**
+
+E não há provedor para reaproveitar: a mensalidade é cobrada com **chave Pix
+estática** digitada pelo operador (`chave_pix` em `lib/assinatura.ts`,
+texto em `lib/cobranca.ts`). Não existe integração com banco/PSP, QR
+dinâmico nem webhook de pagamento em `api/`. Ver a etapa 4 do plano: antes
+de codar é preciso escolher o provedor.
+
+### 4. Prazo legal de 30 dias (CDC) para conserto contado da abertura, com alertas
+
+**[NÃO EXISTE]**
+
+Existe só a garantia contada da entrega (`lib/garantia.ts`). Nada conta prazo
+de conserto a partir da abertura.
+
+### 5. Alerta de aparelho abandonado (pronto e não retirado)
+
+**[PARCIAL — faltam os alertas escalonados e a mensagem pronta]**
+
+Existe:
+- Taxa de guarda por dia depois de `diasAbandono` (`taxaArmazenamento` em
+  `lib/calc.ts`), mostrada na lista e no detalhe da OS
+- Prazo de abandono no termo impresso (`lib/recibo.ts`)
+- Risco do cliente com aparelho pronto há 60+ dias (`lib/clientes.ts`)
+- "OS parada há muito tempo" na conferência (`lib/integridade.ts`)
+
+Falta: avisos em 30, 60 e 90 dias, e a mensagem de WhatsApp pronta para
+cada um.
+
+### 6. Pedido de avaliação no Google após entrega
+
+**[PARCIAL — falta o botão dedicado e o controle de 90 dias]**
+
+Existe: campo `linkAvaliacao` em Configurações; o pedido entra na mensagem
+de entrega e no recibo (`pedidoDeAvaliacao` em `lib/mensagens.ts` e
+`lib/recibo.ts`), só com a OS entregue.
+
+Falta: botão "Pedir avaliação" separado e o registro de que já foi pedido,
+para não pedir de novo ao mesmo cliente em 90 dias.
+
+### 7. Painel de TV da bancada com a fila de OS
+
+**[NÃO EXISTE]**
+
+`pages/Cozinha.tsx` (fila de preparo da pizzaria) é o modelo mais próximo:
+tela cheia com atualização periódica. Não há realtime do Supabase no
+projeto.
+
+### 8. Leitura de nota fiscal por foto com IA
+
+**[NÃO EXISTE]**
+
+A entrada de mercadoria (`components/EntradaNota.tsx`, `lib/entrada.ts`) é
+digitada item a item. Não há leitura de XML, de chave de acesso nem de foto.
+Nenhuma integração com IA no projeto.
+
+### 9. Sugestão de diagnóstico e orçamento por modelo+defeito
+
+**[NÃO EXISTE]**
+
+O mais próximo: histórico do mesmo aparelho (reincidência) e a detecção de
+peça repetida entre orçamentos (`orcamento-repetido`). Nada sugere preço ou
+diagnóstico a partir de OS anteriores.
+
+### 10. Abrir OS por voz
+
+**[NÃO EXISTE]**
+
+### 11. Avisos de status por WhatsApp Cloud API
+
+**[PARCIAL — a Cloud API existe só para o robô do caixa]**
+
+`api/whatsapp.js` usa a Cloud API (`WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`)
+para **receber** lançamentos de caixa e responder a quem digitou. Os avisos
+ao cliente saem por link `wa.me` aberto à mão (`linkWhats` em
+`lib/format.ts`). Mandar aviso automático para o cliente exige modelo de
+mensagem aprovado pela Meta, número por loja e opt-in do cliente — não
+existe nada disso.
+
+---
+
+## Ordem sugerida
+
+1. Identidade visual (`docs/DESIGN.md`) — base para as telas novas
+2. Rastreio estilo delivery (itens 1)
+3. Prazos legais e abandono (itens 4 e 5) — só `lib/` e tela, sem banco novo
+4. Avaliação (item 6)
+5. Painel de TV (item 7)
+6. Pix pelo link (item 3) — depende de escolher o provedor
+7. WhatsApp automático, IA e voz (itens 8 a 11) — dependem de conta e custo
+   por mensagem/chamada; decidir antes de codar
