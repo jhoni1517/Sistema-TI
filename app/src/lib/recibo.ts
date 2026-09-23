@@ -1,4 +1,5 @@
 import type { OrdemServico, Config, MovimentoCaixa, SessaoCaixa, Venda } from "./types";
+import { WINDOWS_META, versaoWindowsDe, textoDaFonte } from "./entrada-os";
 import { OS_STATUS_META } from "./types";
 import { brl, formatDate, formatDateTime, codigoOS, txt } from "./format";
 import { totalPecas, totalDaEntrega, taxaArmazenamento } from "./calc";
@@ -104,6 +105,8 @@ export function reciboOS(
       <div class="label">Cor / IMEI / Série</div>
       <div class="val">${[os.cor, os.imeiSerial].filter(Boolean).map(esc).join(" · ") || "-"}</div>
       ${os.acessorios ? `<div class="label">Acessórios</div><div class="val">${esc(os.acessorios)}</div>` : ""}
+      ${textoDaFonte(os) ? `<div class="label">Fonte / carregador</div><div class="val">${esc(textoDaFonte(os))}</div>` : ""}
+      ${versaoWindowsDe(os.versaoWindows) ? `<div class="label">Windows</div><div class="val">${esc(WINDOWS_META[versaoWindowsDe(os.versaoWindows)!].label)}</div>` : ""}
     </div>
   </div>
 
