@@ -69,6 +69,18 @@ virar pizzaria sozinho e usar o que não pagou. Módulo fora do plano mostra
 uma tela explicando, em vez de redirecionar calado: quem cai lá é cliente
 pagante que abriu a porta errada.
 
+## Design
+
+**Toda tela nova segue `docs/DESIGN.md`**: conceito "bancada de técnico /
+balcão de loja", base de papel quente, uma cor de marca (laranja-sinal),
+cores de status da OS como carimbo, Bricolage Grotesque no texto e IBM Plex
+Mono só em código e valor (sempre `tabular-nums`, classe `.valor`), e voz
+de balcão nos textos.
+
+Use só os tokens (`papel`, `cartao`, `tinta`, `sinal`, `status-*`...).
+Tela antiga migra quando for mexida — trocar tudo de uma vez quebra vinte
+telas sem ninguém ver nenhuma. A ordem está em `docs/ROADMAP.md`.
+
 ## As regras que vieram de bug, não de livro
 
 Cada uma destas custou uma tarde. Não são preferências.

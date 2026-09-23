@@ -1,7 +1,7 @@
 # Roadmap — assistência técnica
 
 Auditoria feita em 23/09/2026 lendo o código, não a memória. Cada item diz
-onde está o que já existe, para ninguém refazer o que pronto.
+onde está o que já existe, para ninguém refazer o que está pronto.
 
 Legenda: **[JÁ EXISTE]**, **[PARCIAL — o que falta]**, **[NÃO EXISTE]**.
 
