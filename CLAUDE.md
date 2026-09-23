@@ -407,3 +407,11 @@ Ele atende no balcão e lê no celular. Seja direto e sem enfeite. Diga o que
 quebrou antes de dizer o que foi feito. Erro seu, assuma sem rodeio. Link
 sempre clicável e completo. Passo a passo numerado quando for mexer em
 painel de terceiro (Vercel, Supabase, Telegram).
+
+**SQL para rodar no Supabase vai SEMPRE colado na resposta**, pronto para
+copiar, junto com o passo a passo numerado e os links completos — mesmo que
+já tenha sido mandado antes. Ele roda pelo celular, no editor do Supabase:
+"rode o arquivo X" obriga a abrir o GitHub, achar o arquivo e copiar de lá.
+Teste o texto colado num Postgres (`scripts/banco-de-teste.sh`) antes de
+mandar, e sem cifrão dentro do corpo de função (ver
+`cifrao-na-funcao.test.ts`).
