@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from "react";
 import { aviso } from "../components/Aviso";
-import { Plus, Search, Pencil, Trash2, Users, Phone, MessageCircle, Wrench, User, Building2, ShieldAlert, Cake, KeyRound } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Users, Phone, MessageCircle, Wrench, User, Building2, ShieldAlert, Cake, KeyRound, Send } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { db, obterLoja } from "../lib/db";
-import { linkDeAcesso, mensagemDeAcesso } from "../lib/area-cliente";
+import { linkDaArea, linkDeAcesso, mensagemDeAcesso, mensagemDeCadastro } from "../lib/area-cliente";
 import { abrirWhatsapp, uid, nowISO, whatsappLink, formatDate, brl, txt, mascaraDocumento, soDigitos, documentoValido } from "../lib/format";
 import { normalizar } from "../lib/busca";
 import { avaliarCliente, classificacaoDe, travaFiado, devendo } from "../lib/clientes";
@@ -40,6 +40,25 @@ export const Clientes: React.FC = () => {
     }
   };
   const temOS = temModulo(ramo, "os");
+
+  /**
+   * Link para o próprio cliente se cadastrar. Sem número, o WhatsApp abre a
+   * lista de contatos com o texto pronto: é só escolher a pessoa.
+   */
+  const mandarCadastro = async (telefone: string) => {
+    try {
+      if (!(await db.loja.areaClienteAtiva())) {
+        return aviso.alerta(
+          "A Área do cliente está desligada. Ligue em Configurações > Área do cliente e tente de novo."
+        );
+      }
+      const link = linkDaArea(`${window.location.origin}${window.location.pathname}`, obterLoja());
+      if (!link) throw new Error("Entre de novo no sistema para gerar o link.");
+      abrirWhatsapp(txt(telefone), mensagemDeCadastro(config.nomeLoja, link));
+    } catch (e) {
+      aviso.erro("Não deu para mandar o link:\n\n" + (e instanceof Error ? e.message : String(e)));
+    }
+  };
   const voc = vocabulario(ramo);
 
   /**
@@ -158,6 +177,11 @@ export const Clientes: React.FC = () => {
             <button className="btn-secondary" onClick={() => setRelacionamento(true)}>
               <Cake size={18} /> Quem chamar hoje
             </button>
+            {temOS && (
+              <button className="btn-secondary" onClick={() => mandarCadastro("")}>
+                <Send size={18} /> Mandar link de cadastro
+              </button>
+            )}
             <button className="btn-primary" onClick={() => setEditando(vazio())}>
               <Plus size={18} /> Novo cliente
             </button>
@@ -329,6 +353,18 @@ export const Clientes: React.FC = () => {
       >
         {editando && (
           <div className="grid gap-4 sm:grid-cols-2">
+            {/* Fila no balcão: em vez de digitar tudo, manda o link e o
+                cliente preenche no celular dele. */}
+            {temOS && !clientes.some((x) => x.id === editando.id) && (
+              <div className="sm:col-span-2 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed border-slate-300 p-3">
+                <p className="text-sm text-slate-500">
+                  Prefere que o cliente preencha? {editando.telefone ? "Vai para o número digitado." : "Digite o WhatsApp abaixo ou escolha o contato."}
+                </p>
+                <button type="button" className="btn-secondary !py-1.5 text-xs" onClick={() => mandarCadastro(editando.telefone)}>
+                  <Send size={14} /> Mandar link de cadastro
+                </button>
+              </div>
+            )}
             {/* Pessoa física ou jurídica: muda os rótulos e o documento */}
             <div className="sm:col-span-2">
               <label className="label">Tipo de cliente</label>
