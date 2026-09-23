@@ -148,7 +148,7 @@ describe("mensagem do cliente", () => {
     const texto = mensagemCliente(os([], { status: "pronta" }), cliente, config);
     // O aparelho vem logo embaixo, sem rótulo: sob um título que diz o
     // estado, ninguém precisa explicar que "PC Preto" é o aparelho.
-    expect(texto.split("\n\n")).toContain("*PRONTA PARA RETIRADA*\nPC Preto");
+    expect(texto.split("\n\n")).toContain("*TÁ PRONTO, PODE BUSCAR*\nPC Preto");
     expect(texto).not.toContain("*Situação:*");
     expect(texto).not.toContain("*Aparelho:*");
   });

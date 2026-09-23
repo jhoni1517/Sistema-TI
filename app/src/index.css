@@ -335,10 +335,20 @@ body {
     font-variant-numeric: tabular-nums;
   }
   /* O carimbo de status: só no estado final que importa (PRONTO,
-     ENTREGUE, CANCELADO). A cor vem de fora (text-status-*). */
+     ENTREGUE, CANCELADO). Fundo e contorno vêm de fora
+     (bg-status-* e outline-status-*). Texto branco e fundo cheio, e não
+     letra colorida no papel: a cor de status sobre o fundo escuro do modo
+     noturno não passa contraste nenhum. */
   .carimbo {
-    @apply inline-block rounded border-4 border-double border-current px-3 py-1 font-extrabold uppercase tracking-wider;
+    @apply inline-block rounded px-4 py-2 font-extrabold uppercase tracking-wider text-white;
+    outline-style: double;
+    outline-width: 5px;
+    outline-offset: 3px;
     transform: rotate(-2deg);
+  }
+  /* Rótulo de seção e de campo: o "NOME:" impresso no papel da OS */
+  .rotulo {
+    @apply text-xs font-semibold uppercase tracking-wider text-tinta-suave;
   }
   .badge {
     @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;

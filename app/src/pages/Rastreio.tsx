@@ -115,7 +115,7 @@ export const Rastreio: React.FC = () => {
       const linha = Array.isArray(data) ? data[0] : data;
       if (!linha) {
         setOs(null);
-        setErro("Ordem não encontrada.");
+        setErro("Não achamos essa OS.");
       } else {
         const publica = linha as OSPublica;
         setOs(publica);
@@ -123,7 +123,7 @@ export const Rastreio: React.FC = () => {
         setEscolha((publica.opcoes || []).find((o) => o.escolhida)?.nome || "");
       }
     } catch {
-      setErro("Não foi possível consultar agora. Tente novamente em instantes.");
+      setErro("Não deu para abrir agora. Tenta de novo daqui a pouco.");
     } finally {
       setCarregando(false);
     }
@@ -145,12 +145,12 @@ export const Rastreio: React.FC = () => {
   const decidir = async (aprovar: boolean) => {
     if (!os || enviando || !supabase) return;
     if (aprovar && faltaEscolher) {
-      aviso.erro("Escolha uma das opções antes de aprovar.");
+      aviso.erro("Escolhe uma das opções antes.");
       return;
     }
     const texto = aprovar
-      ? `Confirma a APROVAÇÃO do orçamento de ${brl(totalEscolhido())} e a execução do serviço?`
-      : "Confirma que NÃO deseja realizar o serviço?";
+      ? `Pode fazer o conserto por ${brl(totalEscolhido())}? A gente começa assim que você confirmar.`
+      : "Certeza que não quer o conserto? O aparelho fica esperando você buscar.";
     if (!confirm(texto)) return;
     setEnviando(true);
     try {
@@ -164,54 +164,65 @@ export const Rastreio: React.FC = () => {
       if (error || data === false) throw new Error();
       await consultar();
     } catch {
-      aviso.erro("Não foi possível registrar sua resposta. Tente novamente.");
+      aviso.erro("Sua resposta não chegou na loja. Tenta de novo.");
     } finally {
       setEnviando(false);
     }
   };
 
   const meta = os ? OS_STATUS_META[os.status] : null;
+  /** Estado final: vira carimbo, e não faixa. Ver docs/DESIGN.md. */
+  const final = os ? ["pronta", "entregue", "cancelada"].includes(os.status) : false;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-brand-900 p-4">
-      <div className="mx-auto max-w-lg py-10">
-        <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600 shadow-lg">
-            <Wrench className="text-white" size={26} />
+    <div className="min-h-screen bg-papel p-4 font-grotesca text-tinta">
+      <div className="mx-auto max-w-lg py-8">
+        <header className="mb-5 flex items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-sinal">
+            <Wrench className="text-sinal-tinta" size={22} strokeWidth={2.5} />
           </div>
-          <h1 className="text-xl font-bold text-white">Acompanhe seu aparelho</h1>
-          <p className="text-sm text-slate-400">Consulte pelo código da ordem de serviço</p>
-        </div>
+          <div>
+            <h1 className="text-xl font-bold leading-tight">Seu aparelho na bancada</h1>
+            <p className="text-sm text-tinta-suave">Tudo o que rolou com ele, sem precisar ligar</p>
+          </div>
+        </header>
 
         {carregando ? (
-          <div className="rounded-2xl bg-white p-10 text-center text-slate-400">Consultando...</div>
+          <div className="rounded-md border border-linha bg-cartao p-10 text-center text-tinta-suave">
+            Procurando seu aparelho...
+          </div>
         ) : !codigo ? (
-          <div className="rounded-2xl bg-white/10 p-8 text-center text-slate-300">
-            Abra o link que a assistência enviou para acompanhar o seu aparelho.
+          <div className="rounded-md border border-linha bg-cartao p-8 text-center text-tinta-suave">
+            Abre o link que a loja te mandou no WhatsApp.
           </div>
         ) : erro || !os || !meta ? (
-          <div className="rounded-2xl bg-white p-8 text-center">
-            <p className="font-semibold text-slate-700">
-              {erro || "Não encontramos esta ordem de serviço."}
-            </p>
+          <div className="rounded-md border border-linha bg-cartao p-8 text-center">
+            <p className="font-semibold">{erro || "Não achamos essa OS."}</p>
             {/* "Confira o código" mandava conferir o que está certo: o código
                 o cliente tem. O que falta é o link inteiro, e quem resolve
                 isso é a loja. */}
-            <p className="mt-1 text-sm text-slate-400">
-              Use sempre o link que a assistência enviou. Se ele não abrir, peça um novo.
+            <p className="mt-1 text-sm text-tinta-suave">
+              Usa sempre o link que a loja mandou. Não abriu? Pede um novo pra loja.
             </p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="bg-brand-600 p-5 text-white">
-              <p className="text-sm text-brand-100">{codigoOS(os.numero)}</p>
-              <p className="text-lg font-bold">
-                Olá{os.primeiroNome ? `, ${os.primeiroNome}` : ""}!
-              </p>
-              <div className="mt-3 flex items-center gap-2">
-                <Smartphone size={18} />
-                <span>{[os.marca, os.modelo].filter(Boolean).join(" ") || "Seu aparelho"}</span>
+          <div className="rounded-md border border-linha bg-cartao">
+            {/* Cabeçalho da via: número no canto, como no papel da OS */}
+            <div className="flex items-start justify-between gap-3 border-b border-dashed border-linha p-5">
+              <div className="min-w-0">
+                <p className="text-lg font-bold">
+                  Oi{os.primeiroNome ? `, ${os.primeiroNome}` : ""}!
+                </p>
+                <p className="mt-1 flex items-center gap-2 text-tinta-suave">
+                  <Smartphone size={16} className="shrink-0" />
+                  <span className="truncate">
+                    {[os.marca, os.modelo].filter(Boolean).join(" ") || "Seu aparelho"}
+                  </span>
+                </p>
               </div>
+              <p className="valor shrink-0 rounded bg-concreto px-2 py-1 text-sm font-semibold">
+                {codigoOS(os.numero)}
+              </p>
             </div>
 
             <div className="p-5">
@@ -219,13 +230,25 @@ export const Rastreio: React.FC = () => {
                 A situação é o que a pessoa abriu esta página para ver, e ela
                 abre no celular, muitas vezes na rua. Cor cheia e letra grande:
                 o crachá pálido das listas some no meio do resto da tela.
+
+                Estado final vira carimbo — é o "PRONTO" batido no papel, a
+                única coisa da página que grita.
               */}
-              <div className={`mb-5 rounded-xl p-5 text-center shadow-md ${meta.forte}`}>
-                <p className="text-2xl font-black uppercase leading-tight tracking-wide">
-                  {meta.destaque}
-                </p>
-                <p className="mt-2 text-sm font-medium opacity-95">{meta.cliente}</p>
-              </div>
+              {final ? (
+                <div className="mb-6 py-3 text-center">
+                  <p className={`carimbo text-2xl ${meta.carimbo}`}>
+                    {meta.destaque}
+                  </p>
+                  <p className="mt-4 text-sm text-tinta-suave">{meta.cliente}</p>
+                </div>
+              ) : (
+                <div className={`mb-6 rounded-md p-5 text-center ${meta.carimbo}`}>
+                  <p className="text-2xl font-extrabold uppercase leading-tight tracking-wide">
+                    {meta.destaque}
+                  </p>
+                  <p className="mt-2 text-sm font-medium opacity-95">{meta.cliente}</p>
+                </div>
+              )}
 
               {/*
                 A foto do problema, antes de qualquer preço.
@@ -241,14 +264,14 @@ export const Rastreio: React.FC = () => {
                 `consultar_os`. Aqui só se desenha o que chegou.
               */}
               {((os.fotos || []).length > 0 || (os.videos || []).length > 0) && (
-                <div className="mb-5">
-                  <p className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
-                    <Camera size={16} /> Seu aparelho
-                  </p>
-                  <p className="mb-3 mt-0.5 text-xs text-slate-500">
+                <section className="mb-6">
+                  <h2 className="rotulo flex items-center gap-1.5">
+                    <Camera size={14} /> O que a gente achou
+                  </h2>
+                  <p className="mb-3 mt-0.5 text-xs text-tinta-suave">
                     {(os.videos || []).length > 0
-                      ? "Toque para ver de perto ou assistir."
-                      : "Toque para ver de perto."}
+                      ? "Toca na foto pra ver de perto, ou no vídeo pra assistir."
+                      : "Toca na foto pra ver de perto."}
                   </p>
 
                   {/*
@@ -283,14 +306,14 @@ export const Rastreio: React.FC = () => {
                         controls
                         playsInline
                         preload={v.capa ? "none" : "metadata"}
-                        className="w-full rounded-xl border border-slate-200 bg-slate-900"
+                        className="w-full rounded-md border border-linha bg-tinta"
                       />
                       {/* A duração vem do nosso cadastro: com preload="none" o
                           player só a descobriria depois do play, e um vídeo sem
                           tempo à vista é um vídeo que a pessoa não sabe se vale
                           o dado móvel dela. */}
                       {duracaoEscrita(v.duracao) && (
-                        <span className="pointer-events-none absolute right-2 top-2 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-semibold text-white">
+                        <span className="valor pointer-events-none absolute right-2 top-2 rounded bg-black/70 px-1.5 py-0.5 text-[11px] font-semibold text-white">
                           {duracaoEscrita(v.duracao)}
                         </span>
                       )}
@@ -305,11 +328,11 @@ export const Rastreio: React.FC = () => {
                           href={url}
                           target="_blank"
                           rel="noreferrer"
-                          className="block overflow-hidden rounded-xl border border-slate-200"
+                          className="block overflow-hidden rounded border border-linha"
                         >
                           <img
                             src={url}
-                            alt="Foto do aparelho enviada pela assistência"
+                            alt="Foto do aparelho tirada pela loja"
                             loading="lazy"
                             className="aspect-square w-full object-cover"
                           />
@@ -317,7 +340,7 @@ export const Rastreio: React.FC = () => {
                       ))}
                     </div>
                   )}
-                </div>
+                </section>
               )}
 
               {/*
@@ -326,12 +349,12 @@ export const Rastreio: React.FC = () => {
                 fazia o número mudar debaixo do olho do cliente.
               */}
               {opcoes.length > 0 && (
-                <div className="mb-5">
-                  <p className="flex items-center gap-1.5 text-sm font-bold text-slate-700">
-                    <ListChecks size={16} /> Escolha uma opção de conserto
-                  </p>
-                  <p className="mb-3 mt-0.5 text-xs text-slate-500">
-                    Cada opção já é o valor do serviço completo.
+                <section className="mb-6">
+                  <h2 className="rotulo flex items-center gap-1.5">
+                    <ListChecks size={14} /> Escolhe como quer o conserto
+                  </h2>
+                  <p className="mb-3 mt-0.5 text-xs text-tinta-suave">
+                    Cada preço já é o serviço inteiro, sem surpresa.
                   </p>
                   <div className="space-y-2">
                     {opcoes.map((op) => {
@@ -339,32 +362,34 @@ export const Rastreio: React.FC = () => {
                       return (
                         <label
                           key={op.nome}
-                          className={`flex cursor-pointer gap-3 rounded-xl border-2 p-3 ${
-                            ativa ? "border-brand-600 bg-brand-50" : "border-slate-200 bg-white"
+                          className={`flex cursor-pointer gap-3 rounded-md border-2 p-3 ${
+                            ativa ? "border-sinal bg-sinal/5" : "border-linha bg-cartao"
                           }`}
                         >
                           <input
                             type="radio"
                             name="opcao-orcamento"
-                            className="mt-1 h-4 w-4 shrink-0 accent-brand-600"
+                            className="mt-1 h-4 w-4 shrink-0 accent-[rgb(var(--sinal))]"
                             checked={ativa}
                             onChange={() => setEscolha(op.nome)}
                           />
                           <span className="min-w-0 flex-1">
                             <span className="flex items-baseline justify-between gap-2">
-                              <b className="text-sm text-slate-800">{op.nome}</b>
-                              <b className="shrink-0 text-base text-slate-800">
+                              <b className="text-sm">{op.nome}</b>
+                              <b className="valor shrink-0 text-base">
                                 {brl(Number(op.total) || 0)}
                               </b>
                             </span>
                             {/* Sem os itens o cliente escolhe entre dois preços
                                 sem saber o que muda de um para o outro. */}
-                            <span className="mt-1 block space-y-0.5 text-xs text-slate-500">
+                            <span className="mt-1 block space-y-0.5 text-xs text-tinta-suave">
                               {(op.itens || []).map((i, n) => (
-                                <span key={n} className="block">
-                                  {i.descricao}
-                                  {Number(i.quantidade) > 1 ? ` (${i.quantidade}x)` : ""} —{" "}
-                                  {brl(Number(i.valor) || 0)}
+                                <span key={n} className="flex justify-between gap-2">
+                                  <span>
+                                    {i.descricao}
+                                    {Number(i.quantidade) > 1 ? ` (${i.quantidade}x)` : ""}
+                                  </span>
+                                  <span className="valor shrink-0">{brl(Number(i.valor) || 0)}</span>
                                 </span>
                               ))}
                             </span>
@@ -373,81 +398,93 @@ export const Rastreio: React.FC = () => {
                       );
                     })}
                   </div>
-                </div>
+                </section>
               )}
 
+              {/* O total fecha a conta como no papel: depois do picote. */}
               {os.total != null && os.total > 0 && (
-                <div className="mb-5 rounded-xl bg-emerald-50 p-4 text-center">
-                  <p className="text-sm text-emerald-700">
-                    {opcoes.length > 0 ? "Total com a opção escolhida" : "Valor do serviço"}
+                <div className="mb-6 flex items-baseline justify-between gap-3 border-t border-dashed border-linha pt-4">
+                  <p className="rotulo">
+                    {opcoes.length > 0 ? "Fica em" : "Valor do conserto"}
                   </p>
-                  <p className="text-2xl font-bold text-emerald-700">
+                  <p className="valor text-3xl font-semibold text-sinal">
                     {brl(totalEscolhido())}
                   </p>
                 </div>
               )}
 
               {os.status === "aguardando_aprovacao" && (
-                <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
-                  <p className="mb-3 text-center text-sm font-semibold text-amber-800">
-                    Podemos executar o serviço?
-                  </p>
+                <div className="mb-6 rounded-md border-2 border-status-aprovacao p-4">
+                  <p className="mb-3 text-center text-base font-bold">Pode fazer o conserto?</p>
                   {faltaEscolher && (
-                    <p className="mb-3 text-center text-xs text-amber-700">
-                      Antes de aprovar, escolha uma das opções acima.
+                    <p className="mb-3 text-center text-xs text-tinta-suave">
+                      Escolhe uma das opções aí em cima antes.
                     </p>
                   )}
                   <div className="flex gap-2">
                     <button
-                      className="btn-success flex-1"
+                      className="btn flex-1 rounded-md bg-sinal text-sinal-tinta hover:bg-sinal/90 focus-visible:ring-sinal"
                       disabled={enviando || faltaEscolher}
                       onClick={() => decidir(true)}
                     >
-                      <ThumbsUp size={16} /> Aprovar
+                      <ThumbsUp size={16} /> Pode fazer
                     </button>
-                    <button className="btn-secondary flex-1" disabled={enviando} onClick={() => decidir(false)}>
-                      <ThumbsDown size={16} /> Não quero
+                    <button
+                      className="btn flex-1 rounded-md border border-linha bg-cartao text-tinta hover:bg-concreto focus-visible:ring-sinal"
+                      disabled={enviando}
+                      onClick={() => decidir(false)}
+                    >
+                      <ThumbsDown size={16} /> Não, obrigado
                     </button>
                   </div>
                 </div>
               )}
 
               {os.status !== "cancelada" && (
-                <div className="space-y-0">
+                <ol className="space-y-0">
                   {FLUXO.map((s, i) => {
                     const atualIdx = FLUXO.indexOf(os.status);
                     const feito = i <= atualIdx;
                     const atual = i === atualIdx;
                     return (
-                      <div key={s} className="flex gap-3">
+                      <li key={s} className="flex gap-3">
                         <div className="flex flex-col items-center">
-                          <div className={`flex h-7 w-7 items-center justify-center rounded-full ${feito ? "bg-brand-600 text-white" : "bg-slate-200 text-slate-400"}`}>
+                          <div
+                            className={`flex h-7 w-7 items-center justify-center rounded-full ${
+                              feito ? OS_STATUS_META[s].carimbo : "border border-linha bg-concreto text-tinta-suave"
+                            }`}
+                          >
                             {feito ? <CheckCircle2 size={16} /> : <Clock size={14} />}
                           </div>
                           {i < FLUXO.length - 1 && (
-                            <div className={`h-6 w-0.5 ${i < atualIdx ? "bg-brand-600" : "bg-slate-200"}`} />
+                            <div className={`h-6 w-0.5 ${i < atualIdx ? "bg-tinta/40" : "bg-linha"}`} />
                           )}
                         </div>
-                        <div className={`pb-2 ${atual ? "font-bold text-slate-800" : feito ? "text-slate-600" : "text-slate-400"}`}>
+                        <div
+                          className={`pb-2 ${
+                            atual ? "font-bold" : feito ? "text-tinta" : "text-tinta-suave"
+                          }`}
+                        >
                           {OS_STATUS_META[s].label}
                         </div>
-                      </div>
+                      </li>
                     );
                   })}
-                </div>
+                </ol>
               )}
 
-              <p className="mt-5 text-center text-xs text-slate-400">
-                Última atualização: {formatDateTime(os.atualizadoEm || undefined)}
+              <p className="mt-5 text-center text-xs text-tinta-suave">
+                Atualizado em <span className="valor">{formatDateTime(os.atualizadoEm || undefined)}</span>
               </p>
             </div>
           </div>
         )}
 
-        <p className="mt-6 flex items-center justify-center gap-1 text-center text-xs text-slate-500">
-          <ShieldCheck size={12} /> Esta página mostra apenas o andamento do seu serviço
+        <p className="mt-6 flex items-center justify-center gap-1 text-center text-xs text-tinta-suave">
+          <ShieldCheck size={12} /> Este link é só seu. A página não mostra senha nem dado pessoal.
         </p>
       </div>
     </div>
   );
 };
+

@@ -78,7 +78,8 @@ veio ver. **Um elemento de marca por área da tela.** Se tudo é laranja, nada
 ### Status da OS — a paleta nasce daqui
 
 Cada status é um **carimbo**: fundo cheio com texto branco. Todos passam AA
-(4,5:1) com branco, e todos passam AA como texto sobre o papel.
+(4,5:1) com branco, e também como texto sobre o papel claro — mas não sobre
+o fundo escuro, então **status é sempre fundo cheio**, nunca letra colorida.
 
 | Status | Token | Hex | Branco por cima | Por que essa cor |
 |---|---|---|---|---|
@@ -138,8 +139,10 @@ Escala (celular primeiro):
   camada que de fato flutua (modal, menu aberto).
 - **Linha tracejada** (`border-dashed`) separa "via do cliente" de "via da
   loja", e o total do resto. É o picote do papel.
-- **Carimbo**: `.carimbo` — borda dupla na cor do status, maiúsculas,
-  rotação de -2°. Só para o estado final que importa (PRONTO, ENTREGUE,
+- **Carimbo**: `.carimbo` — fundo cheio na cor do status, texto branco,
+  contorno duplo na mesma cor (`outline-status-*`), maiúsculas, rotação de
+  -2°. Nunca letra na cor do status sobre o papel: no modo escuro ela não
+  passa contraste. Só para o estado final que importa (PRONTO, ENTREGUE,
   CANCELADO). Rodar texto em todo lugar vira bagunça.
 
 ## Tom de voz: voz de balcão
@@ -165,7 +168,7 @@ Regras:
 | # | Onde | Hoje | Voz de balcão |
 |---|---|---|---|
 | 1 | Rastreio, título | Acompanhe seu aparelho | Seu aparelho na bancada |
-| 2 | Rastreio, subtítulo | Consulte pelo código da ordem de serviço | Tudo que a gente fez nele, em tempo real |
+| 2 | Rastreio, subtítulo | Consulte pelo código da ordem de serviço | Tudo o que rolou com ele, sem precisar ligar |
 | 3 | Rastreio, status pronta | Pronta para retirada | Tá pronto, pode buscar |
 | 4 | Rastreio, texto pronta | Pode vir buscar dentro do nosso horário de atendimento. | Pode vir buscar no nosso horário. |
 | 5 | Rastreio, aguardando aprovação | Podemos executar o serviço? | Pode fazer o conserto? |
@@ -173,9 +176,9 @@ Regras:
 | 7 | Rastreio, confirmação | Confirma que NÃO deseja realizar o serviço? | Certeza que não quer o conserto? O aparelho fica esperando você buscar. |
 | 8 | Rastreio, erro | Não foi possível consultar agora. Tente novamente em instantes. | Não deu para abrir agora. Tenta de novo daqui a pouco. |
 | 9 | Rastreio, sem OS | Não encontramos esta ordem de serviço. | Não achamos essa OS. Pede o link de novo pra loja. |
-| 10 | Rastreio, rodapé | Esta página mostra apenas o andamento do seu serviço | Só você tem este link. Não mostra senha nem dado seu. |
+| 10 | Rastreio, rodapé | Esta página mostra apenas o andamento do seu serviço | Este link é só seu. A página não mostra senha nem dado pessoal. |
 | 11 | Status em reparo (cliente) | Estamos trabalhando no seu aparelho. | Tá na bancada, com o técnico. |
-| 12 | Status aguardando peça (cliente) | Aguardando a chegada de uma peça para continuar. | Esperando a peça chegar. Avisamos quando chegar. |
+| 12 | Status aguardando peça (cliente) | Aguardando a chegada de uma peça para continuar. | Esperando a peça chegar. A gente avisa quando ela chegar. |
 | 13 | OS, lista vazia | Nenhuma ordem de serviço / Clique em 'Nova OS' para começar. | Bancada vazia. Chegou aparelho? Toque em Nova OS. |
 | 14 | Painel, card | Prontas p/ entrega | Pronto, esperando o dono |
 | 15 | PDV, venda fechada | Venda registrada. | Venda feita. Próximo! |

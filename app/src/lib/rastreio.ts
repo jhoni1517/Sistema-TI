@@ -66,7 +66,7 @@ export const tokenDoLink = (hash: string): string =>
 export function problemaNoLink(loja: string, token: string): string {
   if (txt(loja).trim() && txt(token).trim()) return "";
   return (
-    "Este link está incompleto ou é de uma versão antiga. " +
-    "Peça um link novo para a assistência — o código da sua ordem continua o mesmo."
+    "Esse link tá incompleto ou é antigo. " +
+    "Pede um novo pra loja — o número da sua OS continua o mesmo."
   );
 }
