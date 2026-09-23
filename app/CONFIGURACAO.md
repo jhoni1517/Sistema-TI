@@ -70,8 +70,7 @@ Variables**. Marque **Production**, **Preview** e **Development** em todas.
 | `TELEGRAM_TOKEN` | Robô do Telegram | Nenhuma notificação chega no celular |
 | `TELEGRAM_CHAT_ID` | Seu chat, **só para a cobrança de mensalidade** | Você não recebe o resumo de quem está devendo |
 | `PIX_CHAVE_CRIPTO` | Cifra o token do Mercado Pago de cada loja (32 bytes em base64; gere no SQL do Supabase com `select encode(gen_random_bytes(32), 'base64');`) | "Ligar Pix pelo link" recusa gravar o token. **Trocar esta chave invalida os tokens já gravados**: cada loja cola o dela de novo |
-| `VITE_IA_LIGADA` | `1` liga os botões de IA na tela (ler nota por foto, perguntar à IA, ditar a OS). **Desligada por padrão**, porque cada uso custa | Sem ela os botões nem aparecem. A sugestão pelo histórico da loja continua, porque é de graça |
-| `GEMINI_API_KEY` | IA: nota por foto, sugestão de diagnóstico e OS por voz (crie em aistudio.google.com → Get API key) | Os três botões de IA respondem "Falta GEMINI_API_KEY" e não gastam crédito |
+| `GEMINI_API_KEY` | IA: nota por foto, sugestão de diagnóstico e OS por voz (crie em aistudio.google.com → Get API key) | Os botões de IA não aparecem (a sugestão pelo histórico continua). Com a chave, eles aparecem sozinhos. Criando a chave SEM cadastrar cartão no Google, fica no plano grátis e não tem como cobrar |
 | `GEMINI_MODELO` (opcional) | Troca o modelo do Gemini. Padrão: `gemini-2.5-flash-lite` | Nada: usa o padrão |
 | `SITE_URL` (opcional) | Endereço do site para o aviso de pagamento do Mercado Pago | Nada: sem ela usa o endereço de quem chamou |
 

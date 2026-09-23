@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { Lightbulb, Sparkles, Check } from "lucide-react";
 import { aviso } from "./Aviso";
+import { useIaLigada } from "./useIaLigada";
 import { brl, normalizar } from "../lib/format";
-import { perguntarIA, usoDoMes, iaLigada } from "../lib/ia";
+import { perguntarIA, usoDoMes } from "../lib/ia";
 import {
   sugerir,
   resumoParaIA,
@@ -37,6 +38,7 @@ export const SugestaoDaOS: React.FC<{
   const [ia, setIa] = useState<DiagnosticoIA | null>(null);
   const [perguntando, setPerguntando] = useState(false);
   const [uso, setUso] = useState("");
+  const ligada = useIaLigada();
 
   if (!temDadosParaSugerir(os)) return null;
 
@@ -122,7 +124,7 @@ export const SugestaoDaOS: React.FC<{
         </p>
       )}
 
-      {iaLigada() && (
+      {ligada && (
       <div className="mt-3 border-t border-amber-200 pt-2">
         {!ia ? (
           <button className="btn-ghost !py-1 text-xs" disabled={perguntando} onClick={perguntar}>

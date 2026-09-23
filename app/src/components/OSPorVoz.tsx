@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Mic, Square, UserPlus } from "lucide-react";
 import { aviso } from "./Aviso";
+import { useIaLigada } from "./useIaLigada";
 import { useApp } from "../store/AppStore";
-import { perguntarIA, paraBase64, usoDoMes, iaLigada } from "../lib/ia";
+import { perguntarIA, paraBase64, usoDoMes } from "../lib/ia";
 import { lerOSPorVoz, clienteDaVoz, preencherPelaVoz, type OSPorVoz as Ditado } from "../lib/voz-os";
 import { uid, nowISO } from "../lib/format";
 import type { Cliente, OrdemServico } from "../lib/types";
@@ -35,6 +36,7 @@ export const OSPorVoz: React.FC<{
   const [ditado, setDitado] = useState<Ditado | null>(null);
   const [semCadastro, setSemCadastro] = useState(false);
   const [uso, setUso] = useState("");
+  const ligada = useIaLigada();
 
   // Sair da tela com o microfone ligado deixaria a bolinha vermelha do
   // navegador acesa, gravando nada, até fechar a aba.
@@ -47,8 +49,8 @@ export const OSPorVoz: React.FC<{
   );
 
   const suportado = typeof window !== "undefined" && "MediaRecorder" in window && !!navigator.mediaDevices;
-  // IA desligada: cada áudio seria uma chamada paga ao Gemini.
-  if (!suportado || !iaLigada()) return null;
+  // Sem chave do Gemini na Vercel, o microfone nem aparece.
+  if (!suportado || !ligada) return null;
 
   const enviar = async (audio: Blob) => {
     setOuvindo(true);
