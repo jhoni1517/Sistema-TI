@@ -757,6 +757,7 @@ export const Config: React.FC = () => {
       {sessao?.perfil && (
         <Equipe
           meuId={sessao.perfil.id}
+          minhaLoja={sessao.perfil.loja_id}
           meuPapel={sessao.perfil.papel}
           souSuperAdmin={sessao.perfil.super_admin}
         />
