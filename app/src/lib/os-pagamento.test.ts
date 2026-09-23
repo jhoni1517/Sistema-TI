@@ -7,6 +7,7 @@ import {
   perguntaDoResto,
   entregaOAparelho,
   DESTINO_META,
+  lancamentoParaOCusto,
 } from "./os-pagamento";
 import type { MovimentoCaixa } from "./types";
 
@@ -184,5 +185,27 @@ describe("centavo não some no meio do caminho", () => {
     const c = contaDaOS(100, [{ forma: "pix", valor: 99.99 }]);
     expect(c.situacao).toBe("parcial");
     expect(c.falta).toBe(0.01);
+  });
+});
+
+describe("OS paga antes da retirada: o custo entra na entrega", () => {
+  const mov = (m: Partial<MovimentoCaixa>): MovimentoCaixa =>
+    ({ id: "m", tipo: "entrada", categoria: "OS", descricao: "", valor: 100, formaPagamento: "pix", data: "2026-09-01", ...m }) as MovimentoCaixa;
+
+  it("escolhe o primeiro lançamento de entrada da OS", () => {
+    const r = lancamentoParaOCusto(
+      [mov({ id: "b", osId: "o1", data: "2026-09-02" }), mov({ id: "a", osId: "o1", data: "2026-09-01" }), mov({ id: "x", osId: "o2" })],
+      "o1"
+    );
+    expect(r?.id).toBe("a");
+  });
+
+  it("custo já lançado não é lançado de novo", () => {
+    expect(lancamentoParaOCusto([mov({ osId: "o1", custoRelacionado: 50 })], "o1")).toBeNull();
+  });
+
+  it("sem dinheiro na OS não tem onde pôr custo", () => {
+    expect(lancamentoParaOCusto([mov({ osId: "o1", tipo: "saida" })], "o1")).toBeNull();
+    expect(lancamentoParaOCusto([], "o1")).toBeNull();
   });
 });

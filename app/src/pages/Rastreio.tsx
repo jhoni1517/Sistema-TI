@@ -13,6 +13,7 @@ import {
   CalendarClock,
   PackageSearch,
   MessageCircle,
+  QrCode,
 } from "lucide-react";
 import { supabase, supabaseEnabled } from "../lib/supabase";
 import { brl, formatDateTime, codigoOS } from "../lib/format";
@@ -30,6 +31,7 @@ import {
 } from "../lib/rastreio";
 import { duracaoEscrita } from "../lib/video";
 import { MarcaDaLoja } from "../components/MarcaDaLoja";
+import { podePagarPix, imagemDoQR, validadeDoQR, SEGUNDOS_ENTRE_CONSULTAS } from "../lib/pix";
 
 /** O site do sistema, no rodapé discreto */
 const SITE_BALCAO = "https://sistema-ti-caixa.vercel.app/";
@@ -193,6 +195,78 @@ export const Rastreio: React.FC = () => {
   const previsao = os ? previsaoDeEntrega(os.previsao, os.status) : null;
   const falar = os ? linkFalarComLoja(os.whatsapp, os.numero) : "";
   const cor = corDaLoja(os?.cor);
+
+  /*
+   * PIX PELO LINK.
+   *
+   * A página só PERGUNTA ao servidor (api/pix.js) se dá para pagar e
+   * quanto: o valor nunca sai daqui, senão bastaria editar a chamada para
+   * pagar R$ 1 por um conserto de R$ 800. Falha nessa pergunta esconde o
+   * botão em vez de mostrar erro — a loja que não ligou o Pix não pode
+   * ganhar uma mensagem vermelha na página do cliente dela.
+   */
+  const [pix, setPix] = useState<{ disponivel: boolean; valor: number; pago: boolean } | null>(null);
+  const [qr, setQr] = useState<{ copiaECola: string; qrBase64: string; expiraEm: string; valor: number } | null>(null);
+  const [gerandoPix, setGerandoPix] = useState(false);
+
+  const consultarPix = React.useCallback(async () => {
+    if (!os || !podePagarPix(os.status)) return;
+    try {
+      const q = new URLSearchParams({ acao: "status", loja, numero: String(os.numero), t: token });
+      const r = await fetch(`/api/pix?${q}`);
+      if (!r.ok) return;
+      const d = await r.json();
+      setPix({ disponivel: !!d.disponivel, valor: Number(d.valor) || 0, pago: !!d.pago });
+      if (d.pago) setQr(null);
+    } catch {
+      /* sem resposta, sem botão: ver o comentário acima */
+    }
+  }, [os, loja, token]);
+
+  useEffect(() => {
+    consultarPix();
+  }, [consultarPix]);
+
+  // Com o QR na tela, pergunta de tempos em tempos: é assim que a página vira
+  // "Pagamento recebido" sozinha, sem o cliente ter que recarregar.
+  useEffect(() => {
+    if (!qr) return;
+    const t = setInterval(consultarPix, SEGUNDOS_ENTRE_CONSULTAS * 1000);
+    return () => clearInterval(t);
+  }, [qr, consultarPix]);
+
+  const gerarPix = async () => {
+    if (!os || gerandoPix) return;
+    setGerandoPix(true);
+    try {
+      const r = await fetch("/api/pix?acao=gerar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ loja, numero: os.numero, t: token }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d?.erro || "");
+      if (d.pago) return consultarPix();
+      setQr(d);
+    } catch (e) {
+      aviso.erro(
+        "Não deu para gerar o Pix agora. Tenta de novo daqui a pouco." +
+          (e instanceof Error && e.message ? `\n\n${e.message}` : "")
+      );
+    } finally {
+      setGerandoPix(false);
+    }
+  };
+
+  const copiarPix = async () => {
+    if (!qr) return;
+    try {
+      await navigator.clipboard.writeText(qr.copiaECola);
+      aviso.sucesso("Código copiado. Agora é só colar no app do banco, em Pix Copia e Cola.");
+    } catch {
+      aviso.erro("Não deu para copiar sozinho. Segura o dedo no código e copia na mão.");
+    }
+  };
 
   return (
     <div className="min-h-screen bg-papel p-4 font-grotesca text-tinta">
@@ -473,6 +547,72 @@ export const Rastreio: React.FC = () => {
                     {brl(totalEscolhido())}
                   </p>
                 </div>
+              )}
+
+              {pix?.disponivel && pix.pago && (
+                <div className="mb-6 flex items-center gap-3 rounded-md border-2 border-status-pronta p-4">
+                  <CheckCircle2 size={22} className="shrink-0" />
+                  <p className="text-sm">
+                    <b>Pagamento recebido.</b>{" "}
+                    {os.status === "pronta"
+                      ? "Tá tudo certo, é só vir buscar."
+                      : "Tá tudo certo por aqui, é só buscar quando ficar pronto."}
+                  </p>
+                </div>
+              )}
+
+              {pix?.disponivel && !pix.pago && pix.valor > 0 && (
+                <section className="mb-6 rounded-md border-2 border-linha p-4">
+                  <h2 className="rotulo mb-2 flex items-center gap-1.5">
+                    <QrCode size={14} /> Pagar com Pix
+                  </h2>
+                  {!qr ? (
+                    <>
+                      <p className="mb-3 text-sm text-tinta-suave">
+                        Paga agora pelo celular e já deixa tudo acertado. Cai direto na conta da loja.
+                      </p>
+                      <button
+                        className="btn w-full rounded-md bg-sinal text-sinal-tinta hover:bg-sinal/90 focus-visible:ring-sinal"
+                        disabled={gerandoPix}
+                        onClick={gerarPix}
+                      >
+                        <QrCode size={16} />
+                        {gerandoPix ? "Gerando o Pix..." : <>Pagar <span className="valor">{brl(pix.valor)}</span> com Pix</>}
+                      </button>
+                    </>
+                  ) : (
+                    <div className="text-center">
+                      <p className="valor text-3xl font-semibold text-sinal">{brl(qr.valor)}</p>
+                      {imagemDoQR(qr.qrBase64) && (
+                        <img
+                          src={imagemDoQR(qr.qrBase64)}
+                          alt="QR Code do Pix"
+                          className="mx-auto my-3 h-56 w-56 rounded border border-linha bg-white p-2"
+                        />
+                      )}
+                      <p className="mb-2 text-xs text-tinta-suave">
+                        Abre o app do banco e lê o QR, ou copia o código abaixo em Pix Copia e Cola.
+                      </p>
+                      <p className="valor mb-2 max-h-20 overflow-hidden break-all rounded bg-concreto p-2 text-left text-[11px]">
+                        {qr.copiaECola}
+                      </p>
+                      <button
+                        className="btn w-full rounded-md bg-sinal text-sinal-tinta hover:bg-sinal/90 focus-visible:ring-sinal"
+                        onClick={copiarPix}
+                      >
+                        Copiar código Pix
+                      </button>
+                      <p className="mt-2 text-xs text-tinta-suave">
+                        {validadeDoQR(qr.expiraEm) ? `${validadeDoQR(qr.expiraEm)}.` : "Esse código venceu."} Assim que cair, esta página avisa sozinha.
+                      </p>
+                      {!validadeDoQR(qr.expiraEm) && (
+                        <button className="mt-2 text-sm font-semibold underline" onClick={() => setQr(null)}>
+                          Gerar outro código
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </section>
               )}
 
               {os.status === "aguardando_aprovacao" && (

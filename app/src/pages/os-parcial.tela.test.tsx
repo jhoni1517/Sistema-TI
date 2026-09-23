@@ -124,6 +124,7 @@ function tela(ordem: OrdemServico, movimentos: MovimentoCaixa[] = []): string {
       onExcluir={() => {}}
       onReceber={() => {}}
       onFiado={() => {}}
+      onEntregarPago={() => {}}
       pagamentoRegistrado={false}
       historicoAparelho={[]}
       registrando={false}
@@ -166,6 +167,16 @@ describe("o painel de receber da OS", () => {
     const t = tela(os(), [mov(300, "outra-os")]);
     expect(t).toContain("Receber R$ 800,00");
     expect(t).not.toContain("Já recebido nesta OS");
+  });
+
+  it("paga inteira antes (Pix pelo link ou sinal cheio): só entrega, sem 'Receber R$ 0,00'", () => {
+    // Antes o botão dizia "Receber R$ 0,00" e não fechava nada: o aparelho
+    // pago não tinha como sair pelo sistema.
+    const t = tela(os(), [mov(800)]);
+    expect(t).toContain("Já está pago");
+    expect(t).toContain("Entregar");
+    expect(t).not.toContain("Receber R$ 0,00");
+    expect(t).not.toContain("Receber e entregar");
   });
 
   it("OS entregue não mostra o painel de receber", () => {

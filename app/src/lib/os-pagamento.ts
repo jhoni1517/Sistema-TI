@@ -174,3 +174,26 @@ export const faltaNaOS = (
   movimentos: MovimentoCaixa[],
   osId: string
 ): number => centavos(Math.max(0, centavos(n(aCobrar)) - recebidoDaOS(movimentos, osId)));
+
+/**
+ * O lançamento que recebe o custo das peças quando a OS JÁ PAGA é entregue.
+ *
+ * Pago antes da retirada — sinal cheio no balcão ou Pix pelo link — o
+ * dinheiro entrou com custo zero, porque a peça ainda não tinha saído da
+ * prateleira. Na entrega ela sai, e o custo precisa ir para algum lugar:
+ * sem isso o mês fecha com o conserto inteiro como lucro puro, e lucro
+ * inflado é invisível — ninguém procura por ele.
+ *
+ * O custo vai no PRIMEIRO lançamento de entrada da OS, igual ao recebimento
+ * normal. Se algum lançamento dela já tem custo, devolve nulo: entregar de
+ * novo uma OS reaberta não pode lançar o custo duas vezes.
+ */
+export function lancamentoParaOCusto(
+  movimentos: MovimentoCaixa[],
+  osId: string
+): MovimentoCaixa | null {
+  const daOS = (movimentos || []).filter((m) => m.osId === osId && m.tipo === "entrada");
+  if (daOS.length === 0) return null;
+  if (daOS.some((m) => n(m.custoRelacionado) > 0)) return null;
+  return [...daOS].sort((a, b) => String(a.data).localeCompare(String(b.data)))[0];
+}
