@@ -21,6 +21,13 @@ const os = {
 const cliente = { nome: 'João "Zé" Silva & Filhos', telefone: "41999", cpf: "111.444.777-35" };
 
 describe("recibo da OS", () => {
+  it("o papel que o cliente assina traz a garantia legal de 90 dias", () => {
+    // O recibo imprimia o termo de guarda e nada sobre garantia.
+    const html = reciboOS(os, cliente, cfg);
+    expect(html).toContain("Garantia legal: 90 dias");
+    expect(html).toContain("art. 26, II");
+  });
+
   it("imprime mesmo com OS sem peças", () => {
     expect(reciboOS(os, cliente, cfg).length).toBeGreaterThan(500);
   });

@@ -8,7 +8,7 @@
 # NÃO dá para conferir sem um Postgres de verdade, e as três já esconderam
 # bug:
 #
-#   1. as 25 migrações rodam em ordem, num banco novo?
+#   1. as migrações rodam em ordem, num banco novo?
 #   2. a conta que existe em SQL dá o mesmo número que a de TypeScript?
 #   3. duas vendas ao mesmo tempo baixam as duas?
 #

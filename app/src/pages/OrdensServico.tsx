@@ -9,6 +9,7 @@ import {
   Pencil,
   Trash2,
   MessageCircle,
+  Star,
   Printer,
   Smartphone,
   KeyRound,
@@ -142,6 +143,10 @@ import {
   textoDaGarantia,
   garantiasVencendo,
 } from "../lib/garantia";
+import { alertaDeAbandono, mensagemDeAbandono, prazoDoConserto } from "../lib/prazos";
+import { podePedirAvaliacao, mensagemPedidoAvaliacao } from "../lib/avaliacao";
+import { hojeISO } from "../lib/contas";
+import { SeloPrazo } from "../components/SeloPrazo";
 
 
 const STATUS_LIST = Object.keys(OS_STATUS_META) as OSStatus[];
@@ -571,6 +576,7 @@ export const OrdensServico: React.FC = () => {
                       <AlertTriangle size={12} /> Sem pagamento — receber
                     </button>
                   )}
+                  <SeloPrazo os={o} soRisco />
                   {(() => {
                     const dias = diasEmPosse(o);
                     const t = taxaArmazenamento(o, config.taxaArmazenamentoDia || 0, config.diasAbandono || 90);
@@ -580,7 +586,8 @@ export const OrdensServico: React.FC = () => {
                           <AlertTriangle size={11} /> Guarda {brl(t.valor)}
                         </span>
                       );
-                    if (dias >= 15)
+                    // O selo de abandono (30/60/90) já diz isto, com mais peso.
+                    if (dias >= 15 && !alertaDeAbandono(o))
                       return (
                         <span className="badge bg-amber-100 text-amber-700" title="Aparelho parado há muito tempo">
                           <Clock size={11} /> {dias} dias
@@ -1394,6 +1401,22 @@ const OSForm: React.FC<{
         </fieldset>
         )}
 
+        {/* Retorno em garantia liga o relógio de 30 dias do CDC. Sem a marca,
+            o retorno esperava peça como qualquer OS e o prazo estourava sem
+            ninguém ver. Ver lib/prazos.ts. */}
+        <label className="flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-sm">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 shrink-0"
+            checked={!!os.retornoGarantia}
+            onChange={(e) => setOs({ ...os, retornoGarantia: e.target.checked })}
+          />
+          <span>
+            <b>Retorno em garantia</b> — o conserto anterior não resolveu. A loja tem 30 dias
+            corridos, contados de hoje, para resolver (CDC).
+          </span>
+        </label>
+
         {/* Defeito e checklist */}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Defeito relatado pelo cliente *">
@@ -1685,6 +1708,18 @@ const OSForm: React.FC<{
           <Field label="Técnico responsável">
             <input className="input" value={os.tecnico} onChange={(e) => setOs({ ...os, tecnico: e.target.value })} />
           </Field>
+          {/* Sai na página do cliente. "Quando fica pronto?" é a ligação que
+              mais tira o técnico da bancada. */}
+          <Field label="Previsão de entrega">
+            <input
+              type="date"
+              className="input"
+              value={os.previsaoEntrega || ""}
+              // Vazio, e não undefined: undefined some do JSON e a data antiga
+              // ficaria gravada no banco.
+              onChange={(e) => setOs({ ...os, previsaoEntrega: e.target.value })}
+            />
+          </Field>
         </div>
 
         <div className="rounded-xl bg-slate-50 p-4 text-sm">
@@ -1930,8 +1965,32 @@ export const OSDetalhe: React.FC<{
 }> = ({ os, clienteNome, cliente, config, onClose, onStatus, onAvisar, onEditar, onExcluir, onReceber, onFiado, pagamentoRegistrado, historicoAparelho, registrando }) => {
   // `movimentos` vem do store porque é lá que o dinheiro da OS mora: um
   // campo separado começaria a divergir do caixa no primeiro estorno.
-  const { ramo, movimentos } = useApp();
+  const { ramo, movimentos, clientes, saveCliente } = useApp();
   const voc = vocabulario(ramo);
+  /** O cadastro inteiro: é nele que fica anotado quando pedimos avaliação */
+  const clienteCompleto = (clientes || []).find((c) => c.id === os.clienteId);
+  const avaliacao = podePedirAvaliacao(os, clienteCompleto, config);
+  const [pedindoAvaliacao, setPedindoAvaliacao] = useState(false);
+  /**
+   * Abre o WhatsApp ANTES de gravar: janela aberta depois de um `await` é
+   * bloqueada no iPhone, e o botão pareceria morto. Se a anotação falhar,
+   * a tela diz — senão a pessoa pede de novo na semana que vem.
+   */
+  const pedirAvaliacao = async () => {
+    if (!clienteCompleto || !avaliacao.pode || pedindoAvaliacao) return;
+    abrirWhatsapp(txt(clienteCompleto.telefone), mensagemPedidoAvaliacao(os, clienteCompleto, config));
+    setPedindoAvaliacao(true);
+    try {
+      await saveCliente({ ...clienteCompleto, avaliacaoPedidaEm: hojeISO() });
+    } catch (e) {
+      aviso.erro(
+        "A mensagem abriu, mas não ficou anotado que o pedido foi feito:\n\n" +
+          (e instanceof Error ? e.message : String(e))
+      );
+    } finally {
+      setPedindoAvaliacao(false);
+    }
+  };
   const [forma, setForma] = useState<FormaPagamento>("dinheiro");
   const [parcelas, setParcelas] = useState<Parcela[]>([]);
   const [dividido, setDividido] = useState(false);
@@ -2181,6 +2240,47 @@ export const OSDetalhe: React.FC<{
             </div>
           );
         })()}
+
+        {/* Avaliação no Google: só entregue, e uma vez a cada 90 dias por
+            pessoa. O motivo de não poder aparece escrito — botão cinza sem
+            explicação parece sistema travado. */}
+        {os.status === "entregue" && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-3 no-print">
+            <span className="min-w-0 flex-1 text-sm text-slate-600">
+              {avaliacao.pode ? "Cliente satisfeito é a hora de pedir estrela." : avaliacao.motivo}
+            </span>
+            <button
+              className="btn-secondary !py-1.5 text-xs"
+              disabled={!avaliacao.pode || pedindoAvaliacao}
+              onClick={pedirAvaliacao}
+            >
+              <Star size={14} /> Pedir avaliação
+            </button>
+          </div>
+        )}
+
+        {/* Prazos: retorno em garantia (30 dias do CDC) e aparelho parado.
+            O aviso de abandono já sai com a mensagem pronta — é o registro
+            de que a loja chamou, que é o que vale se o cliente reaparecer. */}
+        {(prazoDoConserto(os) || alertaDeAbandono(os)) && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-3 no-print">
+            <SeloPrazo os={os} />
+            {prazoDoConserto(os) && (
+              <span className="min-w-0 flex-1 text-sm text-slate-600">
+                Retorno em garantia: resolver até{" "}
+                <b>{prazoDoConserto(os)!.limite.split("-").reverse().join("/")}</b>.
+              </span>
+            )}
+            {alertaDeAbandono(os) && cliente?.telefone && (
+              <button
+                className="btn-secondary !py-1.5 text-xs"
+                onClick={() => abrirWhatsapp(txt(cliente.telefone), mensagemDeAbandono(os, cliente, config))}
+              >
+                <MessageCircle size={14} /> Avisar cliente
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Fotos da entrada: saem na impressão junto com o termo de guarda,
             que é onde elas valem como prova do estado do aparelho. */}

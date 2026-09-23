@@ -21,6 +21,46 @@
   color-scheme: dark;
 }
 
+/* ====== TOKENS DO BALCÃO (docs/DESIGN.md) ======
+   Formato "R G B" para o Tailwind aplicar opacidade (bg-sinal/10).
+   Nenhuma tela antiga usa isto ainda: elas migram uma por vez, e trocar
+   tudo de uma vez é o jeito de quebrar vinte telas sem ver nenhuma. */
+:root {
+  --papel: 244 239 228;        /* #F4EFE4 */
+  --cartao: 255 253 248;       /* #FFFDF8 */
+  --concreto: 230 224 211;     /* #E6E0D3 */
+  --linha: 214 207 191;        /* #D6CFBF */
+  --tinta: 28 25 20;           /* #1C1914 — 15,3:1 no papel */
+  --tinta-suave: 94 87 75;     /* #5E574B — 6,2:1 no papel */
+  --sinal: 191 63 11;          /* #BF3F0B — branco por cima 5,3:1 */
+  --sinal-tinta: 255 255 255;
+  --etiqueta: 255 194 26;      /* #FFC21A — só fundo, nunca texto */
+
+  /* Status da OS: carimbo cheio com texto branco, todos AA */
+  --status-aberta: 94 87 75;       /* #5E574B */
+  --status-analise: 62 92 118;     /* #3E5C76 */
+  --status-aprovacao: 143 95 0;    /* #8F5F00 */
+  --status-aprovada: 43 110 98;    /* #2B6E62 */
+  --status-reparo: 31 79 163;      /* #1F4FA3 */
+  --status-peca: 156 58 10;        /* #9C3A0A */
+  --status-pronta: 27 122 54;      /* #1B7A36 */
+  --status-entregue: 75 91 69;     /* #4B5B45 */
+  --status-cancelada: 180 35 24;   /* #B42318 */
+}
+
+/* No escuro só a base e a marca mudam. Os carimbos já são escuros o
+   bastante para levar branco por cima em qualquer fundo. */
+:root.dark {
+  --papel: 23 20 17;           /* #171411 */
+  --cartao: 33 29 24;          /* #211D18 */
+  --concreto: 44 39 33;        /* #2C2721 */
+  --linha: 58 52 44;           /* #3A342C */
+  --tinta: 237 230 216;        /* #EDE6D8 */
+  --tinta-suave: 166 156 138;  /* #A69C8A — 6,8:1 no escuro */
+  --sinal: 240 138 75;         /* #F08A4B — 7,4:1 no escuro */
+  --sinal-tinta: 23 20 17;
+}
+
 html,
 body,
 #root {
@@ -100,6 +140,17 @@ body {
     radial-gradient(70% 50% at 50% 105%, rgb(251 191 36 / 0.14), transparent 70%),
     #0f172a;
 }
+
+/* ====== CARIMBO "PRONTO" DO PAINEL DA TV ======
+   O carimbo desce com força e assenta torto, como batido na mão. É o único
+   movimento da parede: se tudo mexe, ninguém olha para nada. */
+@keyframes carimbar {
+  0%   { transform: scale(2.6) rotate(-14deg); opacity: 0; }
+  55%  { transform: scale(0.92) rotate(-5deg); opacity: 1; }
+  75%  { transform: scale(1.04) rotate(-7deg); }
+  100% { transform: scale(1) rotate(-6deg); opacity: 1; }
+}
+.carimbar { animation: carimbar 0.45s cubic-bezier(.2,.9,.3,1.2) both; }
 
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -286,6 +337,29 @@ body {
    */
   .chip {
     @apply inline-flex min-h-[2.25rem] shrink-0 items-center justify-center gap-1.5 rounded-full px-3 font-semibold transition-colors sm:min-h-[1.75rem];
+  }
+  /* Valor em dinheiro, IMEI, nº de OS: letra de etiqueta térmica e
+     algarismo de largura fixa. Sem tabular, R$ 111,11 fica mais estreito
+     que R$ 888,88 e a coluna de preço dança. */
+  .valor {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-variant-numeric: tabular-nums;
+  }
+  /* O carimbo de status: só no estado final que importa (PRONTO,
+     ENTREGUE, CANCELADO). Fundo e contorno vêm de fora
+     (bg-status-* e outline-status-*). Texto branco e fundo cheio, e não
+     letra colorida no papel: a cor de status sobre o fundo escuro do modo
+     noturno não passa contraste nenhum. */
+  .carimbo {
+    @apply inline-block rounded px-4 py-2 font-extrabold uppercase tracking-wider text-white;
+    outline-style: double;
+    outline-width: 5px;
+    outline-offset: 3px;
+    transform: rotate(-2deg);
+  }
+  /* Rótulo de seção e de campo: o "NOME:" impresso no papel da OS */
+  .rotulo {
+    @apply text-xs font-semibold uppercase tracking-wider text-tinta-suave;
   }
   .badge {
     @apply inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold;

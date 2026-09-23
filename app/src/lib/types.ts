@@ -26,7 +26,7 @@ export type OSStatus =
  * - `label` é o nome curto de dentro da loja, para caber em lista e filtro.
  * - `destaque` é o mesmo estado dito para o CLIENTE, e é o que vai grande no
  *   rastreio e sozinho no parágrafo do WhatsApp. "Pronta" não diz nada a quem
- *   está do outro lado; "Pronta para retirada" diz o que ele faz agora.
+ *   está do outro lado; "Tá pronto, pode buscar" diz o que ele faz agora.
  * - `cliente` explica em uma frase, embaixo do destaque.
  *
  * `color` é o crachá pálido das listas — dez linhas de cor cheia viram um
@@ -37,17 +37,29 @@ export type OSStatus =
  */
 export const OS_STATUS_META: Record<
   OSStatus,
-  { label: string; destaque: string; color: string; forte: string; cliente: string }
+  {
+    label: string;
+    destaque: string;
+    color: string;
+    forte: string;
+    cliente: string;
+    /**
+     * O carimbo da identidade visual (docs/DESIGN.md): fundo cheio na cor
+     * do status, texto branco, AA em todos. `forte` fica para as telas que
+     * ainda não migraram.
+     */
+    carimbo: string;
+  }
 > = {
-  aberta: { label: "Aberta", destaque: "Aparelho recebido", color: "bg-slate-100 text-slate-700", forte: "bg-slate-600 text-white", cliente: "Recebemos seu aparelho e vamos analisá-lo." },
-  em_analise: { label: "Em análise", destaque: "Em análise", color: "bg-blue-100 text-blue-700", forte: "bg-blue-600 text-white", cliente: "Estamos avaliando o que o aparelho tem." },
-  aguardando_aprovacao: { label: "Aguardando aprovação", destaque: "Aguardando sua aprovação", color: "bg-amber-100 text-amber-700", forte: "bg-amber-600 text-white", cliente: "O orçamento está pronto. Precisamos do seu OK para começar." },
-  aprovada: { label: "Aprovada", destaque: "Orçamento aprovado", color: "bg-indigo-100 text-indigo-700", forte: "bg-indigo-600 text-white", cliente: "Orçamento aprovado. Vamos iniciar o reparo." },
-  em_reparo: { label: "Em reparo", destaque: "Em reparo", color: "bg-purple-100 text-purple-700", forte: "bg-purple-600 text-white", cliente: "Estamos trabalhando no seu aparelho." },
-  aguardando_peca: { label: "Aguardando peça", destaque: "Aguardando peça", color: "bg-orange-100 text-orange-700", forte: "bg-orange-600 text-white", cliente: "Aguardando a chegada de uma peça para continuar." },
-  pronta: { label: "Pronta", destaque: "Pronta para retirada", color: "bg-emerald-100 text-emerald-700", forte: "bg-emerald-600 text-white", cliente: "Pode vir buscar dentro do nosso horário de atendimento." },
-  entregue: { label: "Entregue", destaque: "Aparelho entregue", color: "bg-teal-100 text-teal-700", forte: "bg-teal-600 text-white", cliente: "Obrigado pela preferência!" },
-  cancelada: { label: "Cancelada", destaque: "Serviço cancelado", color: "bg-red-100 text-red-700", forte: "bg-red-600 text-white", cliente: "O aparelho está disponível para retirada." },
+  aberta: { label: "Aberta", destaque: "Aparelho recebido", color: "bg-slate-100 text-slate-700", forte: "bg-slate-600 text-white", carimbo: "bg-status-aberta outline-status-aberta text-white", cliente: "Seu aparelho chegou. Já já o técnico dá uma olhada." },
+  em_analise: { label: "Em análise", destaque: "Em análise", color: "bg-blue-100 text-blue-700", forte: "bg-blue-600 text-white", carimbo: "bg-status-analise outline-status-analise text-white", cliente: "O técnico tá descobrindo o que ele tem." },
+  aguardando_aprovacao: { label: "Aguardando aprovação", destaque: "Aguardando sua aprovação", color: "bg-amber-100 text-amber-700", forte: "bg-amber-600 text-white", carimbo: "bg-status-aprovacao outline-status-aprovacao text-white", cliente: "O orçamento tá aqui embaixo. Só começamos com o seu OK." },
+  aprovada: { label: "Aprovada", destaque: "Orçamento aprovado", color: "bg-indigo-100 text-indigo-700", forte: "bg-indigo-600 text-white", carimbo: "bg-status-aprovada outline-status-aprovada text-white", cliente: "Você aprovou. Já vai pra bancada." },
+  em_reparo: { label: "Em reparo", destaque: "Em reparo", color: "bg-purple-100 text-purple-700", forte: "bg-purple-600 text-white", carimbo: "bg-status-reparo outline-status-reparo text-white", cliente: "Tá na bancada, com o técnico." },
+  aguardando_peca: { label: "Aguardando peça", destaque: "Aguardando peça", color: "bg-orange-100 text-orange-700", forte: "bg-orange-600 text-white", carimbo: "bg-status-peca outline-status-peca text-white", cliente: "Esperando a peça chegar. A gente avisa quando ela chegar." },
+  pronta: { label: "Pronta", destaque: "Tá pronto, pode buscar", color: "bg-emerald-100 text-emerald-700", forte: "bg-emerald-600 text-white", carimbo: "bg-status-pronta outline-status-pronta text-white", cliente: "Pode vir buscar no nosso horário." },
+  entregue: { label: "Entregue", destaque: "Aparelho entregue", color: "bg-teal-100 text-teal-700", forte: "bg-teal-600 text-white", carimbo: "bg-status-entregue outline-status-entregue text-white", cliente: "Já tá com você. Qualquer coisa, chama a gente." },
+  cancelada: { label: "Cancelada", destaque: "Serviço cancelado", color: "bg-red-100 text-red-700", forte: "bg-red-600 text-white", carimbo: "bg-status-cancelada outline-status-cancelada text-white", cliente: "Sem conserto. O aparelho tá esperando você buscar." },
 };
 
 /**
@@ -144,6 +156,11 @@ export interface Cliente {
   classificadoEm?: string;
   /** Aniversário (AAAA-MM-DD). O ano pode ser qualquer um: só o dia importa. */
   nascimento?: string;
+  /**
+   * Quando pedimos avaliação no Google a esta pessoa (AAAA-MM-DD).
+   * Segura o próximo pedido por 90 dias — ver lib/avaliacao.ts.
+   */
+  avaliacaoPedidaEm?: string;
   /**
    * Teto do fiado deste cliente. Vazio = sem teto.
    *
@@ -341,6 +358,19 @@ export interface OrdemServico {
   videosLaudo?: VideoLaudo[];
   // Quando ficou pronta (base para taxa de armazenamento)
   prontaEm?: string;
+  /**
+   * Para quando a loja promete o aparelho (AAAA-MM-DD). Vai para a página
+   * do cliente — é a primeira coisa que ele liga para perguntar.
+   */
+  previsaoEntrega?: string;
+  /**
+   * O cliente voltou porque o conserto anterior não resolveu.
+   *
+   * Liga o relógio de 30 dias do CDC para sanar o vício (lib/prazos.ts).
+   * Sem a marca, o retorno era uma OS igual às outras, esperava peça como
+   * as outras, e o prazo legal estourava sem ninguém ver.
+   */
+  retornoGarantia?: boolean;
 }
 
 export interface Categoria {
