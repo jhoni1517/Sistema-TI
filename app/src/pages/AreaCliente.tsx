@@ -425,7 +425,7 @@ const LinhaOS: React.FC<{ os: OSDoCliente; loja: string; hoje?: string }> = ({ o
   );
 };
 
-const Caixa: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+export const Caixa: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div className="rounded-md border border-linha bg-cartao p-5">{children}</div>
 );
 
@@ -436,7 +436,7 @@ const Numero: React.FC<{ valor: number; rotulo: string }> = ({ valor, rotulo }) 
   </div>
 );
 
-const Campo: React.FC<{
+export const Campo: React.FC<{
   rotulo: string;
   valor: string;
   mudar: (v: string) => void;
@@ -457,10 +457,10 @@ const Campo: React.FC<{
   </label>
 );
 
-const Erro: React.FC<{ texto: string }> = ({ texto }) =>
+export const Erro: React.FC<{ texto: string }> = ({ texto }) =>
   texto ? <p className="rounded-md border border-status-cancelada/40 bg-status-cancelada/10 p-2 text-sm">{texto}</p> : null;
 
-const Botao: React.FC<{ enviando: boolean; children: React.ReactNode }> = ({ enviando, children }) => (
+export const Botao: React.FC<{ enviando: boolean; children: React.ReactNode }> = ({ enviando, children }) => (
   <button
     type="submit"
     disabled={enviando}
