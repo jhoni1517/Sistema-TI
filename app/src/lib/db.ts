@@ -623,6 +623,48 @@ export const db = {
         );
       }
     },
+
+    /** A área do cliente está ligada? Coluna ainda não criada = desligada. */
+    async areaClienteAtiva(): Promise<boolean> {
+      if (!supabaseEnabled || !supabase || !lojaAtual) return false;
+      const { data, error } = await supabase
+        .from("lojas")
+        .select("area_cliente_ativa")
+        .eq("id", lojaAtual)
+        .maybeSingle();
+      if (error) {
+        if (/column|does not exist|schema cache|42703|PGRST204/i.test(error.message)) return false;
+        throw new Error(`Não foi possível ler a área do cliente: ${error.message}`);
+      }
+      return data?.area_cliente_ativa === true;
+    },
+
+    /** Liga ou desliga. Zero linhas alteradas é recusa do banco (só o dono). */
+    async definirAreaCliente(ativa: boolean): Promise<void> {
+      if (!supabaseEnabled || !supabase || !lojaAtual) throw new Error("Sem conexão com a nuvem.");
+      const { data, error } = await supabase
+        .from("lojas")
+        .update({ area_cliente_ativa: ativa })
+        .eq("id", lojaAtual)
+        .select("id");
+      if (error) throw traduzirErroGravacao(error);
+      if (!data || data.length === 0) {
+        throw new Error("O banco não deixou mudar. Só o dono da loja liga ou desliga a área do cliente.");
+      }
+    },
+
+    /** Segredo do link para o cliente criar a senha (vale 48 horas, uma vez) */
+    async gerarAcessoCliente(clienteId: string): Promise<string> {
+      if (!supabaseEnabled || !supabase) throw new Error("Sem conexão com a nuvem.");
+      const { data, error } = await supabase.rpc("gerar_acesso_cliente", { p_cliente: clienteId });
+      if (error) {
+        if (/function|does not exist|schema cache|PGRST202/i.test(error.message)) {
+          throw new Error("Falta rodar o SQL da área do cliente no Supabase (supabase-migracao-area-cliente.sql).");
+        }
+        throw new Error(error.message);
+      }
+      return String(data || "");
+    },
   },
 
   config: {

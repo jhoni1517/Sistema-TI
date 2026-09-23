@@ -24,6 +24,7 @@ import { Config } from "./pages/Config";
 import { Rastreio } from "./pages/Rastreio";
 import { PainelBancada } from "./pages/PainelBancada";
 import { Catalogo } from "./pages/Catalogo";
+import { AreaCliente } from "./pages/AreaCliente";
 import { SemPerfil } from "./pages/SemPerfil";
 import { Lojas } from "./pages/Lojas";
 import { Assinatura } from "./pages/Assinatura";
@@ -170,6 +171,9 @@ const App: React.FC = () => (
           Filtrar só na tela não esconde nada de quem abre o painel do
           navegador. */}
       <Route path="/catalogo/:loja" element={<Catalogo />} />
+      {/* Área do cliente: CPF e senha que o cliente cria. Não é usuário do
+          sistema; quem confere tudo são as funções do banco. */}
+      <Route path="/cliente/:loja" element={<AreaCliente />} />
       <Route path="/*" element={<AreaProtegida />} />
     </Routes>
   </HashRouter>

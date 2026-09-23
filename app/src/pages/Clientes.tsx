@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from "react";
 import { aviso } from "../components/Aviso";
-import { Plus, Search, Pencil, Trash2, Users, Phone, MessageCircle, Wrench, User, Building2, ShieldAlert, Cake } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Users, Phone, MessageCircle, Wrench, User, Building2, ShieldAlert, Cake, KeyRound } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
-import { uid, nowISO, whatsappLink, formatDate, brl, txt, mascaraDocumento, soDigitos, documentoValido } from "../lib/format";
+import { db, obterLoja } from "../lib/db";
+import { linkDeAcesso, mensagemDeAcesso } from "../lib/area-cliente";
+import { abrirWhatsapp, uid, nowISO, whatsappLink, formatDate, brl, txt, mascaraDocumento, soDigitos, documentoValido } from "../lib/format";
 import { normalizar } from "../lib/busca";
 import { avaliarCliente, classificacaoDe, travaFiado, devendo } from "../lib/clientes";
 import { garantiasDoCliente } from "../lib/garantia";
@@ -25,7 +27,18 @@ const vazio = (): Cliente => ({
 });
 
 export const Clientes: React.FC = () => {
-  const { clientes, ordens, fiados, vendas, saveCliente, removeCliente, ramo } = useApp();
+  const { clientes, ordens, fiados, vendas, saveCliente, removeCliente, ramo, config } = useApp();
+
+  const mandarAcesso = async (c: Cliente) => {
+    try {
+      const token = await db.loja.gerarAcessoCliente(c.id);
+      const link = linkDeAcesso(`${window.location.origin}${window.location.pathname}`, obterLoja(), token);
+      if (!link) throw new Error("Entre de novo no sistema para gerar o link.");
+      abrirWhatsapp(txt(c.telefone), mensagemDeAcesso(c.nome, config.nomeLoja, link));
+    } catch (e) {
+      aviso.erro("Não deu para gerar o acesso:\n\n" + (e instanceof Error ? e.message : String(e)));
+    }
+  };
   const temOS = temModulo(ramo, "os");
   const voc = vocabulario(ramo);
 
@@ -247,6 +260,17 @@ export const Clientes: React.FC = () => {
                   >
                     <MessageCircle size={14} /> WhatsApp
                   </a>
+                )}
+                {/* Link pessoal para o cliente criar a senha da área dele.
+                    Sai pelo WhatsApp de sempre: nada de mensagem paga. */}
+                {temOS && (
+                  <button
+                    className="btn-secondary !py-1.5 !px-2.5 text-xs"
+                    title="Mandar acesso à área do cliente"
+                    onClick={() => mandarAcesso(c)}
+                  >
+                    <KeyRound size={14} /> Acesso
+                  </button>
                 )}
                 <button
                   className="btn-secondary !py-1.5 !px-2.5"
