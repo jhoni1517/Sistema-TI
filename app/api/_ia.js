@@ -8,14 +8,14 @@
 //
 //  Variáveis no Vercel:
 //    GEMINI_API_KEY   -> chave da API do Gemini (aistudio.google.com)
-//    GEMINI_MODELO    -> opcional; padrão "gemini-2.5-flash-lite"
+//    GEMINI_MODELO    -> opcional; padrão "gemini-3.5-flash-lite"
 // ============================================================
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const ANON_KEY = process.env.VITE_SUPABASE_ANON_KEY || SERVICE_KEY;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_MODELO = process.env.GEMINI_MODELO || "gemini-2.5-flash-lite";
+const GEMINI_MODELO = process.env.GEMINI_MODELO || "gemini-3.5-flash-lite";
 
 /**
  * Quanto cada plano pode usar por mês. MESMOS números de src/lib/planos.ts

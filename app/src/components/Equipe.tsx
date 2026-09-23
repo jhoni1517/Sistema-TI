@@ -42,9 +42,10 @@ const venceEm = (iso: string): string => {
 /** Gestão de funcionários da loja (visível para dono e gerente) */
 export const Equipe: React.FC<{
   meuId: string;
+  minhaLoja: string;
   meuPapel: Papel;
   souSuperAdmin?: boolean;
-}> = ({ meuId, meuPapel, souSuperAdmin }) => {
+}> = ({ meuId, minhaLoja, meuPapel, souSuperAdmin }) => {
   const [lista, setLista] = useState<Perfil[]>([]);
   const [convites, setConvites] = useState<Convite[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -59,14 +60,21 @@ export const Equipe: React.FC<{
   const carregar = useCallback(async () => {
     if (!supabase) return;
     setCarregando(true);
-    const { data } = await supabase
+    // O filtro por loja é obrigatório aqui. O administrador do sistema LÊ os
+    // perfis de todas as lojas (para o painel Lojas), e sem o filtro o dono
+    // de cada loja alugada aparecia como se fosse da equipe dele — com
+    // lixeira que não removia nada, porque o banco só deixa mexer na
+    // própria loja.
+    const { data, error } = await supabase
       .from("perfis")
       .select("id, loja_id, nome, papel, ativo, super_admin")
+      .eq("loja_id", minhaLoja)
       .order("papel");
+    if (error) setMsg("Não foi possível carregar a equipe: " + error.message);
     setLista((data as Perfil[]) || []);
     if (podeGerenciar) setConvites(await listarConvites());
     setCarregando(false);
-  }, [podeGerenciar]);
+  }, [podeGerenciar, minhaLoja]);
 
   useEffect(() => {
     carregar();
@@ -74,9 +82,11 @@ export const Equipe: React.FC<{
 
   const atualizar = async (p: Perfil, campos: Partial<Perfil>) => {
     if (!supabase) return;
-    const { error } = await supabase.from("perfis").update(campos).eq("id", p.id);
-    if (error) {
-      setMsg("Não foi possível alterar: " + error.message);
+    // O banco recusa em silêncio: sem permissão, altera zero linhas e não
+    // devolve erro. Por isso pede a linha de volta e confere.
+    const { data, error } = await supabase.from("perfis").update(campos).eq("id", p.id).select("id");
+    if (error || !data?.length) {
+      aviso.erro("Não foi possível alterar: " + (error?.message || "o banco não deixou mexer neste usuário."));
       return;
     }
     setMsg("");
@@ -87,7 +97,12 @@ export const Equipe: React.FC<{
     if (!supabase) return;
     if (p.id === meuId) return aviso.alerta("Você não pode remover o seu próprio acesso.");
     if (!confirm(`Remover o acesso de ${p.nome || "este usuário"}?`)) return;
-    await supabase.from("perfis").delete().eq("id", p.id);
+    const { data, error } = await supabase.from("perfis").delete().eq("id", p.id).select("id");
+    if (error || !data?.length) {
+      aviso.erro("Não foi possível remover: " + (error?.message || "o banco não deixou mexer neste usuário."));
+      return;
+    }
+    aviso.sucesso(`${p.nome || "Usuário"} não entra mais nesta loja.`);
     carregar();
   };
 
