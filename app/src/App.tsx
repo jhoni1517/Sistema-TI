@@ -22,6 +22,7 @@ import { PDV } from "./pages/PDV";
 import { Relatorios } from "./pages/Relatorios";
 import { Config } from "./pages/Config";
 import { Rastreio } from "./pages/Rastreio";
+import { PainelBancada } from "./pages/PainelBancada";
 import { Catalogo } from "./pages/Catalogo";
 import { SemPerfil } from "./pages/SemPerfil";
 import { Lojas } from "./pages/Lojas";
@@ -127,6 +128,10 @@ const AreaProtegida: React.FC = () => {
   return (
     <AppProvider souSuperAdmin={sessao.perfil.super_admin === true} email={sessao.email}>
       <Routes>
+        {/* A TV da bancada: tela cheia, sem menu. Fora do Layout de
+            propósito — menu lateral na parede da loja é espaço roubado da
+            fila, e um clique errado de quem passa abre o caixa. */}
+        <Route path="painel" element={<Protegida recurso="os" papel={papel}><DoPlano modulo="os"><PainelBancada /></DoPlano></Protegida>} />
         <Route element={<Layout onLogout={logout} sessao={sessao} />}>
           <Route index element={<Dashboard />} />
           <Route path="ordens" element={<Protegida recurso="os" papel={papel}><DoPlano modulo="os"><OrdensServico /></DoPlano></Protegida>} />

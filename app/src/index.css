@@ -141,6 +141,17 @@ body {
     #0f172a;
 }
 
+/* ====== CARIMBO "PRONTO" DO PAINEL DA TV ======
+   O carimbo desce com força e assenta torto, como batido na mão. É o único
+   movimento da parede: se tudo mexe, ninguém olha para nada. */
+@keyframes carimbar {
+  0%   { transform: scale(2.6) rotate(-14deg); opacity: 0; }
+  55%  { transform: scale(0.92) rotate(-5deg); opacity: 1; }
+  75%  { transform: scale(1.04) rotate(-7deg); }
+  100% { transform: scale(1) rotate(-6deg); opacity: 1; }
+}
+.carimbar { animation: carimbar 0.45s cubic-bezier(.2,.9,.3,1.2) both; }
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

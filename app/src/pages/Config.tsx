@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { aviso } from "../components/Aviso";
 import { ImagemUpload } from "../components/ImagemUpload";
-import { Store, KeyRound, Cloud, Download, Upload, Save, Database, Palette, Sun, Moon, Monitor, Percent, FileText, ShieldCheck } from "lucide-react";
+import { Store, KeyRound, Cloud, Download, Upload, Save, Database, Palette, Sun, Moon, Monitor, Percent, FileText, ShieldCheck, Tv } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { RAMO_META, temRecurso, temModulo, vocabulario } from "../lib/ramos";
 import { REGRA_MEIO_A_MEIO_META, regraDe, type RegraMeioAMeio } from "../lib/pizza";
@@ -335,6 +335,25 @@ export const Config: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* O painel da TV não é item de menu: abre uma vez na TV da loja e
+          fica lá. Um link aqui é o suficiente, e abre em outra aba para a
+          pessoa não perder a tela de configuração. */}
+      {temModulo(ramoContratado, "os") && (
+        <div className="card mb-5">
+          <h3 className="mb-1 flex items-center gap-2 font-bold text-slate-700">
+            <Tv size={18} /> Painel da bancada (TV)
+          </h3>
+          <p className="mb-3 text-sm text-slate-500">
+            A fila de {vocRamo.ordemCurta} em tela cheia, para deixar na TV da loja: na fila, em
+            reparo, aguardando peça e pronto. Mostra só código, primeiro nome e aparelho, e
+            atualiza sozinho a cada 30 segundos. Na TV, entre com um usuário da equipe.
+          </p>
+          <a className="btn-secondary" href="#/painel" target="_blank" rel="noreferrer">
+            <Tv size={16} /> Abrir painel
+          </a>
+        </div>
+      )}
 
       {/* Termos do recibo */}
       <div className="card mb-5">
