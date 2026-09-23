@@ -106,11 +106,21 @@ describe("o valor do Pix é o mesmo da tela", () => {
 /* ------------------------------------------------------------------ */
 
 describe("o token da loja fica cifrado", () => {
-  const cofre = montar<{ cifrar: (t: string, k: string) => string; decifrar: (g: string, k: string) => string }>(
-    ["cifrar", "decifrar"],
-    "{ cifrar, decifrar }",
-    { createCipheriv, createDecipheriv, randomBytes, Buffer }
+  // O cofre saiu de pix.js para api/_cofre.js, que o WhatsApp também usa.
+  const fonteCofre = readFileSync(resolve(__dirname, "..", "..", "api", "_cofre.js"), "utf8").replace(
+    /export function/g,
+    "function"
   );
+  const cofre = new Function(
+    "createCipheriv",
+    "createDecipheriv",
+    "randomBytes",
+    "Buffer",
+    fonteCofre.replace(/^import .*$/m, "") + "\nreturn { cifrar, decifrar };"
+  )(createCipheriv, createDecipheriv, randomBytes, Buffer) as {
+    cifrar: (t: string, k: string) => string;
+    decifrar: (g: string, k: string) => string;
+  };
   const chave = randomBytes(32).toString("base64");
 
   it("ida e volta", () => {

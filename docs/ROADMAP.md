@@ -99,7 +99,7 @@ projeto.
 
 ### 8. Leitura de nota fiscal por foto com IA
 
-**[NÃO EXISTE]**
+**[JÁ EXISTE — feito em 23/09/2026]** "Ler por foto" na Entrada de mercadoria (`lib/leitura-nota.ts`, `api/ia.js`). Antes: **[NÃO EXISTE]**
 
 A entrada de mercadoria (`components/EntradaNota.tsx`, `lib/entrada.ts`) é
 digitada item a item. Não há leitura de XML, de chave de acesso nem de foto.
@@ -107,7 +107,7 @@ Nenhuma integração com IA no projeto.
 
 ### 9. Sugestão de diagnóstico e orçamento por modelo+defeito
 
-**[NÃO EXISTE]**
+**[JÁ EXISTE — feito em 23/09/2026]** Painel Sugestão na OS (`lib/sugestao.ts`) e "Perguntar à IA". Antes: **[NÃO EXISTE]**
 
 O mais próximo: histórico do mesmo aparelho (reincidência) e a detecção de
 peça repetida entre orçamentos (`orcamento-repetido`). Nada sugere preço ou
@@ -115,11 +115,11 @@ diagnóstico a partir de OS anteriores.
 
 ### 10. Abrir OS por voz
 
-**[NÃO EXISTE]**
+**[JÁ EXISTE — feito em 23/09/2026]** "Ditar a OS" (`lib/voz-os.ts`). Antes: **[NÃO EXISTE]**
 
 ### 11. Avisos de status por WhatsApp Cloud API
 
-**[PARCIAL — a Cloud API existe só para o robô do caixa]**
+**[JÁ EXISTE — feito em 23/09/2026, plano Completo]** `api/whatsapp-os.js`, `lib/whatsapp-os.ts`, migração 28. Os modelos precisam de aprovação na Meta. Antes: **[PARCIAL — a Cloud API existia só para o robô do caixa]**
 
 `api/whatsapp.js` usa a Cloud API (`WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`)
 para **receber** lançamentos de caixa e responder a quem digitou. Os avisos
