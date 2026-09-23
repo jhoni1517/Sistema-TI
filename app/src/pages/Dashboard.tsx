@@ -23,6 +23,8 @@ import { Conferencia } from "../components/Conferencia";
 import { temModulo, vocabulario } from "../lib/ramos";
 import { projetarCaixa, resumoDaProjecao } from "../lib/projecao";
 import { saldoFiado } from "../lib/calc";
+import { prazosEmRisco } from "../lib/prazos";
+import { SeloPrazo } from "../components/SeloPrazo";
 
 export const Dashboard: React.FC = () => {
   const { ordens, clientes, produtos, movimentos, vendas, fiados, sessoes, comandas, contas, config, ramo } = useApp();
@@ -76,6 +78,12 @@ export const Dashboard: React.FC = () => {
 
   /* O ramo manda no Painel igual manda no menu. */
   const temOS = temModulo(ramo, "os");
+  /*
+   * Prazo legal vencendo e aparelho esquecido na prateleira: os dois
+   * estouram em silêncio, e o primeiro aviso é do Procon ou do cliente
+   * bravo. Aqui eles aparecem antes. Ver lib/prazos.ts.
+   */
+  const riscos = useMemo(() => (temOS ? prazosEmRisco(ordens) : []), [ordens, temOS]);
   const palavras = vocabulario(ramo);
 
   return (
@@ -111,6 +119,34 @@ export const Dashboard: React.FC = () => {
         <Card onClick={() => navigate("/caixa")} icon={<Wallet />} color="from-violet-500 to-violet-700" label="Recebido hoje" value={brl(stats.caixaHoje)} />
         <Card onClick={() => navigate("/relatorios")} icon={<TrendingUp />} color="from-amber-500 to-orange-600" label="Lucro líquido (mês)" value={brl(stats.lucroMes)} />
       </div>
+
+      {temOS && (riscos.length > 0 && (
+        <section className="mb-6 rounded-md border border-linha bg-cartao p-4 font-grotesca text-tinta">
+          <h2 className="rotulo mb-3 flex items-center justify-between">
+            <span>Prazos em risco</span>
+            <span className="valor">{riscos.length}</span>
+          </h2>
+          <ul className="divide-y divide-linha">
+            {riscos.slice(0, 6).map((r) => (
+              <li key={`${r.tipo}-${r.os.id}`}>
+                <button
+                  className="flex w-full flex-wrap items-center gap-2 py-2 text-left hover:bg-concreto/60"
+                  onClick={() => navigate("/ordens")}
+                >
+                  <span className="valor text-sm font-semibold">{codigoOS(r.os.numero)}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm">
+                    {nomeCliente(r.os.clienteId)} · {[r.os.marca, r.os.modelo].filter(Boolean).join(" ")}
+                  </span>
+                  <SeloPrazo os={r.os} />
+                </button>
+              </li>
+            ))}
+          </ul>
+          {riscos.length > 6 && (
+            <p className="mt-2 text-xs text-tinta-suave">E mais {riscos.length - 6} na lista de OS.</p>
+          )}
+        </section>
+      ))}
 
       {/* Alertas + a receber */}
       <div className="mb-6 grid gap-4 lg:grid-cols-3">

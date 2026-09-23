@@ -142,6 +142,8 @@ import {
   textoDaGarantia,
   garantiasVencendo,
 } from "../lib/garantia";
+import { alertaDeAbandono, mensagemDeAbandono, prazoDoConserto } from "../lib/prazos";
+import { SeloPrazo } from "../components/SeloPrazo";
 
 
 const STATUS_LIST = Object.keys(OS_STATUS_META) as OSStatus[];
@@ -571,6 +573,7 @@ export const OrdensServico: React.FC = () => {
                       <AlertTriangle size={12} /> Sem pagamento — receber
                     </button>
                   )}
+                  <SeloPrazo os={o} soRisco />
                   {(() => {
                     const dias = diasEmPosse(o);
                     const t = taxaArmazenamento(o, config.taxaArmazenamentoDia || 0, config.diasAbandono || 90);
@@ -580,7 +583,8 @@ export const OrdensServico: React.FC = () => {
                           <AlertTriangle size={11} /> Guarda {brl(t.valor)}
                         </span>
                       );
-                    if (dias >= 15)
+                    // O selo de abandono (30/60/90) já diz isto, com mais peso.
+                    if (dias >= 15 && !alertaDeAbandono(o))
                       return (
                         <span className="badge bg-amber-100 text-amber-700" title="Aparelho parado há muito tempo">
                           <Clock size={11} /> {dias} dias
@@ -1394,6 +1398,22 @@ const OSForm: React.FC<{
         </fieldset>
         )}
 
+        {/* Retorno em garantia liga o relógio de 30 dias do CDC. Sem a marca,
+            o retorno esperava peça como qualquer OS e o prazo estourava sem
+            ninguém ver. Ver lib/prazos.ts. */}
+        <label className="flex items-start gap-2 rounded-lg bg-slate-50 p-3 text-sm">
+          <input
+            type="checkbox"
+            className="mt-0.5 h-4 w-4 shrink-0"
+            checked={!!os.retornoGarantia}
+            onChange={(e) => setOs({ ...os, retornoGarantia: e.target.checked })}
+          />
+          <span>
+            <b>Retorno em garantia</b> — o conserto anterior não resolveu. A loja tem 30 dias
+            corridos, contados de hoje, para resolver (CDC).
+          </span>
+        </label>
+
         {/* Defeito e checklist */}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Defeito relatado pelo cliente *">
@@ -2193,6 +2213,29 @@ export const OSDetalhe: React.FC<{
             </div>
           );
         })()}
+
+        {/* Prazos: retorno em garantia (30 dias do CDC) e aparelho parado.
+            O aviso de abandono já sai com a mensagem pronta — é o registro
+            de que a loja chamou, que é o que vale se o cliente reaparecer. */}
+        {(prazoDoConserto(os) || alertaDeAbandono(os)) && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-3 no-print">
+            <SeloPrazo os={os} />
+            {prazoDoConserto(os) && (
+              <span className="min-w-0 flex-1 text-sm text-slate-600">
+                Retorno em garantia: resolver até{" "}
+                <b>{prazoDoConserto(os)!.limite.split("-").reverse().join("/")}</b>.
+              </span>
+            )}
+            {alertaDeAbandono(os) && cliente?.telefone && (
+              <button
+                className="btn-secondary !py-1.5 text-xs"
+                onClick={() => abrirWhatsapp(txt(cliente.telefone), mensagemDeAbandono(os, cliente, config))}
+              >
+                <MessageCircle size={14} /> Avisar cliente
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Fotos da entrada: saem na impressão junto com o termo de guarda,
             que é onde elas valem como prova do estado do aparelho. */}

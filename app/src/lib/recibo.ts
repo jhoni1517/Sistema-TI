@@ -1,4 +1,5 @@
 import type { OrdemServico, Config, MovimentoCaixa, SessaoCaixa, Venda } from "./types";
+import { termoDeGarantia } from "./prazos";
 import { WINDOWS_META, versaoWindowsDe, textoDaFonte } from "./entrada-os";
 import { OS_STATUS_META } from "./types";
 import { brl, formatDate, formatDateTime, codigoOS, txt } from "./format";
@@ -190,6 +191,11 @@ export function reciboOS(
         </div>`
       : ""
   }
+
+  <div class="box" style="margin-top:14px">
+    <div class="label">Garantia</div>
+    <div style="font-size:11px;color:#333">${esc(termoDeGarantia(os))}</div>
+  </div>
 
   <div class="box" style="margin-top:14px">
     <div class="label">Termo de guarda e retirada</div>

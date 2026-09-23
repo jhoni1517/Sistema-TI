@@ -358,6 +358,14 @@ export interface OrdemServico {
    * do cliente — é a primeira coisa que ele liga para perguntar.
    */
   previsaoEntrega?: string;
+  /**
+   * O cliente voltou porque o conserto anterior não resolveu.
+   *
+   * Liga o relógio de 30 dias do CDC para sanar o vício (lib/prazos.ts).
+   * Sem a marca, o retorno era uma OS igual às outras, esperava peça como
+   * as outras, e o prazo legal estourava sem ninguém ver.
+   */
+  retornoGarantia?: boolean;
 }
 
 export interface Categoria {
