@@ -84,6 +84,9 @@ alter table ordens add column if not exists "fotosLaudo" jsonb default '[]'::jso
 -- Vídeos do laudo, com a capa de cada um. O que a foto não mostra: o barulho
 -- do cooler, a tela que pisca, o curto que só aparece quando liga.
 alter table ordens add column if not exists "videosLaudo" jsonb default '[]'::jsonb;
+-- Previsão de entrega que o cliente vê no rastreio (AAAA-MM-DD). Sem ela a
+-- gravação da OS inteira cai com "column not found in the schema cache".
+alter table ordens add column if not exists "previsaoEntrega" text;
 -- Placa do motor, no ramo de motores e bombas. Texto e não número: "3/4 cv"
 -- e "220/380V" é como está escrito na plaqueta, e obrigar a converter faria
 -- o atendente arredondar de cabeça na frente do cliente.

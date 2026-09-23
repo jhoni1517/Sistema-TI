@@ -1685,6 +1685,18 @@ const OSForm: React.FC<{
           <Field label="Técnico responsável">
             <input className="input" value={os.tecnico} onChange={(e) => setOs({ ...os, tecnico: e.target.value })} />
           </Field>
+          {/* Sai na página do cliente. "Quando fica pronto?" é a ligação que
+              mais tira o técnico da bancada. */}
+          <Field label="Previsão de entrega">
+            <input
+              type="date"
+              className="input"
+              value={os.previsaoEntrega || ""}
+              // Vazio, e não undefined: undefined some do JSON e a data antiga
+              // ficaria gravada no banco.
+              onChange={(e) => setOs({ ...os, previsaoEntrega: e.target.value })}
+            />
+          </Field>
         </div>
 
         <div className="rounded-xl bg-slate-50 p-4 text-sm">

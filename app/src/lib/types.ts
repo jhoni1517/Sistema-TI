@@ -353,6 +353,11 @@ export interface OrdemServico {
   videosLaudo?: VideoLaudo[];
   // Quando ficou pronta (base para taxa de armazenamento)
   prontaEm?: string;
+  /**
+   * Para quando a loja promete o aparelho (AAAA-MM-DD). Vai para a página
+   * do cliente — é a primeira coisa que ele liga para perguntar.
+   */
+  previsaoEntrega?: string;
 }
 
 export interface Categoria {

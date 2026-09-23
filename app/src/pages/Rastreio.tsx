@@ -2,31 +2,37 @@ import React, { useEffect, useState } from "react";
 import { aviso } from "../components/Aviso";
 import { useParams } from "react-router-dom";
 import {
-  Wrench,
   CheckCircle2,
-  Clock,
+  Circle,
   Smartphone,
   ThumbsUp,
   ThumbsDown,
   ShieldCheck,
   ListChecks,
   Camera,
+  CalendarClock,
+  PackageSearch,
+  MessageCircle,
 } from "lucide-react";
 import { supabase, supabaseEnabled } from "../lib/supabase";
 import { brl, formatDateTime, codigoOS } from "../lib/format";
 import { OS_STATUS_META, type OSStatus } from "../lib/types";
-import { tokenDoLink, problemaNoLink } from "../lib/rastreio";
+import {
+  tokenDoLink,
+  problemaNoLink,
+  linhaDoTempo,
+  proximasEtapas,
+  dataDaFoto,
+  previsaoDeEntrega,
+  linkFalarComLoja,
+  corDaLoja,
+  type PassoPublico,
+} from "../lib/rastreio";
 import { duracaoEscrita } from "../lib/video";
+import { MarcaDaLoja } from "../components/MarcaDaLoja";
 
-const FLUXO: OSStatus[] = [
-  "aberta",
-  "em_analise",
-  "aguardando_aprovacao",
-  "aprovada",
-  "em_reparo",
-  "pronta",
-  "entregue",
-];
+/** O site do sistema, no rodapé discreto */
+const SITE_BALCAO = "https://sistema-ti-caixa.vercel.app/";
 
 /** Uma peça dentro de um orçamento */
 interface ItemPublico {
@@ -70,6 +76,15 @@ interface OSPublica {
   /** Vídeos do laudo, com a capa de cada um. Mesmo corte das fotos. */
   videos: { url: string; capa?: string; duracao?: number }[] | null;
   atualizadoEm: string | null;
+  /** Só status e data de cada passo. A nota interna é cortada no banco. */
+  historico: PassoPublico[] | null;
+  /** AAAA-MM-DD */
+  previsao: string | null;
+  /** Nome, logo, chave da cor e telefone do BALCÃO — o que sai na OS impressa */
+  loja: string | null;
+  logo: string | null;
+  cor: string | null;
+  whatsapp: string | null;
 }
 
 /** A loja vem do link; sem ela a consulta não retorna nada */
@@ -173,17 +188,31 @@ export const Rastreio: React.FC = () => {
   const meta = os ? OS_STATUS_META[os.status] : null;
   /** Estado final: vira carimbo, e não faixa. Ver docs/DESIGN.md. */
   const final = os ? ["pronta", "entregue", "cancelada"].includes(os.status) : false;
+  const passos = os ? linhaDoTempo(os.historico, os.status) : [];
+  const futuro = os ? proximasEtapas(os.status) : [];
+  const previsao = os ? previsaoDeEntrega(os.previsao, os.status) : null;
+  const falar = os ? linkFalarComLoja(os.whatsapp, os.numero) : "";
+  const cor = corDaLoja(os?.cor);
 
   return (
     <div className="min-h-screen bg-papel p-4 font-grotesca text-tinta">
       <div className="mx-auto max-w-lg py-8">
-        <header className="mb-5 flex items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md bg-sinal">
-            <Wrench className="text-sinal-tinta" size={22} strokeWidth={2.5} />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold leading-tight">Seu aparelho na bancada</h1>
-            <p className="text-sm text-tinta-suave">Tudo o que rolou com ele, sem precisar ligar</p>
+        {/*
+          A loja no topo, e não o sistema: o cliente deixou o aparelho na
+          "Silva Cell", não num software. Página com a marca de outra empresa
+          parece golpe — e link de WhatsApp que parece golpe não é aberto.
+          A cor dela vem só como faixa: o resto da página segue o papel.
+        */}
+        <header className="mb-5 overflow-hidden rounded-md border border-linha bg-cartao">
+          {cor && <div className="h-1.5" style={{ backgroundColor: cor }} />}
+          <div className="flex items-center gap-3 p-4">
+            <MarcaDaLoja logoUrl={os?.logo || undefined} tamanho={44} />
+            <div className="min-w-0">
+              <h1 className="truncate text-xl font-bold leading-tight">
+                {os?.loja || "Seu aparelho na bancada"}
+              </h1>
+              <p className="text-sm text-tinta-suave">Tudo o que rolou com seu aparelho, sem precisar ligar</p>
+            </div>
           </div>
         </header>
 
@@ -248,6 +277,31 @@ export const Rastreio: React.FC = () => {
                   </p>
                   <p className="mt-2 text-sm font-medium opacity-95">{meta.cliente}</p>
                 </div>
+              )}
+
+              {/*
+                Aguardando peça é o status que mais gera ligação: o aparelho
+                "sumiu" da bancada. Dizer que depende de fora, e para quando
+                está previsto, responde antes da pergunta.
+              */}
+              {os.status === "aguardando_peca" && (
+                <div className="-mt-3 mb-6 flex gap-3 rounded-md border-2 border-status-peca p-4">
+                  <PackageSearch size={22} className="mt-0.5 shrink-0" />
+                  <p className="text-sm">
+                    <b>Isso não depende da bancada.</b> Chegou a peça, seu aparelho volta direto
+                    pro conserto.
+                  </p>
+                </div>
+              )}
+
+              {previsao && (
+                <p
+                  className={`-mt-3 mb-6 flex items-center justify-center gap-2 rounded-md p-3 text-center text-sm font-semibold ${
+                    previsao.atrasada ? "border-2 border-sinal" : "bg-concreto"
+                  }`}
+                >
+                  <CalendarClock size={16} className="shrink-0" /> {previsao.texto}
+                </p>
               )}
 
               {/*
@@ -336,6 +390,14 @@ export const Rastreio: React.FC = () => {
                             loading="lazy"
                             className="aspect-square w-full object-cover"
                           />
+                          {/* A hora da foto é o que a torna prova: "tirada
+                              na bancada, dia 21 às 14:30". Sem hora legível
+                              no nome do arquivo, não aparece nada. */}
+                          {dataDaFoto(url) && (
+                            <span className="valor block bg-concreto px-1 py-0.5 text-center text-[10px] text-tinta-suave">
+                              {formatDateTime(dataDaFoto(url))}
+                            </span>
+                          )}
                         </a>
                       ))}
                     </div>
@@ -440,37 +502,63 @@ export const Rastreio: React.FC = () => {
                 </div>
               )}
 
-              {os.status !== "cancelada" && (
-                <ol className="space-y-0">
-                  {FLUXO.map((s, i) => {
-                    const atualIdx = FLUXO.indexOf(os.status);
-                    const feito = i <= atualIdx;
-                    const atual = i === atualIdx;
+              {/*
+                A linha do tempo de verdade, com data e hora de cada passo —
+                e não um fluxo fixo desenhado. Ida e volta aparece
+                ("em reparo → aguardando peça → em reparo"): é ela que explica
+                o atraso sem ninguém precisar ligar. O que ainda vem fica em
+                cinza, sem hora.
+              */}
+              <section>
+                <h2 className="rotulo mb-3">O caminho do seu aparelho</h2>
+                <ol>
+                  {passos.map((p, i) => {
+                    const atual = i === passos.length - 1;
+                    const ultimoDaLista = atual && futuro.length === 0;
                     return (
-                      <li key={s} className="flex gap-3">
+                      <li key={`${p.status}-${i}`} className="flex gap-3">
                         <div className="flex flex-col items-center">
                           <div
-                            className={`flex h-7 w-7 items-center justify-center rounded-full ${
-                              feito ? OS_STATUS_META[s].carimbo : "border border-linha bg-concreto text-tinta-suave"
-                            }`}
+                            className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${OS_STATUS_META[p.status].carimbo}`}
                           >
-                            {feito ? <CheckCircle2 size={16} /> : <Clock size={14} />}
+                            <CheckCircle2 size={16} />
                           </div>
-                          {i < FLUXO.length - 1 && (
-                            <div className={`h-6 w-0.5 ${i < atualIdx ? "bg-tinta/40" : "bg-linha"}`} />
-                          )}
+                          {!ultimoDaLista && <div className="w-0.5 flex-1 bg-tinta/30" />}
                         </div>
-                        <div
-                          className={`pb-2 ${
-                            atual ? "font-bold" : feito ? "text-tinta" : "text-tinta-suave"
-                          }`}
-                        >
-                          {OS_STATUS_META[s].label}
+                        <div className="min-w-0 pb-4">
+                          <p className={atual ? "font-bold" : ""}>{OS_STATUS_META[p.status].label}</p>
+                          {p.data && (
+                            <p className="valor text-xs text-tinta-suave">{formatDateTime(p.data)}</p>
+                          )}
                         </div>
                       </li>
                     );
                   })}
+                  {futuro.map((s, i) => (
+                    <li key={s} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-linha bg-concreto text-tinta-suave">
+                          <Circle size={10} />
+                        </div>
+                        {i < futuro.length - 1 && <div className="w-0.5 flex-1 bg-linha" />}
+                      </div>
+                      <p className="pb-4 text-tinta-suave">{OS_STATUS_META[s].label}</p>
+                    </li>
+                  ))}
                 </ol>
+              </section>
+
+              {/* O número da OS já vai na mensagem: sem ele, a primeira
+                  resposta da loja é sempre "qual o número?". */}
+              {falar && (
+                <a
+                  href={falar}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="btn mt-2 w-full rounded-md border border-linha bg-cartao text-tinta hover:bg-concreto focus-visible:ring-sinal"
+                >
+                  <MessageCircle size={16} /> Falar com a loja
+                </a>
               )}
 
               <p className="mt-5 text-center text-xs text-tinta-suave">
@@ -482,6 +570,12 @@ export const Rastreio: React.FC = () => {
 
         <p className="mt-6 flex items-center justify-center gap-1 text-center text-xs text-tinta-suave">
           <ShieldCheck size={12} /> Este link é só seu. A página não mostra senha nem dado pessoal.
+        </p>
+        <p className="mt-2 text-center text-[11px] text-tinta-suave">
+          feito com{" "}
+          <a href={SITE_BALCAO} target="_blank" rel="noreferrer" className="font-semibold underline">
+            Balcão
+          </a>
         </p>
       </div>
     </div>
