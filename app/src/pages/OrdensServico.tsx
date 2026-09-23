@@ -150,6 +150,7 @@ import { podePedirAvaliacao, mensagemPedidoAvaliacao } from "../lib/avaliacao";
 import { hojeISO } from "../lib/contas";
 import { SeloPrazo } from "../components/SeloPrazo";
 import { SugestaoDaOS } from "../components/SugestaoDaOS";
+import { OSPorVoz } from "../components/OSPorVoz";
 
 
 const STATUS_LIST = Object.keys(OS_STATUS_META) as OSStatus[];
@@ -1054,6 +1055,15 @@ const OSForm: React.FC<{
   // As ordens também: são o histórico que a Sugestão compara.
   const { ramo, ordens } = useApp();
   const voc = vocabulario(ramo);
+  /**
+   * A OS de AGORA, para quem responde depois de um await (a voz): a
+   * variável `os` da closure é a de quando o microfone foi ligado, e
+   * aplicar por cima dela apagaria o que a pessoa digitou enquanto a IA
+   * pensava.
+   */
+  const osAtual = React.useRef(os);
+  osAtual.current = os;
+  const osNova = !(ordens || []).some((o) => o.id === os.id);
   const trava = travaAtendimento(clientes.find((c) => c.id === os.clienteId));
 
   const addPeca = (opcao?: string) =>
@@ -1226,6 +1236,17 @@ const OSForm: React.FC<{
       }
     >
       <div className="space-y-6">
+        {/* Ditar a OS: só na OS nova. Preenche os campos vazios; salvar
+            continua sendo o botão de sempre, depois de conferir. */}
+        {osNova && (
+          <OSPorVoz
+            os={os}
+            clientes={clientes}
+            comSenha={temRecurso(ramo, "senhaAparelho")}
+            onPreencher={(patch) => setOs({ ...osAtual.current, ...patch })}
+          />
+        )}
+
         {/* Cliente & Status */}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Cliente *">
