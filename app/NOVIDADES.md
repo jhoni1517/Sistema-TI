@@ -11,6 +11,10 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-09-27 · Celular como leitor de código
+Toque no ícone de câmera no PDV, no Estoque, na Contagem ou no IMEI da OS: aponte para o código e o campo se preenche, com bipe.
+Rota: /estoque
+
 ## 2026-09-27 · Técnicos: produtividade e comissão
 Em Relatórios: OS por técnico, dias de bancada, retorno na garantia e comissão do mês (sobre lucro, mão de obra, peça ou fixo), com recibo.
 Rota: /relatorios

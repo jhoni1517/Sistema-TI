@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { aviso } from "../components/Aviso";
 import { useApp } from "../store/AppStore";
+import { BotaoCamera } from "../components/Camera";
 import { SectionTitle, EmptyState, InputNumero } from "../components/ui";
 import { uid, nowISO, brl, txt } from "../lib/format";
 import { deltasApos, faltaNoEstoque, avisoDeFalta } from "../lib/estoque";
@@ -247,8 +248,9 @@ export const PDV: React.FC = () => {
     }
   };
 
-  const lerCodigo = () => {
-    const t = termo.trim();
+  /** `bruto` vem da câmera; sem ele, lê o que está digitado no campo */
+  const lerCodigo = (bruto?: string) => {
+    const t = (bruto ?? termo).trim();
     if (!t) return;
 
     // Etiqueta de balança vem primeiro: ela é única por pacote, então nunca
@@ -677,7 +679,7 @@ export const PDV: React.FC = () => {
               <Barcode size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 ref={buscaRef}
-                className="input !py-3 pl-11 text-base"
+                className="input !py-3 pl-11 pr-12 text-base"
                 placeholder="Código de barras, nome ou SKU"
                 value={termo}
                 onChange={(e) => setTermo(e.target.value)}
@@ -690,6 +692,7 @@ export const PDV: React.FC = () => {
                   if (e.key === "Escape") setTermo("");
                 }}
               />
+              <BotaoCamera className="absolute right-1 top-1/2 -translate-y-1/2" onLer={(c) => lerCodigo(c)} />
             </div>
 
             {termo.trim() !== "" && (

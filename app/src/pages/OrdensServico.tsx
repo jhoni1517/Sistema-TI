@@ -38,6 +38,7 @@ import { etiquetaDoAparelho } from "../lib/etiqueta-aparelho";
 import { QuadroTermos } from "../components/Termos";
 import { paraTresNiveis, eOrcamentoEmNiveis } from "../lib/niveis";
 import { FichaAparelho } from "../components/FichaAparelho";
+import { BotaoCamera } from "../components/Camera";
 import { mesmoAparelho } from "../lib/imei";
 import { obterLoja } from "../lib/db";
 import { linkDeRastreio } from "../lib/rastreio";
@@ -1373,7 +1374,10 @@ const OSForm: React.FC<{
             */}
             {temRecurso(ramo, "imei") && (
               <Field label="IMEI / Nº de série">
-                <input className="input" inputMode="text" value={os.imeiSerial} onChange={(e) => setOs({ ...os, imeiSerial: e.target.value })} />
+                <div className="relative">
+                  <input className="input pr-11" inputMode="text" value={os.imeiSerial} onChange={(e) => setOs({ ...os, imeiSerial: e.target.value })} />
+                  <BotaoCamera modo="imei" className="absolute right-1 top-1/2 -translate-y-1/2" onLer={(imei) => setOs({ ...os, imeiSerial: imei })} />
+                </div>
                 <FichaAparelho imei={os.imeiSerial} ordens={ordens} osAtual={os.id} />
               </Field>
             )}
