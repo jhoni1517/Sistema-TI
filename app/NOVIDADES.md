@@ -11,6 +11,11 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-09-28 · Tabela de serviços
+Preço de cada conserto por modelo. Digite "13 tela" e veja o valor na hora. Importa planilha, reajusta com prévia, e a OS sugere o preço.
+Rota: /tabela
+Módulo: os
+
 ## 2026-09-27 · Celular como leitor de código
 Toque no ícone de câmera no PDV, no Estoque, na Contagem ou no IMEI da OS: aponte para o código e o campo se preenche, com bipe.
 Rota: /estoque

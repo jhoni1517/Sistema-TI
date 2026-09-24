@@ -10,6 +10,7 @@ import type {
   FormaPagamento,
   PecaOS,
 } from "./types";
+import { tabelaVazia, type TabelaServicos } from "./tabela-precos";
 import { codigoOS } from "./format";
 
 /**
@@ -458,6 +459,7 @@ export function gerarDemo(hoje: Date = new Date(), semente = 2024): DadosDemo {
     enderecoLoja: "Rua das Flores, 123 - Centro",
     horarioAtendimento: "Seg a sáb, 9h às 18h",
     ramo: "assistencia",
+    tabelaServicos: tabelaDemo(),
   };
 
   return { clientes, ordens, produtos, movimentos, sessoes, vendas, config };
@@ -473,3 +475,30 @@ export const SESSAO_DEMO = {
   email: "",
   perfil: { id: "demo", loja_id: LOJA_DEMO, nome: "Você", papel: "dono" as const, ativo: true },
 };
+
+/** Preços de mercado de 2026, redondos: a tabela mostra a busca "13 tela" funcionando. */
+function tabelaDemo(): TabelaServicos {
+  const precos: Record<string, [number, number, number, number]> = {
+    "Galaxy A12": [260, 150, 110, 180],
+    "Galaxy A32": [390, 170, 120, 220],
+    "Galaxy A54": [690, 220, 150, 280],
+    "iPhone 11": [480, 260, 220, 350],
+    "iPhone 12": [690, 290, 240, 390],
+    "iPhone 13": [850, 320, 260, 450],
+    "Moto G22": [290, 160, 110, 180],
+    "Moto G52": [420, 180, 120, 220],
+    "Redmi Note 11": [370, 170, 120, 200],
+  };
+  const t = tabelaVazia();
+  for (const [, marca, modelo] of APARELHOS) {
+    const p = precos[modelo];
+    if (!p || t.modelos.some((m) => m.modelo === modelo)) continue;
+    t.modelos.push({
+      id: `tab-${modelo.replace(/\W+/g, "-").toLowerCase()}`, // texto-cru-proposital: id interno
+      marca,
+      modelo,
+      precos: { tela: p[0], bateria: p[1], conector: p[2], "nao-liga": p[3] },
+    });
+  }
+  return t;
+}

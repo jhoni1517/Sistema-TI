@@ -201,3 +201,24 @@ export function linhasParaProdutos(
   });
   return { produtos, problemas };
 }
+
+/**
+ * Arquivo escolhido pela pessoa → linhas. XLSX carrega a biblioteca só
+ * aqui: quem nunca importa não baixa.
+ */
+export async function lerArquivoPlanilha(arquivo: File): Promise<Linha[]> {
+  let lidas: Linha[];
+  if (/\.xlsx$/i.test(arquivo.name)) {
+    const { readSheet } = await import("read-excel-file/browser");
+    const folha = await readSheet(arquivo);
+    lidas = folha
+      .map((l) => l.map((c) => (c === null || c === undefined ? "" : String(c)).trim()))
+      .filter((l) => l.some((c) => c !== ""));
+  } else if (/\.(csv|txt)$/i.test(arquivo.name)) {
+    lidas = lerCSV(await arquivo.text());
+  } else {
+    throw new Error("Use uma planilha .xlsx ou .csv. No Excel: Arquivo, Salvar como, CSV.");
+  }
+  if (lidas.length === 0) throw new Error("A planilha está vazia.");
+  return lidas;
+}

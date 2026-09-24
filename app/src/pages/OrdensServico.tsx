@@ -155,6 +155,7 @@ import { alertaDeAbandono, mensagemDeAbandono, prazoDoConserto } from "../lib/pr
 import { podePedirAvaliacao, mensagemPedidoAvaliacao } from "../lib/avaliacao";
 import { hojeISO } from "../lib/contas";
 import { SeloPrazo } from "../components/SeloPrazo";
+import { PrecoDaTabela } from "../components/PrecoDaTabela";
 import { SugestaoDaOS } from "../components/SugestaoDaOS";
 import { OSPorVoz } from "../components/OSPorVoz";
 
@@ -1533,6 +1534,8 @@ const OSForm: React.FC<{
             <textarea className="input" rows={3} value={os.defeitoConstatado} onChange={(e) => setOs({ ...os, defeitoConstatado: e.target.value })} />
           </Field>
         </div>
+
+        <PrecoDaTabela os={os} onUsar={(p) => setOs({ ...os, pecas: [...(os.pecas || []), p] })} />
 
         {/* Sugestão pelo histórico da loja (e, se pedir, pela IA). Só
             preenche campo quando o técnico clica em "Usar". */}
