@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { aviso } from "../components/Aviso";
 import { Plus, Search, Pencil, Trash2, Users, Phone, MessageCircle, Wrench, User, Building2, ShieldAlert, Cake, KeyRound, Send } from "lucide-react";
 import { useApp } from "../store/AppStore";
+import { useLocation } from "react-router-dom";
 import { ImportarPorFoto } from "../components/ImportarPorFoto";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { db, obterLoja } from "../lib/db";
@@ -119,7 +120,9 @@ export const Clientes: React.FC = () => {
   };
   const [busca, setBusca] = useState("");
   const [editando, setEditando] = useState<Cliente | null>(null);
-  const [relacionamento, setRelacionamento] = useState(false);
+  // O aviso do Painel abre esta lista direto (?chamar=1).
+  const local = useLocation();
+  const [relacionamento, setRelacionamento] = useState(() => new URLSearchParams(local.search).has("chamar"));
   const [filtroClasse, setFiltroClasse] = useState<Classificacao | "todos">("todos");
 
   const juridica = editando?.tipoPessoa === "juridica";

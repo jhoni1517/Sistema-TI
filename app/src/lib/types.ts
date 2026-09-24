@@ -3,6 +3,7 @@ import type { FormatoBalanca } from "./balanca";
 import type { RegraMeioAMeio } from "./pizza";
 import type { RegimeTributario } from "./fiscal";
 import type { EstadoOnboarding } from "./onboarding";
+import type { RegraLembrete } from "./lembretes";
 
 // ==== Tipos de domínio do Sistema TI ====
 
@@ -334,6 +335,8 @@ export interface OrdemServico {
   // Assinatura do cliente (imagem em data URL)
   assinaturaCliente?: string;
   termos?: TermoAssinado[];
+  /** Regras de lembrete já chamadas para esta OS (lib/lembretes.ts) */
+  lembretesFeitos?: string[];
   /**
    * Fotos do aparelho na ENTRADA, com o endereço no depósito de imagens.
    *
@@ -1246,6 +1249,8 @@ export interface Config {
   primeirosPassos?: EstadoOnboarding;
   /** Preço de venda do seminovo perfeito, por modelo (lib/seminovo.ts) */
   referenciasSeminovos?: Record<string, number>;
+  /** Quando chamar o cliente de volta, por tipo de serviço (lib/lembretes.ts) */
+  lembretesServico?: RegraLembrete[];
   comissaoPadrao?: number; // % de comissão padrão por técnico
   // Termos do recibo (guarda/abandono)
   taxaArmazenamentoDia?: number; // R$/dia após a conclusão

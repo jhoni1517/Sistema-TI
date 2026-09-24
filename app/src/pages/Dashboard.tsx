@@ -26,10 +26,18 @@ import { saldoFiado } from "../lib/calc";
 import { prazosEmRisco } from "../lib/prazos";
 import { SeloPrazo } from "../components/SeloPrazo";
 import { ListaPrimeirosPassos } from "../components/PrimeiroAcesso";
+import { lembretesDoDia, REGRAS_PADRAO } from "../lib/lembretes";
 
 export const Dashboard: React.FC = () => {
   const { ordens, clientes, produtos, movimentos, vendas, fiados, sessoes, comandas, contas, config, ramo } = useApp();
   const navigate = useNavigate();
+  const paraChamar = useMemo(
+    () =>
+      temModulo(ramo, "os")
+        ? lembretesDoDia(ordens, clientes, config.lembretesServico?.length ? config.lembretesServico : REGRAS_PADRAO).length
+        : 0,
+    [ramo, ordens, clientes, config.lembretesServico]
+  );
   const [conferindo, setConferindo] = useState(false);
 
   const achados = useMemo(
@@ -95,6 +103,22 @@ export const Dashboard: React.FC = () => {
       </div>
 
       <ListaPrimeirosPassos />
+
+      {/* Serviço que pede volta: bateria, película, limpeza. Ver lib/lembretes.ts */}
+      {paraChamar > 0 && (
+        <button
+          onClick={() => navigate("/clientes?chamar=1")}
+          className="card mb-6 flex w-full items-center gap-3 text-left hover:ring-sinal"
+        >
+          <span className="valor flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sinal text-lg font-bold text-white">
+            {paraChamar}
+          </span>
+          <span className="flex-1">
+            <b className="block">Cliente{paraChamar > 1 ? "s" : ""} para chamar hoje</b>
+            <span className="text-sm text-tinta-suave">Revisão de bateria, película nova, limpeza: o recado já está pronto.</span>
+          </span>
+        </button>
+      )}
 
       {/* Cards principais */}
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

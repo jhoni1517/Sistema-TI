@@ -11,6 +11,11 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-09-26 · Clientes para chamar de volta
+Trocou bateria há um ano, película há seis meses: o cliente aparece no Painel no dia certo, com o recado pronto no WhatsApp.
+Rota: /clientes
+Módulo: os
+
 ## 2026-09-26 · Seminovos: avaliar, comprar e vender com ficha
 Em Estoque, "Avaliar usado": checklist, bateria e o preço sugerido. O aparelho entra no estoque com uma ficha por link e QR para o comprador.
 Rota: /estoque
