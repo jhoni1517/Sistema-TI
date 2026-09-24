@@ -34,6 +34,7 @@ import { Modal, Field, SectionTitle, InputNumero } from "../components/ui";
 import { PatternLock } from "../components/PatternLock";
 import { FotosAparelho } from "../components/FotosAparelho";
 import { printHTML } from "../lib/print";
+import { etiquetaDoAparelho } from "../lib/etiqueta-aparelho";
 import { obterLoja } from "../lib/db";
 import { linkDeRastreio } from "../lib/rastreio";
 import { registrarAcessoSigilo } from "../lib/auth";
@@ -2157,6 +2158,30 @@ export const OSDetalhe: React.FC<{
       config.papelImpressao || "a4"
     );
   };
+  /*
+   * A etiqueta sai SEMPRE na bobina de 58mm, mesmo com o recibo em A4: é
+   * para colar na capinha, e uma folha A4 com um QR no canto vai para o
+   * lixo. O QR é desenhado antes de imprimir — a impressão não espera
+   * imagem carregar.
+   */
+  const imprimirEtiqueta = async () => {
+    try {
+      const qr = trackingUrl ? await QRCode.toDataURL(trackingUrl, { width: 300, margin: 1 }) : "";
+      printHTML(
+        etiquetaDoAparelho({
+          loja: config.nomeLoja,
+          numero: os.numero,
+          cliente: cliente?.nome,
+          aparelho: [os.marca, os.modelo].filter(Boolean).join(" "),
+          qr,
+        }),
+        `Etiqueta ${codigoOS(os.numero)}`,
+        "58"
+      );
+    } catch (e) {
+      aviso.erro("Não deu para montar a etiqueta: " + (e instanceof Error ? e.message : String(e)));
+    }
+  };
   const linkRastreio = () => {
     const url = trackingUrl;
     if (cliente?.telefone) {
@@ -2227,8 +2252,11 @@ export const OSDetalhe: React.FC<{
           </div>
           <div className="text-xs text-tinta-suave">
             <p className="text-sm font-bold text-tinta">Etiqueta de acompanhamento</p>
-            <p>Cola no aparelho. O cliente aponta a câmera e vê como tá o conserto.</p>
+            <p>Cola no aparelho. O cliente aponta a câmera e vê como tá o conserto — e, depois de entregue, a garantia.</p>
             <p className="valor mt-1 text-sm font-semibold text-tinta">{codigoOS(os.numero)}</p>
+            <button className="btn-secondary mt-2 !py-1.5 text-xs no-print" onClick={imprimirEtiqueta}>
+              <Printer size={14} /> Imprimir etiqueta
+            </button>
           </div>
         </div>
 
