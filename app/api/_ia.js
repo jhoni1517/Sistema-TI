@@ -23,8 +23,8 @@ const GEMINI_MODELO = process.env.GEMINI_MODELO || "gemini-3.5-flash-lite";
  * confere de verdade é este lado: a tela só mostra.
  */
 export const LIMITES_IA = {
-  essencial: { nota: 20, diagnostico: 30, voz: 30 },
-  completo: { nota: 200, diagnostico: 300, voz: 300 },
+  essencial: { nota: 20, diagnostico: 30, voz: 30, importacao: 10 },
+  completo: { nota: 200, diagnostico: 300, voz: 300, importacao: 100 },
 };
 
 /** Como cada recurso aparece na mensagem de limite */
@@ -32,6 +32,7 @@ const NOME_DO_RECURSO = {
   nota: "leituras de nota",
   diagnostico: "sugestões da IA",
   voz: "OS por voz",
+  importacao: "fotos de caderno",
 };
 
 function planoDe(v) {

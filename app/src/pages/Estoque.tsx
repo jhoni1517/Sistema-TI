@@ -10,6 +10,7 @@ import { avisoDeEstoqueQueSubiu } from "../lib/estoque";
 import { aoApagarProduto, textoDaConfirmacao } from "../lib/exclusao";
 import { Plus, Search, Package, Pencil, Trash2, AlertTriangle, TrendingUp, FolderTree, FolderPlus, CornerDownRight, Truck, FileQuestion, Wrench, CalendarX, Tag, ClipboardCheck, ShoppingBasket, Store, FileText } from "lucide-react";
 import { useApp } from "../store/AppStore";
+import { ImportarPorFoto } from "../components/ImportarPorFoto";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { CatalogoPublico } from "../components/CatalogoPublico";
 import { temRecurso } from "../lib/ramos";
@@ -202,6 +203,7 @@ export const Estoque: React.FC = () => {
             <button className="btn-secondary" onClick={() => setGerCategorias(true)}>
               <FolderTree size={18} /> Categorias
             </button>
+            <ImportarPorFoto oque="produtos" />
             <button className="btn-primary" onClick={() => setEditando(vazio())}>
               <Plus size={18} /> Novo item
             </button>

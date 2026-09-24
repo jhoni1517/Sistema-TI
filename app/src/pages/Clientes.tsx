@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { aviso } from "../components/Aviso";
 import { Plus, Search, Pencil, Trash2, Users, Phone, MessageCircle, Wrench, User, Building2, ShieldAlert, Cake, KeyRound, Send } from "lucide-react";
 import { useApp } from "../store/AppStore";
+import { ImportarPorFoto } from "../components/ImportarPorFoto";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { db, obterLoja } from "../lib/db";
 import {
@@ -201,6 +202,7 @@ export const Clientes: React.FC = () => {
                 <Send size={18} /> Mandar link de cadastro
               </button>
             )}
+            <ImportarPorFoto oque="clientes" />
             <button className="btn-primary" onClick={() => setEditando(vazio())}>
               <Plus size={18} /> Novo cliente
             </button>

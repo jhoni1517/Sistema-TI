@@ -16,7 +16,7 @@ import { txt } from "./format";
  */
 
 export type Plano = "essencial" | "completo";
-export type RecursoIA = "nota" | "diagnostico" | "voz";
+export type RecursoIA = "nota" | "diagnostico" | "voz" | "importacao";
 
 export const PLANOS: Plano[] = ["essencial", "completo"];
 
@@ -26,11 +26,11 @@ export const PLANO_META: Record<
 > = {
   essencial: {
     label: "Essencial",
-    limitesIA: { nota: 20, diagnostico: 30, voz: 30 },
+    limitesIA: { nota: 20, diagnostico: 30, voz: 30, importacao: 10 },
   },
   completo: {
     label: "Completo",
-    limitesIA: { nota: 200, diagnostico: 300, voz: 300 },
+    limitesIA: { nota: 200, diagnostico: 300, voz: 300, importacao: 100 },
   },
 };
 
@@ -42,4 +42,5 @@ export const RECURSO_IA_META: Record<RecursoIA, string> = {
   nota: "leituras de nota por foto",
   diagnostico: "sugestões da IA",
   voz: "OS abertas por voz",
+  importacao: "fotos de caderno importadas",
 };

@@ -44,7 +44,7 @@ export interface RespostaIA {
 }
 
 export async function perguntarIA(
-  acao: "ler-nota" | "diagnostico" | "voz",
+  acao: "ler-nota" | "diagnostico" | "voz" | "importar-foto",
   corpo: Record<string, unknown>
 ): Promise<RespostaIA> {
   const sessao = (await supabase?.auth.getSession())?.data.session?.access_token;
