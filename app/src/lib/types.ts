@@ -4,6 +4,7 @@ import type { RegraMeioAMeio } from "./pizza";
 import type { RegimeTributario } from "./fiscal";
 import type { EstadoOnboarding } from "./onboarding";
 import type { RegraLembrete } from "./lembretes";
+import type { TaxasCartao } from "./sobra";
 
 // ==== Tipos de domínio do Sistema TI ====
 
@@ -1251,6 +1252,10 @@ export interface Config {
   referenciasSeminovos?: Record<string, number>;
   /** Quando chamar o cliente de volta, por tipo de serviço (lib/lembretes.ts) */
   lembretesServico?: RegraLembrete[];
+  /** Quanto o dono quer tirar por mês (lib/sobra.ts) */
+  metaProLabore?: number;
+  /** Taxa da maquininha em %, por forma (lib/sobra.ts) */
+  taxasCartao?: TaxasCartao;
   comissaoPadrao?: number; // % de comissão padrão por técnico
   // Termos do recibo (guarda/abandono)
   taxaArmazenamentoDia?: number; // R$/dia após a conclusão
