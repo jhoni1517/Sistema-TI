@@ -11,6 +11,11 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-09-25 · Etiqueta com QR no aparelho
+Imprima na bobina e cole na capinha: o cliente escaneia, vê o conserto e, depois de entregue, aciona a garantia.
+Rota: /ordens
+Módulo: os
+
 ## 2026-09-24 · Indique e ganhe
 Mande seu link para outro lojista: ele ganha 30 dias a mais de teste e você ganha 1 mês grátis quando ele assinar.
 Rota: /assinatura

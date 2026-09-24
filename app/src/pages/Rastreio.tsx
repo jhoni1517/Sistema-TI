@@ -31,6 +31,9 @@ import {
 } from "../lib/rastreio";
 import { duracaoEscrita } from "../lib/video";
 import { MarcaDaLoja } from "../components/MarcaDaLoja";
+import { garantiaDaArea } from "../lib/area-cliente";
+import { linkAcionarGarantia, type GarantiaPublica } from "../lib/etiqueta-aparelho";
+import { formatDate } from "../lib/format";
 import { podePagarPix, imagemDoQR, validadeDoQR, SEGUNDOS_ENTRE_CONSULTAS } from "../lib/pix";
 
 /** O site do sistema, no rodapé discreto */
@@ -351,6 +354,10 @@ export const Rastreio: React.FC = () => {
                   </p>
                   <p className="mt-2 text-sm font-medium opacity-95">{meta.cliente}</p>
                 </div>
+              )}
+
+              {os.status === "entregue" && (
+                <GarantiaDoCliente loja={loja} numero={os.numero} token={token} whatsapp={os.whatsapp} />
               )}
 
               {/*
@@ -722,3 +729,69 @@ export const Rastreio: React.FC = () => {
   );
 };
 
+
+/**
+ * Depois da entrega, o QR da etiqueta colada no aparelho cai aqui: até
+ * quando vale a garantia, o que foi feito e o botão de acionar. Quem corta
+ * o que sai é a função garantia_da_os (só entregue, sem preço).
+ */
+const GarantiaDoCliente: React.FC<{ loja: string; numero: number; token: string; whatsapp: string | null }> = ({
+  loja,
+  numero,
+  token,
+  whatsapp,
+}) => {
+  const [g, setG] = useState<GarantiaPublica | null>(null);
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase
+      .rpc("garantia_da_os", { p_loja: loja, p_numero: numero, p_token: token })
+      .then(({ data, error }) => {
+        // Função ainda não criada ou falha: a página continua sem o quadro.
+        if (error) return;
+        const linha = (Array.isArray(data) ? data[0] : data) as GarantiaPublica | undefined;
+        setG(linha || null);
+      });
+  }, [loja, numero, token]);
+
+  if (!g) return null;
+  const garantia = garantiaDaArea({ numero, status: "entregue", entregueEm: g.entregueEm, garantiaDias: g.garantiaDias });
+  if (garantia.situacao === "sem_garantia") return null;
+  const valida = garantia.situacao === "valida";
+  const acionar = valida ? linkAcionarGarantia(whatsapp, numero, garantia.ate) : "";
+  const feito = (g.feito || []).filter(Boolean);
+
+  return (
+    <section className={`mb-6 rounded-md border-2 p-4 ${valida ? "border-status-pronta" : "border-linha"}`}>
+      <p className="text-xs font-semibold uppercase tracking-wide text-tinta-suave">Garantia</p>
+      <p className={`mt-1 text-xl font-bold ${valida ? "text-status-pronta" : "text-tinta-suave"}`}>
+        {valida ? (
+          <>
+            Válida até <span className="valor">{formatDate(garantia.ate)}</span>
+          </>
+        ) : (
+          <>
+            Venceu em <span className="valor">{formatDate(garantia.ate)}</span>
+          </>
+        )}
+      </p>
+      {g.relatado && <p className="mt-2 text-sm text-tinta-suave">Você trouxe por: {g.relatado}</p>}
+      {feito.length > 0 && (
+        <div className="mt-2 text-sm">
+          <p className="font-semibold">O que foi feito</p>
+          <ul className="mt-1 list-disc pl-5 text-tinta-suave">
+            {feito.map((f, i) => (
+              <li key={i}>{f}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {acionar && (
+        <a href={acionar} target="_blank" rel="noreferrer" className="btn mt-3 w-full rounded-md bg-status-pronta text-white">
+          <MessageCircle size={16} /> Acionar garantia
+        </a>
+      )}
+    </section>
+  );
+};
