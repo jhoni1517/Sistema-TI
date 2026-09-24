@@ -14,6 +14,7 @@ import { ImportarPorFoto } from "../components/ImportarPorFoto";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { CatalogoPublico } from "../components/CatalogoPublico";
 import { temRecurso } from "../lib/ramos";
+import { BotaoCamera } from "../components/Camera";
 import { BotaoAvaliarUsado, FichaDoSeminovo, IconeFicha } from "../components/Seminovos";
 import { normalizar } from "../lib/busca";
 import { pendenciasDoProduto, produtosSemFiscal, pendenciasDaLoja } from "../lib/fiscal";
@@ -309,7 +310,8 @@ export const Estoque: React.FC = () => {
 
       <div className="relative mb-4 max-w-md">
         <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input className="input pl-10" placeholder="Buscar produto, código ou categoria..." value={busca} onChange={(e) => setBusca(e.target.value)} />
+        <input className="input pl-10 pr-11" placeholder="Buscar produto, código ou categoria..." value={busca} onChange={(e) => setBusca(e.target.value)} />
+        <BotaoCamera className="absolute right-1 top-1/2 -translate-y-1/2" onLer={setBusca} />
       </div>
 
       {lista.length === 0 ? (
