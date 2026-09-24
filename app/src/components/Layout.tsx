@@ -78,10 +78,12 @@ const nav: Array<{
   { to: "/config", label: "Configurações", icon: Settings, recurso: "config" },
 ];
 
-export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
-  onLogout,
-  sessao,
-}) => {
+export const Layout: React.FC<{
+  onLogout: () => void;
+  sessao?: Sessao;
+  /** Só na loja de exemplo: mostra a faixa com o convite para criar conta */
+  onCriarConta?: () => void;
+}> = ({ onLogout, sessao, onCriarConta }) => {
   const { config, online, erroCarga, loading, reload, pendentes, sincronizar, ramo, ramoAparelho, trocarRamoAparelho } = useApp();
   const local = useLocation();
   const [open, setOpen] = useState(false);
@@ -275,8 +277,19 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
 
       {/* Conteúdo */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <AvisoAssinatura />
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-linha bg-cartao px-4 lg:hidden no-print">
+        {!onCriarConta && <AvisoAssinatura />}
+        {/* Faixa e cabeçalho grudam juntos: dois "sticky top-0" um em cima
+            do outro, o cabeçalho cobria a faixa ao rolar. */}
+        <div className="sticky top-0 z-20 no-print">
+        {onCriarConta && (
+          <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 bg-sinal px-4 py-2 text-center text-sm font-semibold text-white">
+            <span>Você está numa loja de exemplo.</span>
+            <button onClick={onCriarConta} className="rounded bg-white/15 px-2 py-0.5 underline underline-offset-2 hover:bg-white/25">
+              Criar minha conta grátis
+            </button>
+          </div>
+        )}
+        <header className="flex h-16 items-center gap-3 border-b border-linha bg-cartao px-4 lg:hidden no-print">
           <button
             onClick={() => setOpen(true)}
             aria-label="Abrir menu"
@@ -306,6 +319,7 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
             <Search size={20} />
           </button>
         </header>
+        </div>
 
         {/* Visão local ligada: precisa ficar evidente, senão a pessoa acha
             que o sistema mudou sozinho e vai procurar o que não existe. */}

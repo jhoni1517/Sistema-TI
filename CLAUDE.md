@@ -319,8 +319,8 @@ O erro também caía num `.catch(() => {})`, a mesma regra de sempre.
 
 ### Limpar o localStorage no logout apaga as credenciais da nuvem
 
-`limparCacheLocal` preserva `supabaseUrl`, `supabaseKey`, `tema` e
-`corDestaque`. Sem isso o login quebrava na máquina seguinte.
+`limparCacheLocal` preserva `supabaseUrl`, `supabaseKey`, `tema`,
+`corDestaque` e `fundo`. Sem isso o login quebrava na máquina seguinte.
 
 ### Mensagem de erro precisa dizer qual é a saída
 
@@ -345,6 +345,15 @@ Se o valor tem "secret" no nome ou aparece escondido com bolinhas, ele vai
 de um lugar para o outro e nunca por uma conversa, print ou commit. Chave
 que apareceu é chave queimada: gere a nova, publique, e só então revogue a
 velha.
+
+### A loja de exemplo só existe na memória
+
+"Ver o sistema funcionando" (tela de entrada) roda o sistema de verdade em
+cima de `lib/demo.ts`. A porta fecha em `lib/db.ts`: com `emDemo()`, toda
+leitura e gravação fica na memória, nada vai para a fila e a configuração
+não escreve no aparelho — senão o nome "Exemplo" apareceria na tela de
+entrada da loja real que usa aquele computador. Tela que fala com o Supabase
+sem passar por `db` precisa perguntar `emDemo()` antes.
 
 ### Página de diagnóstico é porta dos fundos
 
