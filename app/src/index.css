@@ -23,8 +23,8 @@
 
 /* ====== TOKENS DO BALCÃO (docs/DESIGN.md) ======
    Formato "R G B" para o Tailwind aplicar opacidade (bg-sinal/10).
-   Nenhuma tela antiga usa isto ainda: elas migram uma por vez, e trocar
-   tudo de uma vez é o jeito de quebrar vinte telas sem ver nenhuma. */
+   As telas antigas chegam aqui pela PONTE no fim deste arquivo: os cinzas
+   frios do Tailwind (slate) passam a apontar para o papel e a tinta. */
 :root {
   --papel: 244 239 228;        /* #F4EFE4 */
   --cartao: 255 253 248;       /* #FFFDF8 */
@@ -69,16 +69,11 @@ body,
 
 body {
   margin: 0;
-  font-family: "Inter", system-ui, sans-serif;
+  font-family: "Bricolage Grotesque", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
-  background-color: #f1f5f9;
-  color: #0f172a;
+  background-color: rgb(var(--papel));
+  color: rgb(var(--tinta));
   transition: background-color 0.2s ease, color 0.2s ease;
-}
-
-.dark body {
-  background-color: #0b1220;
-  color: #e2e8f0;
 }
 
 /* ====== MOVIMENTO ======
@@ -171,7 +166,7 @@ body {
    * mais, então lá volta para 36.
    */
   .btn {
-    @apply inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97] sm:min-h-[2.25rem];
+    @apply inline-flex min-h-[2.75rem] items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-semibold transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97] sm:min-h-[2.25rem];
   }
   /*
    * Botão só de ícone: quadrado de 44px no celular.
@@ -186,7 +181,7 @@ body {
     @apply btn bg-brand-600 text-white hover:bg-brand-700 focus:ring-brand-500;
   }
   .btn-secondary {
-    @apply btn bg-white text-slate-700 ring-1 ring-inset ring-slate-300 hover:bg-slate-50 focus:ring-brand-500;
+    @apply btn bg-cartao text-tinta ring-1 ring-inset ring-linha hover:bg-concreto focus:ring-brand-500;
   }
   .btn-danger {
     @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
@@ -195,10 +190,10 @@ body {
     @apply btn bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500;
   }
   .btn-ghost {
-    @apply btn text-slate-600 hover:bg-slate-100;
+    @apply btn text-tinta-suave hover:bg-concreto;
   }
   .card {
-    @apply rounded-xl bg-white p-5 shadow-sm ring-1 ring-slate-200 transition-shadow duration-200 hover:shadow-md;
+    @apply rounded-md bg-cartao p-5 ring-1 ring-linha;
   }
 
   /*
@@ -308,11 +303,11 @@ body {
    * Junto vem a altura de 44px, a mesma dos botões.
    */
   .input {
-    @apply w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-900 placeholder-slate-400 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 sm:py-2 sm:text-sm;
+    @apply w-full rounded-md border border-linha bg-cartao px-3 py-2.5 text-base text-tinta placeholder-tinta-suave/60 transition-colors focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 sm:py-2 sm:text-sm;
   }
   /* Espaço reservado enquanto os dados chegam da nuvem */
   .esqueleto {
-    @apply relative overflow-hidden rounded-lg bg-slate-200/70;
+    @apply relative overflow-hidden rounded-md bg-concreto;
   }
   .esqueleto::after {
     content: "";
@@ -326,7 +321,7 @@ body {
     animation: brilho 1.4s infinite;
   }
   .label {
-    @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500;
+    @apply mb-1 block text-xs font-semibold uppercase tracking-wider text-tinta-suave;
   }
   /*
    * Pastilha de filtro (Em aberto, Pronta, Todas...).
@@ -366,70 +361,76 @@ body {
   }
 }
 
-/* ====== MODO ESCURO (sobrescreve utilitários fixos com segurança) ====== */
-/* Superfícies */
-.dark .bg-white { background-color: #131c2e; }
-.dark .bg-white\/80 { background-color: rgba(19, 28, 46, 0.8); }
-.dark .bg-slate-50 { background-color: #0f1728; }
-.dark .bg-slate-100 { background-color: #26314a; }
-.dark .card { background-color: #131c2e; }
-.dark .input {
-  background-color: #0f1728;
-  border-color: #334155;
-  color: #e2e8f0;
+/* ====== PONTE DAS TELAS ANTIGAS PARA O BALCÃO ======
+ *
+ * As telas foram escritas com os cinzas frios do Tailwind (slate) e fundo
+ * branco. Em vez de reescrever vinte telas à mão — e quebrar alguma sem
+ * ver —, os neutros passam a apontar para os tokens: branco vira cartão,
+ * slate-50 vira papel, as letras cinza viram tinta. Vale no claro e no
+ * escuro, porque os tokens já mudam sozinhos com o tema.
+ *
+ * Vale dentro de `.ponte` (a moldura do sistema, em Layout.tsx). A tela de
+ * entrada é escura de propósito e fica de fora: lá o cinza claro é letra
+ * sobre fundo escuro, e virar tinta-suave apagaria o texto.
+ *
+ * Só os NEUTROS passam por aqui. Cor de aviso (âmbar, vermelho, verde)
+ * continua sendo aviso; no escuro ela ganha fundo escuro logo abaixo.
+ * Tela nova não depende disto: usa os tokens direto (docs/DESIGN.md).
+ */
+.ponte .bg-white { background-color: rgb(var(--cartao)); }
+.ponte .bg-white\/80 { background-color: rgb(var(--cartao)); }
+.ponte .bg-slate-50 { background-color: rgb(var(--papel)); }
+.ponte .bg-slate-100 { background-color: rgb(var(--concreto)); }
+.ponte .bg-slate-200 { background-color: rgb(var(--linha)); }
+.ponte .bg-gray-50 { background-color: rgb(var(--papel)); }
+.ponte .bg-gray-100 { background-color: rgb(var(--concreto)); }
+.ponte .text-slate-900, .ponte .text-slate-800, .ponte .text-slate-700,
+.ponte .text-gray-900, .ponte .text-gray-800, .ponte .text-gray-700 { color: rgb(var(--tinta)); }
+.ponte .text-slate-600, .ponte .text-slate-500, .ponte .text-slate-400,
+.ponte .text-gray-600, .ponte .text-gray-500, .ponte .text-gray-400 { color: rgb(var(--tinta-suave)); }
+.ponte .text-slate-300 { color: rgb(var(--linha)); }
+.ponte .border-slate-100, .ponte .border-slate-200, .ponte .border-slate-300,
+.ponte .border-gray-100, .ponte .border-gray-200, .ponte .border-gray-300 { border-color: rgb(var(--linha)); }
+.ponte .divide-slate-100 > :not([hidden]) ~ :not([hidden]),
+.ponte .divide-slate-200 > :not([hidden]) ~ :not([hidden]) { border-color: rgb(var(--linha)); }
+.ponte .ring-slate-100, .ponte .ring-slate-200, .ponte .ring-slate-300 { --tw-ring-color: rgb(var(--linha)); }
+.ponte .hover\:bg-slate-50:hover, .ponte .hover\:bg-slate-100:hover { background-color: rgb(var(--concreto)); }
+.ponte .hover\:bg-slate-200:hover { background-color: rgb(var(--linha)); }
+.ponte .hover\:text-slate-600:hover, .ponte .hover\:text-slate-700:hover, .ponte .hover\:text-slate-800:hover { color: rgb(var(--tinta)); }
+.ponte .placeholder-slate-400::placeholder { color: rgb(var(--tinta-suave) / 0.6); }
+/* Borda sem cor (border-b, border-t, border) segue a linha do papel. Em
+   :where() para ter peso zero: borda que JÁ tem cor (border-amber-200)
+   continua com a dela. */
+:where(.ponte) :where(.border, .border-b, .border-t, .border-l, .border-r, .border-y, .border-x) {
+  border-color: rgb(var(--linha));
 }
-.dark .btn-secondary {
-  background-color: #131c2e;
-  color: #cbd5e1;
-  --tw-ring-color: #334155;
-}
-/* Textos neutros */
-.dark .text-slate-900 { color: #f1f5f9; }
-.dark .text-slate-800 { color: #e2e8f0; }
-.dark .text-slate-700 { color: #cbd5e1; }
-.dark .text-slate-600 { color: #cbd5e1; }
-.dark .text-slate-500 { color: #94a3b8; }
-/* Bordas / divisórias / rings */
-.dark .border-slate-200 { border-color: #26314a; }
-.dark .border-slate-100 { border-color: #26314a; }
-.dark .border-b { border-color: #26314a; }
-.dark .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #26314a; }
-.dark .ring-slate-200 { --tw-ring-color: #26314a; }
-.dark .ring-slate-300 { --tw-ring-color: #334155; }
-.dark .text-slate-400 { color: #7b8aa3; }
-/* Hovers */
-.dark .hover\:bg-slate-50:hover { background-color: rgba(38, 49, 74, 0.5); }
-.dark .hover\:bg-slate-100:hover { background-color: #26314a; }
-.dark .hover\:bg-slate-200:hover { background-color: #334155; }
-/* Caixas de busca/filtro com fundo branco viram escuras via .bg-white acima */
+
 /* Faixas coloridas de aviso ficavam claras demais no escuro e "furavam" a tela */
 .dark .bg-amber-50 { background-color: #2a2011; }
 .dark .bg-emerald-50 { background-color: #0f2418; }
 .dark .bg-red-50 { background-color: #2a1416; }
 .dark .bg-blue-50 { background-color: #111f38; }
 .dark .bg-brand-50 { background-color: rgb(var(--brand-900) / 0.35); }
-.dark .text-amber-700 { color: #fbbf24; }
-.dark .text-emerald-700 { color: #34d399; }
-.dark .text-red-700 { color: #f87171; }
+.dark .text-amber-700, .dark .text-amber-800 { color: #fbbf24; }
+.dark .text-emerald-700, .dark .text-emerald-800 { color: #34d399; }
+.dark .text-red-700, .dark .text-red-800 { color: #f87171; }
+.dark .text-blue-700, .dark .text-blue-800 { color: #93c5fd; }
 .dark .text-brand-700 { color: rgb(var(--brand-300)); }
 .dark .border-amber-200 { border-color: #4a3a17; }
 .dark .border-emerald-200 { border-color: #17402c; }
 .dark .border-red-200 { border-color: #4a2024; }
-.dark .esqueleto { @apply bg-slate-700/50; }
+.dark .border-blue-200 { border-color: #1e3a5f; }
 
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: rgb(var(--linha));
   border-radius: 8px;
 }
-.dark ::-webkit-scrollbar-thumb {
-  background: #334155;
-}
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: rgb(var(--tinta-suave));
 }
 
 @media print {

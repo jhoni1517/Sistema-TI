@@ -78,8 +78,10 @@ Mono só em código e valor (sempre `tabular-nums`, classe `.valor`), e voz
 de balcão nos textos.
 
 Use só os tokens (`papel`, `cartao`, `tinta`, `sinal`, `status-*`...).
-Tela antiga migra quando for mexida — trocar tudo de uma vez quebra vinte
-telas sem ninguém ver nenhuma. A ordem está em `docs/ROADMAP.md`.
+As telas antigas chegam ao papel pela **ponte** do `index.css`: dentro de
+`.ponte` (a moldura do Layout), `bg-white`, `slate-*` e `.card`/`.btn`/
+`.input` apontam para os tokens, no claro e no escuro. Tela nova não usa
+`slate`: usa o token direto. Degradê colorido é proibido (DESIGN.md).
 
 ## As regras que vieram de bug, não de livro
 

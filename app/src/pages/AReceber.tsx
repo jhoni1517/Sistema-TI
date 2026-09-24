@@ -243,7 +243,7 @@ export const AReceber: React.FC = () => {
 
       {/* Resumo */}
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
-        <div className="card bg-gradient-to-br from-amber-500 to-orange-600 text-white ring-orange-500">
+        <div className="card !bg-status-aprovacao text-white !ring-status-aprovacao">
           <p className="flex items-center gap-2 text-sm text-amber-100"><HandCoins size={16} /> Total a receber</p>
           <p className="mt-1 text-3xl font-bold">{brl(totalAberto)}</p>
         </div>

@@ -89,7 +89,7 @@ export const Dashboard: React.FC = () => {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-800">Olá! 👋</h1> {/* emoji-na-tela: saudação do painel, nunca sai daqui */}
+        <h1 className="text-2xl font-bold text-tinta">Olá!</h1>
         <p className="text-sm text-slate-500">Resumo de hoje · {config.nomeLoja}</p>
       </div>
 
@@ -107,17 +107,17 @@ export const Dashboard: React.FC = () => {
         */}
         {temOS ? (
           <>
-            <Card onClick={() => navigate("/ordens")} icon={<Wrench />} color="from-blue-500 to-blue-700" label={`${palavras.ordemCurta} em aberto`} value={String(stats.abertas.length)} />
-            <Card onClick={() => navigate("/ordens")} icon={<CheckCircle2 />} color="from-emerald-500 to-emerald-700" label="Prontas p/ entrega" value={String(stats.prontas.length)} />
+            <Card onClick={() => navigate("/ordens")} icon={<Wrench />} label={`${palavras.ordemCurta} em aberto`} value={String(stats.abertas.length)} />
+            <Card onClick={() => navigate("/ordens")} icon={<CheckCircle2 />} label="Pronto, esperando o dono" value={String(stats.prontas.length)} />
           </>
         ) : (
           <>
-            <Card onClick={() => navigate("/pdv")} icon={<ShoppingCart />} color="from-blue-500 to-blue-700" label="Vendas hoje" value={String(stats.vendasHoje)} />
-            <Card onClick={() => navigate("/a-receber")} icon={<HandCoins />} color="from-emerald-500 to-emerald-700" label="Fiado em aberto" value={brl(stats.fiadoAberto)} />
+            <Card onClick={() => navigate("/pdv")} icon={<ShoppingCart />} label="Vendas hoje" value={String(stats.vendasHoje)} />
+            <Card onClick={() => navigate("/a-receber")} icon={<HandCoins />} label="Fiado em aberto" value={brl(stats.fiadoAberto)} />
           </>
         )}
-        <Card onClick={() => navigate("/caixa")} icon={<Wallet />} color="from-violet-500 to-violet-700" label="Recebido hoje" value={brl(stats.caixaHoje)} />
-        <Card onClick={() => navigate("/relatorios")} icon={<TrendingUp />} color="from-amber-500 to-orange-600" label="Lucro líquido (mês)" value={brl(stats.lucroMes)} />
+        <Card onClick={() => navigate("/caixa")} icon={<Wallet />} label="Recebido hoje" value={brl(stats.caixaHoje)} />
+        <Card onClick={() => navigate("/relatorios")} icon={<TrendingUp />} label="Lucro líquido (mês)" value={brl(stats.lucroMes)} />
       </div>
 
       {temOS && (riscos.length > 0 && (
@@ -255,7 +255,7 @@ export const Dashboard: React.FC = () => {
                   <p className="truncate text-sm font-semibold text-slate-800">{nomeCliente(o.clienteId)}</p>
                   <p className="truncate text-xs text-slate-400">{o.marca} {o.modelo}</p>
                 </div>
-                <span className={`badge ${OS_STATUS_META[o.status as OSStatus].color}`}>{OS_STATUS_META[o.status as OSStatus].label}</span>
+                <span className={`rounded px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${OS_STATUS_META[o.status as OSStatus].carimbo}`}>{OS_STATUS_META[o.status as OSStatus].label}</span>
                 <span className="hidden text-xs text-slate-400 sm:block">{formatDate(o.criadoEm)}</span>
                 <span className="w-20 text-right text-sm font-bold text-slate-700">{brl(totalOS(o))}</span>
               </div>
@@ -268,10 +268,18 @@ export const Dashboard: React.FC = () => {
   );
 };
 
-const Card: React.FC<{ icon: React.ReactNode; color: string; label: string; value: string; onClick: () => void }> = ({ icon, color, label, value, onClick }) => (
-  <button onClick={onClick} className={`rounded-xl bg-gradient-to-br ${color} p-5 text-left text-white shadow-sm transition hover:scale-[1.02]`}>
-    <div className="mb-2 opacity-90">{icon}</div>
-    <p className="text-2xl font-bold">{value}</p>
-    <p className="text-sm text-white/80">{label}</p>
+/*
+ * Número do dia. Era um degradê colorido por cartão (azul, verde, roxo,
+ * laranja): quatro cores gritando ao mesmo tempo e nenhuma dizendo nada.
+ * Agora é papel com o número em letra de etiqueta, como o resto do balcão.
+ */
+const Card: React.FC<{ icon: React.ReactNode; label: string; value: string; onClick: () => void }> = ({ icon, label, value, onClick }) => (
+  <button
+    onClick={onClick}
+    className="rounded-md border border-linha bg-cartao p-5 text-left text-tinta transition hover:border-tinta-suave"
+  >
+    <div className="mb-2 text-tinta-suave">{icon}</div>
+    <p className="valor text-2xl font-semibold">{value}</p>
+    <p className="text-sm text-tinta-suave">{label}</p>
   </button>
 );

@@ -198,3 +198,12 @@ certo.
 
 Use só os tokens. `bg-slate-100`, `text-indigo-600` e hex solto em tela nova
 é descuido.
+
+**A ponte.** As telas antigas foram escritas com `bg-white` e os cinzas
+`slate`. Dentro de `.ponte` (a moldura do sistema, em `Layout.tsx`), o
+`index.css` faz esses neutros apontarem para os tokens — branco vira
+`cartao`, `slate-50` vira `papel`, letra cinza vira `tinta`/`tinta-suave` —
+e `.card`, `.btn-*`, `.input` e `.label` já nascem no papel. Assim as vinte
+telas mudaram juntas sem reescrever nenhuma. A tela de entrada é escura de
+propósito e fica fora da ponte. A cor de destaque escolhida pela loja
+(Configurações) continua mandando no botão principal e no menu.
