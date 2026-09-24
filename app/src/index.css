@@ -61,6 +61,120 @@
   --sinal-tinta: 23 20 17;
 }
 
+
+/* ====== FUNDOS À ESCOLHA (Configurações > Aparência) ======
+ *
+ * O Balcão (papel quente) é o padrão e o que docs/DESIGN.md descreve. A
+ * loja pode trocar o fundo por outro, e aqui mora só a troca de valores:
+ * nenhuma tela sabe qual fundo está ativo, todas leem os mesmos tokens.
+ * Cada paleta foi medida: tinta e tinta-suave passam 4,5:1 (AA) sobre
+ * papel, cartão e concreto, no claro e no escuro.
+ *
+ * O menu lateral também é token (--menu*), para acompanhar o fundo.
+ * No Clássico o sinal segue a cor de destaque, como era antes.
+ */
+:root {
+  --menu: 28 25 23;         /* stone-900: bancada escura e quente */
+  --menu-2: 41 37 36;       /* stone-800 */
+  --menu-3: 68 64 60;       /* stone-700 */
+  --menu-texto: 214 211 209;
+  --menu-suave: 168 162 158;
+}
+:root[data-fundo="classico"] {
+  --papel: 241 245 249;
+  --cartao: 255 255 255;
+  --concreto: 232 237 243;
+  --linha: 226 232 240;
+  --tinta: 15 23 42;
+  --tinta-suave: 71 85 105;
+}
+:root.dark[data-fundo="classico"] {
+  --papel: 11 18 32;
+  --cartao: 19 28 46;
+  --concreto: 26 36 56;
+  --linha: 38 49 74;
+  --tinta: 226 232 240;
+  --tinta-suave: 148 163 184;
+}
+:root[data-fundo="classico"] {
+  --menu: 15 23 42;
+  --menu-2: 30 41 59;
+  --menu-3: 51 65 85;
+  --menu-texto: 203 213 225;
+  --menu-suave: 148 163 184;
+}
+:root[data-fundo="grafite"] {
+  --papel: 242 242 240;
+  --cartao: 255 255 255;
+  --concreto: 230 230 227;
+  --linha: 212 212 208;
+  --tinta: 23 23 23;
+  --tinta-suave: 82 82 82;
+}
+:root.dark[data-fundo="grafite"] {
+  --papel: 18 18 18;
+  --cartao: 28 28 28;
+  --concreto: 38 38 38;
+  --linha: 54 54 54;
+  --tinta: 237 237 237;
+  --tinta-suave: 163 163 163;
+}
+:root[data-fundo="grafite"] {
+  --menu: 23 23 23;
+  --menu-2: 38 38 38;
+  --menu-3: 64 64 64;
+  --menu-texto: 212 212 212;
+  --menu-suave: 163 163 163;
+}
+:root[data-fundo="oficina"] {
+  --papel: 237 242 234;
+  --cartao: 251 253 249;
+  --concreto: 221 230 215;
+  --linha: 199 211 192;
+  --tinta: 22 33 26;
+  --tinta-suave: 77 94 81;
+}
+:root.dark[data-fundo="oficina"] {
+  --papel: 15 23 18;
+  --cartao: 22 33 26;
+  --concreto: 31 45 36;
+  --linha: 44 61 50;
+  --tinta: 227 236 228;
+  --tinta-suave: 155 176 160;
+}
+:root[data-fundo="oficina"] {
+  --menu: 20 36 26;
+  --menu-2: 31 53 39;
+  --menu-3: 45 74 55;
+  --menu-texto: 212 226 215;
+  --menu-suave: 147 171 153;
+}
+:root[data-fundo="lavanda"] {
+  --papel: 243 241 248;
+  --cartao: 255 255 255;
+  --concreto: 230 225 240;
+  --linha: 211 204 227;
+  --tinta: 28 23 39;
+  --tinta-suave: 87 80 108;
+}
+:root.dark[data-fundo="lavanda"] {
+  --papel: 19 16 27;
+  --cartao: 28 24 39;
+  --concreto: 38 32 54;
+  --linha: 52 44 72;
+  --tinta: 236 232 245;
+  --tinta-suave: 170 162 194;
+}
+:root[data-fundo="lavanda"] {
+  --menu: 30 24 48;
+  --menu-2: 44 36 70;
+  --menu-3: 61 51 96;
+  --menu-texto: 217 210 238;
+  --menu-suave: 167 159 196;
+}
+:root[data-fundo="classico"] { --sinal: var(--brand-600); --sinal-tinta: 255 255 255; }
+:root.dark[data-fundo="classico"] { --sinal: var(--brand-500); --sinal-tinta: 255 255 255; }
+
 html,
 body,
 #root {

@@ -141,6 +141,11 @@
       (function () {
         try {
           var c = JSON.parse(localStorage.getItem("sistema-ti:config") || "{}");
+          // O fundo escolhido entra antes da primeira pintura: sem isto, quem
+          // escolheu outro fundo via o papel piscar a cada abertura.
+          if (/^(classico|grafite|oficina|lavanda)$/.test(c.fundo || "")) {
+            document.documentElement.setAttribute("data-fundo", c.fundo);
+          }
           if (c.nomeLoja) document.getElementById("ab-nome").textContent = c.nomeLoja;
           if (c.logoUrl) {
             var m = document.getElementById("ab-marca");

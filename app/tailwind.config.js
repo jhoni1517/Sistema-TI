@@ -32,6 +32,14 @@ export default {
           tinta: "rgb(var(--sinal-tinta) / <alpha-value>)",
         },
         etiqueta: "rgb(var(--etiqueta) / <alpha-value>)",
+        // Menu lateral: acompanha o fundo escolhido em Configurações
+        menu: {
+          DEFAULT: "rgb(var(--menu) / <alpha-value>)",
+          2: "rgb(var(--menu-2) / <alpha-value>)",
+          3: "rgb(var(--menu-3) / <alpha-value>)",
+          texto: "rgb(var(--menu-texto) / <alpha-value>)",
+          suave: "rgb(var(--menu-suave) / <alpha-value>)",
+        },
         status: {
           aberta: "rgb(var(--status-aberta) / <alpha-value>)",
           analise: "rgb(var(--status-analise) / <alpha-value>)",

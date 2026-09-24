@@ -1204,6 +1204,8 @@ export interface Config {
   // Aparência
   tema?: "auto" | "claro" | "escuro";
   corDestaque?: string; // chave em ACCENTS (azul, esmeralda, ...)
+  /** Fundo do sistema: chave em FUNDOS (balcao, classico, ...). Vazio = balcão. */
+  fundo?: string;
   comissaoPadrao?: number; // % de comissão padrão por técnico
   // Termos do recibo (guarda/abandono)
   taxaArmazenamentoDia?: number; // R$/dia após a conclusão

@@ -158,17 +158,17 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
          * Serviço" e "A Receber (Fiado)" quebrarem em duas linhas ou serem
          * cortados pelo `truncate` — e nome cortado é pior que nome pequeno.
          */
-        className={`fixed inset-y-0 left-0 z-40 flex w-72 transform flex-col overflow-y-auto overscroll-contain bg-stone-900 text-stone-300 transition-transform lg:w-64 lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 flex w-72 transform flex-col overflow-y-auto overscroll-contain bg-menu text-menu-texto transition-transform lg:w-64 lg:static lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex h-16 shrink-0 items-center gap-2 border-b border-stone-800 px-5">
+        <div className="flex h-16 shrink-0 items-center gap-2 border-b border-menu-2 px-5">
           <MarcaDaLoja logoUrl={config.logoUrl} tamanho={36} />
           <div className="truncate">
             <p className="truncate text-base font-bold text-white lg:text-sm">
               {config.nomeLoja}
             </p>
-            <p className="flex items-center gap-1 text-xs text-stone-400 lg:text-[11px]">
+            <p className="flex items-center gap-1 text-xs text-menu-suave lg:text-[11px]">
               {online ? (
                 <>
                   <Cloud size={11} /> Nuvem
@@ -185,11 +185,11 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
         <div className="shrink-0 px-3 pt-3">
           <button
             onClick={() => setBusca(true)}
-            className="flex w-full items-center gap-2 rounded-lg bg-stone-800 px-3 py-2.5 text-base text-stone-400 hover:bg-stone-700 hover:text-stone-200 lg:py-2 lg:text-sm"
+            className="flex w-full items-center gap-2 rounded-lg bg-menu-2 px-3 py-2.5 text-base text-menu-suave hover:bg-menu-3 hover:text-menu-texto lg:py-2 lg:text-sm"
           >
             <Search className="h-[18px] w-[18px] shrink-0 lg:h-4 lg:w-4" />
             <span className="flex-1 text-left">Buscar...</span>
-            <span className="hidden rounded border border-stone-600 px-1.5 py-0.5 text-[10px] lg:inline">
+            <span className="hidden rounded border border-menu-3 px-1.5 py-0.5 text-[10px] lg:inline">
               Ctrl K
             </span>
           </button>
@@ -223,7 +223,7 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
                 `flex items-center gap-3 rounded-lg px-3 py-3 text-base font-medium transition-colors lg:py-2.5 lg:text-sm ${
                   isActive
                     ? "bg-brand-600 text-white"
-                    : "text-stone-300 hover:bg-stone-800 hover:text-white"
+                    : "text-menu-texto hover:bg-menu-2 hover:text-white"
                 }`
               }
             >
@@ -238,13 +238,13 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
         {/* mt-auto em vez de absolute bottom-0: numa tela baixa o bloco
             absoluto cobria os últimos itens do menu, e eles ficavam
             inalcançáveis porque a lista também não rolava. */}
-        <div className="mt-auto shrink-0 border-t border-stone-800 p-3">
+        <div className="mt-auto shrink-0 border-t border-menu-2 p-3">
           {sessao && (
             <div className="mb-2 px-3">
-              <p className="truncate text-sm font-semibold text-stone-300 lg:text-xs">
+              <p className="truncate text-sm font-semibold text-menu-texto lg:text-xs">
                 {sessao.perfil?.nome || sessao.email}
               </p>
-              <p className="text-xs text-stone-500 lg:text-[11px]">
+              <p className="text-xs text-menu-suave lg:text-[11px]">
                 {sessao.perfil ? NOME_PAPEL[sessao.perfil.papel] : "sem perfil"}
               </p>
             </div>
@@ -255,7 +255,7 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
           <button
             onClick={() => reload()}
             disabled={loading}
-            className="mb-1 flex w-full items-center gap-3 rounded-lg px-3 py-3 text-base font-medium text-stone-300 hover:bg-stone-800 hover:text-white disabled:opacity-40 lg:py-2.5 lg:text-sm"
+            className="mb-1 flex w-full items-center gap-3 rounded-lg px-3 py-3 text-base font-medium text-menu-texto hover:bg-menu-2 hover:text-white disabled:opacity-40 lg:py-2.5 lg:text-sm"
           >
             <RefreshCw className={`h-5 w-5 shrink-0 lg:h-[18px] lg:w-[18px] ${loading ? "animate-spin" : ""}`} />
             {loading ? "Atualizando..." : "Atualizar dados"}
@@ -265,7 +265,7 @@ export const Layout: React.FC<{ onLogout: () => void; sessao?: Sessao }> = ({
               onLogout();
               navigate("/");
             }}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-base font-medium text-stone-300 hover:bg-stone-800 hover:text-white lg:py-2.5 lg:text-sm"
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-base font-medium text-menu-texto hover:bg-menu-2 hover:text-white lg:py-2.5 lg:text-sm"
           >
             <LogOut className="h-5 w-5 shrink-0 lg:h-[18px] lg:w-[18px]" />
             Sair
