@@ -20,6 +20,7 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.18.1",
+    "read-excel-file": "^9.3.10",
     "recharts": "^3.10.0"
   },
   "devDependencies": {

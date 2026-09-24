@@ -58,6 +58,8 @@ const DEFAULT_CONFIG: Config = {
 
 interface AppState {
   loading: boolean;
+  /** A configuração da nuvem já chegou (antes disso, a tela mostra o padrão) */
+  configCarregada: boolean;
   online: boolean;
   /** Quantos registros estão presos esperando internet */
   pendentes: number;
@@ -893,6 +895,7 @@ export const AppProvider: React.FC<{
 
   const value: AppState = {
     loading,
+    configCarregada,
     online: db.online,
     pendentes,
     sincronizar,

@@ -25,6 +25,7 @@ import { projetarCaixa, resumoDaProjecao } from "../lib/projecao";
 import { saldoFiado } from "../lib/calc";
 import { prazosEmRisco } from "../lib/prazos";
 import { SeloPrazo } from "../components/SeloPrazo";
+import { ListaPrimeirosPassos } from "../components/PrimeiroAcesso";
 
 export const Dashboard: React.FC = () => {
   const { ordens, clientes, produtos, movimentos, vendas, fiados, sessoes, comandas, contas, config, ramo } = useApp();
@@ -92,6 +93,8 @@ export const Dashboard: React.FC = () => {
         <h1 className="text-2xl font-bold text-tinta">Olá!</h1>
         <p className="text-sm text-slate-500">Resumo de hoje · {config.nomeLoja}</p>
       </div>
+
+      <ListaPrimeirosPassos />
 
       {/* Cards principais */}
       <div className="mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

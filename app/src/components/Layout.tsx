@@ -32,6 +32,9 @@ import {
   Bike,
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
+import { PrimeiroAcesso } from "./PrimeiroAcesso";
+import { deveAbrirAssistente } from "../lib/onboarding";
+import { emDemo } from "../lib/db";
 import { MarcaDaLoja } from "./MarcaDaLoja";
 import { pode, NOME_PAPEL, type Sessao } from "../lib/auth";
 import { temModulo, vocabulario, RAMO_META, type Modulo } from "../lib/ramos";
@@ -84,7 +87,18 @@ export const Layout: React.FC<{
   /** Só na loja de exemplo: mostra a faixa com o convite para criar conta */
   onCriarConta?: () => void;
 }> = ({ onLogout, sessao, onCriarConta }) => {
-  const { config, online, erroCarga, loading, reload, pendentes, sincronizar, ramo, ramoAparelho, trocarRamoAparelho } = useApp();
+  const { config, online, erroCarga, loading, reload, pendentes, sincronizar, ramo, ramoAparelho, trocarRamoAparelho, configCarregada, clientes, produtos, ordens, vendas } = useApp();
+  const [assistenteFechado, setAssistenteFechado] = useState(false);
+  const assistente =
+    !assistenteFechado &&
+    deveAbrirAssistente({
+      configCarregada,
+      loading,
+      demo: emDemo(),
+      dono: sessao?.perfil?.papel === "dono",
+      estado: config.primeirosPassos,
+      quantos: clientes.length + produtos.length + ordens.length + vendas.length,
+    });
   const local = useLocation();
   const [open, setOpen] = useState(false);
   const [busca, setBusca] = useState(false);
@@ -134,6 +148,7 @@ export const Layout: React.FC<{
     <div className="ponte flex min-h-screen bg-papel">
       {/* Pix pelo link que caiu com o sistema aberto. Ver AvisoDePix. */}
       <AvisoDePix />
+      {assistente && <PrimeiroAcesso onFechar={() => setAssistenteFechado(true)} />}
       {/* Overlay mobile */}
       {open && (
         <div
