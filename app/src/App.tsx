@@ -30,7 +30,10 @@ import { SemPerfil } from "./pages/SemPerfil";
 import { Lojas } from "./pages/Lojas";
 import { Assinatura } from "./pages/Assinatura";
 import { carregarSessao, carregarChaveLoja, sair, pode, type Sessao } from "./lib/auth";
-import { definirLoja, limparCacheLocal } from "./lib/db";
+import { definirLoja, limparCacheLocal, entrarDemo, sairDemo } from "./lib/db";
+import { gerarDemo, LOJA_DEMO, SESSAO_DEMO, MENSAGEM_QUERO_CONTA } from "./lib/demo";
+import { abrirWhatsapp } from "./lib/format";
+import { aviso } from "./components/Aviso";
 import { useApp } from "./store/AppStore";
 import { temModulo, type Modulo } from "./lib/ramos";
 import { ForaDoPlano } from "./components/ForaDoPlano";
@@ -107,6 +110,47 @@ const AreaProtegida: React.FC = () => {
     return () => data.subscription.unsubscribe();
   }, [revalidar]);
 
+  /*
+   * Loja de exemplo: o sistema inteiro, sem login, em cima de dados que
+   * moram só na memória. Ver lib/demo.ts e `entrarDemo` em lib/db.ts.
+   */
+  const [demo, setDemo] = useState(false);
+  const [contato, setContato] = useState("");
+
+  const entrarNaDemo = () => {
+    const d = gerarDemo();
+    entrarDemo(
+      {
+        clientes: d.clientes,
+        ordens: d.ordens,
+        produtos: d.produtos,
+        movimentos: d.movimentos,
+        sessoes: d.sessoes,
+        vendas: d.vendas,
+      },
+      d.config
+    );
+    definirLoja(LOJA_DEMO);
+    setDemo(true);
+    // O número de vendas vem antes do clique: abrir o WhatsApp depois de
+    // esperar a rede faz o navegador do celular bloquear a janela.
+    supabase
+      ?.rpc("contato_do_sistema")
+      .then(({ data }) => setContato(typeof data === "string" ? data : ""));
+  };
+
+  const sairDaDemo = () => {
+    sairDemo();
+    definirLoja(null);
+    setDemo(false);
+  };
+
+  const criarConta = () => {
+    sairDaDemo();
+    if (contato) return abrirWhatsapp(contato, MENSAGEM_QUERO_CONTA);
+    aviso.alerta("Para criar sua conta, peça o código de convite a quem te mostrou o sistema.");
+  };
+
   const logout = async () => {
     await sair();
     definirLoja(null);
@@ -115,8 +159,15 @@ const AreaProtegida: React.FC = () => {
     setSessao(null);
   };
 
+  if (demo) {
+    return (
+      <AppProvider>
+        <Rotas sessao={SESSAO_DEMO} onLogout={sairDaDemo} onCriarConta={criarConta} />
+      </AppProvider>
+    );
+  }
   if (verificando) return <Carregando />;
-  if (!sessao) return <Login onEntrou={revalidar} />;
+  if (!sessao) return <Login onEntrou={revalidar} onDemo={entrarNaDemo} />;
   // Conta criada, mas ainda sem vínculo com uma loja
   if (!sessao.perfil) {
     return <SemPerfil email={sessao.email} onSair={logout} onVinculado={revalidar} />;
@@ -125,16 +176,27 @@ const AreaProtegida: React.FC = () => {
   // vazio, sem entender o motivo. Agora o sistema fala com clareza.
   if (!sessao.perfil.ativo) return <Suspenso onSair={logout} />;
 
-  const papel = sessao.perfil.papel;
-
   return (
     <AppProvider souSuperAdmin={sessao.perfil.super_admin === true} email={sessao.email}>
+      <Rotas sessao={sessao} onLogout={logout} />
+    </AppProvider>
+  );
+};
+
+/** As telas de dentro. As mesmas para a loja real e para a de exemplo. */
+const Rotas: React.FC<{ sessao: Sessao; onLogout: () => void; onCriarConta?: () => void }> = ({
+  sessao,
+  onLogout,
+  onCriarConta,
+}) => {
+  const papel = sessao.perfil?.papel;
+  return (
       <Routes>
         {/* A TV da bancada: tela cheia, sem menu. Fora do Layout de
             propósito — menu lateral na parede da loja é espaço roubado da
             fila, e um clique errado de quem passa abre o caixa. */}
         <Route path="painel" element={<Protegida recurso="os" papel={papel}><DoPlano modulo="os"><PainelBancada /></DoPlano></Protegida>} />
-        <Route element={<Layout onLogout={logout} sessao={sessao} />}>
+        <Route element={<Layout onLogout={onLogout} sessao={sessao} onCriarConta={onCriarConta} />}>
           <Route index element={<Dashboard />} />
           <Route path="ordens" element={<Protegida recurso="os" papel={papel}><DoPlano modulo="os"><OrdensServico /></DoPlano></Protegida>} />
           <Route path="clientes" element={<Protegida recurso="clientes" papel={papel}><Clientes /></Protegida>} />
@@ -153,13 +215,13 @@ const AreaProtegida: React.FC = () => {
           <Route path="config" element={<Protegida recurso="config" papel={papel}><Config /></Protegida>} />
           <Route path="assinatura" element={<Protegida recurso="config" papel={papel}><Assinatura /></Protegida>} />
           {/* Painel de quem administra o sistema inteiro */}
-          {sessao.perfil.super_admin && <Route path="lojas" element={<Lojas />} />}
+          {sessao.perfil?.super_admin && <Route path="lojas" element={<Lojas />} />}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
-    </AppProvider>
   );
 };
+
 
 const App: React.FC = () => (
   <AvisoProvider>

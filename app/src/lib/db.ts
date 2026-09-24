@@ -67,6 +67,35 @@ export const definirLoja = (id: string | null) => {
 };
 export const obterLoja = (): string | null => lojaAtual;
 
+/* ---------- Loja de exemplo ----------
+ * "Ver o sistema funcionando" roda o sistema de verdade em cima de dados que
+ * moram só na memória (lib/demo.ts). Todo acesso a dado passa por aqui, então
+ * é aqui que a porta para o Supabase se fecha: com a demonstração ligada,
+ * nenhuma leitura ou gravação sai do navegador, e nada vai para a fila.
+ *
+ * Memória e não localStorage de propósito: F5 ou "sair" apagam tudo, e a
+ * loja de exemplo nunca se mistura com o cache de uma loja real no mesmo
+ * aparelho.
+ */
+let demo: Map<string, WithId[]> | null = null;
+let configDemo: Record<string, unknown> = {};
+
+export const emDemo = (): boolean => demo !== null;
+
+export function entrarDemo(tabelas: Record<string, WithId[]>, config: Record<string, unknown>) {
+  demo = new Map(Object.entries(tabelas).map(([t, linhas]) => [t, linhas.map((l) => ({ ...l }))]));
+  configDemo = { ...config };
+}
+
+export function sairDemo() {
+  demo = null;
+  configDemo = {};
+}
+
+/** Recado de quem tenta, na demonstração, algo que só existe na loja real */
+export const SO_NA_LOJA_REAL =
+  "Na loja de exemplo isso fica desligado. Crie sua conta grátis para usar de verdade.";
+
 /**
  * Apaga o rastro da loja anterior neste aparelho.
  * Num computador de balcão compartilhado, sem isto o próximo usuário veria
@@ -280,6 +309,7 @@ function traduzirErroLeitura(table: string, error: { message?: string; code?: st
 
 // ---------- API pública ----------
 async function getAll<T extends WithId>(table: TableName): Promise<T[]> {
+  if (demo) return (demo.get(table) || []).map((l) => ({ ...l })) as T[];
   if (supabaseEnabled && supabase) {
     const { data, error } = await supabase.from(table).select("*");
     if (error) throw traduzirErroLeitura(table, error);
@@ -293,6 +323,14 @@ async function upsert<T extends WithId>(table: TableName, row: T): Promise<T> {
   // termine no meio da gravação não pode ser aplicada: ela foi tirada do
   // banco antes, e aplicá-la devolveria a tela ao estado anterior.
   escritas++;
+  if (demo) {
+    const linhas = demo.get(table) || [];
+    const i = linhas.findIndex((r) => r.id === row.id);
+    if (i >= 0) linhas[i] = { ...row };
+    else linhas.push({ ...row });
+    demo.set(table, linhas);
+    return row;
+  }
   if (supabaseEnabled && supabase) {
     // Sem loja definida a gravação seria recusada pelo banco com uma mensagem
     // técnica incompreensível. Melhor falhar aqui, dizendo o que fazer.
@@ -340,6 +378,10 @@ async function remove(table: TableName, id: string): Promise<void> {
   // Mesma razão do upsert: apagar também é gravar. Sem isto, a leitura em voo
   // ressuscitaria na tela o lançamento que o operador acabou de excluir.
   escritas++;
+  if (demo) {
+    demo.set(table, (demo.get(table) || []).filter((r) => r.id !== id));
+    return;
+  }
   if (supabaseEnabled && supabase) {
     const { error } = await supabase.from(table).delete().eq("id", id);
     if (error) throw traduzirErroGravacao(error);
@@ -404,6 +446,7 @@ const TABELA_DO_CAMPO: Record<keyof DumpLoja, TableName> = {
 export async function importarTudo(
   dump: DumpLoja
 ): Promise<{ gravados: number; falhas: number }> {
+  if (demo) throw new Error(SO_NA_LOJA_REAL);
   let gravados = 0;
   let falhas = 0;
 
@@ -533,6 +576,7 @@ export const db = {
    */
   loja: {
     async ramo(): Promise<string | null> {
+      if (demo) return String(configDemo.ramo || "assistencia");
       if (!supabaseEnabled || !supabase || !lojaAtual) return null;
       const { data, error } = await supabase
         .from("lojas")
@@ -575,6 +619,7 @@ export const db = {
      * a vitrine, que é o lado seguro de errar.
      */
     async catalogoAtivo(): Promise<boolean> {
+      if (demo) return false;
       if (!supabaseEnabled || !supabase || !lojaAtual) return false;
       const { data, error } = await supabase
         .from("lojas")
@@ -601,6 +646,7 @@ export const db = {
      * A política do banco continua mandando: só o dono da própria loja passa.
      */
     async definirCatalogo(ativo: boolean): Promise<void> {
+      if (demo) throw new Error(SO_NA_LOJA_REAL);
       if (!supabaseEnabled || !supabase || !lojaAtual) {
         throw new Error("Sem conexão com a nuvem.");
       }
@@ -627,6 +673,7 @@ export const db = {
 
     /** A área do cliente está ligada? Coluna ainda não criada = desligada. */
     async areaClienteAtiva(): Promise<boolean> {
+      if (demo) return false;
       if (!supabaseEnabled || !supabase || !lojaAtual) return false;
       const { data, error } = await supabase
         .from("lojas")
@@ -642,6 +689,7 @@ export const db = {
 
     /** Liga ou desliga. Zero linhas alteradas é recusa do banco (só o dono). */
     async definirAreaCliente(ativa: boolean): Promise<void> {
+      if (demo) throw new Error(SO_NA_LOJA_REAL);
       if (!supabaseEnabled || !supabase || !lojaAtual) throw new Error("Sem conexão com a nuvem.");
       const { data, error } = await supabase
         .from("lojas")
@@ -656,6 +704,7 @@ export const db = {
 
     /** Segredo do link para o cliente criar a senha (vale 48 horas, uma vez) */
     async gerarAcessoCliente(clienteId: string): Promise<string> {
+      if (demo) throw new Error(SO_NA_LOJA_REAL);
       if (!supabaseEnabled || !supabase) throw new Error("Sem conexão com a nuvem.");
       const { data, error } = await supabase.rpc("gerar_acesso_cliente", { p_cliente: clienteId });
       if (error) {
@@ -670,6 +719,7 @@ export const db = {
 
   config: {
     async get(): Promise<Record<string, unknown> | null> {
+      if (demo) return { ...configDemo };
       if (!supabaseEnabled || !supabase || !lojaAtual) return null;
       const { data, error } = await supabase
         .from("configuracoes")
@@ -680,6 +730,10 @@ export const db = {
       return (data?.dados as Record<string, unknown>) || null;
     },
     async save(dados: Record<string, unknown>): Promise<void> {
+      if (demo) {
+        configDemo = { ...configDemo, ...dados };
+        return;
+      }
       if (!supabaseEnabled || !supabase || !lojaAtual) return;
       await supabase
         .from("configuracoes")
@@ -696,6 +750,9 @@ export const db = {
  * seria repetir o erro que a fila veio consertar.
  */
 export async function sincronizarPendentes() {
+  // A fila é da loja real deste aparelho: descarregar sem a sessão dela
+  // só geraria recusa e tiraria da fila venda que ainda vai subir.
+  if (demo) return { gravados: 0, restantes: 0, recusados: [] };
   return descarregar(async (tabela, linha) => {
     if (!supabaseEnabled || !supabase) throw new Error("Nuvem desligada");
     const { error } = await supabase.from(tabela).upsert(linha);

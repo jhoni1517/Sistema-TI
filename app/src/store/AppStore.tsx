@@ -6,7 +6,7 @@ import React, {
   useCallback,
   useRef,
 } from "react";
-import { db, sincronizarPendentes, leituraAtual } from "../lib/db";
+import { db, sincronizarPendentes, leituraAtual, emDemo } from "../lib/db";
 import { podeRecarregar } from "../lib/recarga";
 import { grama } from "../lib/estoque";
 import { supabase } from "../lib/supabase";
@@ -168,7 +168,13 @@ export const useApp = (): AppState => {
 function loadConfig(): Config {
   try {
     const raw = localStorage.getItem("sistema-ti:config");
-    if (raw) return { ...DEFAULT_CONFIG, ...JSON.parse(raw) };
+    const local = raw ? JSON.parse(raw) : null;
+    // Na loja de exemplo, do aparelho só vem a aparência: o nome e o
+    // telefone guardados são da loja real que usa este aparelho.
+    if (local && emDemo()) {
+      return { ...DEFAULT_CONFIG, tema: local.tema, corDestaque: local.corDestaque, fundo: local.fundo };
+    }
+    if (local) return { ...DEFAULT_CONFIG, ...local };
   } catch {
     /* ignore */
   }
@@ -380,7 +386,7 @@ export const AppProvider: React.FC<{
    * repetir o erro que a fila veio consertar: o operador precisa saber que
    * existe venda esperando, e precisa saber quando ela entrou.
    */
-  const [pendentes, setPendentes] = useState(() => tamanhoDaFila());
+  const [pendentes, setPendentes] = useState(() => (emDemo() ? 0 : tamanhoDaFila()));
 
   const sincronizar = useCallback(async () => {
     if (tamanhoDaFila() === 0) return;
@@ -526,7 +532,14 @@ export const AppProvider: React.FC<{
    */
   const moverEstoque = async (produto: Produto, delta: number) => {
     const atual = Number(produto.quantidade) || 0;
-    if (!supabase || produto.servico || delta === 0) return;
+    if (produto.servico || delta === 0) return;
+    if (emDemo()) {
+      // Loja de exemplo: a conta é na memória, sem banco para somar.
+      const novo = await db.produtos.save({ ...produto, quantidade: grama(atual + delta) });
+      setProdutos((prev) => prev.map((x) => (x.id === novo.id ? novo : x)));
+      return;
+    }
+    if (!supabase) return;
     const { data, error } = await supabase.rpc("mover_estoque", {
       p_produto: produto.id,
       p_qtd: delta,
@@ -830,7 +843,9 @@ export const AppProvider: React.FC<{
    *    ir para a nuvem.
    */
   const saveConfig = async (c: Config): Promise<boolean> => {
-    localStorage.setItem("sistema-ti:config", JSON.stringify(c));
+    // A loja de exemplo não escreve no aparelho: o que está guardado aqui é
+    // da loja real, e o nome "exemplo" apareceria na tela de entrada dela.
+    if (!emDemo()) localStorage.setItem("sistema-ti:config", JSON.stringify(c));
     setConfig(c);
     if (!configCarregada) {
       // Não é só deixar de subir: é AVISAR. Gravar em silêncio só no

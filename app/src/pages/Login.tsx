@@ -30,7 +30,11 @@ const conviteDoLink = (): string =>
     .get("convite")
     ?.toUpperCase() || "";
 
-export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
+export const Login: React.FC<{
+  onEntrou: () => void;
+  /** Abre a loja de exemplo, sem login. Ver lib/demo.ts. */
+  onDemo?: () => void;
+}> = ({ onEntrou, onDemo }) => {
   const convidado = conviteDoLink();
   const [modo, setModo] = useState<Modo>(convidado ? "criar" : "entrar");
   const [email, setEmail] = useState("");
@@ -466,6 +470,18 @@ export const Login: React.FC<{ onEntrou: () => void }> = ({ onEntrou }) => {
             )}
           </div>
         </form>
+
+        {/* Quem ainda não é cliente quer ver a loja funcionando antes de
+            pedir convite. Fora do formulário: não é um jeito de entrar. */}
+        {onDemo && modo === "entrar" && (
+          <button
+            type="button"
+            onClick={onDemo}
+            className="mt-4 w-full rounded-lg border border-white/20 px-4 py-2.5 text-sm font-semibold text-white hover:bg-white/10"
+          >
+            Ver o sistema funcionando
+          </button>
+        )}
 
         <p className="mt-4 flex items-center justify-center gap-1 text-center text-xs text-slate-400">
           <ShieldCheck size={13} /> Conexão criptografada · dados isolados por loja
