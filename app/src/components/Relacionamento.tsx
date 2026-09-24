@@ -1,5 +1,8 @@
 import React, { useMemo, useState } from "react";
-import { Cake, UserX, HandCoins, MessageCircle } from "lucide-react";
+import { Cake, UserX, HandCoins, MessageCircle, Wrench } from "lucide-react";
+import { Revisoes } from "./Revisoes";
+import { lembretesDoDia, REGRAS_PADRAO } from "../lib/lembretes";
+import { temModulo } from "../lib/ramos";
 import { Modal } from "./ui";
 import { useApp } from "../store/AppStore";
 import { brl, formatDate, txt, abrirWhatsapp } from "../lib/format";
@@ -12,7 +15,7 @@ import {
 } from "../lib/relacionamento";
 import type { Cliente } from "../lib/types";
 
-type Aba = "aniversarios" | "sumidos" | "atrasados";
+type Aba = "revisoes" | "aniversarios" | "sumidos" | "atrasados";
 
 /**
  * Motivos para falar com o cliente antes de ele sumir.
@@ -26,8 +29,14 @@ type Aba = "aniversarios" | "sumidos" | "atrasados";
  * entra no bloqueio de todo mundo.
  */
 export const Relacionamento: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const { clientes, vendas, ordens, fiados, config } = useApp();
-  const [aba, setAba] = useState<Aba>("aniversarios");
+  const { clientes, vendas, ordens, fiados, config, ramo } = useApp();
+  // Revisão só existe onde existe OS: mercearia abre em aniversários.
+  const temOS = temModulo(ramo, "os");
+  const [aba, setAba] = useState<Aba>(temOS ? "revisoes" : "aniversarios");
+  const revisoes = useMemo(
+    () => (temOS ? lembretesDoDia(ordens, clientes, config.lembretesServico?.length ? config.lembretesServico : REGRAS_PADRAO).length : 0),
+    [temOS, ordens, clientes, config.lembretesServico]
+  );
   const [mes, setMes] = useState(new Date().getMonth() + 1);
   const ano = new Date().getFullYear();
 
@@ -46,6 +55,7 @@ export const Relacionamento: React.FC<{ onClose: () => void }> = ({ onClose }) =
   };
 
   const ABAS: { k: Aba; nome: string; n: number; icone: React.ReactNode }[] = [
+    ...(temOS ? [{ k: "revisoes" as Aba, nome: "Revisões", n: revisoes, icone: <Wrench size={15} /> }] : []),
     { k: "aniversarios", nome: "Aniversários", n: aniversarios.length, icone: <Cake size={15} /> },
     { k: "sumidos", nome: "Sumidos", n: sumidos.length, icone: <UserX size={15} /> },
     { k: "atrasados", nome: "Fiado vencido", n: atrasados.length, icone: <HandCoins size={15} /> },
@@ -75,6 +85,8 @@ export const Relacionamento: React.FC<{ onClose: () => void }> = ({ onClose }) =
           </button>
         ))}
       </div>
+
+      {aba === "revisoes" && <Revisoes />}
 
       {aba === "aniversarios" && (
         <div>
