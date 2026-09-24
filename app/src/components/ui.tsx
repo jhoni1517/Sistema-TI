@@ -39,15 +39,15 @@ export const Modal: React.FC<{
    * saber disto.
    */
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-900/50 p-3 backdrop-blur-sm sm:p-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-stone-950/60 p-3 sm:p-4">
       <div
-        className={`flex max-h-[calc(100dvh-1.5rem)] w-full ${maxWidth} flex-col rounded-2xl bg-white shadow-2xl sm:max-h-[calc(100dvh-2rem)]`}
+        className={`flex max-h-[calc(100dvh-1.5rem)] w-full ${maxWidth} flex-col rounded-md border border-linha bg-cartao shadow-2xl sm:max-h-[calc(100dvh-2rem)]`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex shrink-0 items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 sm:px-6 sm:py-4">
           {/* Trunca em vez de quebrar em duas linhas: "Ordem de Serviço
               OS00013" comia uma linha inteira do modal no celular. */}
-          <h3 className="truncate text-base font-bold text-slate-800 sm:text-lg">{title}</h3>
+          <h3 className="truncate text-base font-bold text-tinta sm:text-lg">{title}</h3>
           <button
             onClick={onClose}
             aria-label="Fechar"
@@ -84,8 +84,8 @@ export const EmptyState: React.FC<{
   title: string;
   hint?: string;
 }> = ({ icon, title, hint }) => (
-  <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-200 py-16 text-center">
-    <div className="mb-3 text-slate-300">{icon}</div>
+  <div className="flex flex-col items-center justify-center rounded-md border-2 border-dashed border-linha py-16 text-center">
+    <div className="mb-3 text-linha">{icon}</div>
     <p className="font-semibold text-slate-600">{title}</p>
     {hint && <p className="mt-1 text-sm text-slate-400">{hint}</p>}
   </div>
@@ -98,7 +98,7 @@ export const SectionTitle: React.FC<{
 }> = ({ title, subtitle, action }) => (
   <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
     <div>
-      <h1 className="text-2xl font-bold text-slate-800">{title}</h1>
+      <h1 className="text-2xl font-bold text-tinta">{title}</h1>
       {subtitle && <p className="text-sm text-slate-500">{subtitle}</p>}
     </div>
     {action}

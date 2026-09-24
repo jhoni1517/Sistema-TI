@@ -141,6 +141,10 @@ existe nada disso.
 4. Avaliação (item 6)
 5. Painel de TV (item 7)
 6. Pix pelo link (item 3) — depende de escolher o provedor
-7. IA (itens 8 a 10) está pronta e DESLIGADA; WhatsApp automático (item
-   11) fica para depois. Os dois dependem de conta e custo
-   por mensagem/chamada; decidir antes de codar
+7. IA (itens 8 a 10) pronta: liga sozinha com a chave do Gemini (plano
+   grátis). WhatsApp automático (item 11) fica para depois, por ter custo
+   por mensagem.
+
+Identidade visual aplicada em todas as telas em 24/09/2026 (a ponte do
+`index.css`, ver `docs/DESIGN.md`). Rastreio, lista e detalhe da OS,
+Painel e as telas novas usam os tokens direto.

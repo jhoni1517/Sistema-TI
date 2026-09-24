@@ -317,7 +317,7 @@ export const Clientes: React.FC = () => {
                 </p>
               )}
               <p className="mt-1 text-xs text-slate-400">Desde {formatDate(c.criadoEm)}</p>
-              <div className="mt-3 flex gap-2">
+              <div className="mt-3 flex flex-wrap gap-2">
                 {c.telefone && (
                   <a
                     href={whatsappLink(c.telefone, `Olá ${c.nome}, tudo bem?`)}
@@ -333,10 +333,13 @@ export const Clientes: React.FC = () => {
                 {temOS && (
                   <button
                     className="btn-secondary !py-1.5 !px-2.5 text-xs"
-                    title="Mandar acesso à área do cliente"
+                    title="Acesso: manda o link para o cliente criar a senha da área dele"
                     onClick={() => mandarAcesso(c)}
                   >
-                    <KeyRound size={14} /> Acesso
+                    {/* No celular a lista é de uma coluna e cabe o texto. No
+                        computador os cards ficam estreitos e o texto
+                        empurrava a lixeira para fora: lá fica só o ícone. */}
+                    <KeyRound size={14} /> <span className="sm:hidden">Acesso</span>
                   </button>
                 )}
                 <button

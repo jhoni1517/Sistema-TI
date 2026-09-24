@@ -580,7 +580,7 @@ export const Lojas: React.FC = () => {
             </p>
           )}
         </div>
-        <div className="card bg-gradient-to-br from-brand-600 to-brand-800 text-white ring-brand-700">
+        <div className="card !bg-stone-900 text-white !ring-stone-900">
           <p className="flex items-center gap-2 text-xs text-brand-100">
             <Wallet size={14} /> Receita mensal
           </p>

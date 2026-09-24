@@ -706,7 +706,7 @@ export const Contas: React.FC = () => {
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            <div className="rounded-xl bg-gradient-to-br from-slate-700 to-slate-900 p-4 text-white">
+            <div className="rounded-md bg-stone-900 p-4 text-white">
               <p className="text-xs text-slate-300">Comprado no crédito neste mês</p>
               <p className="mt-1 text-3xl font-bold">{brl(cartao.total)}</p>
               <p className="mt-1 text-xs text-slate-400">

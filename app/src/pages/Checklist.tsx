@@ -189,7 +189,7 @@ export const Checklist: React.FC = () => {
           <div className="h-2 overflow-hidden rounded-full bg-slate-200">
             <div
               className={`h-full rounded-full transition-all duration-300 ${
-                progresso.completo ? "bg-emerald-500" : "bg-gradient-to-r from-amber-400 to-orange-500"
+                progresso.completo ? "bg-emerald-500" : "bg-sinal"
               }`}
               style={{ width: `${progresso.percentual}%` }}
             />
