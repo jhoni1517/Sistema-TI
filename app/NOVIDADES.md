@@ -11,6 +11,10 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-09-26 · Resumo da semana
+No Painel, "Resumo da semana": quanto entrou e sobrou, OS paradas, o que está acabando e quem mais comprou. Com Telegram, chega sozinho toda segunda.
+Rota: /
+
 ## 2026-09-26 · Quanto sobrou pra você
 No Painel: o que entrou, menos peças, contas e maquininha. Compara com o mês passado e mostra quanto falta para a sua meta.
 Rota: /

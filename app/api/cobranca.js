@@ -27,6 +27,8 @@
 //   CRON_SECRET                 -> (opcional) protege a chamada manual
 // ============================================================
 
+import { resumoDaSemana, semanaPassada } from "./_resumo.js";
+
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
@@ -252,6 +254,7 @@ export default async function handler(req, res) {
         fiado: await avisarFiado(chats),
         checklist: await avisarChecklist(chats),
         backup: await conferirBackup(chats),
+        resumo: await resumoSemanal(chats),
       });
     }
 
@@ -320,6 +323,7 @@ export default async function handler(req, res) {
     const fiado = await avisarFiado(chats);
     const checklist = await avisarChecklist(chats);
     const backup = await conferirBackup(chats);
+    const resumo = await resumoSemanal(chats);
 
     return res.status(200).json({
       ok: true,
@@ -329,6 +333,7 @@ export default async function handler(req, res) {
       fiado,
       checklist,
       backup,
+      resumo,
       telegram: enviou ? "enviado" : "não configurado ou falhou",
     });
   } catch (e) {
@@ -947,4 +952,57 @@ async function conferirBackup(chats) {
   return lojasAvisadas === 0
     ? "nada a proteger ainda"
     : `lembrete enviado para ${lojasAvisadas} loja(s)`;
+}
+
+/**
+ * O resumo da semana, no Telegram de cada loja, toda segunda.
+ *
+ * O texto sai de _resumo.js, a MESMA conta do botão do Painel
+ * (src/lib/resumo-semanal.ts), com paridade testada. Uma loja com erro não
+ * derruba as outras: cada uma é tentada sozinha.
+ */
+async function resumoSemanal(chats) {
+  if (new Date().getUTCDay() !== 1) return "fora do dia (só segunda)";
+  if (chats.size === 0) return "nenhuma loja com Telegram configurado";
+
+  const hoje = new Date().toISOString().slice(0, 10);
+  const { de } = semanaPassada(hoje);
+  let nomes = new Map();
+  try {
+    const cfgs = await sb("configuracoes?select=id,dados");
+    nomes = new Map((cfgs || []).map((c) => [String(c.id), String(c?.dados?.nomeLoja || "")]));
+  } catch {
+    /* sem o nome, o resumo sai com "Sua loja" */
+  }
+
+  let enviados = 0;
+  const falhas = [];
+  for (const [lojaId, chat] of chats) {
+    try {
+      const [movimentos, abertas, entregues, produtos] = await Promise.all([
+        sb(`movimentos?select=tipo,valor,"custoRelacionado","compraEstoque","faturaCartao",categoria,"clienteId",data&lojaId=eq.${lojaId}&data=gte.${de}`),
+        sb(`ordens?select=numero,status,"clienteId","entregueEm","atualizadoEm","criadoEm",marca,modelo&lojaId=eq.${lojaId}&status=not.in.(entregue,cancelada)`),
+        sb(`ordens?select=numero,status,"entregueEm"&lojaId=eq.${lojaId}&status=eq.entregue&entregueEm=gte.${de}`),
+        sb(`produtos?select=nome,quantidade,"estoqueMinimo",servico&lojaId=eq.${lojaId}`),
+      ]);
+      const ids = [...new Set((movimentos || []).map((m) => m.clienteId).filter(Boolean))];
+      const clientes = ids.length ? await sb(`clientes?select=id,nome&id=in.(${ids.join(",")})`) : [];
+      const texto = resumoDaSemana(
+        {
+          movimentos: movimentos || [],
+          ordens: [...(abertas || []), ...(entregues || [])],
+          produtos: produtos || [],
+          clientes: clientes || [],
+        },
+        hoje,
+        nomes.get(lojaId) || ""
+      );
+      if (await enviarPara(chat, texto)) enviados++;
+      else falhas.push(lojaId);
+    } catch (e) {
+      console.error("Resumo semanal:", lojaId, e?.message || e);
+      falhas.push(lojaId);
+    }
+  }
+  return `${enviados} loja(s) receberam o resumo` + (falhas.length ? `, ${falhas.length} falharam` : "");
 }
