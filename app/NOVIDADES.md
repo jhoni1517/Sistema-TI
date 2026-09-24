@@ -11,6 +11,10 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-09-26 · Quanto sobrou pra você
+No Painel: o que entrou, menos peças, contas e maquininha. Compara com o mês passado e mostra quanto falta para a sua meta.
+Rota: /
+
 ## 2026-09-26 · Clientes para chamar de volta
 Trocou bateria há um ano, película há seis meses: o cliente aparece no Painel no dia certo, com o recado pronto no WhatsApp.
 Rota: /clientes
