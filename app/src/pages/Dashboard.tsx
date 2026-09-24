@@ -27,6 +27,7 @@ import { prazosEmRisco } from "../lib/prazos";
 import { SeloPrazo } from "../components/SeloPrazo";
 import { ListaPrimeirosPassos } from "../components/PrimeiroAcesso";
 import { QuantoSobrou } from "../components/QuantoSobrou";
+import { ResumoSemana } from "../components/ResumoSemana";
 import { lembretesDoDia, REGRAS_PADRAO } from "../lib/lembretes";
 
 export const Dashboard: React.FC = () => {
@@ -55,7 +56,9 @@ export const Dashboard: React.FC = () => {
     const aReceber = abertas
       .filter((o) => ["pronta", "aprovada", "em_reparo", "aguardando_peca"].includes(o.status))
       .reduce((s, o) => s + totalOS(o), 0);
-    const estoqueBaixo = produtos.filter((p) => p.quantidade <= p.estoqueMinimo);
+    // Serviço não tem estoque: contá-lo aqui acendia o alerta com formatação
+    // e diagnóstico "acabando", e o número deixava de bater com o Estoque.
+    const estoqueBaixo = produtos.filter((p) => !p.servico && p.quantidade <= p.estoqueMinimo);
     const doMes = movimentos.filter(
       (m) => txt(m.data).slice(0, 7) === new Date().toISOString().slice(0, 7)
     );
@@ -98,9 +101,12 @@ export const Dashboard: React.FC = () => {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-tinta">Olá!</h1>
-        <p className="text-sm text-slate-500">Resumo de hoje · {config.nomeLoja}</p>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-tinta">Olá!</h1>
+          <p className="text-sm text-slate-500">Resumo de hoje · {config.nomeLoja}</p>
+        </div>
+        <ResumoSemana />
       </div>
 
       <ListaPrimeirosPassos />
