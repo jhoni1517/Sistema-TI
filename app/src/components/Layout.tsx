@@ -6,6 +6,7 @@ import { AvisoAssinatura } from "./AvisoAssinatura";
 import {
   LayoutDashboard,
   Wrench,
+  Tags,
   Users,
   Package,
   Wallet,
@@ -55,6 +56,7 @@ const nav: Array<{
 }> = [
   { to: "/", label: "Painel", icon: LayoutDashboard, end: true, recurso: "*" },
   { to: "/ordens", label: "Ordens de Serviço", icon: Wrench, recurso: "os", modulo: "os" },
+  { to: "/tabela", label: "Tabela de serviços", icon: Tags, recurso: "os", modulo: "os" },
   /*
    * "Vender", e não "Frente de caixa".
    *
@@ -224,7 +226,7 @@ export const Layout: React.FC<{
             .map((item) =>
               // "Ordens de Serviço" numa pizzaria seria ridículo; o nome do
               // documento central vem do ramo.
-              item.modulo === "os"
+              item.to === "/ordens"
                 ? { ...item, label: vocabulario(ramo).ordemPlural }
                 : item
             )

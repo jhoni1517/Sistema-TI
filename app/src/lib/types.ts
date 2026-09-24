@@ -6,6 +6,7 @@ import type { EstadoOnboarding } from "./onboarding";
 import type { RegraLembrete } from "./lembretes";
 import type { TaxasCartao } from "./sobra";
 import type { RegraComissao } from "./comissao";
+import type { TabelaServicos } from "./tabela-precos";
 
 // ==== Tipos de domínio do Sistema TI ====
 
@@ -1259,6 +1260,8 @@ export interface Config {
   taxasCartao?: TaxasCartao;
   /** Comissão por técnico (chave = nome normalizado). Ver lib/comissao.ts */
   regrasComissao?: Record<string, RegraComissao>;
+  /** Preço por modelo × serviço (lib/tabela-precos.ts). Lida também pela página pública de orçamento. */
+  tabelaServicos?: TabelaServicos;
   comissaoPadrao?: number; // % de comissão padrão por técnico
   // Termos do recibo (guarda/abandono)
   taxaArmazenamentoDia?: number; // R$/dia após a conclusão
