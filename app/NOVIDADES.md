@@ -11,6 +11,11 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-09-29 · Orçamento pelo site
+Uma página para o Instagram e o Google: o cliente escolhe o aparelho e vê o preço, agenda a avaliação ou chama no WhatsApp. Ligue em Configurações.
+Rota: /orcamentos-site
+Módulo: os
+
 ## 2026-09-28 · Tabela de serviços
 Preço de cada conserto por modelo. Digite "13 tela" e veja o valor na hora. Importa planilha, reajusta com prévia, e a OS sugere o preço.
 Rota: /tabela

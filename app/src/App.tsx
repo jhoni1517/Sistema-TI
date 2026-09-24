@@ -21,6 +21,8 @@ import { Delivery } from "./pages/Delivery";
 import { PDV } from "./pages/PDV";
 import { Relatorios } from "./pages/Relatorios";
 import { TabelaServicos } from "./pages/TabelaServicos";
+import { PedidosSite } from "./pages/PedidosSite";
+import { OrcarPublico } from "./pages/OrcarPublico";
 import { Config } from "./pages/Config";
 import { Rastreio } from "./pages/Rastreio";
 import { PainelBancada } from "./pages/PainelBancada";
@@ -203,6 +205,7 @@ const Rotas: React.FC<{ sessao: Sessao; onLogout: () => void; onCriarConta?: () 
           <Route index element={<Dashboard />} />
           <Route path="ordens" element={<Protegida recurso="os" papel={papel}><DoPlano modulo="os"><OrdensServico /></DoPlano></Protegida>} />
           <Route path="tabela" element={<Protegida recurso="os" papel={papel}><DoPlano modulo="os"><TabelaServicos papel={papel} /></DoPlano></Protegida>} />
+          <Route path="orcamentos-site" element={<Protegida recurso="os" papel={papel}><DoPlano modulo="os"><PedidosSite /></DoPlano></Protegida>} />
           <Route path="clientes" element={<Protegida recurso="clientes" papel={papel}><Clientes /></Protegida>} />
           <Route path="estoque" element={<Protegida recurso="estoque" papel={papel}><Estoque /></Protegida>} />
           <Route path="caixa" element={<Protegida recurso="caixa" papel={papel}><Caixa /></Protegida>} />
@@ -247,6 +250,8 @@ const App: React.FC = () => (
       <Route path="/indicar/:codigo" element={<Indicar />} />
       {/* Ficha do aparelho usado: o corte do que sai é da função do banco */}
       <Route path="/seminovo/:loja/:token" element={<SeminovoPublico />} />
+      {/* Orçamento pelo site: link no Instagram e no Google da loja. */}
+      <Route path="/orcar/:loja" element={<OrcarPublico />} />
       <Route path="/*" element={<AreaProtegida />} />
     </Routes>
   </HashRouter>
