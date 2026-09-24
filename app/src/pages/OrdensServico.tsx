@@ -35,6 +35,7 @@ import { PatternLock } from "../components/PatternLock";
 import { FotosAparelho } from "../components/FotosAparelho";
 import { printHTML } from "../lib/print";
 import { etiquetaDoAparelho } from "../lib/etiqueta-aparelho";
+import { QuadroTermos } from "../components/Termos";
 import { obterLoja } from "../lib/db";
 import { linkDeRastreio } from "../lib/rastreio";
 import { registrarAcessoSigilo } from "../lib/auth";
@@ -215,6 +216,19 @@ export const OrdensServico: React.FC = () => {
   const [filtro, setFiltro] = useState<OSStatus | "todas" | "abertas">("abertas");
   const [editando, setEditando] = useState<OrdemServico | null>(null);
   const [detalhe, setDetalhe] = useState<OrdemServico | null>(null);
+  /*
+   * O detalhe acompanha a lista. Ele guardava a OS de quando foi aberto: o
+   * termo assinado lá dentro gravava, mas a janela continuava com a cópia
+   * velha — e o clique seguinte em "mudar a situação" gravava essa cópia por
+   * cima, apagando o termo que o cliente acabou de assinar.
+   */
+  useEffect(() => {
+    setDetalhe((atual) => {
+      if (!atual) return atual;
+      const nova = ordens.find((o) => o.id === atual.id);
+      return nova && nova !== atual ? nova : atual;
+    });
+  }, [ordens]);
   /**
    * Clique duplo no balcão acontece o tempo todo.
    *
@@ -2259,6 +2273,8 @@ export const OSDetalhe: React.FC<{
             </button>
           </div>
         </div>
+
+        <QuadroTermos os={os} cliente={cliente} config={config} />
 
         {/* Alterar status */}
         <div className="no-print">

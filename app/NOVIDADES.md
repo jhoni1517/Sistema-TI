@@ -11,6 +11,11 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-09-25 · Termo assinado com o dedo
+Na entrada e na retirada, o cliente assina na tela do celular. O termo fica lacrado na OS e sai em PDF.
+Rota: /ordens
+Módulo: os
+
 ## 2026-09-25 · Etiqueta com QR no aparelho
 Imprima na bobina e cole na capinha: o cliente escaneia, vê o conserto e, depois de entregue, aciona a garantia.
 Rota: /ordens
