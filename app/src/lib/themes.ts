@@ -88,9 +88,33 @@ export const isDark = (modo: ModoTema): boolean => {
   return window.matchMedia?.("(prefers-color-scheme: dark)").matches ?? false;
 };
 
-/** aplica cor de destaque + modo escuro no documento */
-export const aplicarTema = (corDestaque: string, modo: ModoTema): void => {
+/**
+ * O fundo do sistema: papel, cartão, linha, tinta e menu.
+ *
+ * O Balcão é o padrão (docs/DESIGN.md). Os outros trocam só os valores dos
+ * mesmos tokens em index.css — nenhuma tela sabe qual está ativo. O
+ * Clássico é o visual de antes, azul-marinho, para quem se acostumou com ele.
+ */
+export const FUNDOS = [
+  { k: "balcao", nome: "Balcão", descricao: "Papel quente (padrão)", amostra: ["#F4EFE4", "#FFFDF8", "#1C1917"] },
+  { k: "classico", nome: "Clássico", descricao: "O de antes, azul-marinho", amostra: ["#F1F5F9", "#FFFFFF", "#0F172A"] },
+  { k: "grafite", nome: "Grafite", descricao: "Cinza neutro", amostra: ["#F2F2F0", "#FFFFFF", "#171717"] },
+  { k: "oficina", nome: "Oficina", descricao: "Verde de bancada", amostra: ["#EDF2EA", "#FBFDF9", "#14241A"] },
+  { k: "lavanda", nome: "Lavanda", descricao: "Roxo suave", amostra: ["#F3F1F8", "#FFFFFF", "#1E1830"] },
+] as const;
+
+export type Fundo = (typeof FUNDOS)[number]["k"];
+
+/** Fundo desconhecido vale o Balcão */
+export const fundoValido = (v?: string | null): Fundo =>
+  (FUNDOS.find((f) => f.k === v)?.k ?? "balcao") as Fundo;
+
+/** aplica cor de destaque + modo escuro + fundo no documento */
+export const aplicarTema = (corDestaque: string, modo: ModoTema, fundo?: string): void => {
   const root = document.documentElement;
+  const f = fundoValido(fundo);
+  if (f === "balcao") root.removeAttribute("data-fundo");
+  else root.setAttribute("data-fundo", f);
   const accent = ACCENTS[corDestaque] || ACCENTS.azul;
   Object.entries(accent.vars).forEach(([shade, rgb]) => {
     root.style.setProperty(`--brand-${shade}`, rgb);

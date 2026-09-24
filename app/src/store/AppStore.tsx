@@ -228,13 +228,13 @@ export const AppProvider: React.FC<{
   // Aplica o tema (cor + claro/escuro) e reage à mudança do sistema no modo "auto"
   useEffect(() => {
     const modo = config.tema || "claro";
-    aplicarTema(config.corDestaque || "azul", modo);
+    aplicarTema(config.corDestaque || "azul", modo, config.fundo);
     if (modo !== "auto") return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const handler = () => aplicarTema(config.corDestaque || "azul", "auto");
+    const handler = () => aplicarTema(config.corDestaque || "azul", "auto", config.fundo);
     mq.addEventListener("change", handler);
     return () => mq.removeEventListener("change", handler);
-  }, [config.tema, config.corDestaque]);
+  }, [config.tema, config.corDestaque, config.fundo]);
 
   /**
    * Carrega tudo, e uma tabela com problema NÃO derruba as outras.

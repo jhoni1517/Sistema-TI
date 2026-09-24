@@ -13,7 +13,7 @@ import {
   type RegimeTributario,
 } from "../lib/fiscal";
 import { Field, SectionTitle, InputNumero } from "../components/ui";
-import { ACCENTS, ACCENT_KEYS } from "../lib/themes";
+import { ACCENTS, ACCENT_KEYS, FUNDOS, fundoValido } from "../lib/themes";
 import { Equipe } from "../components/Equipe";
 import { MinhaConta } from "../components/MinhaConta";
 import { carregarSessao, type Sessao } from "../lib/auth";
@@ -849,6 +849,32 @@ export const Config: React.FC = () => {
               {t.icon} {t.nome}
             </button>
           ))}
+        </div>
+
+        <label className="label">Fundo</label>
+        <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+          {FUNDOS.map((f) => {
+            const ativo = fundoValido(config.fundo) === f.k;
+            return (
+              <button
+                key={f.k}
+                onClick={() => setAparencia({ fundo: f.k })}
+                className={`rounded-md border p-2 text-left transition ${
+                  ativo ? "border-brand-500 ring-2 ring-brand-500/40" : "border-slate-200 hover:border-slate-400"
+                }`}
+              >
+                {/* Amostra: fundo, cartão e menu, na ordem em que aparecem */}
+                <span className="mb-2 flex h-10 overflow-hidden rounded border border-slate-200">
+                  <span className="w-1/4" style={{ backgroundColor: f.amostra[2] }} />
+                  <span className="flex flex-1 items-center justify-center" style={{ backgroundColor: f.amostra[0] }}>
+                    <span className="h-5 w-3/4 rounded-sm" style={{ backgroundColor: f.amostra[1] }} />
+                  </span>
+                </span>
+                <span className="block text-sm font-semibold text-slate-800">{f.nome}</span>
+                <span className="block text-xs text-slate-500">{f.descricao}</span>
+              </button>
+            );
+          })}
         </div>
 
         <label className="label">Cor de destaque</label>

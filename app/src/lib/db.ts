@@ -127,6 +127,7 @@ export const limparCacheLocal = () => {
         supabaseKey: cfg.supabaseKey,
         tema: cfg.tema,
         corDestaque: cfg.corDestaque,
+        fundo: cfg.fundo,
       })
     );
   } catch {

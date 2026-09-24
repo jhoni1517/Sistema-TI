@@ -32,6 +32,7 @@ import type { Config } from "./types";
 export const SO_NO_APARELHO = [
   "tema",
   "corDestaque",
+  "fundo",
   "supabaseUrl",
   "supabaseKey",
 ] as const satisfies readonly (keyof Config)[];

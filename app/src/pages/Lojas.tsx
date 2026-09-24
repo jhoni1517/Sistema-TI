@@ -580,7 +580,7 @@ export const Lojas: React.FC = () => {
             </p>
           )}
         </div>
-        <div className="card !bg-stone-900 text-white !ring-stone-900">
+        <div className="card !bg-menu text-white !ring-menu">
           <p className="flex items-center gap-2 text-xs text-brand-100">
             <Wallet size={14} /> Receita mensal
           </p>

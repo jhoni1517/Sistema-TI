@@ -278,7 +278,7 @@ export const Caixa: React.FC = () => {
         de leitura, não dado da loja.
       */}
       <div className={`mb-5 grid gap-3 ${detalhes ? "sm:grid-cols-2 lg:grid-cols-4" : ""}`}>
-        <div className="card !bg-stone-900 text-white !ring-stone-900">
+        <div className="card !bg-menu text-white !ring-menu">
           <p className="flex items-center gap-2 text-sm text-brand-100"><Wallet size={16} /> Saldo em caixa</p>
           <p className="mt-1 text-3xl font-bold">{brl(saldo)}</p>
           {(() => {
