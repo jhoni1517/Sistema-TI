@@ -7,6 +7,7 @@ import type { RegraLembrete } from "./lembretes";
 import type { TaxasCartao } from "./sobra";
 import type { RegraComissao } from "./comissao";
 import type { TabelaServicos } from "./tabela-precos";
+import type { AgendaSite } from "./orcamento-online";
 
 // ==== Tipos de domínio do Sistema TI ====
 
@@ -1174,6 +1175,30 @@ export interface TarefaDiaria {
   atualizadoEm?: string;
 }
 
+/**
+ * Pedido de orçamento que chegou pela página pública. Só entra pela função
+ * pedir_orcamento do banco; a loja muda o status. Ver lib/orcamento-online.ts.
+ */
+export interface PedidoSite {
+  id: ID;
+  lojaId?: string;
+  nome: string;
+  telefone: string;
+  marca: string;
+  modelo: string;
+  problema: string;
+  detalhe?: string;
+  /** "A partir de" mostrado ao cliente, para o balcão não prometer diferente */
+  preco?: number | null;
+  data?: string | null;
+  hora?: string | null;
+  eventoId?: string | null;
+  canal: "agenda" | "whatsapp";
+  status: "novo" | "convertido" | "descartado";
+  osId?: string | null;
+  criadoEm: string;
+}
+
 export interface Evento {
   id: ID;
   titulo: string;
@@ -1262,6 +1287,8 @@ export interface Config {
   regrasComissao?: Record<string, RegraComissao>;
   /** Preço por modelo × serviço (lib/tabela-precos.ts). Lida também pela página pública de orçamento. */
   tabelaServicos?: TabelaServicos;
+  /** Página pública de orçamento /orcar/:loja (lib/orcamento-online.ts). Nasce desligada. */
+  orcamentoSite?: { ativo?: boolean; agendar?: boolean; cor?: string; agenda?: AgendaSite };
   comissaoPadrao?: number; // % de comissão padrão por técnico
   // Termos do recibo (guarda/abandono)
   taxaArmazenamentoDia?: number; // R$/dia após a conclusão

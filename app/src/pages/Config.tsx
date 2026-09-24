@@ -20,6 +20,7 @@ import { carregarSessao, type Sessao } from "../lib/auth";
 import { importarTudo, type DumpLoja } from "../lib/db";
 import { problemaNoChatId } from "../lib/config";
 import { CatalogoPublico, TituloCatalogo } from "../components/CatalogoPublico";
+import { OrcamentoSiteConfig } from "../components/OrcamentoSiteConfig";
 import { AreaDoClienteLoja } from "../components/AreaDoClienteLoja";
 import { CredencialPix } from "../components/CredencialPix";
 import { CredencialFiscal } from "../components/CredencialFiscal";
@@ -310,6 +311,16 @@ export const Config: React.FC = () => {
           <div className="sm:col-span-2 rounded-md border border-linha p-3">
             <AreaDoClienteLoja nomeLoja={form.nomeLoja} />
           </div>
+
+          {temModulo(ramoContratado, "os") && (
+            <div className="sm:col-span-2 rounded-md border border-linha p-3">
+              <OrcamentoSiteConfig
+                valor={form.orcamentoSite}
+                temTabela={!!form.tabelaServicos?.modelos?.length}
+                onMudar={(orcamentoSite) => mudar({ orcamentoSite })}
+              />
+            </div>
+          )}
 
           {/* O ramo é o que a loja CONTRATOU, não uma preferência: quem
               comprou mercearia podia se virar pizzaria sozinho e usar o que

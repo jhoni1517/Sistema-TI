@@ -14,6 +14,7 @@ import type {
   ContaPagar,
   Meta,
   Evento,
+  PedidoSite,
   Venda,
   Comanda,
   TarefaDiaria,
@@ -50,7 +51,8 @@ type TableName =
   | "vendas"
   | "tarefas"
   | "comandas"
-  | "notas";
+  | "notas"
+  | "pedidos_site";
 
 interface WithId {
   id: string;
@@ -538,6 +540,12 @@ export const db = {
     all: () => getAll<Meta>("metas"),
     save: (m: Meta) => upsert("metas", m),
     remove: (id: string) => remove("metas", id),
+  },
+  // Não entra na carga geral: só a tela de pedidos lê, e uma migração
+  // ainda não rodada aqui não pode aparecer como erro no resto do sistema.
+  pedidosSite: {
+    all: () => getAll<PedidoSite>("pedidos_site"),
+    save: (p: PedidoSite) => upsert("pedidos_site", p),
   },
   eventos: {
     all: () => getAll<Evento>("eventos"),

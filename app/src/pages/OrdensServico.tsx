@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { aviso } from "../components/Aviso";
 import QRCode from "qrcode";
 import {
@@ -187,7 +188,7 @@ const SeletorDeForma: React.FC<{
   </select>
 );
 
-const novaOS = (numero: number): OrdemServico => ({
+export const novaOS = (numero: number): OrdemServico => ({
   id: uid(),
   numero,
   clienteId: "",
@@ -221,6 +222,18 @@ export const OrdensServico: React.FC = () => {
   const [filtro, setFiltro] = useState<OSStatus | "todas" | "abertas">("abertas");
   const [editando, setEditando] = useState<OrdemServico | null>(null);
   const [detalhe, setDetalhe] = useState<OrdemServico | null>(null);
+  // Veio de "Virar OS" nos pedidos do site: abre a OS recém-criada, uma vez só.
+  const local = useLocation();
+  const abrirOS = (local.state as { abrirOS?: string } | null)?.abrirOS;
+  const jaAbriu = useRef("");
+  useEffect(() => {
+    if (!abrirOS || jaAbriu.current === abrirOS) return;
+    const o = ordens.find((x) => x.id === abrirOS);
+    if (o) {
+      jaAbriu.current = abrirOS;
+      setDetalhe(o);
+    }
+  }, [abrirOS, ordens]);
   /*
    * O detalhe acompanha a lista. Ele guardava a OS de quando foi aberto: o
    * termo assinado lá dentro gravava, mas a janela continuava com a cópia

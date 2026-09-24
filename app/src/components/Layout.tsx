@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Wrench,
   Tags,
+  Globe,
   Users,
   Package,
   Wallet,
@@ -57,6 +58,7 @@ const nav: Array<{
   { to: "/", label: "Painel", icon: LayoutDashboard, end: true, recurso: "*" },
   { to: "/ordens", label: "Ordens de Serviço", icon: Wrench, recurso: "os", modulo: "os" },
   { to: "/tabela", label: "Tabela de serviços", icon: Tags, recurso: "os", modulo: "os" },
+  { to: "/orcamentos-site", label: "Orçamentos do site", icon: Globe, recurso: "os", modulo: "os" },
   /*
    * "Vender", e não "Frente de caixa".
    *

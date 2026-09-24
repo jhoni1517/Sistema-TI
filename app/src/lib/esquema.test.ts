@@ -43,6 +43,7 @@ const TABELAS: Record<string, string> = {
   // sem linha aqui é campo novo gravando em silêncio contra coluna que não
   // existe — e a gravação inteira da tabela cai junto.
   Comanda: "comandas",
+  PedidoSite: "pedidos_site",
 };
 
 /** Colunas declaradas para uma tabela, no create table e nos alter */
