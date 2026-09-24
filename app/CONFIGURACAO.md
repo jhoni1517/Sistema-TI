@@ -182,7 +182,8 @@ https://supabase.com/dashboard/project/nviagibefxqtognowqwe/sql/new:
 31. `supabase-migracao-trava-assinatura.sql`
 32. `supabase-migracao-indicacao.sql`
 33. `supabase-migracao-garantia-publica.sql`
-34. `supabase-corrigir-colunas.sql`
+34. `supabase-migracao-seminovos.sql`
+35. `supabase-corrigir-colunas.sql`
 
 Quem já rodou o de número 18 antes da nota na ordem de serviço precisa
 rodá-lo **de novo**: ele ganhou a coluna `osId`, que é o que liga a nota à

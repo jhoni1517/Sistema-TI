@@ -11,6 +11,11 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-09-26 · Seminovos: avaliar, comprar e vender com ficha
+Em Estoque, "Avaliar usado": checklist, bateria e o preço sugerido. O aparelho entra no estoque com uma ficha por link e QR para o comprador.
+Rota: /estoque
+Módulo: os
+
 ## 2026-09-25 · Orçamento em 3 níveis
 Econômica, Recomendada e Premium lado a lado no link do cliente, cada uma com sua garantia. Em Relatórios, veja qual ele mais escolhe.
 Rota: /ordens

@@ -80,7 +80,13 @@ export type Recurso =
   | "validade" // data de vencimento no estoque, com alerta
   | "idadeMinima" // venda proibida para menores (bebida alcoólica)
   | "meioAMeio" // pizza com 2 a 4 sabores, e a regra de preço da casa
-  | "observacaoItem"; // "sem cebola", "bem passado": o recado vai para a cozinha
+  | "observacaoItem" // "sem cebola", "bem passado": o recado vai para a cozinha
+  /**
+   * Comprar o usado do cliente e revender com ficha (checklist, fotos e
+   * garantia) por link/QR. É botão em Estoque e ficha no produto, não tela
+   * no menu. Ver lib/seminovo.ts.
+   */
+  | "seminovos";
 
 /**
  * As palavras que a tela usa.
@@ -158,7 +164,7 @@ export const RAMO_META: Record<Ramo, RamoMeta> = {
       aparelhoPlural: "Aparelhos",
     },
     modulos: ["os", "rastreio"],
-    recursos: ["imei", "senhaAparelho", "garantia"],
+    recursos: ["imei", "senhaAparelho", "garantia", "seminovos"],
     aparelhos: ["Celular", "Notebook", "PC", "Tablet", "Impressora", "Console", "Outro"],
     checklist: [
       "Liga normalmente",
