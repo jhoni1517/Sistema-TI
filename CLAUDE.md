@@ -381,6 +381,9 @@ para um processo.
 - Antes de qualquer push: `npm test` **e** `npm run build`. O `tsc --noEmit`
   já passou enquanto o build quebrava — não é o mesmo comando.
 - Uma mudança, um PR, com o problema descrito antes da solução.
+- Mudou algo que a loja VÊ? Uma linha em `app/NOVIDADES.md` no mesmo PR: é
+  o que acende o sininho, e melhoria que ninguém percebe não conta na hora
+  de renovar.
 - Migração de banco é sempre repetível: `if not exists`, `create or
   replace`, `drop policy if exists` antes de criar.
 
