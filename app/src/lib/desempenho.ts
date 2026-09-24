@@ -1,8 +1,6 @@
 import { soData, hojeISO } from "./contas";
-import { txt } from "./format";
 import { centavos } from "./pdv";
-import { totalOS, lucroOS } from "./calc";
-import type { MovimentoCaixa, OrdemServico, Venda, Config } from "./types";
+import type { MovimentoCaixa, Venda } from "./types";
 
 /**
  * As perguntas que o dono faz de cabeça e erra.
@@ -159,68 +157,12 @@ export const horariosDePico = (vendas: Venda[], quantas = 3): FaixaHorario[] =>
     .sort((a, b) => b.receita - a.receita || b.vendas - a.vendas)
     .slice(0, quantas);
 
+/* Comissão do técnico: mora em lib/comissao.ts (regra por técnico e
+ * produtividade). Reexportada aqui para quem já importava daqui. */
+export { comissoes, type Comissao } from "./comissao";
+
 /* ------------------------------------------------------------------ */
-/* Comissão do técnico                                                 */
-/* ------------------------------------------------------------------ */
 
-export interface Comissao {
-  tecnico: string;
-  ordens: number;
-  faturado: number;
-  lucro: number;
-  percentual: number;
-  valor: number;
-}
-
-/**
- * Comissão por técnico, sobre o LUCRO da ordem, não sobre o faturamento.
- *
- * Comissão sobre faturamento premia quem vende peça cara e não premia quem
- * conserta bem: dois técnicos com o mesmo esforço recebem valores diferentes
- * porque um usou uma peça de R$ 400 que a loja apenas repassou.
- *
- * Só ordens ENTREGUES: comissão sobre serviço que ainda pode ser cancelado é
- * dinheiro que vai ter que voltar.
- */
-export function comissoes(
-  ordens: OrdemServico[],
-  config: Config,
-  de?: string,
-  ate?: string
-): Comissao[] {
-  const percentual = n(config.comissaoPadrao);
-  const mapa = new Map<string, Comissao>();
-
-  for (const o of ordens) {
-    if (o.status !== "entregue") continue;
-    const dia = soData(o.entregueEm || o.atualizadoEm);
-    if (de && dia < de) continue;
-    if (ate && dia > ate) continue;
-
-    const nome = txt(o.tecnico).trim() || "Sem técnico";
-    const atual = mapa.get(nome) || {
-      tecnico: nome,
-      ordens: 0,
-      faturado: 0,
-      lucro: 0,
-      percentual,
-      valor: 0,
-    };
-    atual.ordens += 1;
-    atual.faturado = centavos(atual.faturado + totalOS(o));
-    atual.lucro = centavos(atual.lucro + lucroOS(o));
-    mapa.set(nome, atual);
-  }
-
-  return [...mapa.values()]
-    .map((c) => ({
-      ...c,
-      // Lucro negativo não gera comissão negativa: descontar do técnico um
-      // prejuízo que foi decisão da loja é briga garantida.
-      valor: centavos(Math.max(0, c.lucro) * (percentual / 100)),
-    }))
-    .sort((a, b) => b.lucro - a.lucro);
-}
 
 /* ------------------------------------------------------------------ */
 /* Sangria sugerida                                                    */

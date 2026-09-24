@@ -5,6 +5,7 @@ import type { RegimeTributario } from "./fiscal";
 import type { EstadoOnboarding } from "./onboarding";
 import type { RegraLembrete } from "./lembretes";
 import type { TaxasCartao } from "./sobra";
+import type { RegraComissao } from "./comissao";
 
 // ==== Tipos de domínio do Sistema TI ====
 
@@ -1256,6 +1257,8 @@ export interface Config {
   metaProLabore?: number;
   /** Taxa da maquininha em %, por forma (lib/sobra.ts) */
   taxasCartao?: TaxasCartao;
+  /** Comissão por técnico (chave = nome normalizado). Ver lib/comissao.ts */
+  regrasComissao?: Record<string, RegraComissao>;
   comissaoPadrao?: number; // % de comissão padrão por técnico
   // Termos do recibo (guarda/abandono)
   taxaArmazenamentoDia?: number; // R$/dia após a conclusão

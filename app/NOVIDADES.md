@@ -11,6 +11,11 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-09-27 · Técnicos: produtividade e comissão
+Em Relatórios: OS por técnico, dias de bancada, retorno na garantia e comissão do mês (sobre lucro, mão de obra, peça ou fixo), com recibo.
+Rota: /relatorios
+Módulo: os
+
 ## 2026-09-26 · Resumo da semana
 No Painel, "Resumo da semana": quanto entrou e sobrou, OS paradas, o que está acabando e quem mais comprou. Com Telegram, chega sozinho toda segunda.
 Rota: /
