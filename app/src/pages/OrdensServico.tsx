@@ -36,6 +36,8 @@ import { FotosAparelho } from "../components/FotosAparelho";
 import { printHTML } from "../lib/print";
 import { etiquetaDoAparelho } from "../lib/etiqueta-aparelho";
 import { QuadroTermos } from "../components/Termos";
+import { FichaAparelho } from "../components/FichaAparelho";
+import { mesmoAparelho } from "../lib/imei";
 import { obterLoja } from "../lib/db";
 import { linkDeRastreio } from "../lib/rastreio";
 import { registrarAcessoSigilo } from "../lib/auth";
@@ -249,9 +251,9 @@ export const OrdensServico: React.FC = () => {
    * IMEI vazio nunca casa com nada: senao TODA OS sem IMEI viraria historico
    * de todas as outras.
    */
-  const mesmoImei = (a?: string, b?: string): boolean =>
-    // texto-cru-proposital: IMEI e numero e letra, nao tem acento
-    !!a?.trim() && a.trim().toLowerCase() === (b || "").trim().toLowerCase();
+  // "35-693803-564380-9" e "356938035643809" são o mesmo aparelho: a
+  // comparação crua deixava de achar o histórico por causa de um traço.
+  const mesmoImei = mesmoAparelho;
 
   const lista = useMemo(() => {
     const b = normalizar(busca);
@@ -1369,7 +1371,8 @@ const OSForm: React.FC<{
             */}
             {temRecurso(ramo, "imei") && (
               <Field label="IMEI / Nº de série">
-                <input className="input" value={os.imeiSerial} onChange={(e) => setOs({ ...os, imeiSerial: e.target.value })} />
+                <input className="input" inputMode="text" value={os.imeiSerial} onChange={(e) => setOs({ ...os, imeiSerial: e.target.value })} />
+                <FichaAparelho imei={os.imeiSerial} ordens={ordens} osAtual={os.id} />
               </Field>
             )}
             <Field label="Acessórios entregues">
