@@ -9,6 +9,7 @@ import React, {
 import { db, sincronizarPendentes, leituraAtual, emDemo } from "../lib/db";
 import { podeRecarregar } from "../lib/recarga";
 import { grama } from "../lib/estoque";
+import { aplicarGarantiaDoNivel } from "../lib/niveis";
 import { supabase } from "../lib/supabase";
 import { tamanhoDaFila } from "../lib/fila";
 import { paraNuvem, precisaGravarNaNuvem } from "../lib/config";
@@ -480,7 +481,8 @@ export const AppProvider: React.FC<{
     // `gravado` e não `o`: o banco preenche colunas que a tela não tem
     // como saber (o segredo do rastreio é uma), e guardar o objeto que
     // subiu deixaria a tela sem elas até o próximo F5.
-    const gravado = await db.ordens.save(o);
+    // A garantia acompanha o nível que o cliente escolheu (lib/niveis.ts).
+    const gravado = await db.ordens.save(aplicarGarantiaDoNivel(o));
     setOrdens((prev) => {
       const i = prev.findIndex((x) => x.id === gravado.id);
       if (i >= 0) {

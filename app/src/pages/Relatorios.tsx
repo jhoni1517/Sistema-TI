@@ -16,6 +16,7 @@ import {
 } from "recharts";
 import { TrendingUp, DollarSign, Percent, Wrench, Users, Package , FileText } from "lucide-react";
 import { useApp } from "../store/AppStore";
+import { taxaDeEscolha, NIVEIS } from "../lib/niveis";
 import { temModulo } from "../lib/ramos";
 import { SectionTitle, Field } from "../components/ui";
 import { csvDoPeriodo, nomeDoArquivo, limitesDoMes } from "../lib/contabil";
@@ -40,6 +41,7 @@ const MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "O
 
 export const Relatorios: React.FC = () => {
   const { movimentos, ordens, produtos, vendas, config, ramo } = useApp();
+  const niveis = useMemo(() => taxaDeEscolha(ordens), [ordens]);
   const temOS = temModulo(ramo, "os");
   const [meses, setMeses] = useState(6);
 
@@ -441,6 +443,31 @@ export const Relatorios: React.FC = () => {
             </div>
           )}
         </div>
+        )}
+
+        {/* Orçamento em 3 níveis: quem escolheu o quê. Só aparece depois
+            que a loja usou — card vazio é barulho. */}
+        {temOS && niveis.total > 0 && (
+          <div className="card lg:col-span-2">
+            <h3 className="mb-1 font-bold text-tinta">Orçamento em 3 níveis: o que o cliente escolhe</h3>
+            <p className="mb-4 text-xs text-tinta-suave">
+              {niveis.total} orçamento(s) com a escolha registrada. Se quase ninguém fica na Premium, o preço dela pode estar
+              longe demais; se todo mundo vai na Econômica, a Recomendada não está convencendo.
+            </p>
+            <div className="space-y-2">
+              {NIVEIS.map((n) => (
+                <div key={n.k} className="flex items-center gap-3 text-sm">
+                  <span className="w-28 shrink-0 font-semibold">{n.nome}</span>
+                  <div className="h-3 flex-1 rounded-full bg-concreto">
+                    <div className="h-3 rounded-full bg-sinal" style={{ width: `${niveis.porNivel[n.k].pct}%` }} />
+                  </div>
+                  <span className="valor w-24 shrink-0 text-right">
+                    {niveis.porNivel[n.k].pct}% · {niveis.porNivel[n.k].n}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </div>
     </div>

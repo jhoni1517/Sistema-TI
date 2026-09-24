@@ -36,6 +36,7 @@ import { FotosAparelho } from "../components/FotosAparelho";
 import { printHTML } from "../lib/print";
 import { etiquetaDoAparelho } from "../lib/etiqueta-aparelho";
 import { QuadroTermos } from "../components/Termos";
+import { paraTresNiveis, eOrcamentoEmNiveis } from "../lib/niveis";
 import { FichaAparelho } from "../components/FichaAparelho";
 import { mesmoAparelho } from "../lib/imei";
 import { obterLoja } from "../lib/db";
@@ -1169,6 +1170,7 @@ const OSForm: React.FC<{
    * cima. Ver `paraDuasOpcoes` em lib/orcamento.ts.
    */
   const usarVariosOrcamentos = () => setOs(paraDuasOpcoes(os));
+  const emNiveis = eOrcamentoEmNiveis(nomesDasOpcoes(os));
 
   const usarOrcamentoUnico = () => {
     if (
@@ -1705,6 +1707,20 @@ const OSForm: React.FC<{
             >
               Mais de uma opção para o cliente
             </button>
+            {/* Três níveis prontos: o cliente escolhe QUAL conserto, e não
+                só "faço ou não faço". Ver lib/niveis.ts. */}
+            {!emNiveis && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (varios && !confirm("Trocar as opções atuais por Econômica, Recomendada e Premium? As peças já digitadas vão para a Recomendada.")) return;
+                  setOs(paraTresNiveis(os));
+                }}
+                className="chip bg-white text-slate-600 ring-1 ring-slate-200"
+              >
+                Em 3 níveis (econômica, recomendada, premium)
+              </button>
+            )}
           </div>
 
           {varios ? (

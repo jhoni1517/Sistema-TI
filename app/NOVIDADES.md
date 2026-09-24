@@ -11,6 +11,11 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-09-25 · Orçamento em 3 níveis
+Econômica, Recomendada e Premium lado a lado no link do cliente, cada uma com sua garantia. Em Relatórios, veja qual ele mais escolhe.
+Rota: /ordens
+Módulo: os
+
 ## 2026-09-25 · Ficha do aparelho pelo IMEI
 Digitou o IMEI na OS nova, o sistema mostra se o aparelho já passou aqui, as peças trocadas e se ainda está na garantia.
 Rota: /ordens

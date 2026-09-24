@@ -32,6 +32,7 @@ import {
 import { duracaoEscrita } from "../lib/video";
 import { MarcaDaLoja } from "../components/MarcaDaLoja";
 import { garantiaDaArea } from "../lib/area-cliente";
+import { eOrcamentoEmNiveis, nivelDaOpcao, ordemDosNiveis, NIVEIS } from "../lib/niveis";
 import { linkAcionarGarantia, type GarantiaPublica } from "../lib/etiqueta-aparelho";
 import { formatDate } from "../lib/format";
 import { podePagarPix, imagemDoQR, validadeDoQR, SEGUNDOS_ENTRE_CONSULTAS } from "../lib/pix";
@@ -156,6 +157,7 @@ export const Rastreio: React.FC = () => {
   // Um orçamento só não é escolha: ele já está somado no total.
   const opcoes = (os?.opcoes || []).length >= 2 ? os?.opcoes || [] : [];
   const marcada = opcoes.find((o) => o.nome === escolha);
+  const emNiveis = eOrcamentoEmNiveis(opcoes.map((o) => o.nome));
   const faltaEscolher = opcoes.length > 0 && !marcada;
 
   /** O total do orçamento marcado; sem opções, o total que o servidor mandou */
@@ -499,6 +501,9 @@ export const Rastreio: React.FC = () => {
                   <p className="mb-3 mt-0.5 text-xs text-tinta-suave">
                     Cada preço já é o serviço inteiro, sem surpresa.
                   </p>
+                  {emNiveis ? (
+                    <NiveisLadoALado opcoes={opcoes} escolha={escolha} onEscolher={setEscolha} />
+                  ) : (
                   <div className="space-y-2">
                     {opcoes.map((op) => {
                       const ativa = escolha === op.nome;
@@ -541,6 +546,7 @@ export const Rastreio: React.FC = () => {
                       );
                     })}
                   </div>
+                  )}
                 </section>
               )}
 
@@ -793,5 +799,65 @@ const GarantiaDoCliente: React.FC<{ loja: string; numero: number; token: string;
         </a>
       )}
     </section>
+  );
+};
+
+/**
+ * Os três níveis lado a lado, na ordem da prateleira, com a diferença dita
+ * em uma frase. A do meio vem marcada (é a sugestão da loja e a primeira da
+ * conta) e leva o selo. Os itens aparecem só da marcada: três listas
+ * lado a lado no celular viram uma parede de letra miúda.
+ */
+const NiveisLadoALado: React.FC<{
+  opcoes: OpcaoPublica[];
+  escolha: string;
+  onEscolher: (nome: string) => void;
+}> = ({ opcoes, escolha, onEscolher }) => {
+  const lista = ordemDosNiveis(opcoes);
+  const marcada = lista.find((o) => o.nome === escolha);
+  return (
+    <>
+      <div className="grid grid-cols-3 gap-2">
+        {lista.map((op) => {
+          const n = nivelDaOpcao(op.nome)!;
+          const meta = NIVEIS.find((x) => x.k === n.nivel)!;
+          const ativa = escolha === op.nome;
+          return (
+            <button
+              key={op.nome}
+              type="button"
+              onClick={() => onEscolher(op.nome)}
+              className={`relative flex min-w-0 flex-col rounded-md border-2 px-1.5 pb-2 pt-4 text-left sm:p-3 sm:pt-4 ${
+                ativa ? "border-sinal bg-sinal/5" : "border-linha bg-cartao"
+              }`}
+            >
+              {n.nivel === "recomendada" && (
+                <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-sinal px-1.5 py-0.5 text-[10px] font-bold uppercase text-white">
+                  Indicada
+                </span>
+              )}
+              <b className="whitespace-nowrap text-[11.5px] leading-tight tracking-tight sm:text-sm">{meta.nome}</b>
+              <span className="valor mt-1 text-sm font-bold sm:text-base">{brl(Number(op.total) || 0)}</span>
+              <span className="mt-1 text-[11px] font-semibold text-status-pronta">{n.dias} dias de garantia</span>
+              <span className="mt-1 text-[11px] leading-snug text-tinta-suave">{meta.explica}</span>
+            </button>
+          );
+        })}
+      </div>
+      {marcada && (marcada.itens || []).length > 0 && (
+        <div className="mt-3 space-y-0.5 rounded-md bg-papel p-3 text-xs text-tinta-suave">
+          <p className="mb-1 font-semibold text-tinta">Na {nivelDaOpcao(marcada.nome) ? NIVEIS.find((x) => x.k === nivelDaOpcao(marcada.nome)!.nivel)!.nome : ""} entra:</p>
+          {(marcada.itens || []).map((i, n) => (
+            <span key={n} className="flex justify-between gap-2">
+              <span>
+                {i.descricao}
+                {Number(i.quantidade) > 1 ? ` (${i.quantidade}x)` : ""}
+              </span>
+              <span className="valor shrink-0">{brl(Number(i.valor) || 0)}</span>
+            </span>
+          ))}
+        </div>
+      )}
+    </>
   );
 };
