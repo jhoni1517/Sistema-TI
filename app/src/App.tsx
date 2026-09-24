@@ -27,6 +27,7 @@ import { Catalogo } from "./pages/Catalogo";
 import { AreaCliente } from "./pages/AreaCliente";
 import { CadastroCliente } from "./pages/CadastroCliente";
 import { Indicar } from "./pages/Indicar";
+import { SeminovoPublico } from "./pages/SeminovoPublico";
 import { SemPerfil } from "./pages/SemPerfil";
 import { Lojas } from "./pages/Lojas";
 import { Assinatura } from "./pages/Assinatura";
@@ -242,6 +243,8 @@ const App: React.FC = () => (
       <Route path="/cadastro/:loja" element={<CadastroCliente />} />
       {/* Lojista indica lojista: sem login, o bônus é dado pelo banco */}
       <Route path="/indicar/:codigo" element={<Indicar />} />
+      {/* Ficha do aparelho usado: o corte do que sai é da função do banco */}
+      <Route path="/seminovo/:loja/:token" element={<SeminovoPublico />} />
       <Route path="/*" element={<AreaProtegida />} />
     </Routes>
   </HashRouter>

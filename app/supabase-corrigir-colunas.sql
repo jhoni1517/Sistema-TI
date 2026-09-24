@@ -109,6 +109,7 @@ alter table produtos add column if not exists "fornecedorId" text;
 alter table produtos add column if not exists servico boolean default false;
 -- Frente de caixa: leitor de código de barras, venda por quilo e validade.
 alter table produtos add column if not exists "codigoBarras" text;
+alter table produtos add column if not exists seminovo jsonb;
 alter table produtos add column if not exists "porPeso" boolean default false;
 alter table produtos add column if not exists validade text;
 -- Código curto do produto na balança do balcão: é por ele que a frente de

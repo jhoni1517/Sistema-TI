@@ -14,6 +14,7 @@ import { ImportarPorFoto } from "../components/ImportarPorFoto";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { CatalogoPublico } from "../components/CatalogoPublico";
 import { temRecurso } from "../lib/ramos";
+import { BotaoAvaliarUsado, FichaDoSeminovo, IconeFicha } from "../components/Seminovos";
 import { normalizar } from "../lib/busca";
 import { pendenciasDoProduto, produtosSemFiscal, pendenciasDaLoja } from "../lib/fiscal";
 import { situacaoValidade, produtosVencendo, VALIDADE_META } from "../lib/pdv";
@@ -44,6 +45,7 @@ const vazio = (): Produto => ({
 
 export const Estoque: React.FC = () => {
   const { produtos, categorias, fornecedores, cotacoes, vendas, ordens, ramo, config, saveProduto, removeProduto, saveCategoria, removeCategoria, saveFornecedor, removeFornecedor } = useApp();
+  const [ficha, setFicha] = useState<Produto | null>(null);
   const [busca, setBusca] = useState("");
   const [editando, setEditando] = useState<Produto | null>(null);
   const [soBaixo, setSoBaixo] = useState(false);
@@ -204,6 +206,7 @@ export const Estoque: React.FC = () => {
               <FolderTree size={18} /> Categorias
             </button>
             <ImportarPorFoto oque="produtos" />
+            {temRecurso(ramo, "seminovos") && <BotaoAvaliarUsado />}
             <button className="btn-primary" onClick={() => setEditando(vazio())}>
               <Plus size={18} /> Novo item
             </button>
@@ -217,6 +220,8 @@ export const Estoque: React.FC = () => {
       {reposicao && <Reposicao onClose={() => setReposicao(false)} />}
 
       {/* Vencimento: só para quem vende coisa que estraga */}
+      {ficha && <FichaDoSeminovo produto={ficha} onFechar={() => setFicha(null)} />}
+
       {temRecurso(ramo, "validade") && vencendo.length > 0 && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3">
           <p className="flex items-center gap-2 text-sm font-bold text-amber-800">
@@ -383,6 +388,9 @@ export const Estoque: React.FC = () => {
                     <td className="px-4 py-3 text-right text-emerald-600">{brl(margem)}</td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-1">
+                        {p.seminovo?.ficha && (
+                          <button className="btn-ghost !p-2" title="Ficha do seminovo" onClick={() => setFicha(p)}><IconeFicha size={15} /></button>
+                        )}
                         <button className="btn-ghost !p-2" onClick={() => setEditando(p)}><Pencil size={15} /></button>
                         <button className="btn-ghost !p-2 text-red-500" onClick={async () => {
                           // Produto já vendido não se apaga: o cupom do

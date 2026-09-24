@@ -406,6 +406,25 @@ export interface Fornecedor {
   criadoEm: string;
 }
 
+/**
+ * A ficha de um aparelho usado comprado pela loja. Ver lib/seminovo.ts.
+ * Mora dentro do produto (recurso, não módulo).
+ */
+export interface Seminovo {
+  /** Itens do checklist que PASSARAM (chaves de CHECKLIST_USADO) */
+  ok: Record<string, boolean>;
+  /** Saúde da bateria em %, quando o aparelho mostra */
+  bateria?: number;
+  imei?: string;
+  fotos?: string[];
+  garantiaDias?: number;
+  avaliadoEm?: string;
+  /** Segredo do link público da ficha */
+  ficha?: string;
+  /** Entrou como troca (sem saída de dinheiro do caixa) */
+  troca?: boolean;
+}
+
 export interface Produto {
   id: ID;
   nome: string;
@@ -495,6 +514,7 @@ export interface Produto {
    * elas é só este número.
    */
   codigoBalanca?: string;
+  seminovo?: Seminovo;
   criadoEm: string;
 }
 
@@ -1224,6 +1244,8 @@ export interface Config {
   fundo?: string;
   /** Assistente do primeiro acesso (lib/onboarding.ts). Sobe para a nuvem. */
   primeirosPassos?: EstadoOnboarding;
+  /** Preço de venda do seminovo perfeito, por modelo (lib/seminovo.ts) */
+  referenciasSeminovos?: Record<string, number>;
   comissaoPadrao?: number; // % de comissão padrão por técnico
   // Termos do recibo (guarda/abandono)
   taxaArmazenamentoDia?: number; // R$/dia após a conclusão
