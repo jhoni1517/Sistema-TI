@@ -26,6 +26,7 @@ import { PainelBancada } from "./pages/PainelBancada";
 import { Catalogo } from "./pages/Catalogo";
 import { AreaCliente } from "./pages/AreaCliente";
 import { CadastroCliente } from "./pages/CadastroCliente";
+import { Indicar } from "./pages/Indicar";
 import { SemPerfil } from "./pages/SemPerfil";
 import { Lojas } from "./pages/Lojas";
 import { Assinatura } from "./pages/Assinatura";
@@ -239,6 +240,8 @@ const App: React.FC = () => (
       <Route path="/cliente/:loja" element={<AreaCliente />} />
       {/* Só o formulário: o cadastro cai na lista da loja, sem senha */}
       <Route path="/cadastro/:loja" element={<CadastroCliente />} />
+      {/* Lojista indica lojista: sem login, o bônus é dado pelo banco */}
+      <Route path="/indicar/:codigo" element={<Indicar />} />
       <Route path="/*" element={<AreaProtegida />} />
     </Routes>
   </HashRouter>

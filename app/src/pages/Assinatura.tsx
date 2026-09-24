@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Copy, Check, MessageCircle, ShieldCheck, CalendarClock, Lock } from "lucide-react";
 import { aviso } from "../components/Aviso";
 import { SectionTitle } from "../components/ui";
+import { IndiqueEGanhe } from "../components/IndiqueEGanhe";
 import { brl, formatDate, txt, abrirWhatsapp } from "../lib/format";
 import { obterLoja } from "../lib/db";
 import {
@@ -223,6 +224,8 @@ export const Assinatura: React.FC = () => {
           </p>
         )}
       </div>
+
+      <IndiqueEGanhe />
 
       <p className="flex items-start gap-1.5 text-xs text-slate-400">
         <ShieldCheck size={13} className="mt-0.5 shrink-0" />

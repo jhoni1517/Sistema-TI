@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { PrimeiroAcesso } from "./PrimeiroAcesso";
+import { AplicarIndicacao } from "./IndiqueEGanhe";
 import { deveAbrirAssistente } from "../lib/onboarding";
 import { emDemo } from "../lib/db";
 import { MarcaDaLoja } from "./MarcaDaLoja";
@@ -148,6 +149,7 @@ export const Layout: React.FC<{
     <div className="ponte flex min-h-screen bg-papel">
       {/* Pix pelo link que caiu com o sistema aberto. Ver AvisoDePix. */}
       <AvisoDePix />
+      <AplicarIndicacao dono={sessao?.perfil?.papel === "dono"} />
       {assistente && <PrimeiroAcesso onFechar={() => setAssistenteFechado(true)} />}
       {/* Overlay mobile */}
       {open && (
