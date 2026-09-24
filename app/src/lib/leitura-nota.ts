@@ -75,7 +75,7 @@ export function dataDaNota(v: unknown): string {
 }
 
 /** Tira o ```json ... ``` que a IA às vezes põe em volta, e acha o objeto */
-function extrairJSON(bruto: unknown): unknown {
+export function extrairJSON(bruto: unknown): unknown {
   if (bruto && typeof bruto === "object") return bruto;
   const s = txt(bruto as string).trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
   const i = s.indexOf("{");

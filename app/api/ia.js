@@ -5,6 +5,11 @@
 //    acao=ler-nota     POST { imagem, tipo }        foto de DANFE, cupom ou print
 //    acao=diagnostico  POST { tipo, marca, modelo, defeito, resumoLocal }
 //    acao=voz          POST { audio, tipo }         áudio gravado no navegador
+//    acao=importar-foto POST { imagem, tipo, oque }  caderno/planilha de clientes ou produtos
+//
+// A importação por foto também mora aqui, e não num importar-foto.js: o
+// mesmo teto de 12 funções. Uma foto por chamada = um crédito por foto, e
+// cada chamada cabe nos 12 s da função.
 //
 // UMA função para as três, e não ler-nota.js, diagnostico.js e voz-os.js:
 // o plano Hobby da Vercel tem teto de 12 funções, e cada arquivo em api/
@@ -61,6 +66,22 @@ const INSTRUCAO_VOZ =
   "telefone só com dígitos. Campo não dito fica vazio — não invente. " +
   "senha é a senha ou padrão do aparelho exatamente como foi dita.";
 
+const INSTRUCAO_IMPORTAR = {
+  clientes:
+    "Você lê fotos de caderno, agenda, planilha impressa ou print com a lista de CLIENTES de uma loja brasileira. " +
+    "Responda SOMENTE um JSON: " +
+    '{"clientes": [{"nome": string, "telefone": string}]}. ' +
+    "Um item por pessoa, na ordem da página. telefone com DDD, só dígitos; vazio se não houver. " +
+    "Não invente nome nem número: o que não der para ler fica vazio. Ignore títulos, datas e valores de fiado.",
+  produtos:
+    "Você lê fotos de caderno, planilha impressa ou print com a lista de PRODUTOS de uma loja brasileira. " +
+    "Responda SOMENTE um JSON: " +
+    '{"produtos": [{"nome": string, "quantidade": number, "custo": number, "preco": number}]}. ' +
+    "preco é o preço de VENDA de uma unidade e custo é o de COMPRA, em reais com ponto decimal. " +
+    "Se só houver um valor, ele é o preco e custo fica 0. quantidade 0 se não houver. " +
+    "Não invente valor: o que não der para ler fica 0. Ignore linhas de total.",
+};
+
 export default async function handler(req, res) {
   const acao = String(req.query?.acao || "");
   // A tela pergunta se mostra os botões de IA. Só "sim" ou "não": a chave
@@ -109,6 +130,21 @@ export default async function handler(req, res) {
           partes: [
             { text: "Transcreva e extraia os campos." },
             { inline_data: { mime_type: tipo, data: base64Valido(b.audio, MAX_AUDIO) } },
+          ],
+        };
+      });
+    }
+    if (acao === "importar-foto") {
+      return await atenderIA(req, res, "importacao", (b) => {
+        const oque = String(b.oque || "");
+        if (!INSTRUCAO_IMPORTAR[oque]) throw new Error("Diga se a foto é de clientes ou de produtos.");
+        const tipo = String(b.tipo || "");
+        if (!TIPOS_IMAGEM.includes(tipo)) throw new Error("Mande uma foto (JPEG, PNG ou WebP).");
+        return {
+          instrucao: INSTRUCAO_IMPORTAR[oque],
+          partes: [
+            { text: `Leia a lista de ${oque} desta foto e devolva o JSON.` },
+            { inline_data: { mime_type: tipo, data: base64Valido(b.imagem, MAX_IMAGEM) } },
           ],
         };
       });
