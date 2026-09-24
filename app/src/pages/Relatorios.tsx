@@ -14,9 +14,10 @@ import {
   CartesianGrid,
   Legend,
 } from "recharts";
-import { TrendingUp, DollarSign, Percent, Wrench, Users, Package , FileText } from "lucide-react";
+import { TrendingUp, DollarSign, Percent, Wrench, Package , FileText } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { taxaDeEscolha, NIVEIS } from "../lib/niveis";
+import { ComissaoTecnicos } from "../components/ComissaoTecnicos";
 import { temModulo } from "../lib/ramos";
 import { SectionTitle, Field } from "../components/ui";
 import { csvDoPeriodo, nomeDoArquivo, limitesDoMes } from "../lib/contabil";
@@ -24,7 +25,6 @@ import {
   comparativoRecente,
   ticketMedio,
   horariosDePico,
-  comissoes,
 } from "../lib/desempenho";
 import {
   giroDosProdutos,
@@ -127,7 +127,6 @@ export const Relatorios: React.FC = () => {
   const semana = useMemo(() => comparativoRecente(movimentos, 7), [movimentos]);
   const ticket = useMemo(() => ticketMedio(vendas), [vendas]);
   const pico = useMemo(() => horariosDePico(vendas), [vendas]);
-  const comissao = useMemo(() => comissoes(ordens, config), [ordens, config]);
 
   // As ordens entram no giro: na assistência a peça sai por OS, não por
   // venda. Sem elas a curva ABC vinha vazia e o estoque inteiro aparecia
@@ -405,45 +404,7 @@ export const Relatorios: React.FC = () => {
           página, com números diferentes, debaixo do mesmo título, e a errada
           era a que pagava mais.
         */}
-        {temOS && (
-        <div className="card lg:col-span-2">
-          <h3 className="mb-1 flex items-center gap-2 font-bold text-slate-700"><Users size={16} /> Comissão por técnico</h3>
-          <p className="mb-4 text-xs text-slate-400">
-            {/* comissao-na-tela: só o texto, a conta vem da lib */}
-            Sobre o LUCRO das OS entregues, a {config.comissaoPadrao || 0}% (ajuste em
-            Configurações). Sobre faturamento, quem usa peça cara receberia mais
-            do que quem conserta melhor.
-          </p>
-          {comissao.length === 0 ? (
-            <p className="py-8 text-center text-sm text-slate-400">Nenhuma OS entregue ainda.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="border-b border-slate-200 text-left text-xs uppercase text-slate-400">
-                  <tr>
-                    <th className="px-3 py-2">Técnico</th>
-                    <th className="px-3 py-2 text-center">OS entregues</th>
-                    <th className="px-3 py-2 text-right">Faturado</th>
-                    <th className="px-3 py-2 text-right">Lucro</th>
-                    <th className="px-3 py-2 text-right">Comissão</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {comissao.map((t) => (
-                    <tr key={t.tecnico} className="border-b border-slate-100">
-                      <td className="px-3 py-2 font-semibold text-slate-800">{t.tecnico}</td>
-                      <td className="px-3 py-2 text-center text-slate-600">{t.ordens}</td>
-                      <td className="px-3 py-2 text-right text-slate-700">{brl(t.faturado)}</td>
-                      <td className="px-3 py-2 text-right text-slate-700">{brl(t.lucro)}</td>
-                      <td className="px-3 py-2 text-right font-bold text-emerald-600">{brl(t.valor)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-        )}
+        {temOS && <ComissaoTecnicos />}
 
         {/* Orçamento em 3 níveis: quem escolheu o quê. Só aparece depois
             que a loja usou — card vazio é barulho. */}

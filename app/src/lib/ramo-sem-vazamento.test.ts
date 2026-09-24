@@ -97,7 +97,9 @@ describe("os pontos exatos que vazavam", () => {
 
   it("Relatórios: o gráfico de OS e a comissão do técnico", () => {
     const t = semComentarios(ler("pages/Relatorios.tsx"));
-    expect(t.match(/\{temOS && \(/g)?.length).toBe(2);
+    // O gráfico de OS e a comissão (agora um componente) só com o módulo.
+    expect(t.match(/\{temOS && \(/g)?.length).toBeGreaterThanOrEqual(1);
+    expect(t).toMatch(/\{temOS && <ComissaoTecnicos \/>\}/);
   });
 
   it("Configurações: guarda, comissão e senha do aparelho", () => {
