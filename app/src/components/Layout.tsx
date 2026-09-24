@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { PrimeiroAcesso } from "./PrimeiroAcesso";
+import { Sino } from "./Sino";
 import { AplicarIndicacao } from "./IndiqueEGanhe";
 import { deveAbrirAssistente } from "../lib/onboarding";
 import { emDemo } from "../lib/db";
@@ -201,10 +202,10 @@ export const Layout: React.FC<{
           </div>
         </div>
 
-        <div className="shrink-0 px-3 pt-3">
+        <div className="flex shrink-0 gap-2 px-3 pt-3">
           <button
             onClick={() => setBusca(true)}
-            className="flex w-full items-center gap-2 rounded-lg bg-menu-2 px-3 py-2.5 text-base text-menu-suave hover:bg-menu-3 hover:text-menu-texto lg:py-2 lg:text-sm"
+            className="flex min-w-0 flex-1 items-center gap-2 rounded-lg bg-menu-2 px-3 py-2.5 text-base text-menu-suave hover:bg-menu-3 hover:text-menu-texto lg:py-2 lg:text-sm"
           >
             <Search className="h-[18px] w-[18px] shrink-0 lg:h-4 lg:w-4" />
             <span className="flex-1 text-left">Buscar...</span>
@@ -212,6 +213,7 @@ export const Layout: React.FC<{
               Ctrl K
             </span>
           </button>
+          <Sino variante="menu" />
         </div>
 
         <nav className="flex-1 space-y-1 p-3">
@@ -327,6 +329,7 @@ export const Layout: React.FC<{
           >
             <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
           </button>
+          <Sino variante="topo" />
           <button
             onClick={() => setBusca(true)}
             className="alvo-toque -mr-1.5 rounded-lg text-slate-600 hover:bg-slate-100"
