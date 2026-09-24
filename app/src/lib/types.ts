@@ -230,6 +230,20 @@ export interface VideoLaudo {
   duracao?: number;
 }
 
+export type TipoTermo = "entrada" | "retirada";
+
+/** Termo assinado com o dedo na tela. Ver lib/termo.ts. */
+export interface TermoAssinado {
+  tipo: TipoTermo;
+  /** O texto COMO FOI assinado: não se monta de novo depois */
+  texto: string;
+  /** Endereço da imagem da assinatura no Storage */
+  assinatura: string;
+  assinadoEm: string;
+  /** SHA-256 de texto + assinatura + hora: o lacre */
+  hash: string;
+}
+
 export interface OrdemServico {
   id: ID;
   numero: number;
@@ -319,6 +333,7 @@ export interface OrdemServico {
   recusadoEm?: string;
   // Assinatura do cliente (imagem em data URL)
   assinaturaCliente?: string;
+  termos?: TermoAssinado[];
   /**
    * Fotos do aparelho na ENTRADA, com o endereço no depósito de imagens.
    *
