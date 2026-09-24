@@ -2,6 +2,7 @@ import type { Ramo } from "./ramos";
 import type { FormatoBalanca } from "./balanca";
 import type { RegraMeioAMeio } from "./pizza";
 import type { RegimeTributario } from "./fiscal";
+import type { EstadoOnboarding } from "./onboarding";
 
 // ==== Tipos de domínio do Sistema TI ====
 
@@ -1206,6 +1207,8 @@ export interface Config {
   corDestaque?: string; // chave em ACCENTS (azul, esmeralda, ...)
   /** Fundo do sistema: chave em FUNDOS (balcao, classico, ...). Vazio = balcão. */
   fundo?: string;
+  /** Assistente do primeiro acesso (lib/onboarding.ts). Sobe para a nuvem. */
+  primeirosPassos?: EstadoOnboarding;
   comissaoPadrao?: number; // % de comissão padrão por técnico
   // Termos do recibo (guarda/abandono)
   taxaArmazenamentoDia?: number; // R$/dia após a conclusão
