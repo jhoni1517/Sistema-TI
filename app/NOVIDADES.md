@@ -11,6 +11,11 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-10-06 · Peça encomendada na OS
+Anote na OS a peça pedida e a previsão. Quando a nota chega, a peça fica reservada para a OS e o balcão não vende. Painel de peças a caminho.
+Rota: /
+Módulo: os
+
 ## 2026-10-05 · Alerta de margem caindo
 Quando a nota chega com custo maior, o sistema mostra o que apertou (produto e serviço da tabela) e ajusta o preço em um toque. Painel em Relatórios.
 Rota: /relatorios

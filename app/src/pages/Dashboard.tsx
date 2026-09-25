@@ -31,6 +31,7 @@ import { ResumoSemana } from "../components/ResumoSemana";
 import { AlertaInsatisfeitos } from "../components/Satisfacao";
 import { AlertaAuditoria } from "./Auditoria";
 import { AlertaTrocas } from "./Trocas";
+import { PecasACaminho } from "../components/PecasEncomendadas";
 import { lembretesDoDia, REGRAS_PADRAO } from "../lib/lembretes";
 
 export const Dashboard: React.FC = () => {
@@ -121,6 +122,8 @@ export const Dashboard: React.FC = () => {
       {temOS && <AlertaInsatisfeitos />}
 
       {temOS && <AlertaTrocas />}
+
+      {temOS && <PecasACaminho />}
 
       {/* Serviço que pede volta: bateria, película, limpeza. Ver lib/lembretes.ts */}
       {paraChamar > 0 && (
