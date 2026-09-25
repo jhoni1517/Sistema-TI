@@ -44,6 +44,7 @@ const TABELAS: Record<string, string> = {
   // existe — e a gravação inteira da tabela cai junto.
   Comanda: "comandas",
   PedidoSite: "pedidos_site",
+  Avaliacao: "avaliacoes",
 };
 
 /** Colunas declaradas para uma tabela, no create table e nos alter */

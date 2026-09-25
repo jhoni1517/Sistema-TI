@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { aviso } from "../components/Aviso";
+import { AvaliarAtendimento } from "../components/AvaliarAtendimento";
 import { useParams } from "react-router-dom";
 import {
   CheckCircle2,
@@ -356,6 +357,10 @@ export const Rastreio: React.FC = () => {
                   </p>
                   <p className="mt-2 text-sm font-medium opacity-95">{meta.cliente}</p>
                 </div>
+              )}
+
+              {os.status === "entregue" && (
+                <AvaliarAtendimento loja={loja} numero={os.numero} token={token} nomeLoja={os.loja} />
               )}
 
               {os.status === "entregue" && (

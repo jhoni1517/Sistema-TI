@@ -18,6 +18,7 @@ import { TrendingUp, DollarSign, Percent, Wrench, Package , FileText } from "luc
 import { useApp } from "../store/AppStore";
 import { taxaDeEscolha, NIVEIS } from "../lib/niveis";
 import { ComissaoTecnicos } from "../components/ComissaoTecnicos";
+import { PainelSatisfacao } from "../components/Satisfacao";
 import { temModulo } from "../lib/ramos";
 import { SectionTitle, Field } from "../components/ui";
 import { csvDoPeriodo, nomeDoArquivo, limitesDoMes } from "../lib/contabil";
@@ -405,6 +406,8 @@ export const Relatorios: React.FC = () => {
           era a que pagava mais.
         */}
         {temOS && <ComissaoTecnicos />}
+
+        {temOS && <PainelSatisfacao />}
 
         {/* Orçamento em 3 níveis: quem escolheu o quê. Só aparece depois
             que a loja usou — card vazio é barulho. */}

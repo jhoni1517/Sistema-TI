@@ -11,6 +11,11 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-09-30 · Avaliação e depoimentos
+Depois da entrega, o cliente dá nota no link. Nota boa vai para o Google e vira depoimento no site; nota ruim avisa só você no Painel.
+Rota: /relatorios
+Módulo: os
+
 ## 2026-09-29 · Orçamento pelo site
 Uma página para o Instagram e o Google: o cliente escolhe o aparelho e vê o preço, agenda a avaliação ou chama no WhatsApp. Ligue em Configurações.
 Rota: /orcamentos-site

@@ -15,6 +15,7 @@ import type {
   Meta,
   Evento,
   PedidoSite,
+  Avaliacao,
   Venda,
   Comanda,
   TarefaDiaria,
@@ -52,7 +53,8 @@ type TableName =
   | "tarefas"
   | "comandas"
   | "notas"
-  | "pedidos_site";
+  | "pedidos_site"
+  | "avaliacoes";
 
 interface WithId {
   id: string;
@@ -546,6 +548,28 @@ export const db = {
   pedidosSite: {
     all: () => getAll<PedidoSite>("pedidos_site"),
     save: (p: PedidoSite) => upsert("pedidos_site", p),
+  },
+  // Avaliação só entra pela página do cliente. A loja lê e, pela função
+  // resolver_avaliacao, marca resolvido ou esconde: gravação direta
+  // permitiria inventar depoimento.
+  avaliacoes: {
+    all: () => getAll<Avaliacao>("avaliacoes"),
+    resolver: async (id: string, patch: { resolvido?: boolean; resolucao?: string; oculto?: boolean }): Promise<void> => {
+      escritas++;
+      if (demo) {
+        demo.set("avaliacoes", (demo.get("avaliacoes") || []).map((a) => (a.id === id ? { ...a, ...patch } : a)));
+        return;
+      }
+      if (!supabaseEnabled || !supabase) throw new Error("Avaliação só existe com a nuvem ligada.");
+      const { data, error } = await supabase.rpc("resolver_avaliacao", {
+        p_id: id,
+        p_resolvido: patch.resolvido ?? null,
+        p_resolucao: patch.resolucao ?? null,
+        p_oculto: patch.oculto ?? null,
+      });
+      if (error) throw traduzirErroGravacao(error);
+      if (data === false) throw new Error("Avaliação não encontrada. Atualize a página.");
+    },
   },
   eventos: {
     all: () => getAll<Evento>("eventos"),
