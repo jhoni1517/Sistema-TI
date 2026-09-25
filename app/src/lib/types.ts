@@ -1199,6 +1199,28 @@ export interface PedidoSite {
   criadoEm: string;
 }
 
+/**
+ * Nota que o cliente deu no link de rastreio depois da entrega. Só entra
+ * pela função avaliar_atendimento; a loja só marca resolvido ou oculta.
+ * Ver lib/depoimentos.ts.
+ */
+export interface Avaliacao {
+  lojaId?: string;
+  id: string;
+  osId: string;
+  numero?: number | null;
+  nota: number;
+  comentario?: string | null;
+  publicar?: boolean;
+  /** Só o primeiro nome do cliente, gravado pela função */
+  nome?: string | null;
+  aparelho?: string | null;
+  criadoEm: string;
+  resolvido?: boolean;
+  resolucao?: string | null;
+  oculto?: boolean;
+}
+
 export interface Evento {
   id: ID;
   titulo: string;

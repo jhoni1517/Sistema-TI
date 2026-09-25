@@ -184,7 +184,8 @@ https://supabase.com/dashboard/project/nviagibefxqtognowqwe/sql/new:
 33. `supabase-migracao-garantia-publica.sql`
 34. `supabase-migracao-seminovos.sql`
 35. `supabase-migracao-orcamento-site.sql`
-36. `supabase-corrigir-colunas.sql`
+36. `supabase-migracao-depoimentos.sql`
+37. `supabase-corrigir-colunas.sql`
 
 Quem já rodou o de número 18 antes da nota na ordem de serviço precisa
 rodá-lo **de novo**: ele ganhou a coluna `osId`, que é o que liga a nota à

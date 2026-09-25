@@ -23,6 +23,7 @@ import { Relatorios } from "./pages/Relatorios";
 import { TabelaServicos } from "./pages/TabelaServicos";
 import { PedidosSite } from "./pages/PedidosSite";
 import { OrcarPublico } from "./pages/OrcarPublico";
+import { DepoimentosPublico } from "./pages/DepoimentosPublico";
 import { Config } from "./pages/Config";
 import { Rastreio } from "./pages/Rastreio";
 import { PainelBancada } from "./pages/PainelBancada";
@@ -252,6 +253,7 @@ const App: React.FC = () => (
       <Route path="/seminovo/:loja/:token" element={<SeminovoPublico />} />
       {/* Orçamento pelo site: link no Instagram e no Google da loja. */}
       <Route path="/orcar/:loja" element={<OrcarPublico />} />
+      <Route path="/depoimentos/:loja" element={<DepoimentosPublico />} />
       <Route path="/*" element={<AreaProtegida />} />
     </Routes>
   </HashRouter>
