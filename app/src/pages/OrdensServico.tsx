@@ -157,6 +157,7 @@ import { podePedirAvaliacao, mensagemPedidoAvaliacao } from "../lib/avaliacao";
 import { hojeISO } from "../lib/contas";
 import { SeloPrazo } from "../components/SeloPrazo";
 import { PrecoDaTabela } from "../components/PrecoDaTabela";
+import { pedirMotivo } from "../components/motivo";
 import { SugestaoDaOS } from "../components/SugestaoDaOS";
 import { OSPorVoz } from "../components/OSPorVoz";
 
@@ -769,8 +770,10 @@ export const OrdensServico: React.FC = () => {
               );
             }
             if (!confirm(textoDaConfirmacao(r))) return;
+            const motivo = pedirMotivo("os_excluida", `Excluir a OS ${detalhe.numero}`);
+            if (motivo === null) return;
             try {
-              await removeOrdem(detalhe.id);
+              await removeOrdem(detalhe.id, motivo);
             } catch (e) {
               // A janela fechava como se tivesse apagado. Assinatura vencida
               // ou permissão derrubam a exclusão em silêncio, e a OS volta

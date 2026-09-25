@@ -16,6 +16,7 @@ import type {
   Evento,
   PedidoSite,
   Avaliacao,
+  RegistroAuditoria,
   Venda,
   Comanda,
   TarefaDiaria,
@@ -54,7 +55,8 @@ type TableName =
   | "comandas"
   | "notas"
   | "pedidos_site"
-  | "avaliacoes";
+  | "avaliacoes"
+  | "auditoria";
 
 interface WithId {
   id: string;
@@ -569,6 +571,31 @@ export const db = {
       });
       if (error) throw traduzirErroGravacao(error);
       if (data === false) throw new Error("Avaliação não encontrada. Atualize a página.");
+    },
+  },
+  // Só inserção e sem ler de volta: quem registra (o atendente) não pode
+  // ler a auditoria, e o upsert comum pede a linha de volta.
+  auditoria: {
+    /** Só a partir de `desde` (AAAA-MM-DD): a auditoria só cresce, e o Painel lê a cada abertura. */
+    all: async (desde?: string): Promise<RegistroAuditoria[]> => {
+      if (demo || !supabaseEnabled || !supabase || !desde) {
+        const todos = await getAll<RegistroAuditoria>("auditoria");
+        return desde ? todos.filter((r) => (r.criadoEm || "") >= desde) : todos;
+      }
+      const { data, error } = await supabase.from("auditoria").select("*").gte("criadoEm", desde);
+      if (error) throw traduzirErroLeitura("auditoria", error);
+      return (data as RegistroAuditoria[]) || [];
+    },
+    registrar: async (r: RegistroAuditoria): Promise<void> => {
+      if (demo) {
+        const linha: RegistroAuditoria = { ...r, usuario: "Você (exemplo)" };
+        demo.set("auditoria", [...(demo.get("auditoria") || []), linha]);
+        return;
+      }
+      if (!supabaseEnabled || !supabase) return;
+      if (!lojaAtual) throw new Error("Sessão expirada.");
+      const { error } = await supabase.from("auditoria").insert({ ...r, lojaId: lojaAtual });
+      if (error) throw traduzirErroLeitura("auditoria", error);
     },
   },
   eventos: {

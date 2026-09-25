@@ -251,6 +251,19 @@ export const Config: React.FC = () => {
             </p>
           </Field>
 
+          <Field label="Desconto que entra na auditoria (%)">
+            <InputNumero
+              className="input"
+              min={0}
+              max={100}
+              value={form.descontoAuditado}
+              onChange={(descontoAuditado) => mudar({ descontoAuditado })}
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              Desconto acima disso, na venda ou na OS, fica registrado com quem deu. Vazio = 10%.
+            </p>
+          </Field>
+
           {/* Avisos no Telegram DESTA loja. A rotina diária mandava tudo
               para um chat só, o do operador do sistema: nome e dívida de
               cliente iam parar no celular de outra pessoa, e quem precisava

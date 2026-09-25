@@ -27,7 +27,7 @@ import type { MovimentoCaixa } from "../lib/types";
  * que não foi conferido naquele dia — e isso não tem desfazer.
  */
 export const Inventario: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const { produtos, sessoes, saveProduto, saveMovimento } = useApp();
+  const { produtos, sessoes, saveProduto, saveMovimento, auditar } = useApp();
   const [busca, setBusca] = useState("");
   const [contagem, setContagem] = useState<Contagem>({});
   const [soDivergentes, setSoDivergentes] = useState(false);
@@ -93,7 +93,11 @@ export const Inventario: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         await saveMovimento(mov);
       }
 
-      for (const p of ajustes) await saveProduto(p);
+      for (const p of ajustes) {
+        const anterior = produtos.find((x) => x.id === p.id);
+        await saveProduto(p);
+        await auditar("estoque", { alvo: p.nome, antes: anterior?.quantidade ?? 0, depois: p.quantidade, motivo: "Contagem de inventário" });
+      }
 
       aviso.sucesso(
         `${ajustes.length} produto(s) ajustado(s).` +

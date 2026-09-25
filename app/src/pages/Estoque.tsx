@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { pedirMotivo } from "../components/motivo";
 import { aviso } from "../components/Aviso";
 import { ImagemUpload } from "../components/ImagemUpload";
 import { Etiquetas } from "../components/Etiquetas";
@@ -45,7 +46,7 @@ const vazio = (): Produto => ({
 });
 
 export const Estoque: React.FC = () => {
-  const { produtos, categorias, fornecedores, cotacoes, vendas, ordens, ramo, config, saveProduto, removeProduto, saveCategoria, removeCategoria, saveFornecedor, removeFornecedor } = useApp();
+  const { produtos, categorias, fornecedores, cotacoes, vendas, ordens, ramo, config, saveProduto, removeProduto, saveCategoria, removeCategoria, saveFornecedor, removeFornecedor, auditar } = useApp();
   const [ficha, setFicha] = useState<Produto | null>(null);
   const [busca, setBusca] = useState("");
   const [editando, setEditando] = useState<Produto | null>(null);
@@ -158,8 +159,21 @@ export const Estoque: React.FC = () => {
       categoria: editando.categoriaId ? nomeCat(editando) : editando.categoria,
       fornecedor: editando.fornecedorId ? nomeForn(editando) : editando.fornecedor,
     };
+    // Mexer na quantidade de um produto que já existe é ajuste manual:
+    // entra na auditoria, com motivo. Entrada de mercadoria tem caminho
+    // próprio (Entrada de nota), que registra de onde veio.
+    const anterior = produtos.find((x) => x.id === p.id);
+    const ajuste = anterior && !p.servico && (anterior.quantidade || 0) !== (p.quantidade || 0);
+    let motivo: string | null = null;
+    if (ajuste) {
+      motivo = pedirMotivo("estoque", `Estoque de "${p.nome}": ${anterior.quantidade || 0} → ${p.quantidade || 0}`);
+      if (motivo === null) return;
+    }
     try {
       await saveProduto(p);
+      if (ajuste) {
+        await auditar("estoque", { alvo: p.nome, antes: anterior.quantidade || 0, depois: p.quantidade || 0, motivo });
+      }
       setEditando(null);
     } catch (e) {
       aviso.erro("Não foi possível salvar o produto.\n\n" + (e instanceof Error ? e.message : String(e)) + "\n\nSe você usa a nuvem, confira se rodou o comando SQL de atualização das tabelas.");

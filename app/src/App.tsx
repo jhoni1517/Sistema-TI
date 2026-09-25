@@ -22,6 +22,7 @@ import { PDV } from "./pages/PDV";
 import { Relatorios } from "./pages/Relatorios";
 import { TabelaServicos } from "./pages/TabelaServicos";
 import { PedidosSite } from "./pages/PedidosSite";
+import { Auditoria } from "./pages/Auditoria";
 import { OrcarPublico } from "./pages/OrcarPublico";
 import { DepoimentosPublico } from "./pages/DepoimentosPublico";
 import { Config } from "./pages/Config";
@@ -207,6 +208,7 @@ const Rotas: React.FC<{ sessao: Sessao; onLogout: () => void; onCriarConta?: () 
           <Route path="ordens" element={<Protegida recurso="os" papel={papel}><DoPlano modulo="os"><OrdensServico /></DoPlano></Protegida>} />
           <Route path="tabela" element={<Protegida recurso="os" papel={papel}><DoPlano modulo="os"><TabelaServicos papel={papel} /></DoPlano></Protegida>} />
           <Route path="orcamentos-site" element={<Protegida recurso="os" papel={papel}><DoPlano modulo="os"><PedidosSite /></DoPlano></Protegida>} />
+          <Route path="auditoria" element={<Protegida recurso="auditoria" papel={papel}><Auditoria /></Protegida>} />
           <Route path="clientes" element={<Protegida recurso="clientes" papel={papel}><Clientes /></Protegida>} />
           <Route path="estoque" element={<Protegida recurso="estoque" papel={papel}><Estoque /></Protegida>} />
           <Route path="caixa" element={<Protegida recurso="caixa" papel={papel}><Caixa /></Protegida>} />
