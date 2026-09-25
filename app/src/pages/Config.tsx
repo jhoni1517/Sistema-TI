@@ -251,6 +251,23 @@ export const Config: React.FC = () => {
             </p>
           </Field>
 
+          {temModulo(ramoContratado, "os") && (
+            <label className="flex items-start gap-2 sm:col-span-2">
+              <input
+                type="checkbox"
+                className="mt-1 h-5 w-5"
+                checked={form.pinRetirada !== false}
+                onChange={(e) => mudar({ pinRetirada: e.target.checked })}
+              />
+              <span>
+                <b>Código de retirada na entrega</b>
+                <span className="block text-xs text-slate-400">
+                  Quando a OS fica pronta, o cliente recebe um código de 4 números. Na entrega, o sistema pede o código; sem ele, só com motivo e foto do documento.
+                </span>
+              </span>
+            </label>
+          )}
+
           <label className="flex items-start gap-2 sm:col-span-2">
             <input
               type="checkbox"

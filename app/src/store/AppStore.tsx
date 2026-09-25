@@ -12,6 +12,7 @@ import { grama } from "../lib/estoque";
 import { aplicarGarantiaDoNivel } from "../lib/niveis";
 import { novoRegistro, descontoAcima, type AcaoAuditoria } from "../lib/auditoria";
 import { totalOS } from "../lib/calc";
+import { precisaDePin, gerarPin } from "../lib/retirada";
 import { uid } from "../lib/format";
 import { supabase } from "../lib/supabase";
 import { tamanhoDaFila } from "../lib/fila";
@@ -505,6 +506,9 @@ export const AppProvider: React.FC<{
     // como saber (o segredo do rastreio é uma), e guardar o objeto que
     // subiu deixaria a tela sem elas até o próximo F5.
     // A garantia acompanha o nível que o cliente escolheu (lib/niveis.ts).
+    // Ficou pronta: nasce o código de retirada (lib/retirada.ts). Aqui, e não
+    // na tela, porque a OS fica pronta por mais de um caminho.
+    if (precisaDePin(o, config)) o = { ...o, pinRetirada: gerarPin() };
     const gravado = await db.ordens.save(aplicarGarantiaDoNivel(o));
     setOrdens((prev) => {
       const i = prev.findIndex((x) => x.id === gravado.id);

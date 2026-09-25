@@ -158,6 +158,9 @@ import { hojeISO } from "../lib/contas";
 import { SeloPrazo } from "../components/SeloPrazo";
 import { PrecoDaTabela } from "../components/PrecoDaTabela";
 import { pedirMotivo } from "../components/motivo";
+import { ConferirRetirada, type Retirada } from "../components/ConferirRetirada";
+import { exigePin } from "../lib/retirada";
+import { linkDoDocumento } from "../lib/imagens";
 import { SugestaoDaOS } from "../components/SugestaoDaOS";
 import { OSPorVoz } from "../components/OSPorVoz";
 
@@ -218,7 +221,28 @@ export const novaOS = (numero: number): OrdemServico => ({
 });
 
 export const OrdensServico: React.FC = () => {
-  const { ordens, clientes, produtos, sessoes, movimentos, fiados, config, fontesComFalha, saveOrdem, removeOrdem, saveMovimento, saveProduto, saveFiado } = useApp();
+  const { ordens, clientes, produtos, sessoes, movimentos, fiados, config, fontesComFalha, saveOrdem, removeOrdem, saveMovimento, saveProduto, saveFiado, auditar } = useApp();
+  /*
+   * Código de retirada. A conferência vem ANTES do dinheiro: desistir no
+   * meio não pode deixar lançamento no caixa de um aparelho que ficou.
+   * O resultado segue até a gravação da entrega por este ref.
+   */
+  const [retiradaPedida, setRetiradaPedida] = useState<{ os: OrdemServico; resolver: (r: Retirada | null) => void } | null>(null);
+  const retiradaRef = useRef<Retirada | undefined>(undefined);
+  const conferirRetirada = (o: OrdemServico): Promise<boolean> => {
+    retiradaRef.current = undefined;
+    if (!exigePin(o, config)) return Promise.resolve(true);
+    return new Promise((ok) =>
+      setRetiradaPedida({
+        os: o,
+        resolver: (r) => {
+          setRetiradaPedida(null);
+          retiradaRef.current = r || undefined;
+          ok(!!r);
+        },
+      })
+    );
+  };
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<OSStatus | "todas" | "abertas">("abertas");
   const [editando, setEditando] = useState<OrdemServico | null>(null);
@@ -374,7 +398,10 @@ export const OrdensServico: React.FC = () => {
         "Não foi possível mudar o status:\n\n" + (e instanceof Error ? e.message : String(e))
       );
     }
-    setDetalhe(atualizado);
+    // Sem setDetalhe(atualizado) aqui: a janela acompanha a lista (efeito
+    // lá em cima), e a lista já tem o que o banco gravou. Pôr `atualizado`
+    // por cima apagava da tela o que a gravação acrescentou, como o código
+    // de retirada que nasce quando a OS fica pronta.
   };
 
   /**
@@ -421,14 +448,24 @@ export const OrdensServico: React.FC = () => {
           "Cadastre-as no estoque para o controle ficar certo."
       );
     }
+    const retirada = retiradaRef.current;
+    retiradaRef.current = undefined;
     await saveOrdem({
       ...o,
       ...semSigilo(),
+      ...(retirada ? { retirada } : {}),
       status: "entregue",
       entregueEm: nowISO(),
       atualizadoEm: nowISO(),
       historico: [...o.historico, { data: nowISO(), status: "entregue" }],
     });
+    if (retirada && !retirada.comPin) {
+      await auditar("entrega_sem_pin", {
+        alvo: `OS ${o.numero} · ${o.marca} ${o.modelo}`,
+        depois: { documento: retirada.documento },
+        motivo: retirada.motivo,
+      });
+    }
   };
 
   /**
@@ -880,6 +917,7 @@ export const OrdensServico: React.FC = () => {
             }
 
             if (registrando) return; // clique duplo no balcão acontece o tempo todo
+            if (entrega && !(await conferirRetirada(detalhe))) return;
             setRegistrando(true);
             let dinheiroEntrou = false;
             try {
@@ -1052,6 +1090,7 @@ export const OrdensServico: React.FC = () => {
               if (!ok) return;
             }
             if (registrando) return; // dois cliques = o cliente devendo o dobro
+            if (!(await conferirRetirada(detalhe))) return;
             setRegistrando(true);
             let fiadoEntrou = false;
             try {
@@ -1093,6 +1132,8 @@ export const OrdensServico: React.FC = () => {
           registrando={registrando}
         />
       )}
+      {/* Por último: abre por cima da janela da OS. */}
+      {retiradaPedida && <ConferirRetirada os={retiradaPedida.os} onFechar={retiradaPedida.resolver} />}
     </div>
   );
 };
@@ -2445,6 +2486,12 @@ export const OSDetalhe: React.FC<{
         {/* Avaliação no Google: só entregue, e uma vez a cada 90 dias por
             pessoa. O motivo de não poder aparece escrito — botão cinza sem
             explicação parece sistema travado. */}
+        {os.retirada && <RetiradaDaOS r={os.retirada} />}
+        {os.status === "pronta" && os.pinRetirada && config.pinRetirada !== false && (
+          <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600 no-print">
+            Código de retirada enviado ao cliente (no link e na mensagem de pronto). Na entrega, o sistema pede o código.
+          </p>
+        )}
         {os.status === "entregue" && (
           <div className="flex flex-wrap items-center gap-2 rounded-lg bg-slate-50 p-3 no-print">
             <span className="min-w-0 flex-1 text-sm text-slate-600">
@@ -3056,3 +3103,26 @@ const Linha: React.FC<{ label: string; value: string }> = ({ label, value }) => 
     <span className="valor">{value}</span>
   </div>
 );
+
+/** Como o aparelho saiu: com o código, ou sem (motivo e documento). */
+const RetiradaDaOS: React.FC<{ r: NonNullable<OrdemServico["retirada"]> }> = ({ r }) => {
+  const abrir = async () => {
+    try {
+      window.open(await linkDoDocumento(r.documento || ""), "_blank");
+    } catch (e) {
+      aviso.erro(e instanceof Error ? e.message : String(e));
+    }
+  };
+  return r.comPin ? (
+    <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600 no-print">Retirado com o código em {formatDateTime(r.em)}.</p>
+  ) : (
+    <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900 no-print">
+      <b>Entregue sem o código</b> em {formatDateTime(r.em)}. Motivo: {r.motivo}
+      {r.documento && !r.documento.startsWith("exemplo/") && (
+        <button className="ml-2 underline" onClick={abrir}>
+          Ver documento
+        </button>
+      )}
+    </div>
+  );
+};

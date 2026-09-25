@@ -359,6 +359,8 @@ export const Rastreio: React.FC = () => {
                 </div>
               )}
 
+              {os.status === "pronta" && <CodigoRetirada loja={loja} numero={os.numero} token={token} />}
+
               {os.status === "entregue" && (
                 <AvaliarAtendimento loja={loja} numero={os.numero} token={token} nomeLoja={os.loja} />
               )}
@@ -864,5 +866,27 @@ const NiveisLadoALado: React.FC<{
         </div>
       )}
     </>
+  );
+};
+
+/**
+ * O código de retirada, só enquanto a OS está pronta. Quem tem o link é o
+ * cliente; é ele quem mostra o código no balcão (lib/retirada.ts).
+ */
+const CodigoRetirada: React.FC<{ loja: string; numero: number; token: string }> = ({ loja, numero, token }) => {
+  const [pin, setPin] = useState<string | null>(null);
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.rpc("pin_da_os", { p_loja: loja, p_numero: numero, p_token: token }).then(({ data, error }) => {
+      if (!error && typeof data === "string" && data) setPin(data);
+    });
+  }, [loja, numero, token]);
+  if (!pin) return null;
+  return (
+    <section className="mb-6 rounded-md border-2 border-status-pronta p-4 text-center">
+      <p className="text-xs font-semibold uppercase tracking-wide text-tinta-suave">Código de retirada</p>
+      <p className="valor mt-1 text-4xl font-bold tracking-[0.3em]">{pin}</p>
+      <p className="mt-1 text-sm text-tinta-suave">Informe no balcão. Só entregamos o aparelho com este código.</p>
+    </section>
   );
 };

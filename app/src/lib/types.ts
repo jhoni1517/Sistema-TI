@@ -394,6 +394,10 @@ export interface OrdemServico {
    * as outras, e o prazo legal estourava sem ninguém ver.
    */
   retornoGarantia?: boolean;
+  /** Código de retirada, gerado quando fica pronta. Ver lib/retirada.ts. */
+  pinRetirada?: string;
+  /** Como saiu: com código, ou sem (motivo e caminho da foto do documento, no depósito privado) */
+  retirada?: { comPin: boolean; motivo?: string; documento?: string; em: string };
 }
 
 export interface Categoria {
@@ -1341,6 +1345,8 @@ export interface Config {
   descontoAuditado?: number;
   /** Fechamento de caixa cego: conta sem ver o esperado (lib/caixa.ts) */
   fechamentoCego?: boolean;
+  /** Código de retirada na entrega da OS. Vazio = ligado (lib/retirada.ts). */
+  pinRetirada?: boolean;
   /** Página pública de orçamento /orcar/:loja (lib/orcamento-online.ts). Nasce desligada. */
   orcamentoSite?: { ativo?: boolean; agendar?: boolean; cor?: string; agenda?: AgendaSite };
   comissaoPadrao?: number; // % de comissão padrão por técnico
