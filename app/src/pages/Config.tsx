@@ -297,6 +297,19 @@ export const Config: React.FC = () => {
             </Field>
           )}
 
+          <Field label="Margem-alvo (%)">
+            <InputNumero
+              className="input"
+              min={0}
+              max={90}
+              value={form.margemAlvo}
+              onChange={(margemAlvo) => mudar({ margemAlvo })}
+            />
+            <p className="mt-1 text-xs text-slate-400">
+              De cada R$ 100 vendidos, quanto você quer que sobre depois do custo da peça. Abaixo disso, o sistema avisa. Vazio = 40%.
+            </p>
+          </Field>
+
           <Field label="Desconto que entra na auditoria (%)">
             <InputNumero
               className="input"

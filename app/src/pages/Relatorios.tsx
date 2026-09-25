@@ -20,6 +20,7 @@ import { taxaDeEscolha, NIVEIS } from "../lib/niveis";
 import { ComissaoTecnicos } from "../components/ComissaoTecnicos";
 import { PainelSatisfacao } from "../components/Satisfacao";
 import { DiferencasCaixa } from "../components/DiferencasCaixa";
+import { MargensEmRisco } from "../components/MargensEmRisco";
 import { temModulo } from "../lib/ramos";
 import { SectionTitle, Field } from "../components/ui";
 import { csvDoPeriodo, nomeDoArquivo, limitesDoMes } from "../lib/contabil";
@@ -225,7 +226,7 @@ export const Relatorios: React.FC = () => {
       {/* Curva ABC e o que está parado.
           A tela respondia "quanto entrou". Não respondia a pergunta que
           decide o dinheiro do mês: o que eu paro de comprar? */}
-      <div className="mb-6 grid gap-4 lg:grid-cols-2">
+      <div className="mb-6 grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <div className="card">
           <h3 className="mb-1 flex items-center gap-2 font-bold text-slate-700">
             <TrendingUp size={17} /> O que carrega o faturamento
@@ -340,7 +341,8 @@ export const Relatorios: React.FC = () => {
         </ResponsiveContainer>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      {/* minmax(0,1fr): sem isso a coluna cresce até a tabela mais larga e a página vaza para o lado no celular. */}
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         {/* Barras receita x despesa */}
         <div className="card">
           <h3 className="mb-4 font-bold text-slate-700">Receita x Despesas por mês</h3>
@@ -411,6 +413,8 @@ export const Relatorios: React.FC = () => {
         {temOS && <PainelSatisfacao />}
 
         <DiferencasCaixa />
+
+        <MargensEmRisco />
 
         {/* Orçamento em 3 níveis: quem escolheu o quê. Só aparece depois
             que a loja usou — card vazio é barulho. */}

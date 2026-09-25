@@ -1,5 +1,8 @@
 import React, { useMemo, useState } from "react";
-import { Truck, Search, AlertTriangle, Plus, Trash2 } from "lucide-react";
+import { ImpactoMargem } from "./ImpactoMargem";
+import { impactoDoCusto, MARGEM_ALVO_PADRAO } from "../lib/margem";
+import { tabelaSegura } from "../lib/tabela-precos";
+import { Truck, Search, Plus, Trash2 } from "lucide-react";
 import { aviso } from "./Aviso";
 import { Modal, Field, InputNumero } from "./ui";
 import { useApp } from "../store/AppStore";
@@ -12,7 +15,7 @@ import {
   custoRateado,
   aplicarEntrada,
   problemaNaEntrada,
-  avisosDeMargem,
+  custoMedio,
   type ItemEntrada,
 } from "../lib/entrada";
 import { FORMAS_DE_COMPRA } from "../lib/pagamento";
@@ -32,7 +35,7 @@ import { paraEntrada } from "../lib/leitura-nota";
  * A conta mora em lib/entrada.ts, com teste.
  */
 export const EntradaNota: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const { produtos, fornecedores, sessoes, saveProduto, saveMovimento } = useApp();
+  const { produtos, fornecedores, sessoes, config, saveProduto, saveMovimento } = useApp();
   const [busca, setBusca] = useState("");
   const [itens, setItens] = useState<ItemEntrada[]>([]);
   const [frete, setFrete] = useState(0);
@@ -54,7 +57,23 @@ export const EntradaNota: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   // valia e as dependências declaradas mentiam sobre o que ele observa.
   const entrada = useMemo(() => ({ itens, frete, desconto }), [itens, frete, desconto]);
   const problema = problemaNaEntrada(entrada, todos);
-  const avisos = useMemo(() => avisosDeMargem(entrada, todos), [entrada, todos]);
+  // Custo médio depois desta nota, contra o de antes (lib/margem.ts).
+  const impacto = useMemo(() => {
+    const rateado = custoRateado(entrada);
+    const mudancas = itens
+      .map((i) => {
+        const p = todos.find((x) => x.id === i.produtoId);
+        if (!p || Number(i.quantidade) <= 0) return null;
+        return {
+          produtoId: p.id,
+          custoAntes: Number(p.custo) || 0,
+          custoDepois: custoMedio(p.quantidade, p.custo, i.quantidade, rateado[i.produtoId] ?? i.custoUnit),
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => !!x);
+    const tabela = config.tabelaServicos ? tabelaSegura(config.tabelaServicos) : undefined;
+    return impactoDoCusto(mudancas, todos, tabela, config.margemAlvo ?? MARGEM_ALVO_PADRAO).filter((x) => x.emRisco);
+  }, [entrada, itens, todos, config.tabelaServicos, config.margemAlvo]);
 
   const sugestoes = useMemo(() => {
     const t = normalizar(busca);
@@ -371,32 +390,15 @@ export const EntradaNota: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         </div>
       )}
 
-      {avisos.length > 0 && (
-        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
-          <p className="flex items-center gap-2 text-sm font-bold text-amber-800">
-            <AlertTriangle size={16} /> A margem apertou nestes itens
-          </p>
-          <p className="mb-2 text-xs text-amber-700">
-            O fornecedor subiu o preço e o seu preço de venda continua o mesmo. Reveja
-            antes de vender o lote inteiro apertado.
-          </p>
-          <div className="space-y-1">
-            {avisos.map((a) => (
-              <div key={a.produtoId} className="flex flex-wrap gap-2 text-xs text-amber-800">
-                <b className="min-w-0 flex-1 truncate">{a.nome}</b>
-                <span>
-                  custo {brl(a.custoAntes)} → {brl(a.custoDepois)} · venda {brl(a.preco)} ·{" "}
-                  {a.noPrejuizo ? (
-                    <b>vende no prejuízo</b>
-                  ) : (
-                    <>margem {a.margemDepois}%</>
-                  )}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Custo que sobe aperta o produto E os serviços da tabela que usam a peça. */}
+      <div className="mt-3">
+        <ImpactoMargem
+          itens={impacto}
+          titulo="A margem apertou"
+          subtitulo="O fornecedor subiu o preço. Ajuste antes de vender o lote inteiro apertado."
+          comTexto
+        />
+      </div>
 
       {problema && itens.length > 0 && (
         <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-800">{problema}</p>
