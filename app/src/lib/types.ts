@@ -1221,6 +1221,25 @@ export interface Avaliacao {
   oculto?: boolean;
 }
 
+/**
+ * Linha do registro de auditoria. Imutável no banco: só inserção. Quem
+ * (usuarioId, usuario) e quando (criadoEm) o banco carimba sozinho, por
+ * cima do que a tela mandar. Ver lib/auditoria.ts.
+ */
+export interface RegistroAuditoria {
+  id: ID;
+  lojaId?: string;
+  acao: string;
+  alvo: string;
+  antes?: string | null;
+  depois?: string | null;
+  valor?: number | null;
+  motivo?: string | null;
+  usuarioId?: string | null;
+  usuario?: string | null;
+  criadoEm: string;
+}
+
 export interface Evento {
   id: ID;
   titulo: string;
@@ -1309,6 +1328,8 @@ export interface Config {
   regrasComissao?: Record<string, RegraComissao>;
   /** Preço por modelo × serviço (lib/tabela-precos.ts). Lida também pela página pública de orçamento. */
   tabelaServicos?: TabelaServicos;
+  /** Desconto acima deste % entra na auditoria (lib/auditoria.ts). Vazio = 10. */
+  descontoAuditado?: number;
   /** Página pública de orçamento /orcar/:loja (lib/orcamento-online.ts). Nasce desligada. */
   orcamentoSite?: { ativo?: boolean; agendar?: boolean; cor?: string; agenda?: AgendaSite };
   comissaoPadrao?: number; // % de comissão padrão por técnico

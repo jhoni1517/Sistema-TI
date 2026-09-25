@@ -29,6 +29,7 @@ import { ListaPrimeirosPassos } from "../components/PrimeiroAcesso";
 import { QuantoSobrou } from "../components/QuantoSobrou";
 import { ResumoSemana } from "../components/ResumoSemana";
 import { AlertaInsatisfeitos } from "../components/Satisfacao";
+import { AlertaAuditoria } from "./Auditoria";
 import { lembretesDoDia, REGRAS_PADRAO } from "../lib/lembretes";
 
 export const Dashboard: React.FC = () => {
@@ -113,6 +114,8 @@ export const Dashboard: React.FC = () => {
       <ListaPrimeirosPassos />
 
       <QuantoSobrou />
+
+      <AlertaAuditoria />
 
       {temOS && <AlertaInsatisfeitos />}
 

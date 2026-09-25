@@ -45,6 +45,7 @@ const TABELAS: Record<string, string> = {
   Comanda: "comandas",
   PedidoSite: "pedidos_site",
   Avaliacao: "avaliacoes",
+  RegistroAuditoria: "auditoria",
 };
 
 /** Colunas declaradas para uma tabela, no create table e nos alter */

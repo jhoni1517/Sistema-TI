@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { problemaNoMotivo } from "../lib/auditoria";
 import { Undo2, Search, AlertTriangle } from "lucide-react";
 import { aviso } from "./Aviso";
 import { Modal, Field, InputNumero } from "./ui";
@@ -69,6 +70,9 @@ export const Devolucao: React.FC<{ onClose: () => void }> = ({ onClose }) => {
   const confirmar = async () => {
     if (!venda || !resumo || gravando) return;
     if (problema) return aviso.alerta(problema);
+    // Devolução é dinheiro saindo da gaveta: o motivo vai para a auditoria.
+    const semMotivo = problemaNoMotivo("venda_cancelada", motivo);
+    if (semMotivo) return aviso.alerta(semMotivo);
     if (
       !confirm(
         `Devolver ${brl(resumo.valor)} ao cliente?\n\n` +
@@ -283,7 +287,7 @@ export const Devolucao: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             Devolver tudo o que resta
           </button>
 
-          <Field label="Motivo (sai no lançamento do caixa)">
+          <Field label="Motivo * (sai no lançamento do caixa e na auditoria)">
             <input
               className="input"
               placeholder="Produto com defeito, tamanho errado, desistiu..."

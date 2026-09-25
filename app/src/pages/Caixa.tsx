@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { pedirMotivo } from "../components/motivo";
 import { aviso } from "../components/Aviso";
 import {
   Plus,
@@ -231,8 +232,11 @@ export const Caixa: React.FC = () => {
       return;
     }
 
+    const motivo = pedirMotivo("estorno", `Apagar ${brl(m.valor)} (${txt(m.descricao)})`);
+    if (motivo === null) return;
+
     try {
-      await removeMovimento(m.id);
+      await removeMovimento(m.id, motivo);
       aviso.sucesso("Movimentação apagada.");
     } catch (e) {
       // A janela fechava como se tivesse apagado, e o valor continuava lá.

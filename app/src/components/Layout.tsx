@@ -8,6 +8,7 @@ import {
   Wrench,
   Tags,
   Globe,
+  ShieldAlert,
   Users,
   Package,
   Wallet,
@@ -83,6 +84,8 @@ const nav: Array<{
   { to: "/contas", label: "Contas a Pagar", icon: Receipt, recurso: "caixa" },
   { to: "/renda", label: "Renda fixa", icon: PiggyBank, recurso: "caixa" },
   { to: "/relatorios", label: "Relatórios", icon: BarChart3, recurso: "relatorios" },
+  // Só o dono: nenhum outro papel tem o recurso "auditoria".
+  { to: "/auditoria", label: "Auditoria", icon: ShieldAlert, recurso: "auditoria" },
   { to: "/assinatura", label: "Assinatura", icon: CreditCard, recurso: "config" },
   { to: "/config", label: "Configurações", icon: Settings, recurso: "config" },
 ];

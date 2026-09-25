@@ -11,6 +11,10 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-10-01 · Auditoria: quem fez o quê
+Desconto alto, venda devolvida, OS excluída, lançamento apagado, preço e estoque mexidos: tudo registrado com quem fez e o motivo. Só o dono vê.
+Rota: /auditoria
+
 ## 2026-09-30 · Avaliação e depoimentos
 Depois da entrega, o cliente dá nota no link. Nota boa vai para o Google e vira depoimento no site; nota ruim avisa só você no Painel.
 Rota: /relatorios

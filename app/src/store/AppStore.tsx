@@ -10,6 +10,9 @@ import { db, sincronizarPendentes, leituraAtual, emDemo } from "../lib/db";
 import { podeRecarregar } from "../lib/recarga";
 import { grama } from "../lib/estoque";
 import { aplicarGarantiaDoNivel } from "../lib/niveis";
+import { novoRegistro, descontoAcima, type AcaoAuditoria } from "../lib/auditoria";
+import { totalOS } from "../lib/calc";
+import { uid } from "../lib/format";
 import { supabase } from "../lib/supabase";
 import { tamanhoDaFila } from "../lib/fila";
 import { paraNuvem, precisaGravarNaNuvem } from "../lib/config";
@@ -120,13 +123,16 @@ interface AppState {
   saveCliente: (c: Cliente) => Promise<void>;
   removeCliente: (id: string) => Promise<void>;
   saveOrdem: (o: OrdemServico) => Promise<void>;
-  removeOrdem: (id: string) => Promise<void>;
+  /** `motivo` é obrigatório na tela (lib/auditoria.ts) e vai para a auditoria */
+  removeOrdem: (id: string, motivo?: string) => Promise<void>;
   saveProduto: (p: Produto) => Promise<void>;
   /** Mexe no estoque pelo banco, de forma atômica. Delta: baixa é negativo. */
   moverEstoque: (p: Produto, delta: number) => Promise<void>;
   removeProduto: (id: string) => Promise<void>;
   saveMovimento: (m: MovimentoCaixa) => Promise<void>;
-  removeMovimento: (id: string) => Promise<void>;
+  removeMovimento: (id: string, motivo?: string) => Promise<void>;
+  /** Registra na auditoria. Não derruba a ação se falhar: avisa. */
+  auditar: (acao: AcaoAuditoria, dados: { alvo: string; antes?: unknown; depois?: unknown; valor?: number | null; motivo?: string | null }) => Promise<void>;
   saveSessao: (s: SessaoCaixa) => Promise<void>;
   saveFiado: (f: Fiado) => Promise<void>;
   removeFiado: (id: string) => Promise<void>;
@@ -477,7 +483,24 @@ export const AppProvider: React.FC<{
     setClientes((prev) => prev.filter((x) => x.id !== id));
   };
 
+  /**
+   * Registro de auditoria DEPOIS que a ação deu certo: ação que falhou não
+   * aconteceu. Falha aqui não desfaz a venda nem a exclusão — só avisa,
+   * uma vez por sessão, para não virar barulho no balcão.
+   */
+  const auditoriaAvisada = useRef(false);
+  const auditar: AppState["auditar"] = async (acao, dados) => {
+    try {
+      await db.auditoria.registrar(novoRegistro(uid(), acao, dados));
+    } catch (e) {
+      if (auditoriaAvisada.current) return;
+      auditoriaAvisada.current = true;
+      aviso.alerta("A ação foi feita, mas não entrou na auditoria:\n\n" + (e instanceof Error ? e.message : String(e)));
+    }
+  };
+
   const saveOrdem = async (o: OrdemServico) => {
+    const antes = ordens.find((x) => x.id === o.id);
     // `gravado` e não `o`: o banco preenche colunas que a tela não tem
     // como saber (o segredo do rastreio é uma), e guardar o objeto que
     // subiu deixaria a tela sem elas até o próximo F5.
@@ -492,13 +515,29 @@ export const AppProvider: React.FC<{
       }
       return [...prev, gravado];
     });
+    const alvo = `OS ${o.numero}`;
+    if (antes && ["entregue", "cancelada"].includes(antes.status) && antes.status !== o.status) {
+      await auditar("os_reaberta", { alvo, antes: antes.status, depois: o.status, valor: totalOS(o) });
+    }
+    if ((o.desconto || 0) !== (antes?.desconto || 0)) {
+      const pct = descontoAcima(totalOS(o) + (o.desconto || 0), o.desconto || 0, config.descontoAuditado);
+      if (pct !== null) await auditar("desconto", { alvo, antes: antes?.desconto || 0, depois: `${o.desconto} (${pct}%)`, valor: o.desconto });
+    }
   };
-  const removeOrdem = async (id: string) => {
+  const removeOrdem = async (id: string, motivo?: string) => {
+    const antes = ordens.find((x) => x.id === id);
     await db.ordens.remove(id);
     setOrdens((prev) => prev.filter((x) => x.id !== id));
+    await auditar("os_excluida", {
+      alvo: antes ? `OS ${antes.numero} · ${antes.marca} ${antes.modelo}` : id,
+      antes: antes ? { status: antes.status, total: totalOS(antes) } : undefined,
+      valor: antes ? totalOS(antes) : null,
+      motivo,
+    });
   };
 
   const saveProduto = async (p: Produto) => {
+    const antes = produtos.find((x) => x.id === p.id);
     // `gravado` e não `p`: o banco preenche colunas que a tela não tem
     // como saber (o segredo do rastreio é uma), e guardar o objeto que
     // subiu deixaria a tela sem elas até o próximo F5.
@@ -511,7 +550,10 @@ export const AppProvider: React.FC<{
         return n;
       }
       return [...prev, gravado];
-    });
+    });    // preco-cru-proposital: auditoria do preço CADASTRADO, não do cobrado
+    if (antes && (antes.preco || 0) !== (p.preco || 0)) {
+      await auditar("preco", { alvo: p.nome, antes: antes.preco, depois: p.preco, valor: p.preco }); // preco-cru-proposital
+    }
   };
   const removeProduto = async (id: string) => {
     await db.produtos.remove(id);
@@ -575,6 +617,7 @@ export const AppProvider: React.FC<{
   };
 
   const saveMovimento = async (m: MovimentoCaixa) => {
+    const nova = !movimentos.some((x) => x.id === m.id);
     // `gravado` e não `m`: o banco preenche colunas que a tela não tem
     // como saber (o segredo do rastreio é uma), e guardar o objeto que
     // subiu deixaria a tela sem elas até o próximo F5.
@@ -588,10 +631,20 @@ export const AppProvider: React.FC<{
       }
       return [...prev, gravado];
     });
+    if (nova && m.tipo === "sangria") {
+      await auditar("sangria", { alvo: m.descricao || "Sangria", valor: m.valor });
+    }
   };
-  const removeMovimento = async (id: string) => {
+  const removeMovimento = async (id: string, motivo?: string) => {
+    const antes = movimentos.find((x) => x.id === id);
     await db.movimentos.remove(id);
     setMovimentos((prev) => prev.filter((x) => x.id !== id));
+    await auditar("estorno", {
+      alvo: antes ? `${antes.tipo} · ${antes.descricao}` : id,
+      antes: antes ? { valor: antes.valor, forma: antes.formaPagamento, data: antes.data } : undefined,
+      valor: antes?.valor ?? null,
+      motivo,
+    });
   };
 
   const saveSessao = async (s: SessaoCaixa) => {
@@ -797,6 +850,7 @@ export const AppProvider: React.FC<{
   };
 
   const saveVenda = async (v: Venda) => {
+    const antes = vendas.find((x) => x.id === v.id);
     // `gravado` e não `v`: o banco preenche colunas que a tela não tem
     // como saber (o segredo do rastreio é uma), e guardar o objeto que
     // subiu deixaria a tela sem elas até o próximo F5.
@@ -810,6 +864,15 @@ export const AppProvider: React.FC<{
       }
       return [...prev, gravado];
     });
+    const alvo = `Venda ${v.numero}`;
+    if (!antes && v.desconto > 0) {
+      const bruto = v.itens.reduce((t, it) => t + (it.precoUnit || 0) * (it.quantidade || 0), 0);
+      const pct = descontoAcima(bruto, v.desconto, config.descontoAuditado);
+      if (pct !== null) await auditar("desconto", { alvo, depois: `${v.desconto} (${pct}%)`, valor: v.desconto });
+    }
+    for (const d of (v.devolucoes || []).slice((antes?.devolucoes || []).length)) {
+      await auditar("venda_cancelada", { alvo, depois: d, valor: d.valor, motivo: d.motivo });
+    }
   };
   const saveMeta = async (m: Meta) => {
     // `gravado` e não `m`: o banco preenche colunas que a tela não tem
@@ -938,6 +1001,7 @@ export const AppProvider: React.FC<{
     removeProduto,
     saveMovimento,
     removeMovimento,
+    auditar,
     saveSessao,
     saveFiado,
     removeFiado,
