@@ -19,6 +19,7 @@ import { useApp } from "../store/AppStore";
 import { taxaDeEscolha, NIVEIS } from "../lib/niveis";
 import { ComissaoTecnicos } from "../components/ComissaoTecnicos";
 import { PainelSatisfacao } from "../components/Satisfacao";
+import { DiferencasCaixa } from "../components/DiferencasCaixa";
 import { temModulo } from "../lib/ramos";
 import { SectionTitle, Field } from "../components/ui";
 import { csvDoPeriodo, nomeDoArquivo, limitesDoMes } from "../lib/contabil";
@@ -408,6 +409,8 @@ export const Relatorios: React.FC = () => {
         {temOS && <ComissaoTecnicos />}
 
         {temOS && <PainelSatisfacao />}
+
+        <DiferencasCaixa />
 
         {/* Orçamento em 3 níveis: quem escolheu o quê. Só aparece depois
             que a loja usou — card vazio é barulho. */}

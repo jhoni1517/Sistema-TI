@@ -475,3 +475,117 @@ export function totaisParaCongelar(r: ResumoCaixa): TotaisFechamento {
     porForma: { ...r.porForma },
   };
 }
+
+// ---------- Fechamento cego ----------
+
+/**
+ * No fechamento cego o operador conta SEM ver o esperado.
+ *
+ * Mostrando o esperado, a contagem vira cópia: quem contou R$ 187 e vê
+ * "esperado R$ 190" reconta até achar 190 — ou escreve 190 direto. A
+ * diferença que o sistema registra passa a ser sempre zero, e a gaveta que
+ * perde R$ 3 por dia nunca aparece. Cego, o número é o que a mão contou.
+ *
+ * Confere cada forma separada: gaveta (papel), e o total da maquininha e
+ * do Pix no extrato. Cartão que não bate é venda lançada na forma errada —
+ * ou venda que não passou pela maquininha.
+ */
+
+/** Forma de pagamento normalizada: vazio é dinheiro (ver `ehEspecie`). */
+const chaveDaForma = (f?: string | null): string => {
+  // texto-cru-proposital: forma de pagamento é valor interno, gravado pelo sistema
+  const k = txt(f).trim().toLowerCase();
+  return k === "" ? "dinheiro" : k;
+};
+
+/**
+ * O que devia ter em cada forma. Dinheiro é o que está EM ESPÉCIE na
+ * gaveta (com a abertura e menos sangria); as outras são entradas menos
+ * saídas daquela forma (estorno no cartão sai do cartão).
+ */
+export function esperadoPorForma(r: ResumoCaixa, movimentos: MovimentoCaixa[]): Record<string, number> {
+  const e: Record<string, number> = { dinheiro: r.emEspecie };
+  for (const m of movimentos) {
+    const k = chaveDaForma(m.formaPagamento);
+    if (k === "dinheiro" || m.tipo === "sangria") continue;
+    const v = Number(m.valor) || 0;
+    if (m.tipo === "entrada") e[k] = (e[k] || 0) + v;
+    else if (m.tipo === "saida") e[k] = (e[k] || 0) - v;
+  }
+  for (const k of Object.keys(e)) e[k] = arredonda(e[k]);
+  return e;
+}
+
+export interface DiferencaForma {
+  forma: string;
+  esperado: number;
+  /** undefined = não contou esta forma */
+  contado?: number;
+  diferenca?: number;
+}
+
+/** Forma por forma, dinheiro primeiro. Forma sem esperado e sem contagem não aparece. */
+export function diferencasPorForma(esperado: Record<string, number>, contado: Record<string, number | undefined>): DiferencaForma[] {
+  const formas = [...new Set([...Object.keys(esperado), ...Object.keys(contado)])].filter(
+    (f) => (esperado[f] || 0) !== 0 || typeof contado[f] === "number" || f === "dinheiro"
+  );
+  formas.sort((a, b) => (a === "dinheiro" ? -1 : b === "dinheiro" ? 1 : a.localeCompare(b)));
+  return formas.map((forma) => {
+    const esp = esperado[forma] || 0;
+    const c = contado[forma];
+    return typeof c === "number" && Number.isFinite(c)
+      ? { forma, esperado: esp, contado: c, diferenca: arredonda(c - esp) }
+      : { forma, esperado: esp };
+  });
+}
+
+/** Soma das diferenças contadas. undefined se nada foi contado. */
+export function diferencaTotal(linhas: DiferencaForma[]): number | undefined {
+  const contadas = linhas.filter((l) => typeof l.diferenca === "number");
+  return contadas.length ? arredonda(contadas.reduce((s, l) => s + (l.diferenca || 0), 0)) : undefined;
+}
+
+export interface DiferencasDoOperador {
+  operador: string;
+  fechamentos: number;
+  conferidos: number;
+  sobra: number;
+  falta: number;
+  liquido: number;
+  comDiferenca: number;
+}
+
+/**
+ * Relatório do mês: diferença de caixa por quem fechou.
+ *
+ * Sobra e falta separadas: somar tudo esconde quem falta R$ 50 num dia e
+ * "sobra" R$ 50 no outro — que é justamente o padrão de quem pega e devolve.
+ * Diferença de até 50 centavos é troco, não conta.
+ */
+export function diferencasPorOperador(sessoes: SessaoCaixa[], movimentos: MovimentoCaixa[], mes: string, tolerancia = 0.5): DiferencasDoOperador[] {
+  const porSessao = movimentosPorSessao(movimentos);
+  const mapa = new Map<string, DiferencasDoOperador>();
+  for (const s of sessoes) {
+    if (!s.fechadoEm || txt(s.fechadoEm).slice(0, 7) !== mes) continue;
+    const operador = txt(s.fechadoPor).trim() || "Sem nome";
+    const d = mapa.get(operador) || { operador, fechamentos: 0, conferidos: 0, sobra: 0, falta: 0, liquido: 0, comDiferenca: 0 };
+    d.fechamentos++;
+    let dif: number | undefined;
+    if (s.contadoPorForma && s.esperadoPorForma) {
+      dif = diferencaTotal(diferencasPorForma(s.esperadoPorForma, s.contadoPorForma));
+    } else {
+      dif = resumoCaixa(s, porSessao.get(s.id) || []).diferenca;
+    }
+    if (dif !== undefined) {
+      d.conferidos++;
+      if (Math.abs(dif) > tolerancia) {
+        d.comDiferenca++;
+        if (dif > 0) d.sobra = arredonda(d.sobra + dif);
+        else d.falta = arredonda(d.falta - dif);
+      }
+      d.liquido = arredonda(d.sobra - d.falta);
+    }
+    mapa.set(operador, d);
+  }
+  return [...mapa.values()].sort((a, b) => b.falta - a.falta || a.operador.localeCompare(b.operador));
+}

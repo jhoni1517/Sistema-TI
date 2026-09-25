@@ -11,6 +11,10 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-10-02 · Fechamento de caixa cego
+Quem fecha conta gaveta, cartão e Pix sem ver o esperado; a sobra ou falta aparece depois, com o nome. Relatório do mês por funcionário. Ligue em Configurações.
+Rota: /config
+
 ## 2026-10-01 · Auditoria: quem fez o quê
 Desconto alto, venda devolvida, OS excluída, lançamento apagado, preço e estoque mexidos: tudo registrado com quem fez e o motivo. Só o dono vê.
 Rota: /auditoria

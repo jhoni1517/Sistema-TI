@@ -1,4 +1,7 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { emDemo } from "../lib/db";
+import { FechamentoCego } from "../components/FechamentoCego";
+import { carregarSessao } from "../lib/auth";
 import { pedirMotivo } from "../components/motivo";
 import { aviso } from "../components/Aviso";
 import {
@@ -47,6 +50,8 @@ import {
   carimboDoLancamento,
   totaisParaCongelar,
   problemaNaDataDoLancamento,
+  esperadoPorForma,
+  diferencasPorForma,
   type EscopoCaixa,
 } from "../lib/caixa";
 import type { MovimentoCaixa, TipoMovimento, FormaPagamento, SessaoCaixa, Produto, Cliente } from "../lib/types";
@@ -153,11 +158,27 @@ export const Caixa: React.FC = () => {
     setAbrindo(false);
   };
 
-  const confirmarFechamento = async (contado?: number) => {
-    if (!sessaoAberta) return;
+  // Quem fecha: vai para a sessão e separa a diferença por funcionário.
+  /** Esperado congelado quando o fechamento cego começou; null = janela fechada */
+  const [cego, setCego] = useState<Record<string, number> | null>(null);
+  const [quem, setQuem] = useState<{ nome: string; id: string }>({ nome: "", id: "" });
+  useEffect(() => {
+    carregarSessao()
+      .then((x) => x && setQuem({ nome: x.perfil?.nome || x.email, id: x.userId }))
+      .catch(() => undefined);
+  }, []);
+
+  const confirmarFechamento = async (
+    contado?: number,
+    cego?: { contadoPorForma: Record<string, number>; esperadoPorForma: Record<string, number> }
+  ): Promise<boolean> => {
+    if (!sessaoAberta) return false;
     try {
       await saveSessao({
         ...sessaoAberta,
+        ...(cego ? { ...cego, cego: true } : {}),
+        fechadoPor: quem.nome || (emDemo() ? "Você (exemplo)" : undefined),
+        fechadoPorId: quem.id || undefined,
         fechadoEm: nowISO(),
         valorFechamento: saldo,
         // Só grava a contagem se a pessoa realmente contou. Gravar o saldo
@@ -178,12 +199,17 @@ export const Caixa: React.FC = () => {
          */
         totaisFechamento: totaisParaCongelar(resumo),
       });
-      setFechando(false);
-      aviso.sucesso("Caixa fechado. O resumo fica guardado na aba Fechamentos.");
+      // No cego, a janela continua aberta para mostrar o resultado.
+      if (!cego) {
+        setFechando(false);
+        aviso.sucesso("Caixa fechado. O resumo fica guardado na aba Fechamentos.");
+      }
+      return true;
     } catch (e) {
       aviso.erro(
         "Não foi possível fechar o caixa:\n\n" + (e instanceof Error ? e.message : String(e))
       );
+      return false;
     }
   };
 
@@ -263,7 +289,12 @@ export const Caixa: React.FC = () => {
           <div className="flex flex-wrap gap-2">
             <button className="btn-secondary" onClick={imprimirResumo}><Printer size={16} /> Imprimir resumo</button>
             {sessaoAberta ? (
-              <button className="btn-danger" onClick={() => setFechando(true)}><Lock size={16} /> Fechar caixa</button>
+              <button
+                className="btn-danger"
+                onClick={() => (config.fechamentoCego ? setCego(esperadoPorForma(resumo, movsSessao)) : setFechando(true))}
+              >
+                <Lock size={16} /> Fechar caixa
+              </button>
             ) : (
               <button className="btn-success" onClick={() => setAbrindo(true)}><Unlock size={16} /> Abrir caixa</button>
             )}
@@ -643,6 +674,16 @@ export const Caixa: React.FC = () => {
       )}
 
       {/* Fechamento de caixa */}
+      {/* Fora do "caixa aberto": depois de confirmar, o caixa fecha e a
+          janela precisa continuar para mostrar a sobra ou a falta. */}
+      {cego && (
+        <FechamentoCego
+          esperado={cego}
+          mesasAbertas={comandasAbertas(comandas).length}
+          onClose={() => setCego(null)}
+          onConfirm={(contadoPorForma) => confirmarFechamento(contadoPorForma.dinheiro, { contadoPorForma, esperadoPorForma: cego })}
+        />
+      )}
       {fechando && sessaoAberta && (
         <FecharCaixaModal
           abertura={abertura}
@@ -1132,6 +1173,7 @@ const Fechamentos: React.FC<{
               </p>
               <p className="text-xs text-slate-500">
                 {formatDateTime(s.abertoEm)} até {s.fechadoEm ? formatDateTime(s.fechadoEm) : "-"}
+                {s.fechadoPor ? ` · por ${s.fechadoPor}${s.cego ? " (cego)" : ""}` : ""}
                 {" · "}
                 {r.quantidade} movimentação(ões)
               </p>
@@ -1199,7 +1241,25 @@ const DetalheFechamento: React.FC<{
         <p className="text-sm text-slate-500">
           Aberto em {formatDateTime(sessao.abertoEm)} · fechado em{" "}
           {sessao.fechadoEm ? formatDateTime(sessao.fechadoEm) : "-"}
+          {sessao.fechadoPor ? ` por ${sessao.fechadoPor}` : ""}
         </p>
+
+        {sessao.contadoPorForma && sessao.esperadoPorForma && (
+          <div className="rounded-xl border border-slate-200 p-3 text-sm">
+            <p className="label">Contagem às cegas, por forma</p>
+            {diferencasPorForma(sessao.esperadoPorForma, sessao.contadoPorForma).map((l) => (
+              <div key={l.forma} className="flex justify-between py-0.5">
+                <span>{nomeDaForma(l.forma)}</span>
+                <span className="valor">
+                  {brl(l.esperado)} → {l.contado === undefined ? "não contado" : brl(l.contado)}
+                  {l.diferenca !== undefined && Math.abs(l.diferenca) > 0.5 && (
+                    <b className={l.diferenca > 0 ? " text-amber-700" : " text-red-700"}> ({l.diferenca > 0 ? "+" : ""}{brl(l.diferenca)})</b>
+                  )}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="rounded-xl bg-slate-50 p-4">
           <Linha label="Abertura (troco)" value={brl(r.abertura)} />
