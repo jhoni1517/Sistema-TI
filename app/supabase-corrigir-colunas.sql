@@ -203,6 +203,11 @@ alter table notas add column if not exists "osId" text;
 alter table ordens add column if not exists "pinRetirada" text;
 alter table ordens add column if not exists retirada jsonb;
 
+-- ---------- Entrada de mercadoria: itens, fornecedor e nota ----------
+alter table movimentos add column if not exists "itensEntrada" jsonb;
+alter table movimentos add column if not exists fornecedor text;
+alter table movimentos add column if not exists "numeroNota" text;
+
 -- ---------- Confere o resultado ----------
 -- Deve listar compraEstoque, custoRelacionado, osId e sessaoId.
 select column_name, data_type

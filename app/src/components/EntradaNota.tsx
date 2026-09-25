@@ -138,6 +138,14 @@ export const EntradaNota: React.FC<{ onClose: () => void }> = ({ onClose }) => {
            */
           formaPagamento: forma,
           compraEstoque: true,
+          // O que veio, de quem e qual nota: é como se acha, meses depois,
+          // de onde veio a peça que voltou com defeito (lib/rma.ts).
+          itensEntrada: itens
+            .filter((i) => Number(i.quantidade) > 0)
+            // Custo já com frete e desconto rateados: é o que a peça custou de fato.
+            .map((i) => ({ produtoId: i.produtoId, quantidade: Number(i.quantidade), custoUnit: custoRateado(entrada)[i.produtoId] ?? (Number(i.custoUnit) || 0) })),
+          fornecedor: fornecedor.trim() || undefined,
+          numeroNota: nota.trim() || undefined,
           sessaoId: sessao?.id,
           data: nowISO(),
         };

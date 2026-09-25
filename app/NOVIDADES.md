@@ -11,6 +11,11 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-10-04 · Trocas com fornecedor
+Peça que voltou com defeito vira troca com o fornecedor, com nota, data e custo da compra. Mostra o dinheiro parado e avisa antes da garantia dele acabar.
+Rota: /trocas
+Módulo: os
+
 ## 2026-10-03 · Código de retirada
 Quando a OS fica pronta, o cliente recebe um código de 4 números. Na entrega, o sistema pede o código: aparelho não sai com a pessoa errada.
 Rota: /ordens
