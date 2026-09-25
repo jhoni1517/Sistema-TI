@@ -12,7 +12,7 @@ import type { OrdemServico, PecaOS } from "../lib/types";
  * que o defeito menciona ("tela trincou") vem primeiro e destacado.
  */
 export const PrecoDaTabela: React.FC<{ os: OrdemServico; onUsar: (p: PecaOS) => void }> = ({ os, onUsar }) => {
-  const { config } = useApp();
+  const { config, produtos } = useApp();
   const sug = useMemo(
     () => (config.tabelaServicos ? sugestaoParaOS(tabelaSegura(config.tabelaServicos), os) : null),
     [config.tabelaServicos, os]
@@ -37,7 +37,11 @@ export const PrecoDaTabela: React.FC<{ os: OrdemServico; onUsar: (p: PecaOS) => 
               className={`inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-sm ${
                 combina ? "border-sinal bg-sinal/10 font-semibold" : "border-linha bg-cartao"
               } disabled:opacity-50`}
-              onClick={() => onUsar({ descricao, quantidade: 1, custoUnit: 0, precoUnit: preco })}
+              onClick={() => {
+                // Peça ligada na tabela: a linha já leva custo e baixa o estoque na entrega.
+                const peca = produtos.find((p) => p.id === sug.modelo.pecas?.[servico.id]);
+                onUsar({ descricao, quantidade: 1, custoUnit: Number(peca?.custo) || 0, precoUnit: preco, produtoId: peca?.id });
+              }}
             >
               {!usado && <Plus size={14} />}
               {servico.nome} <span className="valor">{brl(preco)}</span>

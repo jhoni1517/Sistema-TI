@@ -41,6 +41,12 @@ export interface ModeloTabela {
   modelo: string;
   /** id do serviço → preço. Ausente = a loja não faz ou não definiu. */
   precos: Record<string, number>;
+  /**
+   * id do serviço → produto do estoque que ele usa (a tela do A15). É o que
+   * liga a subida de custo da peça à margem do serviço (lib/margem.ts) e
+   * põe custo e baixa de estoque na OS sugerida pela tabela.
+   */
+  pecas?: Record<string, string>;
 }
 
 export interface TabelaServicos {
@@ -143,7 +149,9 @@ export const tirarServico = (t: TabelaServicos, id: string): TabelaServicos => (
   modelos: t.modelos.map((m) => {
     const precos = { ...m.precos };
     delete precos[id];
-    return { ...m, precos };
+    const pecas = { ...(m.pecas || {}) };
+    delete pecas[id];
+    return { ...m, precos, pecas };
   }),
 });
 
@@ -438,4 +446,18 @@ export function exportarCSV(t: TabelaServicos): string {
     ].join(";")
   );
   return [cab, ...corpo].join("\r\n");
+}
+
+/** Liga (ou desliga, com produtoId vazio) a peça do estoque que o serviço usa neste modelo. */
+export function definirPeca(t: TabelaServicos, modeloId: string, servicoId: string, produtoId: string | undefined): TabelaServicos {
+  return {
+    ...t,
+    modelos: t.modelos.map((m) => {
+      if (m.id !== modeloId) return m;
+      const pecas = { ...(m.pecas || {}) };
+      if (produtoId) pecas[servicoId] = produtoId;
+      else delete pecas[servicoId];
+      return { ...m, pecas };
+    }),
+  };
 }

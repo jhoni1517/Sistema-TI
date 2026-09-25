@@ -26,3 +26,7 @@ dist-ssr
 # Variáveis de ambiente
 .env
 .env.local
+
+# Captura de tela solta na raiz do app é teste que escapou, não arquivo do sistema.
+# Ícones e imagens do sistema moram em public/.
+/*.png

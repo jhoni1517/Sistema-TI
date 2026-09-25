@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { Search, Plus, Upload, Download, Copy, Percent, Trash2, Save } from "lucide-react";
+import { Search, Plus, Upload, Download, Copy, Percent, Trash2, Save, Link2 } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { Modal, InputNumero } from "../components/ui";
 import { aviso } from "../components/Aviso";
@@ -11,6 +11,7 @@ import {
   tabelaVazia,
   modelosOrdenados,
   definirPreco,
+  definirPeca,
   acrescentarModelo,
   acrescentarServico,
   tirarModelo,
@@ -43,6 +44,7 @@ export function TabelaServicos({ papel }: { papel?: Papel }) {
   const [busca, setBusca] = useState("");
   const [janela, setJanela] = useState<"" | "modelo" | "servico" | "copiar" | "reajuste">("");
   const arquivo = useRef<HTMLInputElement>(null);
+  const [pecasDe, setPecasDe] = useState("");
 
   // A tabela chega da nuvem depois da tela abrir. Acompanha enquanto
   // ninguém mexeu — depois, recarregar por cima apagaria o que foi digitado.
@@ -225,7 +227,15 @@ export function TabelaServicos({ papel }: { papel?: Papel }) {
                     </td>
                   ))}
                   {podeEditar && (
-                    <td className="pr-2">
+                    <td className="whitespace-nowrap pr-2">
+                      <button
+                        className={`p-1 hover:text-tinta ${Object.keys(m.pecas || {}).length ? "text-sinal" : "text-tinta-suave"}`}
+                        aria-label={`Peças usadas no ${m.modelo}`}
+                        title="Peças do estoque que cada serviço usa"
+                        onClick={() => setPecasDe(m.id)}
+                      >
+                        <Link2 size={14} />
+                      </button>
                       <button
                         className="p-1 text-tinta-suave hover:text-red-600"
                         aria-label={`Tirar ${m.modelo}`}
@@ -248,6 +258,7 @@ export function TabelaServicos({ papel }: { papel?: Papel }) {
       {janela === "servico" && <NovoServico tab={tab} onFechar={() => setJanela("")} onPronto={mudar} />}
       {janela === "copiar" && <CopiarPrecos tab={tab} onFechar={() => setJanela("")} onPronto={mudar} />}
       {janela === "reajuste" && <Reajustar tab={tab} onFechar={() => setJanela("")} onPronto={mudar} />}
+      {pecasDe && <PecasDoModelo tab={tab} modeloId={pecasDe} onFechar={() => setPecasDe("")} onPronto={mudar} />}
     </div>
   );
 }
@@ -475,6 +486,73 @@ const Reajustar: React.FC<Janela> = ({ tab, onFechar, onPronto }) => {
           </div>
         )}
       </div>
+    </Modal>
+  );
+};
+
+/**
+ * Qual peça do estoque cada serviço usa neste modelo. Com isso, a subida
+ * de custo da peça avisa a margem do serviço (lib/margem.ts), e a OS
+ * sugerida pela tabela já vem com custo e baixa de estoque.
+ */
+const PecasDoModelo: React.FC<{ tab: Tabela; modeloId: string; onFechar: () => void; onPronto: (t: Tabela) => void }> = ({
+  tab,
+  modeloId,
+  onFechar,
+  onPronto,
+}) => {
+  const { produtos } = useApp();
+  const pecasDoEstoque = useMemo(() => produtos.filter((p) => !p.servico).sort((a, b) => a.nome.localeCompare(b.nome)), [produtos]);
+  const m = tab.modelos.find((x) => x.id === modeloId);
+  const [local, setLocal] = useState<Record<string, string>>(() => ({ ...(m?.pecas || {}) }));
+  const [texto, setTexto] = useState<Record<string, string>>(() =>
+    Object.fromEntries(Object.entries(m?.pecas || {}).map(([s, id]) => [s, produtos.find((p) => p.id === id)?.nome || ""]))
+  );
+  if (!m) return null;
+  const servicos = tab.servicos.filter((s) => m.precos[s.id] > 0);
+
+  const ok = () => {
+    let t = tab;
+    for (const s of tab.servicos) t = definirPeca(t, m.id, s.id, local[s.id] || undefined);
+    onPronto(t);
+    onFechar();
+  };
+
+  return (
+    <Modal open onClose={onFechar} title={`Peças · ${[m.marca, m.modelo].filter(Boolean).join(" ")}`} footer={<button className="btn-primary" onClick={ok}>Pronto</button>}>
+      {servicos.length === 0 ? (
+        <p className="text-sm text-tinta-suave">Ponha preço em algum serviço deste modelo primeiro.</p>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-sm text-tinta-suave">Escolha a peça do estoque que cada serviço usa. Mão de obra pura fica em branco.</p>
+          <datalist id="pecas-estoque">
+            {pecasDoEstoque.map((p) => (
+              <option key={p.id} value={p.nome} />
+            ))}
+          </datalist>
+          {servicos.map((s) => {
+            const p = produtos.find((x) => x.id === local[s.id]);
+            return (
+              <label key={s.id} className="label block">
+                {s.nome} <span className="font-normal text-tinta-suave">({brl(m.precos[s.id])})</span>
+                <input
+                  className="input"
+                  list="pecas-estoque"
+                  placeholder="Digite para buscar no estoque"
+                  value={texto[s.id] || ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setTexto((t) => ({ ...t, [s.id]: v }));
+                    const achado = pecasDoEstoque.find((x) => x.nome === v);
+                    setLocal((l) => ({ ...l, [s.id]: achado ? achado.id : "" }));
+                  }}
+                />
+                {p && <span className="text-xs font-normal text-tinta-suave">custo {brl(Number(p.custo) || 0)}</span>}
+              </label>
+            );
+          })}
+        </div>
+      )}
     </Modal>
   );
 };

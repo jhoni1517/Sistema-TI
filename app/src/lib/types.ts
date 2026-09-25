@@ -1390,6 +1390,8 @@ export interface Config {
   pinRetirada?: boolean;
   /** Garantia que o fornecedor dá na peça, em dias, quando a nota não diz (lib/rma.ts). Vazio = 90. */
   garantiaFornecedorDias?: number;
+  /** Margem mínima desejada, em % sobre o preço de venda (lib/margem.ts). Vazio = 40. */
+  margemAlvo?: number;
   /** Página pública de orçamento /orcar/:loja (lib/orcamento-online.ts). Nasce desligada. */
   orcamentoSite?: { ativo?: boolean; agendar?: boolean; cor?: string; agenda?: AgendaSite };
   comissaoPadrao?: number; // % de comissão padrão por técnico

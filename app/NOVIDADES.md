@@ -11,6 +11,10 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-10-05 · Alerta de margem caindo
+Quando a nota chega com custo maior, o sistema mostra o que apertou (produto e serviço da tabela) e ajusta o preço em um toque. Painel em Relatórios.
+Rota: /relatorios
+
 ## 2026-10-04 · Trocas com fornecedor
 Peça que voltou com defeito vira troca com o fornecedor, com nota, data e custo da compra. Mostra o dinheiro parado e avisa antes da garantia dele acabar.
 Rota: /trocas
