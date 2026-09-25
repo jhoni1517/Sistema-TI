@@ -17,6 +17,7 @@ import type {
   PedidoSite,
   Avaliacao,
   RegistroAuditoria,
+  RMA,
   Venda,
   Comanda,
   TarefaDiaria,
@@ -56,7 +57,8 @@ type TableName =
   | "notas"
   | "pedidos_site"
   | "avaliacoes"
-  | "auditoria";
+  | "auditoria"
+  | "rmas";
 
 interface WithId {
   id: string;
@@ -597,6 +599,11 @@ export const db = {
       const { error } = await supabase.from("auditoria").insert({ ...r, lojaId: lojaAtual });
       if (error) throw traduzirErroLeitura("auditoria", error);
     },
+  },
+  rmas: {
+    all: () => getAll<RMA>("rmas"),
+    save: (r: RMA) => upsert("rmas", r),
+    remove: (id: string) => remove("rmas", id),
   },
   eventos: {
     all: () => getAll<Evento>("eventos"),

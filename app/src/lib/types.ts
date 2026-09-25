@@ -803,6 +803,14 @@ export interface MovimentoCaixa {
    * vezes do lucro.
    */
   compraEstoque?: boolean;
+  /**
+   * Entrada de mercadoria: o que veio na nota, de quem e qual nota. É o que
+   * permite achar, meses depois, de quem foi comprada a peça que voltou com
+   * defeito (lib/rma.ts) e quanto ela custava antes (lib/margem.ts).
+   */
+  itensEntrada?: { produtoId: string; quantidade: number; custoUnit: number }[];
+  fornecedor?: string;
+  numeroNota?: string;
   /** Pagamento da fatura do cartão: sai do caixa, mas não é despesa nova */
   faturaCartao?: boolean;
   data: string;
@@ -1253,6 +1261,39 @@ export interface RegistroAuditoria {
   criadoEm: string;
 }
 
+export type StatusRMA = "enviar" | "enviado" | "trocado" | "credito" | "negado";
+
+/**
+ * Peça com defeito voltando para o fornecedor (RMA). Ver lib/rma.ts.
+ */
+export interface RMA {
+  id: ID;
+  lojaId?: string;
+  /** OS que voltou em garantia por causa desta peça */
+  osId?: ID;
+  osNumero?: number;
+  produtoId?: ID;
+  descricao: string;
+  quantidade: number;
+  /** Quanto a peça custou: é o dinheiro parado até o fornecedor resolver */
+  valor: number;
+  fornecedor: string;
+  /** AAAA-MM-DD */
+  dataCompra?: string;
+  numeroNota?: string;
+  /** Lançamento da entrada de mercadoria de onde a peça veio */
+  movimentoEntradaId?: ID;
+  garantiaFornecedorDias: number;
+  fotos?: string[];
+  defeito?: string;
+  status: StatusRMA;
+  historico: { data: string; status: StatusRMA; obs?: string }[];
+  /** Crédito ou valor devolvido pelo fornecedor, quando status = credito */
+  valorRecuperado?: number;
+  criadoEm: string;
+  atualizadoEm: string;
+}
+
 export interface Evento {
   id: ID;
   titulo: string;
@@ -1347,6 +1388,8 @@ export interface Config {
   fechamentoCego?: boolean;
   /** Código de retirada na entrega da OS. Vazio = ligado (lib/retirada.ts). */
   pinRetirada?: boolean;
+  /** Garantia que o fornecedor dá na peça, em dias, quando a nota não diz (lib/rma.ts). Vazio = 90. */
+  garantiaFornecedorDias?: number;
   /** Página pública de orçamento /orcar/:loja (lib/orcamento-online.ts). Nasce desligada. */
   orcamentoSite?: { ativo?: boolean; agendar?: boolean; cor?: string; agenda?: AgendaSite };
   comissaoPadrao?: number; // % de comissão padrão por técnico

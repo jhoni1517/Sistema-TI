@@ -161,6 +161,7 @@ import { pedirMotivo } from "../components/motivo";
 import { ConferirRetirada, type Retirada } from "../components/ConferirRetirada";
 import { exigePin } from "../lib/retirada";
 import { linkDoDocumento } from "../lib/imagens";
+import { PecaComDefeito } from "../components/PecaComDefeito";
 import { SugestaoDaOS } from "../components/SugestaoDaOS";
 import { OSPorVoz } from "../components/OSPorVoz";
 
@@ -2486,6 +2487,7 @@ export const OSDetalhe: React.FC<{
         {/* Avaliação no Google: só entregue, e uma vez a cada 90 dias por
             pessoa. O motivo de não poder aparece escrito — botão cinza sem
             explicação parece sistema travado. */}
+        <PecaComDefeito os={os} />
         {os.retirada && <RetiradaDaOS r={os.retirada} />}
         {os.status === "pronta" && os.pinRetirada && config.pinRetirada !== false && (
           <p className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600 no-print">

@@ -283,6 +283,20 @@ export const Config: React.FC = () => {
             </span>
           </label>
 
+          {temModulo(ramoContratado, "os") && (
+            <Field label="Garantia do fornecedor nas peças (dias)">
+              <InputNumero
+                className="input"
+                min={0}
+                value={form.garantiaFornecedorDias}
+                onChange={(garantiaFornecedorDias) => mudar({ garantiaFornecedorDias })}
+              />
+              <p className="mt-1 text-xs text-slate-400">
+                Prazo para devolver peça com defeito ao fornecedor. Vazio = 90 dias. Dá para mudar em cada troca.
+              </p>
+            </Field>
+          )}
+
           <Field label="Desconto que entra na auditoria (%)">
             <InputNumero
               className="input"
