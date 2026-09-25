@@ -1061,6 +1061,15 @@ export interface SessaoCaixa {
    * recalculada — é o melhor que dá para fazer com o histórico que já existe.
    */
   totaisFechamento?: TotaisFechamento;
+  /** Fechamento cego: o que foi contado em cada forma, sem ver o esperado (lib/caixa.ts) */
+  contadoPorForma?: Record<string, number>;
+  /** O esperado de cada forma, congelado na hora de fechar */
+  esperadoPorForma?: Record<string, number>;
+  /** Fechou sem ver o esperado */
+  cego?: boolean;
+  /** Quem fechou: é o que separa a diferença por funcionário no relatório */
+  fechadoPor?: string;
+  fechadoPorId?: string;
   observacoes?: string;
 }
 
@@ -1330,6 +1339,8 @@ export interface Config {
   tabelaServicos?: TabelaServicos;
   /** Desconto acima deste % entra na auditoria (lib/auditoria.ts). Vazio = 10. */
   descontoAuditado?: number;
+  /** Fechamento de caixa cego: conta sem ver o esperado (lib/caixa.ts) */
+  fechamentoCego?: boolean;
   /** Página pública de orçamento /orcar/:loja (lib/orcamento-online.ts). Nasce desligada. */
   orcamentoSite?: { ativo?: boolean; agendar?: boolean; cor?: string; agenda?: AgendaSite };
   comissaoPadrao?: number; // % de comissão padrão por técnico

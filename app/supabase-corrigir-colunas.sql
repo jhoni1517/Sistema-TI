@@ -173,6 +173,12 @@ alter table sessoes add column if not exists "valorFechamento" numeric;
 -- Dinheiro contado na gaveta. Sem ele não existe quebra de caixa: o sistema
 -- guardava o valor que ele mesmo calculou e concordava consigo para sempre.
 alter table sessoes add column if not exists "valorContado" numeric;
+-- Fechamento cego: contagem e esperado por forma, e quem fechou.
+alter table sessoes add column if not exists "contadoPorForma" jsonb;
+alter table sessoes add column if not exists "esperadoPorForma" jsonb;
+alter table sessoes add column if not exists cego boolean;
+alter table sessoes add column if not exists "fechadoPor" text;
+alter table sessoes add column if not exists "fechadoPorId" text;
 
 -- ---------- Lojas (assinatura) ----------
 -- Quem rodou o supabase-migracao-assinatura.sql antes destas colunas

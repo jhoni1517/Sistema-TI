@@ -251,6 +251,21 @@ export const Config: React.FC = () => {
             </p>
           </Field>
 
+          <label className="flex items-start gap-2 sm:col-span-2">
+            <input
+              type="checkbox"
+              className="mt-1 h-5 w-5"
+              checked={!!form.fechamentoCego}
+              onChange={(e) => mudar({ fechamentoCego: e.target.checked })}
+            />
+            <span>
+              <b>Fechamento de caixa cego</b>
+              <span className="block text-xs text-slate-400">
+                Quem fecha conta cada forma (gaveta, cartão, Pix) sem ver o esperado. A sobra ou falta aparece depois e fica registrada com o nome de quem fechou.
+              </span>
+            </span>
+          </label>
+
           <Field label="Desconto que entra na auditoria (%)">
             <InputNumero
               className="input"
