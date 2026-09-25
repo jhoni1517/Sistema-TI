@@ -202,3 +202,32 @@ export async function apagarImagem(url: string, lojaId: string): Promise<void> {
   if (!caminho || !daLoja(caminho, lojaId)) return;
   await supabase.storage.from(BUCKET).remove([caminho]);
 }
+
+/**
+ * Foto de DOCUMENTO (entrega sem código de retirada). Vai para o depósito
+ * privado `documentos`, e não para o de imagens, que é público por endereço:
+ * RG de cliente não pode abrir para quem adivinhar o link. Devolve o
+ * caminho, não um endereço — para ver, `linkDoDocumento`, que expira.
+ */
+export async function enviarDocumento(arquivo: File, lojaId: string): Promise<string> {
+  if (!supabaseEnabled || !supabase) throw new Error("A foto do documento precisa da nuvem ligada.");
+  if (!lojaId) throw new Error("Loja não identificada. Entre de novo no sistema.");
+  const problema = problemaNoArquivo(arquivo);
+  if (problema) throw new Error(problema);
+  const menor = await prepararImagem(arquivo, 1200);
+  const caminho = `${lojaId}/retirada/${crypto.randomUUID()}.jpg`;
+  const { error } = await supabase.storage.from("documentos").upload(caminho, menor, { contentType: "image/jpeg" });
+  if (error) {
+    if (/bucket.*not.*found/i.test(error.message)) throw new Error("O depósito de documentos não existe. Rode o supabase-migracao-retirada.sql.");
+    throw new Error(`Não foi possível enviar a foto: ${error.message}`);
+  }
+  return caminho;
+}
+
+/** Link de 10 minutos para ver o documento. Só a própria loja consegue. */
+export async function linkDoDocumento(caminho: string): Promise<string> {
+  if (!supabaseEnabled || !supabase) throw new Error("Sem nuvem.");
+  const { data, error } = await supabase.storage.from("documentos").createSignedUrl(caminho, 600);
+  if (error || !data) throw new Error(error?.message || "Não foi possível abrir o documento.");
+  return data.signedUrl;
+}

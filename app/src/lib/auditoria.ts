@@ -25,7 +25,8 @@ export type AcaoAuditoria =
   | "sangria"
   | "estorno"
   | "estoque"
-  | "permissao";
+  | "permissao"
+  | "entrega_sem_pin";
 
 export const ACOES: Record<AcaoAuditoria, { nome: string; motivo: boolean; limiteDia: number }> = {
   desconto: { nome: "Desconto alto", motivo: false, limiteDia: 8 },
@@ -37,6 +38,7 @@ export const ACOES: Record<AcaoAuditoria, { nome: string; motivo: boolean; limit
   estorno: { nome: "Lançamento apagado (estorno)", motivo: true, limiteDia: 5 },
   estoque: { nome: "Ajuste manual de estoque", motivo: true, limiteDia: 15 },
   permissao: { nome: "Permissão alterada", motivo: false, limiteDia: 3 },
+  entrega_sem_pin: { nome: "Entrega sem código de retirada", motivo: true, limiteDia: 3 },
 };
 
 /** Desconto padrão a partir do qual registra, em % */

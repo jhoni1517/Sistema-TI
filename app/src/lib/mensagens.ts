@@ -1,4 +1,5 @@
 import { brl, codigoOS, negrito, txt } from "./format";
+import { textoDoPin } from "./retirada";
 import { avaliacaoRecente } from "./avaliacao";
 import { avisoDeFotoNaMensagem } from "./fotos-laudo";
 import { totalOS, totalPecas, totalComOpcao } from "./calc";
@@ -290,6 +291,9 @@ export function mensagemCliente(
   // para sair de casa; o link é para quem quiser conferir depois.
   const retirada = ondeRetirar(o, config);
   if (retirada) partes.push(retirada);
+
+  // O código de retirada só existe para quem recebe esta mensagem.
+  if (o.status === "pronta" && o.pinRetirada && config.pinRetirada !== false) partes.push(textoDoPin(o.pinRetirada));
 
   if (linkRastreio) {
     // Uma linha, sem título gritado. O link já se explica, e o rótulo em

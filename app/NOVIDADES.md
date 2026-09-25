@@ -11,6 +11,11 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-10-03 · Código de retirada
+Quando a OS fica pronta, o cliente recebe um código de 4 números. Na entrega, o sistema pede o código: aparelho não sai com a pessoa errada.
+Rota: /ordens
+Módulo: os
+
 ## 2026-10-02 · Fechamento de caixa cego
 Quem fecha conta gaveta, cartão e Pix sem ver o esperado; a sobra ou falta aparece depois, com o nome. Relatório do mês por funcionário. Ligue em Configurações.
 Rota: /config

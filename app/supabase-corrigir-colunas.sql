@@ -199,6 +199,10 @@ alter table lojas add column if not exists ramo text;
 -- OS derruba a gravação inteira de `notas`, em silêncio.
 alter table notas add column if not exists "osId" text;
 
+-- ---------- Código de retirada ----------
+alter table ordens add column if not exists "pinRetirada" text;
+alter table ordens add column if not exists retirada jsonb;
+
 -- ---------- Confere o resultado ----------
 -- Deve listar compraEstoque, custoRelacionado, osId e sessaoId.
 select column_name, data_type
