@@ -25,15 +25,19 @@
 //   TELEGRAM_TOKEN              -> já existe, do robô de despesas
 //   TELEGRAM_CHAT_ID            -> seu chat, para onde vai o resumo
 //   CRON_SECRET                 -> (opcional) protege a chamada manual
+//   RESEND_API_KEY              -> (opcional) e-mails da sequência do teste grátis
 // ============================================================
 
 import { resumoDaSemana, semanaPassada } from "./_resumo.js";
+import { etapaDoTeste, recadoDoTeste, diasDoTeste, passosCompletos, emailDoRecado, ramoTemOS } from "./_teste.js";
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
 const SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const CRON_SECRET = process.env.CRON_SECRET;
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+const RESEND_FROM = process.env.RESEND_FROM || "Sistema TI <onboarding@resend.dev>";
 
 const dinheiro = (v) =>
   (Number(v) || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -266,6 +270,7 @@ export default async function handler(req, res) {
         checklist: await avisarChecklist(chats),
         backup: await conferirBackup(chats),
         resumo: await resumoSemanal(chats),
+        teste: await emailsDoTeste(req.headers.host),
       });
     }
 
@@ -335,6 +340,7 @@ export default async function handler(req, res) {
     const checklist = await avisarChecklist(chats);
     const backup = await conferirBackup(chats);
     const resumo = await resumoSemanal(chats);
+    const teste = await emailsDoTeste(req.headers.host);
 
     return res.status(200).json({
       ok: true,
@@ -345,6 +351,7 @@ export default async function handler(req, res) {
       checklist,
       backup,
       resumo,
+      teste,
       telegram: enviou ? "enviado" : "não configurado ou falhou",
     });
   } catch (e) {
@@ -1017,4 +1024,103 @@ async function resumoSemanal(chats) {
     }
   }
   return `${enviados} loja(s) receberam o resumo` + (falhas.length ? `, ${falhas.length} falharam` : "");
+}
+
+/**
+ * A sequência do período grátis, por e-mail (regras em _teste.js, as mesmas
+ * do aviso dentro do app).
+ *
+ * Vai para o e-mail de quem é dono da loja, uma vez por etapa. A loja
+ * desliga em Configurações (`emailsTeste: false`). Sem RESEND_API_KEY, só
+ * o aviso dentro do app existe.
+ *
+ * Marca como enviado só o que o Resend aceitou: e-mail que falhou volta
+ * amanhã em vez de sumir.
+ */
+async function emailsDoTeste(host) {
+  if (!RESEND_API_KEY) return "sem RESEND_API_KEY";
+  const hoje = new Date().toISOString().slice(0, 10);
+  const lojas = await sb('lojas?select=id,nome,ramo,venceEm,testeAte,criadoEm,isento,bloqueada&testeAte=not.is.null&isento=is.false');
+  const emTeste = (lojas || []).filter((l) => !l.bloqueada && ehTeste(l) && l.criadoEm);
+  if (emTeste.length === 0) return 0;
+
+  const ja = await sb("avisos_cobranca?select=loja_id,tipo,referencia&tipo=like.teste_email_*");
+  const enviados = new Set((ja || []).map((a) => `${a.loja_id}|${a.tipo}|${a.referencia}`));
+  const url = host ? `https://${host}/` : "";
+  let n = 0;
+
+  for (const l of emTeste) {
+    try {
+      const { diaDoTeste, faltam } = diasDoTeste(l.criadoEm, l.venceEm, hoje);
+      if (faltam < 0) continue;
+      const referencia = String(l.testeAte).slice(0, 10);
+      const cfg = await sb(`configuracoes?select=dados&id=eq.${l.id}`);
+      const dados = cfg?.[0]?.dados || {};
+      if (dados.emailsTeste === false) continue;
+
+      const temOS = ramoTemOS(l.ramo);
+      const [produtos, ordens, vendas, rastreios] = await Promise.all([
+        contar(`produtos?lojaId=eq.${l.id}`),
+        contar(`ordens?lojaId=eq.${l.id}`),
+        contar(`vendas?lojaId=eq.${l.id}`),
+        contar(`rastreios_abertos?loja=eq.${l.id}`),
+      ]);
+      const uso = {
+        diaDoTeste,
+        faltam,
+        passosCompletos: passosCompletos(dados, produtos, ordens, vendas, temOS),
+        ordens,
+        vendas,
+        rastreios,
+        temOS,
+      };
+      const etapa = etapaDoTeste(uso);
+      if (!etapa) continue;
+      const tipo = `teste_email_${etapa}`;
+      if (enviados.has(`${l.id}|${tipo}|${referencia}`)) continue;
+
+      const para = await emailDoDono(l.id);
+      if (!para) continue;
+      const m = emailDoRecado(recadoDoTeste(etapa, uso), dados.nomeLoja || l.nome, url);
+      const r = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${RESEND_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from: RESEND_FROM, to: [para], subject: m.assunto, html: m.html }),
+      });
+      if (!r.ok) continue;
+      await sb("avisos_cobranca", {
+        method: "POST",
+        headers: { Prefer: "resolution=ignore-duplicates" },
+        body: JSON.stringify([{ loja_id: l.id, tipo, referencia }]),
+      });
+      n++;
+    } catch {
+      // Uma loja com problema (tabela nova sem migração, e-mail recusado)
+      // não pode impedir o e-mail das outras.
+    }
+  }
+  return n;
+}
+
+/** Quantas linhas, sem trazer nenhuma. Tabela que não existe conta zero. */
+async function contar(caminho) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${caminho}&select=*`, {
+    method: "HEAD",
+    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, Prefer: "count=exact" },
+  });
+  if (!r.ok) return 0;
+  return Number((r.headers.get("content-range") || "").split("/")[1]) || 0;
+}
+
+/** O e-mail de login do dono da loja (o primeiro dono ativo). */
+async function emailDoDono(lojaId) {
+  const donos = await sb(`perfis?select=id&loja_id=eq.${lojaId}&papel=eq.dono&ativo=is.true&order=criadoEm.asc&limit=1`);
+  const id = donos?.[0]?.id;
+  if (!id) return "";
+  const r = await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${id}`, {
+    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}` },
+  });
+  if (!r.ok) return "";
+  const u = await r.json();
+  return typeof u?.email === "string" ? u.email : "";
 }

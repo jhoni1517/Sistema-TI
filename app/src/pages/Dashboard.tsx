@@ -26,6 +26,7 @@ import { saldoFiado } from "../lib/calc";
 import { prazosEmRisco } from "../lib/prazos";
 import { SeloPrazo } from "../components/SeloPrazo";
 import { ListaPrimeirosPassos } from "../components/PrimeiroAcesso";
+import { AvisoTeste } from "../components/AvisoTeste";
 import { QuantoSobrou } from "../components/QuantoSobrou";
 import { ResumoSemana } from "../components/ResumoSemana";
 import { AlertaInsatisfeitos } from "../components/Satisfacao";
@@ -114,6 +115,7 @@ export const Dashboard: React.FC = () => {
         <ResumoSemana />
       </div>
 
+      <AvisoTeste />
       <ListaPrimeirosPassos />
 
       <QuantoSobrou />
