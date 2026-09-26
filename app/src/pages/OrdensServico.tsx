@@ -164,6 +164,7 @@ import { linkDoDocumento } from "../lib/imagens";
 import { PecaComDefeito } from "../components/PecaComDefeito";
 import { PecasEncomendadas } from "../components/PecasEncomendadas";
 import { EmprestimoReserva } from "../components/EmprestimoReserva";
+import { BotaoSimularParcelas } from "../components/SimuladorParcelas";
 import { emprestado } from "../lib/reserva";
 import { SugestaoDaOS } from "../components/SugestaoDaOS";
 import { OSPorVoz } from "../components/OSPorVoz";
@@ -2713,6 +2714,9 @@ export const OSDetalhe: React.FC<{
         {/* Receber pagamento */}
         {os.status !== "entregue" && os.status !== "cancelada" && !(restaCobrar === 0 && jaRecebido > 0) && (
           <div className="rounded-xl bg-emerald-50 p-3 no-print">
+            <div className="mb-2">
+              <BotaoSimularParcelas valor={restaCobrar} descricao={`${os.marca} ${os.modelo}`.trim()} />
+            </div>
             <div className="flex flex-wrap items-center gap-2">
               <DollarSign size={18} className="text-emerald-600" />
               <span className="text-sm font-semibold text-emerald-800">Receber e entregar:</span>

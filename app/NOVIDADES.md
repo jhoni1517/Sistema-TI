@@ -11,6 +11,10 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-10-08 · Simulador de parcelas
+No PDV e na OS: 1x a 12x com as taxas da sua maquininha, sem juros ou repassando, pronto para o WhatsApp. Taxas em Configurações.
+Rota: /config
+
 ## 2026-10-07 · Aparelho reserva
 Empreste um celular da loja durante o conserto, com estado, fotos, caução e termo assinado. Na entrega o sistema lembra de pegar de volta.
 Rota: /config
