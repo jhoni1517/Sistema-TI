@@ -199,6 +199,17 @@ export default async function handler(req, res) {
     });
   }
 
+  /*
+   * O backup diário roda na SUA função (api/backup.js), com 15 segundos
+   * próprios: aqui só se dá a partida. O Hobby não deixa ter um terceiro
+   * cron. Sem CRON_SECRET não há como a função confiar no pedido.
+   */
+  const backup =
+    CRON_SECRET && req.headers.host
+      ? fetch(`https://${req.headers.host}/api/backup`, { headers: { Authorization: `Bearer ${CRON_SECRET}` } }).catch(() => null)
+      : null;
+  if (backup) await Promise.race([backup, new Promise((ok) => setTimeout(ok, 1500))]);
+
   try {
     const cfgs = await sb("sistema_config?select=dias_tolerancia&limit=1");
     const tolerancia = Number(cfgs?.[0]?.dias_tolerancia ?? 5);
@@ -943,8 +954,9 @@ async function conferirBackup(chats) {
       "*Backup semanal*\n" +
         `Hoje o sistema guarda ${clientes} cliente(s), ${ordens} ordem(ns), ` +
         `${produtos} produto(s) e ${movimentos} lançamento(s) de caixa.\n\n` +
-        "Abra Configurações e clique em Exportar. O arquivo fica no seu " +
-        "aparelho — ele tem dado de cliente e não deve circular por conversa."
+        "O sistema guarda um backup automático por dia, dos últimos 30 dias. " +
+        "Confira em Configurações > Backup e, uma vez por mês, baixe uma cópia " +
+        "para o seu computador — ela tem dado de cliente e não deve circular por conversa."
     );
     if (enviou) lojasAvisadas++;
   }
