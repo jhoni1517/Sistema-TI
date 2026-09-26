@@ -1,5 +1,6 @@
 import { txt, codigoOS, formatDateTime } from "./format";
 import { linhaDoRecibo } from "./backup";
+import { linhasDoEmprestimo } from "./reserva";
 import type { OrdemServico, TermoAssinado, TipoTermo } from "./types";
 
 /**
@@ -18,6 +19,7 @@ import type { OrdemServico, TermoAssinado, TipoTermo } from "./types";
 export const TITULO_TERMO: Record<TipoTermo, string> = {
   entrada: "Termo de entrada do aparelho",
   retirada: "Termo de retirada do aparelho",
+  emprestimo: "Termo de empréstimo de aparelho reserva",
 };
 
 const linha = (rotulo: string, valor?: string | null) => {
@@ -64,6 +66,12 @@ export function textoDoTermo(
         "sem backup, nem por defeitos que já existiam e não foram relatados.",
       `O aparelho não retirado em até ${diasGuarda} dias após o aviso de pronto pode ter taxa de guarda, conforme o termo da loja.`,
     ]
+      .filter((l, i, a) => l !== "" || (i > 0 && a[i - 1] !== ""))
+      .join("\n");
+  }
+
+  if (tipo === "emprestimo") {
+    return [...cabecalho, ...(os.emprestimo ? linhasDoEmprestimo(os.emprestimo, loja) : [])]
       .filter((l, i, a) => l !== "" || (i > 0 && a[i - 1] !== ""))
       .join("\n");
   }

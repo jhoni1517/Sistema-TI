@@ -21,6 +21,7 @@ import { importarTudo, type DumpLoja } from "../lib/db";
 import { problemaNoChatId } from "../lib/config";
 import { CatalogoPublico, TituloCatalogo } from "../components/CatalogoPublico";
 import { OrcamentoSiteConfig } from "../components/OrcamentoSiteConfig";
+import { AparelhosReservaConfig } from "../components/AparelhosReservaConfig";
 import { AreaDoClienteLoja } from "../components/AreaDoClienteLoja";
 import { CredencialPix } from "../components/CredencialPix";
 import { CredencialFiscal } from "../components/CredencialFiscal";
@@ -383,6 +384,12 @@ export const Config: React.FC = () => {
           <div className="sm:col-span-2 rounded-md border border-linha p-3">
             <AreaDoClienteLoja nomeLoja={form.nomeLoja} />
           </div>
+
+          {temModulo(ramoContratado, "os") && (
+            <div className="sm:col-span-2 rounded-md border border-linha p-3">
+              <AparelhosReservaConfig valor={form.aparelhosReserva} onMudar={(aparelhosReserva) => mudar({ aparelhosReserva })} />
+            </div>
+          )}
 
           {temModulo(ramoContratado, "os") && (
             <div className="sm:col-span-2 rounded-md border border-linha p-3">

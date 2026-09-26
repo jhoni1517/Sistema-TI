@@ -235,7 +235,7 @@ export interface VideoLaudo {
   duracao?: number;
 }
 
-export type TipoTermo = "entrada" | "retirada";
+export type TipoTermo = "entrada" | "retirada" | "emprestimo";
 
 /** Termo assinado com o dedo na tela. Ver lib/termo.ts. */
 export interface TermoAssinado {
@@ -400,6 +400,32 @@ export interface OrdemServico {
   retirada?: { comPin: boolean; motivo?: string; documento?: string; em: string };
   /** Peças encomendadas para esta OS (lib/pedido-peca.ts). Mora na OS: é recurso, não tela. */
   pedidosPeca?: PedidoPeca[];
+  /** Aparelho reserva emprestado ao cliente durante o conserto (lib/reserva.ts) */
+  emprestimo?: Emprestimo;
+}
+
+/** Aparelho da loja para emprestar durante o conserto. Mora na configuração. */
+export interface AparelhoReserva {
+  id: ID;
+  nome: string;
+  imei?: string;
+  observacao?: string;
+}
+
+export interface Emprestimo {
+  aparelhoId: ID;
+  /** Nome na hora do empréstimo: o cadastro pode mudar depois */
+  nome: string;
+  imei?: string;
+  /** Como saiu: riscos, bateria, acessórios */
+  estado: string;
+  fotos?: string[];
+  /** Caução em dinheiro, guardada à parte (não é receita) */
+  caucao?: number;
+  emprestadoEm: string;
+  devolvidoEm?: string;
+  /** Como voltou */
+  estadoDevolucao?: string;
 }
 
 /** Peça encomendada ao fornecedor para uma OS. Ver lib/pedido-peca.ts. */
@@ -1410,6 +1436,8 @@ export interface Config {
   garantiaFornecedorDias?: number;
   /** Margem mínima desejada, em % sobre o preço de venda (lib/margem.ts). Vazio = 40. */
   margemAlvo?: number;
+  /** Aparelhos da loja para emprestar durante o conserto (lib/reserva.ts) */
+  aparelhosReserva?: AparelhoReserva[];
   /** Página pública de orçamento /orcar/:loja (lib/orcamento-online.ts). Nasce desligada. */
   orcamentoSite?: { ativo?: boolean; agendar?: boolean; cor?: string; agenda?: AgendaSite };
   comissaoPadrao?: number; // % de comissão padrão por técnico

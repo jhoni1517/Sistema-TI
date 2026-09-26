@@ -23,7 +23,11 @@ type Cliente = { nome?: string; telefone?: string; cpf?: string };
 /** O quadro "Termos assinados" no detalhe da OS */
 export const QuadroTermos: React.FC<{ os: OrdemServico; cliente?: Cliente; config: Config }> = ({ os, cliente, config }) => {
   const [assinando, setAssinando] = useState<TipoTermo | null>(null);
-  const tipos: TipoTermo[] = podeTermoRetirada(os) ? ["entrada", "retirada"] : ["entrada"];
+  const tipos: TipoTermo[] = [
+    "entrada",
+    ...(podeTermoRetirada(os) ? (["retirada"] as TipoTermo[]) : []),
+    ...(os.emprestimo ? (["emprestimo"] as TipoTermo[]) : []),
+  ];
 
   return (
     <div className="rounded-md border border-linha p-3 no-print">

@@ -163,6 +163,8 @@ import { exigePin } from "../lib/retirada";
 import { linkDoDocumento } from "../lib/imagens";
 import { PecaComDefeito } from "../components/PecaComDefeito";
 import { PecasEncomendadas } from "../components/PecasEncomendadas";
+import { EmprestimoReserva } from "../components/EmprestimoReserva";
+import { emprestado } from "../lib/reserva";
 import { SugestaoDaOS } from "../components/SugestaoDaOS";
 import { OSPorVoz } from "../components/OSPorVoz";
 
@@ -231,8 +233,22 @@ export const OrdensServico: React.FC = () => {
    */
   const [retiradaPedida, setRetiradaPedida] = useState<{ os: OrdemServico; resolver: (r: Retirada | null) => void } | null>(null);
   const retiradaRef = useRef<Retirada | undefined>(undefined);
+  const devolucaoRef = useRef<OrdemServico["emprestimo"] | undefined>(undefined);
   const conferirRetirada = (o: OrdemServico): Promise<boolean> => {
     retiradaRef.current = undefined;
+    devolucaoRef.current = undefined;
+    // Aparelho reserva: a entrega é o último momento em que o cliente está
+    // no balcão com o reserva na mão.
+    if (emprestado(o)) {
+      const e = o.emprestimo!;
+      if (confirm(`O cliente está com o reserva ${e.nome}.\n\nEle devolveu agora? (OK = devolveu)`)) {
+        const estado = prompt(`Como o ${e.nome} voltou?`, "Mesmo estado da saída");
+        devolucaoRef.current = { ...e, devolvidoEm: nowISO(), estadoDevolucao: (estado || "").trim() };
+        if (e.caucao) aviso.info(`Devolva a caução de ${brl(e.caucao)}.`);
+      } else if (!confirm(`Entregar a OS com o ${e.nome} ainda com o cliente? Fica o aviso no Painel.`)) {
+        return Promise.resolve(false);
+      }
+    }
     if (!exigePin(o, config)) return Promise.resolve(true);
     return new Promise((ok) =>
       setRetiradaPedida({
@@ -456,6 +472,7 @@ export const OrdensServico: React.FC = () => {
       ...o,
       ...semSigilo(),
       ...(retirada ? { retirada } : {}),
+      ...(devolucaoRef.current ? { emprestimo: devolucaoRef.current } : {}),
       status: "entregue",
       entregueEm: nowISO(),
       atualizadoEm: nowISO(),
@@ -2489,6 +2506,7 @@ export const OSDetalhe: React.FC<{
             pessoa. O motivo de não poder aparece escrito — botão cinza sem
             explicação parece sistema travado. */}
         <PecasEncomendadas os={os} />
+        <EmprestimoReserva os={os} />
         <PecaComDefeito os={os} />
         {os.retirada && <RetiradaDaOS r={os.retirada} />}
         {os.status === "pronta" && os.pinRetirada && config.pinRetirada !== false && (
