@@ -11,6 +11,11 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-10-10 · Modo bancada
+Para o técnico: celular na bancada, só as OS dele, botões grandes e cronômetro de bancada. O tempo entra no relatório de produtividade.
+Rota: /bancada
+Módulo: os
+
 ## 2026-10-09 · Backup automático todo dia
 O sistema guarda sozinho uma cópia criptografada por dia, dos últimos 30 dias. Em Configurações: baixar, fazer agora e restaurar com prévia.
 Rota: /config
