@@ -11,6 +11,10 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-10-11 · Dicas do período de teste
+Durante o teste, o Painel mostra o próximo passo e quantas ligações o link de acompanhamento já poupou. Também por e-mail, se quiser.
+Rota: /
+
 ## 2026-10-10 · Modo bancada
 Para o técnico: celular na bancada, só as OS dele, botões grandes e cronômetro de bancada. O tempo entra no relatório de produtividade.
 Rota: /bancada

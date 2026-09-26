@@ -141,6 +141,12 @@ export const Rastreio: React.FC = () => {
       } else {
         const publica = linha as OSPublica;
         setOs(publica);
+        // Conta a "ligação economizada" do teste grátis. É um contador, não
+        // dado do cliente: falhar aqui não pode estragar a página dele.
+        supabase.rpc("anotar_rastreio", { p_loja: loja, p_numero: numero, p_token: token }).then(
+          () => undefined,
+          () => undefined
+        );
         // A sugestão da loja já vem marcada; o cliente troca se quiser.
         setEscolha((publica.opcoes || []).find((o) => o.escolhida)?.nome || "");
       }

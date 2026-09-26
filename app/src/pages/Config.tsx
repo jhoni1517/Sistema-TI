@@ -1029,6 +1029,18 @@ export const Config: React.FC = () => {
           />
           <span className="text-xs font-normal text-slate-400">Aos domingos, o arquivo criptografado. Toque em Salvar configurações lá embaixo.</span>
         </label>
+        <label className="mt-3 flex items-start gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={form.emailsTeste !== false}
+            onChange={(e) => mudar({ emailsTeste: e.target.checked })}
+          />
+          <span>
+            Receber no e-mail de login as dicas do período de teste
+            <span className="block text-xs text-tinta-suave">São quatro no máximo, e só enquanto o teste durar.</span>
+          </span>
+        </label>
         <p className="mb-2 mt-5 text-xs font-semibold uppercase text-slate-400">Arquivo aberto (JSON)</p>
         <div className="flex flex-wrap gap-3">
           <button className="btn-secondary" onClick={exportar}><Download size={16} /> Exportar backup</button>

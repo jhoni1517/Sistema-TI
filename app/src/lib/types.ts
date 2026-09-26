@@ -1452,6 +1452,10 @@ export interface Config {
   taxasParcelas?: Record<string, number>;
   /** E-mail que recebe o backup semanal cifrado, aos domingos (api/backup.js). Vazio = não manda. */
   backupEmail?: string;
+  /** E-mails da sequência do teste grátis (api/_teste.js). Vazio = manda; false = desligado. */
+  emailsTeste?: boolean;
+  /** Etapas da sequência do teste que a loja já dispensou na tela (lib/sequencia-teste.ts) */
+  avisosTeste?: string[];
   /** Página pública de orçamento /orcar/:loja (lib/orcamento-online.ts). Nasce desligada. */
   orcamentoSite?: { ativo?: boolean; agendar?: boolean; cor?: string; agenda?: AgendaSite };
   comissaoPadrao?: number; // % de comissão padrão por técnico
