@@ -398,6 +398,24 @@ export interface OrdemServico {
   pinRetirada?: string;
   /** Como saiu: com código, ou sem (motivo e caminho da foto do documento, no depósito privado) */
   retirada?: { comPin: boolean; motivo?: string; documento?: string; em: string };
+  /** Peças encomendadas para esta OS (lib/pedido-peca.ts). Mora na OS: é recurso, não tela. */
+  pedidosPeca?: PedidoPeca[];
+}
+
+/** Peça encomendada ao fornecedor para uma OS. Ver lib/pedido-peca.ts. */
+export interface PedidoPeca {
+  id: ID;
+  produtoId?: ID;
+  descricao: string;
+  quantidade: number;
+  fornecedor?: string;
+  /** Custo combinado com o fornecedor */
+  valor?: number;
+  /** AAAA-MM-DD */
+  previsao?: string;
+  status: "pedido" | "chegou" | "cancelado";
+  pedidoEm: string;
+  chegouEm?: string;
 }
 
 export interface Categoria {

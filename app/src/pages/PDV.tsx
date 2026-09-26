@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { conflitoComReserva, reservas } from "../lib/pedido-peca";
 import {
   ShoppingCart,
   Barcode,
@@ -124,7 +125,7 @@ const BotaoNota: React.FC<{
 
 
 export const PDV: React.FC = () => {
-  const { produtos, clientes, sessoes, vendas, notas, config, ramo, fontesComFalha, saveVenda, saveMovimento, moverEstoque, saveNota } =
+  const { produtos, clientes, sessoes, vendas, notas, ordens, config, ramo, fontesComFalha, saveVenda, saveMovimento, moverEstoque, saveNota } =
     useApp();
 
   /* Recursos do ramo: numa mercearia não existe pizza nem "sem cebola" */
@@ -410,6 +411,9 @@ export const PDV: React.FC = () => {
     // conferência achar depois. Ver problemaNoCarrinho.
     const problema = problemaNoCarrinho(itens);
     if (problema) return aviso.alerta(problema);
+    // Peça que chegou para uma OS tem dono: o balcão não vende (lib/pedido-peca.ts).
+    const reservada = conflitoComReserva(itens, produtos, reservas(ordens));
+    if (reservada) return aviso.alerta(reservada);
     if (dividido) {
       const erro = problemaNoPagamento(total, parcelas);
       if (erro) return aviso.alerta(erro);

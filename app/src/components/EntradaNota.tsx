@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from "react";
+import { chegadaDaEntrada, mensagemPecaChegou } from "../lib/pedido-peca";
+import type { OrdemServico, PedidoPeca } from "../lib/types";
 import { ImpactoMargem } from "./ImpactoMargem";
 import { impactoDoCusto, MARGEM_ALVO_PADRAO } from "../lib/margem";
 import { tabelaSegura } from "../lib/tabela-precos";
@@ -6,7 +8,7 @@ import { Truck, Search, Plus, Trash2 } from "lucide-react";
 import { aviso } from "./Aviso";
 import { Modal, Field, InputNumero } from "./ui";
 import { useApp } from "../store/AppStore";
-import { uid, nowISO, brl, txt } from "../lib/format";
+import { uid, nowISO, brl, txt, whatsappLink } from "../lib/format";
 import { normalizar } from "../lib/busca";
 import { sessaoAberta as achaSessaoAberta } from "../lib/caixa";
 import {
@@ -35,7 +37,8 @@ import { paraEntrada } from "../lib/leitura-nota";
  * A conta mora em lib/entrada.ts, com teste.
  */
 export const EntradaNota: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const { produtos, fornecedores, sessoes, config, saveProduto, saveMovimento } = useApp();
+  const { produtos, fornecedores, sessoes, config, ordens, clientes, saveProduto, saveMovimento, saveOrdem } = useApp();
+  const [chegadas, setChegadas] = useState<{ os: OrdemServico; pedido: PedidoPeca }[] | null>(null);
   const [busca, setBusca] = useState("");
   const [itens, setItens] = useState<ItemEntrada[]>([]);
   const [frete, setFrete] = useState(0);
@@ -182,6 +185,22 @@ export const EntradaNota: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         );
       }
 
+      // Peça encomendada para OS: reserva para ela e devolve a OS à bancada
+      // (lib/pedido-peca.ts). Falhar aqui não desfaz a entrada, que já está
+      // gravada — só avisa qual OS ficou sem a marca.
+      const { atualizadas, chegadas: vieram } = chegadaDaEntrada(
+        ordens,
+        itens.map((i) => ({ produtoId: i.produtoId, quantidade: Number(i.quantidade) || 0 })),
+        nowISO()
+      );
+      for (const o of atualizadas) {
+        try {
+          await saveOrdem(o);
+        } catch (e) {
+          aviso.erro(`A peça da OS ${o.numero} entrou no estoque, mas a OS não foi marcada:\n\n` + (e instanceof Error ? e.message : String(e)));
+        }
+      }
+
       const cadastrados = novos.filter((p) => itens.some((i) => i.produtoId === p.id)).length;
       aviso.sucesso(
         `Entrada lançada. ${itens.length} item(ns) no estoque.` +
@@ -189,7 +208,8 @@ export const EntradaNota: React.FC<{ onClose: () => void }> = ({ onClose }) => {
             ? ` ${cadastrados} produto(s) novo(s) cadastrado(s) sem preço de venda: defina em Estoque antes de vender.`
             : "")
       );
-      onClose();
+      if (vieram.length) setChegadas(vieram);
+      else onClose();
     } catch (e) {
       aviso.erro(
         "Não foi possível lançar a entrada:\n\n" + (e instanceof Error ? e.message : String(e))
@@ -198,6 +218,38 @@ export const EntradaNota: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       setGravando(false);
     }
   };
+
+  // A entrada trouxe peça encomendada: mostra quais OS voltam para a bancada
+  // e deixa o aviso ao cliente a um toque.
+  if (chegadas) {
+    return (
+      <Modal open onClose={onClose} title="Chegou peça de OS" footer={<button className="btn-primary" onClick={onClose}>Fechar</button>}>
+        <p className="mb-3 text-sm">Estas peças ficaram reservadas para as OS abaixo. O balcão não vende peça reservada.</p>
+        <div className="divide-y divide-linha">
+          {chegadas.map(({ os, pedido }) => {
+            const cli = clientes.find((c) => c.id === os.clienteId);
+            return (
+              <div key={pedido.id} className="flex flex-wrap items-center gap-2 py-2 text-sm">
+                <span className="min-w-0 flex-1">
+                  <b>OS {os.numero}</b> · {pedido.descricao} · {cli?.nome || "cliente"}
+                </span>
+                {cli?.telefone && (
+                  <a
+                    className="btn-secondary !py-1.5 text-xs"
+                    href={whatsappLink(cli.telefone, mensagemPecaChegou(cli.nome, config.nomeLoja, os))}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Avisar no WhatsApp
+                  </a>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </Modal>
+    );
+  }
 
   return (
     <Modal
