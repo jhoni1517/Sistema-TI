@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { conflitoComReserva, reservas } from "../lib/pedido-peca";
+import { BotaoSimularParcelas } from "../components/SimuladorParcelas";
 import {
   ShoppingCart,
   Barcode,
@@ -896,7 +897,10 @@ export const PDV: React.FC = () => {
           </div>
 
           <p className="text-xs uppercase tracking-wide text-slate-400">Total</p>
-          <p className="mb-4 text-4xl font-bold text-slate-800">{brl(total)}</p>
+          <p className="mb-2 text-4xl font-bold text-slate-800">{brl(total)}</p>
+          <div className="mb-4">
+            <BotaoSimularParcelas valor={total} />
+          </div>
 
           {!dividido ? (
             <>

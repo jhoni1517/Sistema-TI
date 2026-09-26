@@ -22,6 +22,7 @@ import { problemaNoChatId } from "../lib/config";
 import { CatalogoPublico, TituloCatalogo } from "../components/CatalogoPublico";
 import { OrcamentoSiteConfig } from "../components/OrcamentoSiteConfig";
 import { AparelhosReservaConfig } from "../components/AparelhosReservaConfig";
+import { TaxasMaquininha } from "../components/TaxasMaquininha";
 import { AreaDoClienteLoja } from "../components/AreaDoClienteLoja";
 import { CredencialPix } from "../components/CredencialPix";
 import { CredencialFiscal } from "../components/CredencialFiscal";
@@ -297,6 +298,10 @@ export const Config: React.FC = () => {
               </p>
             </Field>
           )}
+
+          <div className="sm:col-span-2 rounded-md border border-linha p-3">
+            <TaxasMaquininha form={form} mudar={mudar} />
+          </div>
 
           <Field label="Margem-alvo (%)">
             <InputNumero

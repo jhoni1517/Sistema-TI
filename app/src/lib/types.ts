@@ -1438,6 +1438,8 @@ export interface Config {
   margemAlvo?: number;
   /** Aparelhos da loja para emprestar durante o conserto (lib/reserva.ts) */
   aparelhosReserva?: AparelhoReserva[];
+  /** Taxa da maquininha no crédito parcelado, por número de parcelas (2 a 12), em % (lib/parcelamento.ts) */
+  taxasParcelas?: Record<string, number>;
   /** Página pública de orçamento /orcar/:loja (lib/orcamento-online.ts). Nasce desligada. */
   orcamentoSite?: { ativo?: boolean; agendar?: boolean; cor?: string; agenda?: AgendaSite };
   comissaoPadrao?: number; // % de comissão padrão por técnico
