@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { aviso } from "../components/Aviso";
 import { SectionTitle, Field, Modal, EmptyState, InputNumero } from "../components/ui";
+import { SaudeLojas } from "../components/SaudeLojas";
 import { brl, formatDate, txt, abrirWhatsapp } from "../lib/format";
 import { normalizar } from "../lib/busca";
 import { gerarLinkDeSenha } from "../lib/auth";
@@ -612,6 +613,8 @@ export const Lojas: React.FC = () => {
           </div>
         </div>
       )}
+
+      {!carregando && lojas.length > 0 && <SaudeLojas lojas={lojas} />}
 
       <div className="relative mb-4 max-w-md">
         <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
