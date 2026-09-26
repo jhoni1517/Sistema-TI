@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { negrito } from "./format";
+import type { UsoRecente } from "./saude";
 
 /**
  * Assinatura das lojas.
@@ -340,6 +341,32 @@ export async function resumoUsoLojas(): Promise<Record<string, UsoDaLoja>> {
       produtos: Number(l.produtos) || 0,
       ordens: Number(l.ordens) || 0,
       vendas: Number(l.vendas) || 0,
+    };
+  }
+  return mapa;
+}
+
+/**
+ * Uso recente de cada loja, para o painel "Saúde das lojas" (conta em
+ * lib/saude.ts). Mesma regra de `resumoUsoLojas`: falhar aqui não derruba a
+ * lista, só esconde o painel — e devolve null para a tela dizer por quê.
+ */
+export async function saudeDasLojas(): Promise<Record<string, UsoRecente> | null> {
+  if (!supabase) return {};
+  const { data, error } = await supabase.rpc("saude_das_lojas");
+  if (error || !Array.isArray(data)) return null;
+  const mapa: Record<string, UsoRecente> = {};
+  for (const l of data as Record<string, unknown>[]) {
+    const id = String(l.loja);
+    mapa[id] = {
+      loja: id,
+      ultimoUso: l.ultimo_uso ? String(l.ultimo_uso) : null,
+      osRecentes: Number(l.os_recentes) || 0,
+      osAnteriores: Number(l.os_anteriores) || 0,
+      vendasRecentes: Number(l.vendas_recentes) || 0,
+      vendasAnteriores: Number(l.vendas_anteriores) || 0,
+      caixaRecentes: Number(l.caixa_recentes) || 0,
+      funcoes: Array.isArray(l.funcoes) ? l.funcoes.map(String) : [],
     };
   }
   return mapa;
