@@ -11,6 +11,11 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-10-07 · Aparelho reserva
+Empreste um celular da loja durante o conserto, com estado, fotos, caução e termo assinado. Na entrega o sistema lembra de pegar de volta.
+Rota: /config
+Módulo: os
+
 ## 2026-10-06 · Peça encomendada na OS
 Anote na OS a peça pedida e a previsão. Quando a nota chega, a peça fica reservada para a OS e o balcão não vende. Painel de peças a caminho.
 Rota: /
