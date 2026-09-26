@@ -29,6 +29,7 @@ import { DepoimentosPublico } from "./pages/DepoimentosPublico";
 import { Config } from "./pages/Config";
 import { Rastreio } from "./pages/Rastreio";
 import { PainelBancada } from "./pages/PainelBancada";
+import { ModoBancada } from "./pages/ModoBancada";
 import { Catalogo } from "./pages/Catalogo";
 import { AreaCliente } from "./pages/AreaCliente";
 import { CadastroCliente } from "./pages/CadastroCliente";
@@ -204,6 +205,8 @@ const Rotas: React.FC<{ sessao: Sessao; onLogout: () => void; onCriarConta?: () 
             propósito — menu lateral na parede da loja é espaço roubado da
             fila, e um clique errado de quem passa abre o caixa. */}
         <Route path="painel" element={<Protegida recurso="os" papel={papel}><DoPlano modulo="os"><PainelBancada /></DoPlano></Protegida>} />
+        {/* O celular do técnico na bancada: também fora do Layout, botões enormes. */}
+        <Route path="bancada" element={<Protegida recurso="os" papel={papel}><DoPlano modulo="os"><ModoBancada /></DoPlano></Protegida>} />
         <Route element={<Layout onLogout={onLogout} sessao={sessao} onCriarConta={onCriarConta} />}>
           <Route index element={<Dashboard />} />
           <Route path="ordens" element={<Protegida recurso="os" papel={papel}><DoPlano modulo="os"><OrdensServico /></DoPlano></Protegida>} />

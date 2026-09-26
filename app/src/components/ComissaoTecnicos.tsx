@@ -52,6 +52,7 @@ export const ComissaoTecnicos: React.FC = () => {
                 <th className="px-2 py-2">Técnico</th>
                 <th className="px-2 py-2 text-center">OS</th>
                 <th className="px-2 py-2 text-center">Bancada</th>
+                <th className="px-2 py-2 text-center">Mão na OS</th>
                 <th className="px-2 py-2 text-center">Retrabalho</th>
                 <th className="px-2 py-2 text-right">Gerado</th>
                 <th className="px-2 py-2">Regra</th>
@@ -67,6 +68,10 @@ export const ComissaoTecnicos: React.FC = () => {
                     <td className="px-2 py-2 font-semibold">{c.tecnico}</td>
                     <td className="valor px-2 py-2 text-center">{c.ordens}</td>
                     <td className="valor px-2 py-2 text-center">{p?.tempoMedio != null ? `${String(p.tempoMedio).replace(".", ",")}d` : "-"}</td>
+                    <td className="valor px-2 py-2 text-center">
+                      {p?.comCronometro ? `${String(p.horasBancada).replace(".", ",")}h` : "-"}
+                      {p?.comCronometro ? <span className="block text-xs text-tinta-suave">{p.comCronometro} OS</span> : null}
+                    </td>
                     <td className={`valor px-2 py-2 text-center ${p && p.retrabalho >= 10 ? "font-bold text-red-700" : ""}`}>
                       {p ? `${p.retrabalho}% (${p.retornos})` : "-"}
                     </td>
@@ -92,7 +97,7 @@ export const ComissaoTecnicos: React.FC = () => {
             </tbody>
           </table>
           <p className="mt-2 text-xs text-tinta-suave">
-            Bancada: dias da abertura até ficar pronta. Retrabalho: quantas voltaram na garantia, cobradas de quem fez o
+            Bancada: dias da abertura até ficar pronta. Mão na OS: horas no cronômetro do modo bancada. Retrabalho: quantas voltaram na garantia, cobradas de quem fez o
             conserto original (pelo IMEI).
           </p>
         </div>

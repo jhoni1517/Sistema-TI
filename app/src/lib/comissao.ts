@@ -103,6 +103,10 @@ export interface Produtividade {
   /** % das concluídas que voltaram na garantia */
   retrabalho: number;
   gerado: number;
+  /** Horas de mão na OS, pelo cronômetro do modo bancada (só as OS que usaram) */
+  horasBancada: number;
+  /** Quantas das concluídas têm tempo de bancada: média sobre elas, não sobre todas */
+  comCronometro: number;
 }
 
 const dias = (de?: string, ate?: string): number | null => {
@@ -125,9 +129,9 @@ export function produtividade(ordens: OrdemServico[], de?: string, ate?: string)
     const d = soData(o.entregueEm || o.atualizadoEm);
     return (!de || d >= de) && (!ate || d <= ate);
   };
-  const mapa = new Map<string, { concluidas: number; tempos: number[]; retornos: number; gerado: number }>();
+  const mapa = new Map<string, { concluidas: number; tempos: number[]; retornos: number; gerado: number; seg: number; comCron: number }>();
   const pegar = (nome: string) => {
-    if (!mapa.has(nome)) mapa.set(nome, { concluidas: 0, tempos: [], retornos: 0, gerado: 0 });
+    if (!mapa.has(nome)) mapa.set(nome, { concluidas: 0, tempos: [], retornos: 0, gerado: 0, seg: 0, comCron: 0 });
     return mapa.get(nome)!;
   };
 
@@ -138,6 +142,11 @@ export function produtividade(ordens: OrdemServico[], de?: string, ate?: string)
     t.gerado = centavos(t.gerado + totalOS(o));
     const d = dias(o.criadoEm, o.prontaEm || o.entregueEm);
     if (d !== null) t.tempos.push(d);
+    const seg = Number(o.bancada?.acumulado) || 0;
+    if (seg > 0) {
+      t.seg += seg;
+      t.comCron++;
+    }
   }
 
   for (const r of ordens) {
@@ -156,6 +165,8 @@ export function produtividade(ordens: OrdemServico[], de?: string, ate?: string)
       retornos: t.retornos,
       retrabalho: t.concluidas ? Math.round((t.retornos / t.concluidas) * 100) : 0,
       gerado: t.gerado,
+      horasBancada: Math.round((t.seg / 3600) * 10) / 10,
+      comCronometro: t.comCron,
     }))
     .sort((a, b) => b.concluidas - a.concluidas || a.tecnico.localeCompare(b.tecnico));
 }

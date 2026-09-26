@@ -402,6 +402,16 @@ export interface OrdemServico {
   pedidosPeca?: PedidoPeca[];
   /** Aparelho reserva emprestado ao cliente durante o conserto (lib/reserva.ts) */
   emprestimo?: Emprestimo;
+  /** Cronômetro do modo bancada (lib/bancada.ts) */
+  bancada?: CronometroBancada;
+}
+
+/** Tempo de mão na OS, somado a cada pausa. */
+export interface CronometroBancada {
+  /** Rodando desde (ISO). Vazio = parado. */
+  inicio?: string;
+  /** Segundos já trabalhados, sem contar o trecho que está rodando */
+  acumulado: number;
 }
 
 /** Aparelho da loja para emprestar durante o conserto. Mora na configuração. */
