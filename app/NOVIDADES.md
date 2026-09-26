@@ -11,6 +11,10 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-10-09 · Backup automático todo dia
+O sistema guarda sozinho uma cópia criptografada por dia, dos últimos 30 dias. Em Configurações: baixar, fazer agora e restaurar com prévia.
+Rota: /config
+
 ## 2026-10-08 · Simulador de parcelas
 No PDV e na OS: 1x a 12x com as taxas da sua maquininha, sem juros ou repassando, pronto para o WhatsApp. Taxas em Configurações.
 Rota: /config

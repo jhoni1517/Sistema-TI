@@ -421,6 +421,8 @@ export interface DumpLoja {
   tarefas?: TarefaDiaria[];
   comandas?: Comanda[];
   notas?: Nota[];
+  rmas?: RMA[];
+  pedidos_site?: PedidoSite[];
 }
 
 const TABELA_DO_CAMPO: Record<keyof DumpLoja, TableName> = {
@@ -441,6 +443,8 @@ const TABELA_DO_CAMPO: Record<keyof DumpLoja, TableName> = {
   tarefas: "tarefas",
   comandas: "comandas",
   notas: "notas",
+  rmas: "rmas",
+  pedidos_site: "pedidos_site",
 };
 
 /**

@@ -23,6 +23,7 @@ import { CatalogoPublico, TituloCatalogo } from "../components/CatalogoPublico";
 import { OrcamentoSiteConfig } from "../components/OrcamentoSiteConfig";
 import { AparelhosReservaConfig } from "../components/AparelhosReservaConfig";
 import { TaxasMaquininha } from "../components/TaxasMaquininha";
+import { BackupAutomatico } from "../components/BackupAutomatico";
 import { AreaDoClienteLoja } from "../components/AreaDoClienteLoja";
 import { CredencialPix } from "../components/CredencialPix";
 import { CredencialFiscal } from "../components/CredencialFiscal";
@@ -1016,6 +1017,19 @@ export const Config: React.FC = () => {
       {/* Backup */}
       <div className="card mb-5">
         <h3 className="mb-4 flex items-center gap-2 font-bold text-slate-700"><Database size={18} /> Backup dos dados</h3>
+        <BackupAutomatico />
+        <label className="label mt-3 block">
+          E-mail para receber o backup toda semana (opcional)
+          <input
+            className="input"
+            type="email"
+            placeholder="dono@minhaloja.com"
+            value={form.backupEmail || ""}
+            onChange={(e) => mudar({ backupEmail: e.target.value.trim() })}
+          />
+          <span className="text-xs font-normal text-slate-400">Aos domingos, o arquivo criptografado. Toque em Salvar configurações lá embaixo.</span>
+        </label>
+        <p className="mb-2 mt-5 text-xs font-semibold uppercase text-slate-400">Arquivo aberto (JSON)</p>
         <div className="flex flex-wrap gap-3">
           <button className="btn-secondary" onClick={exportar}><Download size={16} /> Exportar backup</button>
           <label className={`btn-secondary cursor-pointer ${importando ? "pointer-events-none opacity-60" : ""}`}>
