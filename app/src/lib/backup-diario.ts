@@ -33,6 +33,7 @@ export const TABELAS_BACKUP = [
   "comandas",
   "notas",
   "rmas",
+  "cascos",
   "pedidos_site",
 ] as const;
 export type TabelaBackup = (typeof TABELAS_BACKUP)[number];
@@ -204,5 +205,6 @@ export const NOME_TABELA: Record<TabelaBackup, string> = {
   comandas: "Comandas",
   notas: "Notas fiscais",
   rmas: "Trocas com fornecedor",
+  cascos: "Cascos",
   pedidos_site: "Orçamentos do site",
 };

@@ -6,10 +6,16 @@ O sininho do sistema lê este arquivo. Cada novidade é um bloco:
     Uma frase, em voz de balcão, dizendo o que a loja ganha.
     Rota: /endereco-no-sistema
     Módulo: os            (opcional: só aparece para quem tem o módulo)
+    Recurso: casco        (opcional: só aparece para o ramo que tem o campo)
 
 A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
+
+## 2026-10-12 · Casco retornável
+No PDV, diga quantos cascos o cliente trouxe; o que ficar com ele entra na ficha. Em Clientes, o saldo, o histórico e a devolução.
+Rota: /clientes
+Recurso: casco
 
 ## 2026-10-11 · Dicas do período de teste
 Durante o teste, o Painel mostra o próximo passo e quantas ligações o link de acompanhamento já poupou. Também por e-mail, se quiser.

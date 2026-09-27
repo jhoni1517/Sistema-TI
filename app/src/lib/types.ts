@@ -564,6 +564,12 @@ export interface Produto {
   /** Vencimento do lote (AAAA-MM-DD). Vira alerta no estoque. */
   validade?: string;
   /**
+   * Tipo do vasilhame retornável ("Garrafa 600ml", "Engradado 24"). Vazio =
+   * não tem casco. Produtos com o mesmo tipo dividem o mesmo saldo: a
+   * garrafa de uma marca volta no lugar da de outra. Ver lib/casco.ts.
+   */
+  casco?: string;
+  /**
    * Promoção com prazo. O preço cheio continua em `preco` e volta sozinho
    * quando o prazo acaba — promover editando o preço na mão dava certo até
    * a hora de destrocar, que ninguém lembrava. Ver lib/promocao.ts.
@@ -1312,6 +1318,22 @@ export interface RegistroAuditoria {
   motivo?: string | null;
   usuarioId?: string | null;
   usuario?: string | null;
+  criadoEm: string;
+}
+
+/**
+ * Um lançamento de casco: o cliente levou (quantidade positiva) ou devolveu
+ * (negativa). O saldo é a soma, por cliente e tipo. Ver lib/casco.ts.
+ */
+export interface LancamentoCasco {
+  id: ID;
+  lojaId?: string;
+  clienteId: ID;
+  tipo: string;
+  quantidade: number;
+  vendaId?: ID;
+  vendaNumero?: number;
+  obs?: string;
   criadoEm: string;
 }
 

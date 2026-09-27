@@ -25,6 +25,7 @@ export const TABELAS_BACKUP = [
   "comandas",
   "notas",
   "rmas",
+  "cascos",
   "pedidos_site",
 ];
 

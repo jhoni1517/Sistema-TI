@@ -18,6 +18,7 @@ import type {
   Avaliacao,
   RegistroAuditoria,
   RMA,
+  LancamentoCasco,
   Venda,
   Comanda,
   TarefaDiaria,
@@ -58,7 +59,8 @@ type TableName =
   | "pedidos_site"
   | "avaliacoes"
   | "auditoria"
-  | "rmas";
+  | "rmas"
+  | "cascos";
 
 interface WithId {
   id: string;
@@ -422,6 +424,7 @@ export interface DumpLoja {
   comandas?: Comanda[];
   notas?: Nota[];
   rmas?: RMA[];
+  cascos?: LancamentoCasco[];
   pedidos_site?: PedidoSite[];
 }
 
@@ -444,6 +447,7 @@ const TABELA_DO_CAMPO: Record<keyof DumpLoja, TableName> = {
   comandas: "comandas",
   notas: "notas",
   rmas: "rmas",
+  cascos: "cascos",
   pedidos_site: "pedidos_site",
 };
 
@@ -603,6 +607,10 @@ export const db = {
       const { error } = await supabase.from("auditoria").insert({ ...r, lojaId: lojaAtual });
       if (error) throw traduzirErroLeitura("auditoria", error);
     },
+  },
+  cascos: {
+    all: () => getAll<LancamentoCasco>("cascos"),
+    save: (l: LancamentoCasco) => upsert("cascos", l),
   },
   rmas: {
     all: () => getAll<RMA>("rmas"),

@@ -62,3 +62,13 @@ describe("leitura", () => {
     expect(maisNova(l)).toBe("2026-03-01");
   });
 });
+
+describe("Recurso:", () => {
+  it("novidade de campo só aparece para o ramo que tem o campo", async () => {
+    const { lerNovidades, novidadesDoRamo } = await import("./novidades");
+    const l = lerNovidades("## 2026-10-12 · Casco\nFrase.\nRota: /clientes\nRecurso: casco\n");
+    expect(l[0].recurso).toBe("casco");
+    expect(novidadesDoRamo(l, "bebidas")).toHaveLength(1);
+    expect(novidadesDoRamo(l, "assistencia")).toHaveLength(0);
+  });
+});
