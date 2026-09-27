@@ -123,6 +123,11 @@ export default async function handler(req, res) {
   const feitos = [];
   const falhas = [];
   const pulados = [];
+  // A última loja TENTADA, e não a última que deu certo: continuar da última
+  // que deu certo fazia a próxima chamada repetir a loja que falhou. Se ela
+  // falhasse devagar, gastando os 10 segundos sozinha, a corrente se
+  // chamava para sempre sem sair do lugar.
+  let ultimaTentada = depois;
 
   try {
     const lr = await fetch(`${SUPABASE_URL}/rest/v1/lojas?select=id,nome,chave_cripto,ativa&chave_cripto=not.is.null&order=id`, {
@@ -137,6 +142,7 @@ export default async function handler(req, res) {
         pulados.push(l.id);
         continue;
       }
+      ultimaTentada = l.id;
       try {
         const tabelas = {};
         for (const t of TABELAS_BACKUP) {
@@ -165,8 +171,7 @@ export default async function handler(req, res) {
     }
     // Sobrou loja: a próxima chamada continua dali, com 15 segundos novos.
     if (pulados.length && CRON_SECRET && req.headers.host) {
-      const ultima = feitos.length ? feitos[feitos.length - 1].loja : depois;
-      const proxima = fetch(`https://${req.headers.host}/api/backup?depois=${encodeURIComponent(ultima || "")}`, {
+      const proxima = fetch(`https://${req.headers.host}/api/backup?depois=${encodeURIComponent(ultimaTentada || "")}`, {
         headers: { Authorization: `Bearer ${CRON_SECRET}` },
       }).catch(() => null);
       await Promise.race([proxima, new Promise((ok) => setTimeout(ok, 1500))]);
