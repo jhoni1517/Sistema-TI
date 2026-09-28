@@ -1,4 +1,4 @@
-import { temModulo, type Modulo } from "./ramos";
+import { temModulo, temRecurso, type Modulo, type Recurso } from "./ramos";
 
 /**
  * O sininho: o que mudou no sistema desde a última vez que a pessoa olhou.
@@ -17,6 +17,8 @@ export interface Novidade {
   frase: string;
   rota: string;
   modulo?: Modulo;
+  /** Novidade de um campo que só alguns ramos têm (o casco só existe na adega) */
+  recurso?: Recurso;
 }
 
 const CABECALHO = /^##\s+(\d{4}-\d{2}-\d{2})\s+·\s+(.+?)\s*$/;
@@ -40,8 +42,10 @@ export function lerNovidades(md: string): Novidade[] {
     if (!atual || !linha || bruta.startsWith("    ")) continue;
     const rota = linha.match(/^Rota:\s*(\S+)/i);
     const modulo = linha.match(/^Módulo:\s*(\S+)/i);
+    const recurso = linha.match(/^Recurso:\s*(\S+)/i);
     if (rota) atual.rota = rota[1];
     else if (modulo) atual.modulo = modulo[1] as Modulo;
+    else if (recurso) atual.recurso = recurso[1] as Recurso;
     else if (!atual.frase) atual.frase = linha;
   }
   fechar();
@@ -50,7 +54,7 @@ export function lerNovidades(md: string): Novidade[] {
 
 /** As que valem para esta loja: módulo que ela não tem não vira novidade */
 export const novidadesDoRamo = (lista: Novidade[], ramo: string | null | undefined): Novidade[] =>
-  lista.filter((n) => !n.modulo || temModulo(ramo, n.modulo));
+  lista.filter((n) => (!n.modulo || temModulo(ramo, n.modulo)) && (!n.recurso || temRecurso(ramo, n.recurso)));
 
 /**
  * Quais a pessoa ainda não viu. `vistoAte` é a data da mais nova que ela

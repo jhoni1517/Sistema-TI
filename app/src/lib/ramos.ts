@@ -79,6 +79,7 @@ export type Recurso =
   | "peso" // produto vendido por quilo, com preço por kg
   | "validade" // data de vencimento no estoque, com alerta
   | "idadeMinima" // venda proibida para menores (bebida alcoólica)
+  | "casco" // vasilhame retornável: saldo por cliente, ida e volta (lib/casco.ts)
   | "meioAMeio" // pizza com 2 a 4 sabores, e a regra de preço da casa
   | "observacaoItem" // "sem cebola", "bem passado": o recado vai para a cozinha
   /**
@@ -262,7 +263,7 @@ export const RAMO_META: Record<Ramo, RamoMeta> = {
     descricao: "Balcão com entrega, vencimento e restrição de idade",
     vocabulario: VENDA,
     modulos: ["pdv", "delivery"],
-    recursos: ["validade", "idadeMinima"],
+    recursos: ["validade", "idadeMinima", "casco"],
     aparelhos: [],
     checklist: [],
   },

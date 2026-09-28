@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { aviso } from "../components/Aviso";
-import { Plus, Search, Pencil, Trash2, Users, Phone, MessageCircle, Wrench, User, Building2, ShieldAlert, Cake, KeyRound, Send } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Users, Phone, MessageCircle, Wrench, User, Building2, ShieldAlert, Cake, KeyRound, Send, Recycle } from "lucide-react";
 import { useApp } from "../store/AppStore";
 import { useLocation } from "react-router-dom";
 import { ImportarPorFoto } from "../components/ImportarPorFoto";
@@ -18,7 +18,9 @@ import { abrirWhatsapp, uid, nowISO, whatsappLink, formatDate, brl, txt, mascara
 import { normalizar } from "../lib/busca";
 import { avaliarCliente, classificacaoDe, travaFiado, devendo } from "../lib/clientes";
 import { garantiasDoCliente } from "../lib/garantia";
-import { temModulo, vocabulario } from "../lib/ramos";
+import { temModulo, temRecurso, vocabulario } from "../lib/ramos";
+import { pendentesPorCliente, tiposDeCasco } from "../lib/casco";
+import { useCascos, CascosDoCliente } from "../components/Cascos";
 import { aoApagarCliente, textoDaConfirmacao } from "../lib/exclusao";
 import { Relacionamento } from "../components/Relacionamento";
 import { CLASSIFICACAO_META, type Classificacao, type Cliente } from "../lib/types";
@@ -36,7 +38,11 @@ const vazio = (): Cliente => ({
 });
 
 export const Clientes: React.FC = () => {
-  const { clientes, ordens, fiados, vendas, saveCliente, removeCliente, ramo, config } = useApp();
+  const { clientes, ordens, fiados, vendas, produtos, saveCliente, removeCliente, ramo, config } = useApp();
+  const usaCasco = temRecurso(ramo, "casco");
+  const cascos = useCascos(usaCasco);
+  const pendentes = useMemo(() => pendentesPorCliente(cascos.lista || []), [cascos.lista]);
+  const [cascosDe, setCascosDe] = useState<Cliente | null>(null);
 
   const mandarAcesso = async (c: Cliente) => {
     try {
@@ -215,6 +221,19 @@ export const Clientes: React.FC = () => {
 
       {relacionamento && <Relacionamento onClose={() => setRelacionamento(false)} />}
 
+      {usaCasco && cascos.erro && (
+        <p className="card mb-3 text-sm text-status-cancelada">Os cascos não carregaram: {cascos.erro}</p>
+      )}
+      {usaCasco && (
+        <CascosDoCliente
+          cliente={cascosDe}
+          lista={cascos.lista || []}
+          tipos={tiposDeCasco(produtos)}
+          salvar={cascos.salvar}
+          onClose={() => setCascosDe(null)}
+        />
+      )}
+
       <Modal open={!!linkPara} onClose={() => setLinkPara(null)} title="Mandar link de cadastro">
         <div className="space-y-2">
           <p className="text-sm text-slate-500">
@@ -323,6 +342,14 @@ export const Clientes: React.FC = () => {
               )}
               <p className="mt-1 text-xs text-slate-400">Desde {formatDate(c.criadoEm)}</p>
               <div className="mt-3 flex flex-wrap gap-2">
+                {usaCasco && (
+                  <button
+                    className={`btn-secondary !px-2 !py-1 text-xs ${pendentes[c.id] ? "!border-sinal text-sinal" : ""}`}
+                    onClick={() => setCascosDe(c)}
+                  >
+                    <Recycle size={14} /> {pendentes[c.id] ? `Deve ${pendentes[c.id]} casco${pendentes[c.id] === 1 ? "" : "s"}` : "Cascos"}
+                  </button>
+                )}
                 {c.telefone && (
                   <a
                     href={whatsappLink(c.telefone, `Olá ${c.nome}, tudo bem?`)}

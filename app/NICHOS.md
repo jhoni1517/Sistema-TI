@@ -85,7 +85,7 @@ Referências: Xpertus ERP, MBM Solutions, Andra ERP, Nex, Siscoban.
 
 | # | O que é | Situação |
 |---|---|---|
-| 1 | **Casco / vasilhame retornável** — saldo por cliente, envio e retorno | Não feito |
+| 1 | **Casco / vasilhame retornável** — saldo por cliente, envio e retorno | Feito (lib/casco.ts) |
 | 2 | **Tabela de preço** por tipo de cliente (bar, restaurante, varejo) | Não feito |
 | 3 | **Lote, validade e FIFO** | Parcial |
 | 4 | **Entrega por região** com romaneio de carga | Não feito |
@@ -125,8 +125,7 @@ plataformas. Não dá para simplesmente implementar.
 Cada bloco abaixo é entregável sozinho e não depende dos outros.
 
 1. ~~Etiqueta de balança~~ — feito
-2. **Casco retornável** (bebidas) — uma tabela de lançamentos e um saldo por
-   cliente. O menor dos três que definem nicho.
+2. ~~Casco retornável~~ — feito
 3. **Meio a meio + comanda de mesa + KDS** (pizzaria) — o maior. São três
    telas novas, e faz sentido fazer as três juntas porque uma sem a outra
    não fecha o fluxo da casa.

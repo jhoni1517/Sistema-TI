@@ -14,6 +14,7 @@ import { useApp } from "../store/AppStore";
 import { ImportarPorFoto } from "../components/ImportarPorFoto";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { CatalogoPublico } from "../components/CatalogoPublico";
+import { tiposDeCasco } from "../lib/casco";
 import { temRecurso } from "../lib/ramos";
 import { BotaoCamera } from "../components/Camera";
 import { BotaoAvaliarUsado, FichaDoSeminovo, IconeFicha } from "../components/Seminovos";
@@ -594,6 +595,26 @@ export const Estoque: React.FC = () => {
                 <p className="mt-1 text-xs text-slate-400">
                   O número curto que este produto tem na balança do balcão. É por
                   ele que a frente de caixa reconhece a etiqueta e já lança o peso.
+                </p>
+              </Field>
+            )}
+
+            {temRecurso(ramo, "casco") && !editando.servico && !editando.porPeso && (
+              <Field label="Casco retornável">
+                <input
+                  className="input"
+                  list="tipos-de-casco"
+                  placeholder="Vazio = não tem. Ex.: Garrafa 600ml"
+                  value={editando.casco || ""}
+                  onChange={(e) => setEditando({ ...editando, casco: e.target.value })}
+                />
+                <datalist id="tipos-de-casco">
+                  {tiposDeCasco(produtos).map((t) => (
+                    <option key={t} value={t} />
+                  ))}
+                </datalist>
+                <p className="mt-1 text-xs text-tinta-suave">
+                  Mesmo nome em marcas diferentes = mesmo saldo: a garrafa de uma volta no lugar da outra.
                 </p>
               </Field>
             )}

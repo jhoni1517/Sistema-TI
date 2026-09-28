@@ -62,6 +62,8 @@ import {
 import { Devolucao } from "../components/Devolucao";
 import { MontarPizza } from "../components/MontarPizza";
 import { temRecurso } from "../lib/ramos";
+import { cascosDaVenda, problemaNoCasco, lancamentosDaVenda, saldoDoCliente } from "../lib/casco";
+import { useCascos, CascosNaVenda } from "../components/Cascos";
 import {
   pedidoDaNota,
   problemaParaEmitir,
@@ -150,6 +152,15 @@ export const PDV: React.FC = () => {
   const [parcelas, setParcelas] = useState<Parcela[]>([]);
   const dividido = parcelas.length > 0;
   const [clienteId, setClienteId] = useState("");
+  // Casco retornável (lib/casco.ts): só na loja que tem o recurso.
+  const usaCasco = temRecurso(ramo, "casco");
+  const cascos = useCascos(usaCasco);
+  const [trouxe, setTrouxe] = useState<Record<string, number>>({});
+  const levou = useMemo(() => (usaCasco ? cascosDaVenda(itens, produtos) : {}), [usaCasco, itens, produtos]);
+  const saldoCasco = useMemo(
+    () => (clienteId && cascos.lista ? saldoDoCliente(cascos.lista, clienteId) : {}),
+    [clienteId, cascos.lista]
+  );
   const [gravando, setGravando] = useState(false);
   const [ultima, setUltima] = useState<Venda | null>(null);
   const [pedindoNota, setPedindoNota] = useState(false);
@@ -402,6 +413,7 @@ export const PDV: React.FC = () => {
     setRecebido(undefined);
     setParcelas([]);
     setClienteId("");
+    setTrouxe({});
     setTermo("");
     focarBusca();
   };
@@ -415,6 +427,8 @@ export const PDV: React.FC = () => {
     // Peça que chegou para uma OS tem dono: o balcão não vende (lib/pedido-peca.ts).
     const reservada = conflitoComReserva(itens, produtos, reservas(ordens));
     if (reservada) return aviso.alerta(reservada);
+    const casco = problemaNoCasco(levou, trouxe, clienteId || undefined, saldoCasco);
+    if (casco) return aviso.alerta(casco);
     if (dividido) {
       const erro = problemaNoPagamento(total, parcelas);
       if (erro) return aviso.alerta(erro);
@@ -508,6 +522,21 @@ export const PDV: React.FC = () => {
        */
       for (const { produto, delta } of deltasApos(itens, produtos)) {
         await moverEstoque(produto, delta);
+      }
+
+      // Casco depois do dinheiro e do estoque, e com erro próprio: a venda
+      // já está feita, e dizer "não foi possível fechar a venda" aqui faria
+      // a pessoa vender de novo.
+      const idaEVolta = lancamentosDaVenda(uid, venda, levou, trouxe);
+      if (idaEVolta.length > 0) {
+        try {
+          await cascos.salvar(idaEVolta);
+        } catch (e) {
+          aviso.erro(
+            `Venda ${venda.numero} registrada, mas os cascos NÃO foram anotados. Anote na ficha do cliente (Clientes > Cascos):\n\n` +
+              (e instanceof Error ? e.message : String(e))
+          );
+        }
       }
 
       setUltima({ ...venda, movimentoId });
@@ -1103,6 +1132,12 @@ export const PDV: React.FC = () => {
                     </option>
                   ))}
               </select>
+            </div>
+          )}
+
+          {usaCasco && (
+            <div className="mb-3">
+              <CascosNaVenda levou={levou} trouxe={trouxe} onTrouxe={setTrouxe} saldo={saldoCasco} erroCarga={cascos.erro} />
             </div>
           )}
 

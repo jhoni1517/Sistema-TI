@@ -191,7 +191,8 @@ https://supabase.com/dashboard/project/nviagibefxqtognowqwe/sql/new:
 40. `supabase-migracao-backup.sql`
 41. `supabase-migracao-saude.sql`
 42. `supabase-migracao-sequencia-teste.sql`
-43. `supabase-corrigir-colunas.sql`
+43. `supabase-migracao-cascos.sql`
+44. `supabase-corrigir-colunas.sql`
 
 Quem já rodou o de número 18 antes da nota na ordem de serviço precisa
 rodá-lo **de novo**: ele ganhou a coluna `osId`, que é o que liga a nota à
