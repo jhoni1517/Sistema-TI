@@ -561,8 +561,14 @@ export interface Produto {
    * quantidade vendida é fracionária (0,315 kg). Mercearia e açougue.
    */
   porPeso?: boolean;
-  /** Vencimento do lote (AAAA-MM-DD). Vira alerta no estoque. */
+  /**
+   * Vencimento (AAAA-MM-DD). Vira alerta no estoque. Com `lotes`, vale para o
+   * estoque que entrou sem lote; o alerta usa a validade do lote que sai
+   * primeiro (lib/lotes.ts).
+   */
   validade?: string;
+  /** O que entrou, lote por lote. O que sobra de cada um é calculado (lib/lotes.ts). */
+  lotes?: LoteProduto[];
   /**
    * Tipo do vasilhame retornável ("Garrafa 600ml", "Engradado 24"). Vazio =
    * não tem casco. Produtos com o mesmo tipo dividem o mesmo saldo: a
@@ -1319,6 +1325,14 @@ export interface RegistroAuditoria {
   usuarioId?: string | null;
   usuario?: string | null;
   criadoEm: string;
+}
+
+/** Uma entrada de mercadoria com a sua validade (lib/lotes.ts). */
+export interface LoteProduto {
+  /** AAAA-MM-DD */
+  validade: string;
+  quantidade: number;
+  entradaEm: string;
 }
 
 /**

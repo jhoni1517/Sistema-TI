@@ -33,6 +33,8 @@ export interface ItemEntrada {
   quantidade: number;
   /** Custo unitário na nota, antes do rateio de frete e desconto */
   custoUnit: number;
+  /** Validade do lote que está chegando (lib/lotes.ts). Vazio = sem lote. */
+  validade?: string;
 }
 
 export interface Entrada {

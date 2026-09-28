@@ -8,6 +8,8 @@ import { Truck, Search, Plus, Trash2 } from "lucide-react";
 import { aviso } from "./Aviso";
 import { Modal, Field, InputNumero } from "./ui";
 import { useApp } from "../store/AppStore";
+import { temRecurso } from "../lib/ramos";
+import { comLoteNovo, problemaNoLote } from "../lib/lotes";
 import { uid, nowISO, brl, txt, whatsappLink } from "../lib/format";
 import { normalizar } from "../lib/busca";
 import { sessaoAberta as achaSessaoAberta } from "../lib/caixa";
@@ -37,7 +39,9 @@ import { paraEntrada } from "../lib/leitura-nota";
  * A conta mora em lib/entrada.ts, com teste.
  */
 export const EntradaNota: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const { produtos, fornecedores, sessoes, config, ordens, clientes, saveProduto, saveMovimento, saveOrdem } = useApp();
+  const { produtos, fornecedores, sessoes, config, ordens, clientes, ramo, saveProduto, saveMovimento, saveOrdem } = useApp();
+  // Loja que controla validade: cada item que chega pode trazer o seu lote.
+  const usaLote = temRecurso(ramo, "validade");
   const [chegadas, setChegadas] = useState<{ os: OrdemServico; pedido: PedidoPeca }[] | null>(null);
   const [busca, setBusca] = useState("");
   const [itens, setItens] = useState<ItemEntrada[]>([]);
@@ -180,8 +184,13 @@ export const EntradaNota: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         // aqui, com a quantidade e o custo desta nota.
         const p = todos.find((x) => x.id === i.produtoId);
         if (!p || Number(i.quantidade) <= 0) continue;
+        const somado = aplicarEntrada(p, i.quantidade, rateado[i.produtoId] ?? i.custoUnit);
+        // O lote é montado com o produto de ANTES da entrada: é o saldo de
+        // antes que diz quais lotes ainda estão vivos (lib/lotes.ts).
         await saveProduto(
-          aplicarEntrada(p, i.quantidade, rateado[i.produtoId] ?? i.custoUnit)
+          usaLote && i.validade && !problemaNoLote(i.validade, Number(i.quantidade))
+            ? { ...somado, lotes: comLoteNovo(p, i.validade, Number(i.quantidade), nowISO().slice(0, 10)) }
+            : somado
         );
       }
 
@@ -395,6 +404,17 @@ export const EntradaNota: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                   <Trash2 size={15} />
                 </button>
               </div>
+              {usaLote && (
+                <label className="col-span-12 flex items-center gap-2 text-xs text-tinta-suave">
+                  Validade deste lote
+                  <input
+                    type="date"
+                    className="input !w-auto !py-1 text-sm"
+                    value={i.validade || ""}
+                    onChange={(e) => mudar(n, { validade: e.target.value })}
+                  />
+                </label>
+              )}
             </div>
           ))}
         </div>

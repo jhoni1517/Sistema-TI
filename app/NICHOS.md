@@ -18,7 +18,7 @@ Referências: MarketUP, Kyte, MercadinhoPDV, Lojista Pro, SISMEGA.
 |---|---|---|
 | 1 | **Etiqueta de balança (EAN-13 prefixo 2)** — o código impresso traz o peso dentro | **Feito** |
 | 2 | **NFC-e** — cupom fiscal eletrônico | Não feito, ver abaixo |
-| 3 | **Lote e validade com FIFO** — vende primeiro o que vence antes, e bloqueia vencido | Parcial: alerta de validade existe, FIFO não |
+| 3 | **Lote e validade com FIFO** — vende primeiro o que vence antes, e bloqueia vencido | Feito (lib/lotes.ts); vencido é aviso no caixa, não bloqueio |
 | 4 | **PDV que funciona sem internet** e sincroniza depois | Não feito |
 | 5 | **Tabela de preço** (varejo / atacado) e desconto por volume | Não feito |
 
@@ -87,7 +87,7 @@ Referências: Xpertus ERP, MBM Solutions, Andra ERP, Nex, Siscoban.
 |---|---|---|
 | 1 | **Casco / vasilhame retornável** — saldo por cliente, envio e retorno | Feito (lib/casco.ts) |
 | 2 | **Tabela de preço** por tipo de cliente (bar, restaurante, varejo) | Não feito |
-| 3 | **Lote, validade e FIFO** | Parcial |
+| 3 | **Lote, validade e FIFO** | Feito (lib/lotes.ts) |
 | 4 | **Entrega por região** com romaneio de carga | Não feito |
 | 5 | **Idade mínima** na venda | Não feito (recurso já declarado) |
 
@@ -129,8 +129,8 @@ Cada bloco abaixo é entregável sozinho e não depende dos outros.
 3. **Meio a meio + comanda de mesa + KDS** (pizzaria) — o maior. São três
    telas novas, e faz sentido fazer as três juntas porque uma sem a outra
    não fecha o fluxo da casa.
-4. **Lote com FIFO** (mercearia e bebidas) — muda o modelo de estoque: hoje
-   o produto tem uma quantidade só, e passaria a ter lotes.
+4. ~~Lote com FIFO~~ — feito, sem mudar o modelo: o saldo continua um
+   número só, e o que sobra de cada lote é calculado (lib/lotes.ts)
 5. **Tabela de preço** (mercearia e bebidas) — barato perto do resto.
 
 ---

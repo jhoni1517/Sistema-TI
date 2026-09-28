@@ -62,6 +62,8 @@ import {
 import { Devolucao } from "../components/Devolucao";
 import { MontarPizza } from "../components/MontarPizza";
 import { temRecurso } from "../lib/ramos";
+import { vencidasDaVenda } from "../lib/lotes";
+import { hojeISO } from "../lib/contas";
 import { cascosDaVenda, problemaNoCasco, lancamentosDaVenda, saldoDoCliente } from "../lib/casco";
 import { useCascos, CascosNaVenda } from "../components/Cascos";
 import {
@@ -442,6 +444,14 @@ export const PDV: React.FC = () => {
     const semEstoque = faltaNoEstoque(itens, produtos);
     if (semEstoque.length > 0 && !confirm(avisoDeFalta(semEstoque) + "\n\nFechar a venda assim?")) {
       return;
+    }
+    // O que vence antes sai primeiro (lib/lotes.ts). Se a próxima unidade é
+    // de um lote vencido, ou ela está na prateleira ou foi jogada fora sem
+    // ajuste: alguém precisa olhar. Não bloqueia: quem vê a mercadoria é o
+    // balcão, e a conta do sistema pode estar atrasada.
+    if (temRecurso(ramo, "validade")) {
+      const vencidas = vencidasDaVenda(itens, produtos, hojeISO());
+      if (vencidas && !confirm(vencidas + "\n\nConfira a validade na mão do cliente. Fechar a venda assim?")) return;
     }
 
     /*
