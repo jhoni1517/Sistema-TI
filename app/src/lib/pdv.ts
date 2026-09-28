@@ -1,6 +1,7 @@
 import { txt } from "./format";
 import { produtosParaOS, normalizar } from "./busca";
-import { soData, hojeISO, diasAteVencer } from "./contas";
+import { hojeISO, diasAteVencer } from "./contas";
+import { validadeEfetiva, type ComLotes } from "./lotes";
 import { precoEfetivo } from "./promocao";
 import type { ItemVenda, Produto, Venda } from "./types";
 
@@ -271,11 +272,12 @@ export const VALIDADE_META: Record<SituacaoValidade, { label: string; cor: strin
  * não serve para nada. Com uma semana ainda dá para promover e vender.
  */
 export function situacaoValidade(
-  p: Pick<Produto, "validade">,
+  p: ComLotes,
   diasAlerta = 7,
   hoje = hojeISO()
 ): SituacaoValidade {
-  const v = soData(p.validade);
+  // A do lote que sai primeiro (lib/lotes.ts). Sem lotes, é o campo de sempre.
+  const v = validadeEfetiva(p);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return "sem_validade";
   const dias = diasAteVencer(v, hoje);
   if (dias < 0) return "vencido";
@@ -294,5 +296,5 @@ export function produtosVencendo(
       const s = situacaoValidade(p, diasAlerta, hoje);
       return s === "vencido" || s === "vence_perto";
     })
-    .sort((a, b) => soData(a.validade).localeCompare(soData(b.validade)));
+    .sort((a, b) => validadeEfetiva(a).localeCompare(validadeEfetiva(b)));
 }

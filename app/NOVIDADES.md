@@ -12,6 +12,11 @@ A mais nova vai em cima. Rota errada ou data inválida reprova o
 `novidades.test.ts` — novidade que leva para lugar nenhum é pior que
 nenhuma.
 
+## 2026-10-13 · Lote com validade
+Na entrada de mercadoria, a validade de cada lote. O alerta segue o lote que sai primeiro, e o caixa avisa se a venda sai do lote vencido.
+Rota: /estoque
+Recurso: validade
+
 ## 2026-10-12 · Casco retornável
 No PDV, diga quantos cascos o cliente trouxe; o que ficar com ele entra na ficha. Em Clientes, o saldo, o histórico e a devolução.
 Rota: /clientes

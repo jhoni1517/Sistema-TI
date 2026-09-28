@@ -15,6 +15,7 @@ import { ImportarPorFoto } from "../components/ImportarPorFoto";
 import { Modal, Field, EmptyState, SectionTitle, InputNumero } from "../components/ui";
 import { CatalogoPublico } from "../components/CatalogoPublico";
 import { tiposDeCasco } from "../lib/casco";
+import { validadeEfetiva, lotesRestantes } from "../lib/lotes";
 import { temRecurso } from "../lib/ramos";
 import { BotaoCamera } from "../components/Camera";
 import { BotaoAvaliarUsado, FichaDoSeminovo, IconeFicha } from "../components/Seminovos";
@@ -252,7 +253,7 @@ export const Estoque: React.FC = () => {
                   onClick={() => setEditando(p)}
                   className={`badge ${VALIDADE_META[v].cor} hover:opacity-80`}
                 >
-                  {p.nome} · {formatDate(p.validade)}
+                  {p.nome} · {formatDate(validadeEfetiva(p))}
                 </button>
               );
             })}
@@ -383,7 +384,7 @@ export const Estoque: React.FC = () => {
                             {nomeCat(p)}
                             {p.sku ? ` · ${p.sku}` : ""}
                             {p.porPeso ? " · por kg" : ""}
-                            {p.validade ? ` · vence ${formatDate(p.validade)}` : ""}
+                            {validadeEfetiva(p) ? ` · vence ${formatDate(validadeEfetiva(p))}` : ""}
                           </p>
                         </div>
                       </div>
@@ -620,14 +621,35 @@ export const Estoque: React.FC = () => {
             )}
 
             {temRecurso(ramo, "validade") && (
-              <Field label="Validade">
+              <Field label={editando.lotes?.length ? "Validade do estoque sem lote" : "Validade"}>
                 <input
                   type="date"
                   className="input"
                   value={editando.validade || ""}
                   onChange={(e) => setEditando({ ...editando, validade: e.target.value })}
                 />
+                <p className="mt-1 text-xs text-tinta-suave">
+                  Chegou mercadoria com outra validade? Lance pela Entrada de mercadoria, com a validade do lote: o que vence antes sai primeiro.
+                </p>
               </Field>
+            )}
+
+            {temRecurso(ramo, "validade") && !!editando.lotes?.length && (
+              <div className="sm:col-span-2">
+                <p className="label">Lotes na prateleira (o de cima sai primeiro)</p>
+                <ul className="divide-y divide-linha rounded-md border border-linha text-sm">
+                  {lotesRestantes(editando).map((l, i) => (
+                    <li key={i} className="flex justify-between px-3 py-1.5">
+                      <span>
+                        {l.validade ? `vence ${formatDate(l.validade)}` : "sem validade"}
+                        {l.semLote && <span className="text-tinta-suave"> · sem lote</span>}
+                      </span>
+                      <b className="valor">{l.quantidade}</b>
+                    </li>
+                  ))}
+                  {lotesRestantes(editando).length === 0 && <li className="px-3 py-1.5 text-tinta-suave">Sem estoque.</li>}
+                </ul>
+              </div>
             )}
 
             <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-slate-50 p-3 sm:col-span-2">

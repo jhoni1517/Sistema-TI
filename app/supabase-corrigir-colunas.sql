@@ -140,6 +140,7 @@ alter table produtos add column if not exists "precoPromocional" numeric;
 alter table produtos add column if not exists "promocaoInicio" text;
 alter table produtos add column if not exists "promocaoFim" text;
 alter table produtos add column if not exists casco text;
+alter table produtos add column if not exists lotes jsonb;
 
 -- ---------- Clientes ----------
 alter table clientes add column if not exists "tipoPessoa" text default 'fisica';
