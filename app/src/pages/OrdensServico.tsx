@@ -2268,9 +2268,21 @@ export const OSDetalhe: React.FC<{
     obterLoja(),
     os
   );
-  const imprimir = () => {
+  /*
+   * O QR é desenhado ANTES de abrir a impressão, como na etiqueta: a
+   * impressão não espera imagem carregar. Se o QR falhar, o papel sai sem
+   * ele — o cliente com o aparelho na mão não pode ficar sem a OS por isso.
+   */
+  const imprimir = async () => {
+    const qr = trackingUrl
+      ? await QRCode.toDataURL(trackingUrl, { width: 300, margin: 1 }).catch(() => "")
+      : "";
     printHTML(
-      reciboOS(os, cliente, config, { incluirCliente }),
+      reciboOS(os, cliente, config, {
+        incluirCliente,
+        qr,
+        areaSenha: temRecurso(ramo, "senhaAparelho"),
+      }),
       codigoOS(os.numero),
       config.papelImpressao || "a4"
     );
