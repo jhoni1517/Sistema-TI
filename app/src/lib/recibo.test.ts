@@ -177,3 +177,35 @@ describe("o backup vai para o papel que o cliente assina", () => {
     expect(reciboOS(os, cliente, cfg)).not.toContain("Backup dos dados");
   });
 });
+
+describe("senha e QR no papel da OS", () => {
+  const png = "data:image/png;base64,iVBORw0KGgo=";
+  const comSenha = { ...os, senhaAparelho: "1234-SEGREDO" } as OrdemServico;
+
+  it("o QR do rastreio sai no papel", () => {
+    const html = reciboOS(os, cliente, cfg, { qr: png });
+    expect(html).toContain(png);
+    expect(html).toContain("acompanhe o conserto");
+  });
+
+  it("QR que não é imagem não entra no src", () => {
+    // O texto vai direto para o atributo: aceitar qualquer coisa abriria a
+    // porta para um endereço de fora no papel da loja.
+    const html = reciboOS(os, cliente, cfg, { qr: 'x" onerror="alert(1)' });
+    expect(html).not.toContain("onerror");
+    expect(html).not.toContain("acompanhe o conserto");
+  });
+
+  it("o espaço da senha sai em branco, nunca com a senha guardada", () => {
+    // O papel fica na gaveta e na carteira do cliente: imprimir a senha
+    // desfaz a criptografia que protege o campo no banco.
+    const html = reciboOS(comSenha, cliente, cfg, { areaSenha: true });
+    expect(html).toContain("Senha / padrão de desbloqueio");
+    expect(html).not.toContain("1234-SEGREDO");
+    expect((html.match(/<circle /g) || []).length).toBe(9);
+  });
+
+  it("ramo sem senha de aparelho não ganha o espaço", () => {
+    expect(reciboOS(os, cliente, cfg)).not.toContain("Senha / padrão");
+  });
+});

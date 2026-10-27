@@ -9,7 +9,10 @@
 export type Papel = "a4" | "58" | "80";
 
 const MEDIDAS: Record<Papel, { largura: string; margem: string; fonte: string }> = {
-  a4: { largura: "auto", margem: "12mm", fonte: "13px" },
+  // Com 13px a OS saía miúda e ocupando meia folha: o cliente apertava o
+  // olho para ler o termo que estava assinando. As outras medidas do recibo
+  // são em `em`, então crescem junto com esta — e encolhem na bobina.
+  a4: { largura: "auto", margem: "12mm", fonte: "15px" },
   // 58mm de bobina tem ~48mm imprimíveis; 80mm tem ~72mm. Usar a largura
   // cheia joga o fim de cada linha para fora da área de impressão.
   "58": { largura: "48mm", margem: "2mm", fonte: "10px" },
@@ -82,22 +85,22 @@ export function printHTML(inner: string, title = "Impressão", papel: Papel = "a
     .right { text-align: right; }
     .muted { color: #666; }
     .head { text-align: center; border-bottom: 2px solid #111; padding-bottom: 8px; margin-bottom: 10px; }
-    .head h1 { font-size: 20px; }
-    .head p { margin: 2px 0; font-size: 12px; color: #444; }
+    .head h1 { font-size: 1.6em; }
+    .head p { margin: 2px 0; font-size: .92em; color: #444; }
     .row { display: flex; justify-content: space-between; gap: 16px; }
     .box { border: 1px solid #ddd; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; }
-    .label { font-size: 10px; text-transform: uppercase; letter-spacing: .04em; color: #888; }
-    .val { font-size: 13px; margin-bottom: 4px; }
+    .label { font-size: .75em; text-transform: uppercase; letter-spacing: .04em; color: #888; }
+    .val { font-size: 1em; margin-bottom: 4px; }
     table { width: 100%; border-collapse: collapse; margin: 8px 0; }
-    th { text-align: left; font-size: 11px; text-transform: uppercase; color: #888; border-bottom: 1px solid #ccc; padding: 6px 4px; }
+    th { text-align: left; font-size: .8em; text-transform: uppercase; color: #888; border-bottom: 1px solid #ccc; padding: 6px 4px; }
     td { padding: 4px 4px; border-bottom: 1px solid #eee; }
-    .tot { margin-left: auto; width: 260px; }
+    .tot { margin-left: auto; width: 300px; }
     .tot .line { display: flex; justify-content: space-between; padding: 3px 0; }
-    .tot .grand { border-top: 1px solid #111; margin-top: 4px; padding-top: 6px; font-size: 16px; font-weight: bold; }
-    .sign { display: flex; gap: 40px; margin-top: 28px; }
-    .sign div { flex: 1; text-align: center; border-top: 1px solid #111; padding-top: 4px; font-size: 11px; }
-    .foot { margin-top: 20px; text-align: center; font-size: 11px; color: #666; }
-    .badge { display: inline-block; padding: 2px 8px; border: 1px solid #111; border-radius: 999px; font-size: 11px; font-weight: bold; }
+    .tot .grand { border-top: 1px solid #111; margin-top: 4px; padding-top: 6px; font-size: 1.25em; font-weight: bold; }
+    .sign { display: flex; gap: 40px; margin-top: 44px; }
+    .sign div { flex: 1; text-align: center; border-top: 1px solid #111; padding-top: 4px; font-size: .85em; }
+    .foot { margin-top: 20px; text-align: center; font-size: .85em; color: #666; }
+    .badge { display: inline-block; padding: 2px 8px; border: 1px solid #111; border-radius: 999px; font-size: .85em; font-weight: bold; }
   </style></head><body>${inner}</body></html>`);
   doc.close();
 

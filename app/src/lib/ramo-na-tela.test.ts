@@ -50,9 +50,10 @@ describe("a tela da OS não escreve lista de ramo à mão", () => {
 
   it("o bloco de senha só aparece com o recurso ligado", () => {
     expect(tela).toMatch(/temRecurso\(ramo, "senhaAparelho"\)/);
-    // Nos três lugares: o formulário, o detalhe e a OS ditada por voz, que
-    // só preenche a senha quando o ramo tem o campo.
-    expect(tela.match(/temRecurso\(ramo, "senhaAparelho"\)/g)?.length).toBe(3);
+    // Nos quatro lugares: o formulário, o detalhe, o papel impresso (que
+    // ganha o espaço para escrever a senha) e a OS ditada por voz, que só
+    // preenche a senha quando o ramo tem o campo.
+    expect(tela.match(/temRecurso\(ramo, "senhaAparelho"\)/g)?.length).toBe(4);
   });
 
   it("o IMEI só aparece com o recurso ligado", () => {

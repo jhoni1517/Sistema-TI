@@ -47,13 +47,29 @@ const cab = (config: Config) => `
     <p>${[config.telefoneLoja, config.cnpj].filter(Boolean).map(esc).join(" · ")}</p>
   </div>`;
 
+/**
+ * Os nove pontos do padrão de desbloqueio, para o cliente riscar com a
+ * caneta. Desenho em SVG porque sai igual em qualquer impressora.
+ */
+const GRADE_PADRAO = `<svg width="22mm" height="22mm" viewBox="0 0 30 30" style="display:block;margin:0 auto">${[5, 15, 25]
+  .flatMap((y) => [5, 15, 25].map((x) => `<circle cx="${x}" cy="${y}" r="1.8" fill="#111" />`))
+  .join("")}</svg>`;
+
 export function reciboOS(
   os: OrdemServico,
   cliente: { nome?: string; telefone?: string; cpf?: string } | undefined,
   config: Config,
-  opts?: { incluirCliente?: boolean }
+  opts?: {
+    incluirCliente?: boolean;
+    /** QR do rastreio, já desenhado (data:image/png). Vazio = sem QR. */
+    qr?: string;
+    /** O ramo guarda senha de aparelho: sai o espaço para escrever. */
+    areaSenha?: boolean;
+  }
 ): string {
   const incluirCliente = opts?.incluirCliente !== false && !!cliente?.nome;
+  // Só imagem de verdade entra: o texto vai direto para o atributo src.
+  const qr = /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(opts?.qr || "") ? opts!.qr! : "";
   const dias = config.diasAbandono || 90;
   const taxa = config.taxaArmazenamentoDia || 0;
   const guardaInfo = taxaArmazenamento(os, taxa, dias);
@@ -116,6 +132,48 @@ export function reciboOS(
     <div class="val">${esc(os.defeitoRelatado) || "-"}</div>
     ${os.defeitoConstatado ? `<div class="label">Laudo técnico</div><div class="val">${esc(os.defeitoConstatado)}</div>` : ""}
   </div>
+
+  ${
+    /*
+     * A senha sai EM BRANCO, para escrever à mão, e nunca a que está
+     * guardada no sistema. O papel fica na gaveta da loja e na carteira do
+     * cliente: imprimir a senha do celular de alguém ali desfaz a
+     * criptografia que protege o campo no banco.
+     *
+     * O QR é o do rastreio, o mesmo da etiqueta: o cliente acompanha o
+     * conserto pelo papel que levou, sem precisar perguntar no WhatsApp.
+     */
+    opts?.areaSenha || qr
+      ? `<div class="row">
+          ${
+            opts?.areaSenha
+              ? `<div class="box" style="flex:1">
+                  <div class="label">Senha / padrão de desbloqueio</div>
+                  <div class="row" style="align-items:flex-end;margin-top:6px">
+                    <div style="flex:1">
+                      <div style="border-bottom:1px solid #111;height:1.8em"></div>
+                      <div class="muted" style="font-size:.75em;margin-top:2px">Senha / PIN</div>
+                      <div style="border-bottom:1px solid #111;height:1.8em;margin-top:6px"></div>
+                      <div class="muted" style="font-size:.75em;margin-top:2px">Conta vinculada (Google / iCloud)</div>
+                    </div>
+                    <div class="center">${GRADE_PADRAO}
+                      <div class="muted" style="font-size:.75em">Padrão</div>
+                    </div>
+                  </div>
+                </div>`
+              : ""
+          }
+          ${
+            qr
+              ? `<div class="box center" style="width:40mm;flex:none">
+                  <img src="${qr}" alt="" style="width:30mm;height:30mm;display:block;margin:0 auto" />
+                  <div style="font-size:.75em">Aponte a câmera e acompanhe o conserto</div>
+                </div>`
+              : ""
+          }
+        </div>`
+      : ""
+  }
 
   ${
     pecas.length
@@ -187,19 +245,19 @@ export function reciboOS(
     linhaDoRecibo(os)
       ? `<div class="box" style="margin-top:14px">
           <div class="label">Backup dos dados</div>
-          <div style="font-size:11px;color:#333">${esc(linhaDoRecibo(os))}</div>
+          <div style="font-size:.85em;color:#333">${esc(linhaDoRecibo(os))}</div>
         </div>`
       : ""
   }
 
   <div class="box" style="margin-top:14px">
     <div class="label">Garantia</div>
-    <div style="font-size:11px;color:#333">${esc(termoDeGarantia(os))}</div>
+    <div style="font-size:.85em;color:#333">${esc(termoDeGarantia(os))}</div>
   </div>
 
   <div class="box" style="margin-top:14px">
     <div class="label">Termo de guarda e retirada</div>
-    <div style="font-size:11px;color:#333">${termoGuarda}</div>
+    <div style="font-size:.85em;color:#333">${termoGuarda}</div>
   </div>
 
   ${
@@ -207,11 +265,11 @@ export function reciboOS(
     // satisfeito. É o único momento em que pedir avaliação faz sentido.
     os.status === "entregue" && txt(config.linkAvaliacao).trim()
       ? `<div class="box" style="margin-top:14px;text-align:center">
-          <div style="font-size:12px">
+          <div style="font-size:.92em">
             Seu feedback é importante para a ${esc(config.nomeLoja) || "nossa loja"}.
             Poste uma avaliação no nosso perfil.
           </div>
-          <div style="font-size:11px;word-break:break-all;margin-top:4px">${esc(
+          <div style="font-size:.85em;word-break:break-all;margin-top:4px">${esc(
             txt(config.linkAvaliacao).trim()
           )}</div>
         </div>`
@@ -273,7 +331,7 @@ export function reciboVenda(
     <div class="line grand"><span>Total</span><span>${brl(valor)}</span></div>
   </div>
 
-  <p style="margin-top:14px;font-size:12px">
+  <p style="margin-top:14px;font-size:.92em">
     Recebemos de ${cliente?.nome ? `<b>${esc(cliente.nome)}</b>` : "_____________________________"}
     a importância de <b>${brl(valor)}</b> referente ao descrito acima.
   </p>
@@ -373,7 +431,7 @@ export function reciboPDV(
     }
   </div>
 
-  <p class="center muted" style="margin-top:14px;font-size:11px">
+  <p class="center muted" style="margin-top:14px;font-size:.85em">
     Documento sem valor fiscal. Guarde para troca ou devolucao.
   </p>`;
 }
@@ -539,7 +597,7 @@ export function reciboMovimento(mov: MovimentoCaixa, config: Config): string {
     <div class="line grand"><span>Valor</span><span>${brl(Number(mov.valor) || 0)}</span></div>
   </div>
 
-  <p style="margin-top:14px;font-size:12px">
+  <p style="margin-top:14px;font-size:.92em">
     ${
       saida
         ? `Retirado do caixa a importância de <b>${brl(Number(mov.valor) || 0)}</b> referente ao descrito acima.`
